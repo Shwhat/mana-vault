@@ -5,7 +5,10 @@ import { fileURLToPath } from "node:url";
 import { initializeDatabase, openDatabase, type CardRow } from "./database.js";
 import { importCollectionCsv } from "./collection-import.js";
 
-export async function buildApp(database = openDatabase()): Promise<FastifyInstance> {
+export async function buildApp(
+  database = openDatabase(),
+  webRoot = process.env.WEB_DIST_PATH ?? fileURLToPath(new URL("../../web/dist", import.meta.url)),
+): Promise<FastifyInstance> {
   initializeDatabase(database);
   const app = Fastify({ logger: process.env.NODE_ENV !== "test" });
 
@@ -15,7 +18,6 @@ export async function buildApp(database = openDatabase()): Promise<FastifyInstan
     (_request, body, done) => done(null, body),
   );
 
-  const webRoot = process.env.WEB_DIST_PATH ?? fileURLToPath(new URL("../../web/dist", import.meta.url));
   await app.register(fastifyStatic, {
     root: webRoot,
     prefix: "/",

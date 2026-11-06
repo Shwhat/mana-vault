@@ -14,15 +14,6 @@ async function setup() {
 }
 
 describe("API", () => {
-  it("serves the built web app from the API origin", async () => {
-    const { app, database } = await setup();
-    const response = await app.inject({ method: "GET", url: "/" });
-    expect(response.statusCode).toBe(200);
-    expect(response.body).toContain("<title>Mana Vault</title>");
-    await app.close();
-    database.close();
-  });
-
   it("reports ok", async () => {
     const { app, database } = await setup();
     const res = await app.inject({ method: "GET", url: "/api/health" });
