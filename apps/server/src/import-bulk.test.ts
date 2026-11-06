@@ -138,6 +138,62 @@ describe("Scryfall bulk importer", () => {
     }
   });
 
+  it("imports cards without a top-level type line using face data or an empty type line", async () => {
+    const dataPath = await writeBulkText([
+      JSON.stringify({
+        id: "printing-face",
+        oracle_id: "oracle-face",
+        name: "Front // Back",
+        type_line: null,
+        card_faces: [{ type_line: "Creature — Human" }, { type_line: "Creature — Werewolf" }],
+        set: "tst",
+        set_name: "Test Set",
+        collector_number: "1",
+        rarity: "rare",
+      }),
+      JSON.stringify({
+        id: "printing-no-type",
+        oracle_id: "oracle-no-type",
+        name: "Unknown Type Card",
+        set: "tst",
+        set_name: "Test Set",
+        collector_number: "2",
+        rarity: "common",
+      }),
+    ].join("\n"));
+    const database = new DatabaseSync(":memory:");
+    initializeDatabase(database);
+    try {
+      expect(await importBulkFile(dataPath, database)).toBe(2);
+      expect(database.prepare("SELECT type_line FROM cards WHERE id = 'printing-face'").get()?.type_line)
+        .toBe("Creature — Human // Creature — Werewolf");
+      expect(database.prepare("SELECT type_line FROM cards WHERE id = 'printing-no-type'").get()?.type_line).toBe("");
+    } finally {
+      database.close();
+    }
+  });
+
+  it("still rejects a malformed non-string top-level type line", async () => {
+    const dataPath = await writeBulkText(JSON.stringify({
+      id: "printing-invalid",
+      oracle_id: "oracle-invalid",
+      name: "Invalid Type Card",
+      type_line: 42,
+      set: "tst",
+      set_name: "Test Set",
+      collector_number: "3",
+      rarity: "common",
+    }));
+    const database = new DatabaseSync(":memory:");
+    initializeDatabase(database);
+    try {
+      await expect(importBulkFile(dataPath, database)).rejects.toThrow("invalid type_line");
+      expect(database.prepare("SELECT COUNT(*) AS count FROM cards").get()?.count).toBe(0);
+    } finally {
+      database.close();
+    }
+  });
+
   it("rolls back JSONL imports when a line is malformed", async () => {
     const dataPath = await writeBulkText([
       JSON.stringify({

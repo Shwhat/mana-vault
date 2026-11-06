@@ -34,7 +34,7 @@ From the repository root, run:
 npm.cmd run import:cards --workspace=@mana-vault/server
 ```
 
-This reads the current `default_cards` URL from Scryfall's bulk-data metadata, downloads the compressed JSONL feed, decompresses it as a stream, and imports one record at a time into SQLite. The prior uncompressed JSON-array feed is still accepted for compatibility. Download progress and periodic import counts are printed to the console. To refresh the catalog later, run:
+This reads the current `default_cards` URL from Scryfall's bulk-data metadata, downloads the compressed JSONL feed, decompresses it as a stream, and imports one record at a time into SQLite. Cards without a top-level type line use the available card-face type lines, or an empty type line if Scryfall omits both. The prior uncompressed JSON-array feed is still accepted for compatibility. Download progress and periodic import counts are printed to the console. To refresh the catalog later, run:
 
 ```powershell
 npm.cmd run update:cards

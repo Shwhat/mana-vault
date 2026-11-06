@@ -122,10 +122,14 @@ interface Printing {
 
 function parsePrinting(value: unknown): Printing {
   const record = toRecord(value, "card");
-  const cardFace = Array.isArray(record.card_faces) ? record.card_faces[0] : undefined;
-  const cardFaceRecord = cardFace === undefined ? undefined : toRecord(cardFace, "card face");
+  const cardFaces = parseCardFaces(record.card_faces);
+  const cardFaceRecord = cardFaces[0];
   const faceImageUris = cardFaceRecord?.image_uris === undefined ? undefined : toRecord(cardFaceRecord.image_uris, "card face image");
   const imageUris = record.image_uris === undefined ? undefined : toRecord(record.image_uris, "card image");
+  const topLevelTypeLine = optionalString(record, "type_line");
+  const faceTypeLines = cardFaces
+    .map((face) => optionalString(face, "type_line"))
+    .filter((typeLine): typeLine is string => typeLine !== null);
   const colors = record.colors ?? [];
   const parsedColors = parseColors(colors, "colors");
   const colorIdentity = parseColors(record.color_identity ?? [], "color identity");
@@ -147,7 +151,7 @@ function parsePrinting(value: unknown): Printing {
     name: requiredString(record, "name"),
     manaCost: optionalString(record, "mana_cost"),
     manaValue: typeof manaValue === "number" ? manaValue : null,
-    typeLine: requiredString(record, "type_line"),
+    typeLine: topLevelTypeLine ?? faceTypeLines.join(" // "),
     oracleText: optionalString(record, "oracle_text"),
     colors: parsedColors,
     colorIdentity,
@@ -160,6 +164,12 @@ function parsePrinting(value: unknown): Printing {
     releasedAt: optionalString(record, "released_at"),
     artist: optionalString(record, "artist"),
   };
+}
+
+function parseCardFaces(value: unknown): Array<Record<string, unknown>> {
+  if (value === undefined) return [];
+  if (!Array.isArray(value)) throw new Error("Scryfall card has invalid card faces");
+  return value.map((face) => toRecord(face, "card face"));
 }
 
 function parseColors(value: unknown, label: string): string[] {
