@@ -39,6 +39,7 @@ button { cursor: pointer; }
 .side-link small { margin-left: auto; color: #9aa4b1; font: 8px "DM Mono", monospace; }
 .side-divider { height: 1px; margin: 22px 10px; background: var(--line); }
 .side-note { margin: 0 10px; color: var(--muted); font-size: 11px; line-height: 1.65; }
+.catalog-hint { margin-top: 8px; }
 .content { min-width: 0; max-width: 1000px; width: 100%; padding: 34px 42px 18px; margin: 0 auto; }
 .page-heading { display: flex; align-items: end; justify-content: space-between; margin-bottom: 22px; }
 h1 { margin: 7px 0 4px; font-size: 22px; font-weight: 600; letter-spacing: -.6px; }
@@ -55,6 +56,8 @@ kbd { padding: 2px 6px; border: 1px solid var(--line); border-radius: 3px; color
 .filters label { display: flex; align-items: center; gap: 8px; color: #8994a2; font-size: 10px; }
 .filters input, .filters select { width: 130px; height: 29px; padding: 0 8px; border: 1px solid var(--line); border-radius: 4px; outline: 0; color: #536171; background: var(--surface); font-size: 10px; }
 .filters select { width: 110px; }
+.filters .number-filter { width: 62px; }
+.scan-button { align-self: center; }
 .card-list { margin-top: 13px; background: var(--surface); border: 1px solid var(--line); border-radius: 7px; overflow: hidden; }
 .card-row { min-height: 82px; display: flex; align-items: center; gap: 14px; padding: 10px 13px; border-bottom: 1px solid var(--line); }
 .card-row:last-child { border-bottom: 0; }
@@ -124,6 +127,17 @@ kbd { padding: 2px 6px; border: 1px solid var(--line); border-radius: 3px; color
 .deck-card-row > div { flex: 1; min-width: 0; }
 .deck-card-row strong { display: block; overflow: hidden; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
 .deck-card-row small { display: block; margin-top: 3px; overflow: hidden; color: var(--muted); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.scanner-backdrop { position: fixed; z-index: 20; inset: 0; display: grid; place-items: center; padding: 18px; background: rgb(15 24 34 / 65%); }
+.scanner-panel { width: min(100%, 560px); max-height: 94vh; overflow: auto; padding: 18px; border: 1px solid var(--line); border-radius: 8px; color: var(--text); background: var(--surface); box-shadow: 0 12px 40px rgb(0 0 0 / 22%); }
+.scanner-heading { display: flex; align-items: start; justify-content: space-between; gap: 12px; }
+.scanner-heading h2 { margin: 5px 0 0; font-size: 17px; }
+.scanner-panel > p { color: var(--muted); font-size: 11px; line-height: 1.5; }
+.camera-frame { position: relative; display: grid; place-items: center; min-height: 200px; overflow: hidden; border-radius: 6px; background: #10151b; }
+.camera-frame video { width: 100%; max-height: 60vh; object-fit: contain; }
+.camera-guide { position: absolute; width: min(50%, 220px); height: 72%; border: 2px solid rgb(255 255 255 / 75%); border-radius: 12px; box-shadow: 0 0 0 999px rgb(0 0 0 / 12%); pointer-events: none; }
+.scanner-message { min-height: 17px; color: var(--accent) !important; }
+.scanner-panel .primary-button { margin-top: 0; }
+.scanner-note { margin-bottom: 0; font-size: 9px !important; }
 .deck-quantity { width: 25px; color: #718094; font: 10px "DM Mono", monospace; }
 .zone-tag { color: #8390a0; font: 8px "DM Mono", monospace; text-transform: uppercase; }
 .empty-state.compact { padding: 38px 12px; }
@@ -140,6 +154,7 @@ footer span { padding: 0 4px; }
 .dark .deck-context { border-color: #344b6b; color: #a2b7d4; background: #1b293b; }
 .dark .deck-context strong { color: #acd0ff; }
 .dark .remove-button:hover { border-color: #684040; background: #352323; }
+.dark .scanner-panel { background: var(--surface); }
 button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible { outline: 2px solid #6c9fe8; outline-offset: 2px; }
 .search-box:focus-within { border-color: #9ab9e5; }
 @media (max-width: 720px) {
@@ -155,7 +170,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible
   .filters input, .filters select { flex: 1; width: 0; }
   .card-row { gap: 10px; padding: 9px; }
   .theme-toggle { padding: 6px 7px; font-size: 10px; }
-  .collection-actions { flex-direction: column; }
+  .collection-actions { flex-wrap: wrap; justify-content: end; }
   .deck-layout { grid-template-columns: 1fr; }
   .deck-detail { min-height: 180px; }
   .row-actions { flex-direction: column; }

@@ -4,6 +4,9 @@ import fastifyStatic from "@fastify/static";
 import { fileURLToPath } from "node:url";
 import { initializeDatabase, openDatabase, type CardRow } from "./database.js";
 import { importCollectionCsv } from "./collection-import.js";
+import { importDecklist } from "./deck-import.js";
+import { createBackup, restoreBackup } from "./backup.js";
+import { parseCardQuery } from "./card-search.js";
 
 export async function buildApp(
   database = openDatabase(),
@@ -17,6 +20,16 @@ export async function buildApp(
     { parseAs: "string", bodyLimit: 5 * 1024 * 1024 },
     (_request, body, done) => done(null, body),
   );
+  app.addContentTypeParser(
+    "text/plain",
+    { parseAs: "string", bodyLimit: 5 * 1024 * 1024 },
+    (_request, body, done) => done(null, body),
+  );
+  app.addContentTypeParser(
+    "application/vnd.mana-vault.backup+json",
+    { parseAs: "string", bodyLimit: 25 * 1024 * 1024 },
+    (_request, body, done) => done(null, body),
+  );
 
   await app.register(fastifyStatic, {
     root: webRoot,
@@ -25,12 +38,47 @@ export async function buildApp(
     wildcard: false,
   });
 
+  app.post<{ Params: { deckId: string }; Body: string }>("/api/decks/:deckId/import", async (request, reply) => {
+    if (typeof request.body !== "string" || !request.body.trim()) {
+      return reply.code(400).send({ error: "Upload a non-empty decklist file" });
+    }
+    const deck = database.prepare("SELECT id, mode FROM decks WHERE id = ?").get(request.params.deckId);
+    if (!deck) return reply.code(404).send({ error: "Deck not found" });
+    try {
+      return importDecklist(database, request.params.deckId, deck.mode as "normal" | "theme", request.body);
+    } catch (error) {
+      return reply.code(400).send({ error: error instanceof Error ? error.message : "Could not import decklist" });
+    }
+  });
+
   app.get("/api/health", async () => ({ status: "ok" }));
 
-  app.get<{ Querystring: { q?: string; color?: string; type?: string; set?: string; limit?: string } }>(
+  app.get("/api/catalog/status", async () => ({
+    printingCount: database.prepare("SELECT COUNT(*) AS count FROM cards").get()?.count ?? 0,
+    updatedAt: database.prepare("SELECT value FROM catalog_metadata WHERE key = 'updated_at'").get()?.value ?? null,
+  }));
+
+  app.get("/api/backup", async (_request, reply) => {
+    reply.header("content-disposition", 'attachment; filename="mana-vault-backup.json"');
+    return createBackup(database);
+  });
+
+  app.post<{ Body: string }>("/api/backup/restore", async (request, reply) => {
+    if (typeof request.body !== "string" || !request.body.trim()) {
+      return reply.code(400).send({ error: "Choose a Mana Vault backup file" });
+    }
+    try {
+      restoreBackup(database, request.body);
+      return { status: "restored" };
+    } catch (error) {
+      return reply.code(400).send({ error: error instanceof Error ? error.message : "Could not restore backup" });
+    }
+  });
+
+  app.get<{ Querystring: { q?: string; color?: string; type?: string; set?: string; rarity?: string; format?: string; mvMin?: string; mvMax?: string; limit?: string } }>(
     "/api/cards",
     async (request, reply) => {
-      const { q = "", color, type, set, limit = "40" } = request.query;
+      const { q = "", color, type, set, rarity, format, mvMin, mvMax, limit = "40" } = request.query;
       const parsedLimit = Number(limit);
       if (
         typeof q !== "string" ||
@@ -38,6 +86,10 @@ export async function buildApp(
         (color !== undefined && typeof color !== "string") ||
         (type !== undefined && typeof type !== "string") ||
         (set !== undefined && typeof set !== "string") ||
+        (rarity !== undefined && typeof rarity !== "string") ||
+        (format !== undefined && typeof format !== "string") ||
+        (mvMin !== undefined && typeof mvMin !== "string") ||
+        (mvMax !== undefined && typeof mvMax !== "string") ||
         typeof limit !== "string" ||
         !Number.isInteger(parsedLimit) ||
         parsedLimit < 1 ||
@@ -51,10 +103,13 @@ export async function buildApp(
 
       const conditions: string[] = [];
       const values: (string | number)[] = [];
-      if (q.trim()) {
-        const pattern = `%${q.trim().replace(/[\\%_]/g, "\\$&")}%`;
-        conditions.push("(name LIKE ? ESCAPE '\\' OR type_line LIKE ? ESCAPE '\\' OR oracle_text LIKE ? ESCAPE '\\')");
-        values.push(pattern, pattern, pattern);
+      try {
+        for (const clause of parseCardQuery(q)) {
+          conditions.push(clause.sql);
+          values.push(...clause.values);
+        }
+      } catch (error) {
+        return reply.code(400).send({ error: error instanceof Error ? error.message : "Invalid card search" });
       }
       if (color) {
         conditions.push("instr(colors, ?) > 0");
@@ -68,10 +123,36 @@ export async function buildApp(
         conditions.push("set_code = ?");
         values.push(set.trim().toLowerCase());
       }
+      if (rarity?.trim()) {
+        if (!["common", "uncommon", "rare", "mythic", "special", "bonus"].includes(rarity.trim().toLowerCase())) {
+          return reply.code(400).send({ error: "Choose a valid rarity" });
+        }
+        conditions.push("rarity = ?");
+        values.push(rarity.trim().toLowerCase());
+      }
+      if (format?.trim()) {
+        if (!/^[a-z0-9-]{2,30}$/i.test(format.trim())) return reply.code(400).send({ error: "Invalid format filter" });
+        conditions.push("json_extract(legalities, ?) = 'legal'");
+        values.push(`$.${format.trim().toLowerCase()}`);
+      }
+      for (const [parameter, operator] of [[mvMin, ">="], [mvMax, "<="]] as const) {
+        if (parameter !== undefined && parameter.trim()) {
+          const manaValue = Number(parameter);
+          if (!Number.isFinite(manaValue) || manaValue < 0 || manaValue > 100) {
+            return reply.code(400).send({ error: "Mana value filters must be from 0 to 100" });
+          }
+          conditions.push(`mana_value ${operator} ?`);
+          values.push(manaValue);
+        }
+      }
+      if (mvMin && mvMax && Number(mvMin) > Number(mvMax)) {
+        return reply.code(400).send({ error: "Minimum mana value cannot exceed maximum" });
+      }
 
       const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
       const rows = database.prepare(
-        `SELECT id, oracle_id, name, mana_cost, type_line, oracle_text, colors, set_code, set_name, collector_number, rarity, image_url, released_at
+        `SELECT id, oracle_id, name, mana_cost, mana_value, type_line, oracle_text, colors, color_identity, legalities,
+                set_code, set_name, collector_number, rarity, image_url, released_at, artist
          FROM cards ${where} ORDER BY name, released_at DESC LIMIT ?`,
       ).all(...values, parsedLimit);
       return rows.map(toCardRow);
@@ -187,7 +268,7 @@ export async function buildApp(
     ).get(request.params.deckId);
     if (!deck) return reply.code(404).send({ error: "Deck not found" });
     const cards = database.prepare(
-      `SELECT dc.oracle_id, dc.printing_id, dc.quantity, dc.zone, c.name, c.mana_cost,
+      `SELECT dc.id AS entry_id, dc.oracle_id, dc.printing_id, dc.quantity, dc.zone, c.name, c.mana_cost,
               c.type_line, c.set_code, c.set_name, c.collector_number, c.image_url
        FROM deck_cards dc JOIN cards c ON c.id = COALESCE(
          dc.printing_id,
@@ -211,18 +292,26 @@ export async function buildApp(
       if (!card) return reply.code(404).send({ error: "Card printing not found" });
       if (typeof card.oracle_id !== "string") throw new Error("Card printing has no valid oracle ID");
       const selectedPrinting = deck.mode === "theme" ? cardId : null;
-      database.prepare(
-        `INSERT INTO deck_cards (deck_id, oracle_id, printing_id, quantity, zone)
-         VALUES (?, ?, ?, ?, ?)
-         ON CONFLICT(deck_id, oracle_id, zone) DO UPDATE SET
-           printing_id = excluded.printing_id, quantity = quantity + excluded.quantity`,
-      ).run(request.params.deckId, card.oracle_id, selectedPrinting, quantity, zone);
+      const insert = selectedPrinting
+        ? database.prepare(
+          `INSERT INTO deck_cards (deck_id, oracle_id, printing_id, quantity, zone)
+           VALUES (?, ?, ?, ?, ?)
+           ON CONFLICT(deck_id, oracle_id, printing_id, zone) WHERE printing_id IS NOT NULL
+           DO UPDATE SET quantity = quantity + excluded.quantity`,
+        )
+        : database.prepare(
+          `INSERT INTO deck_cards (deck_id, oracle_id, printing_id, quantity, zone)
+           VALUES (?, ?, ?, ?, ?)
+           ON CONFLICT(deck_id, oracle_id, zone) WHERE printing_id IS NULL
+           DO UPDATE SET quantity = quantity + excluded.quantity`,
+        );
+      insert.run(request.params.deckId, card.oracle_id, selectedPrinting, quantity, zone);
       database.prepare("UPDATE decks SET updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(request.params.deckId);
       return reply.code(201).send({ status: "added" });
     },
   );
 
-  app.patch<{ Params: { deckId: string; oracleId: string }; Querystring: { zone?: string }; Body: { quantity?: number; zone?: string } }>(
+  app.patch<{ Params: { deckId: string; oracleId: string }; Querystring: { zone?: string; entryId?: string }; Body: { quantity?: number; zone?: string } }>(
     "/api/decks/:deckId/cards/:oracleId",
     async (request, reply) => {
       const currentZone = request.query.zone ?? "main";
@@ -238,28 +327,36 @@ export async function buildApp(
       ) {
         return reply.code(400).send({ error: "Provide a quantity from 0 to 100 and valid deck zones" });
       }
-      const existing = database.prepare(
-        `SELECT printing_id FROM deck_cards WHERE deck_id = ? AND oracle_id = ? AND zone = ?`,
-      ).get(request.params.deckId, request.params.oracleId, currentZone);
+      const existing = request.query.entryId
+        ? database.prepare(
+          "SELECT id, oracle_id, printing_id FROM deck_cards WHERE deck_id = ? AND id = ?",
+        ).get(request.params.deckId, Number(request.query.entryId))
+        : database.prepare(
+          "SELECT id, oracle_id, printing_id FROM deck_cards WHERE deck_id = ? AND oracle_id = ? AND zone = ? LIMIT 1",
+        ).get(request.params.deckId, request.params.oracleId, currentZone);
       if (!existing) return reply.code(404).send({ error: "Deck card not found" });
+      if (typeof existing.id !== "number" || typeof existing.oracle_id !== "string" ||
+        (existing.printing_id !== null && typeof existing.printing_id !== "string")) {
+        throw new Error("Deck card has invalid stored values");
+      }
       if (quantity === 0) {
-        database.prepare("DELETE FROM deck_cards WHERE deck_id = ? AND oracle_id = ? AND zone = ?")
-          .run(request.params.deckId, request.params.oracleId, currentZone);
+        database.prepare("DELETE FROM deck_cards WHERE id = ?").run(existing.id);
       } else if (currentZone === nextZone) {
-        database.prepare("UPDATE deck_cards SET quantity = ? WHERE deck_id = ? AND oracle_id = ? AND zone = ?")
-          .run(quantity, request.params.deckId, request.params.oracleId, currentZone);
+        database.prepare("UPDATE deck_cards SET quantity = ? WHERE id = ?").run(quantity, existing.id);
       } else {
         database.exec("BEGIN");
         try {
-          database.prepare(
-            `INSERT INTO deck_cards (deck_id, oracle_id, printing_id, quantity, zone)
-             SELECT deck_id, oracle_id, printing_id, ?, ? FROM deck_cards
-             WHERE deck_id = ? AND oracle_id = ? AND zone = ?
-             ON CONFLICT(deck_id, oracle_id, zone) DO UPDATE SET
-               printing_id = excluded.printing_id, quantity = quantity + excluded.quantity`,
-          ).run(quantity, nextZone, request.params.deckId, request.params.oracleId, currentZone);
-          database.prepare("DELETE FROM deck_cards WHERE deck_id = ? AND oracle_id = ? AND zone = ?")
-            .run(request.params.deckId, request.params.oracleId, currentZone);
+          const target = database.prepare(
+            `SELECT id FROM deck_cards
+             WHERE deck_id = ? AND oracle_id = ? AND zone = ? AND printing_id IS ?`,
+          ).get(request.params.deckId, existing.oracle_id, nextZone, existing.printing_id);
+          if (target && typeof target.id === "number") {
+            database.prepare("UPDATE deck_cards SET quantity = quantity + ? WHERE id = ?").run(quantity, target.id);
+            database.prepare("DELETE FROM deck_cards WHERE id = ?").run(existing.id);
+          } else {
+            database.prepare("UPDATE deck_cards SET quantity = ?, zone = ? WHERE id = ?")
+              .run(quantity, nextZone, existing.id);
+          }
           database.exec("COMMIT");
         } catch (error) {
           database.exec("ROLLBACK");
@@ -271,16 +368,21 @@ export async function buildApp(
     },
   );
 
-  app.delete<{ Params: { deckId: string; oracleId: string }; Querystring: { zone?: string } }>(
+  app.delete<{ Params: { deckId: string; oracleId: string }; Querystring: { zone?: string; entryId?: string } }>(
     "/api/decks/:deckId/cards/:oracleId",
     async (request, reply) => {
       const zone = request.query.zone ?? "main";
       if (!["main", "sideboard", "commander"].includes(zone)) {
         return reply.code(400).send({ error: "Invalid deck zone" });
       }
-      const result = database.prepare(
-        "DELETE FROM deck_cards WHERE deck_id = ? AND oracle_id = ? AND zone = ?",
-      ).run(request.params.deckId, request.params.oracleId, zone);
+      const entry = request.query.entryId
+        ? database.prepare("SELECT id FROM deck_cards WHERE deck_id = ? AND id = ?")
+          .get(request.params.deckId, Number(request.query.entryId))
+        : database.prepare("SELECT id FROM deck_cards WHERE deck_id = ? AND oracle_id = ? AND zone = ? LIMIT 1")
+          .get(request.params.deckId, request.params.oracleId, zone);
+      const result = entry && typeof entry.id === "number"
+        ? database.prepare("DELETE FROM deck_cards WHERE id = ?").run(entry.id)
+        : { changes: 0 };
       if (!result.changes) return reply.code(404).send({ error: "Deck card not found" });
       database.prepare("UPDATE decks SET updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(request.params.deckId);
       return { status: "removed" };
@@ -306,14 +408,18 @@ function toCardRow(row: Record<string, unknown>): CardRow {
     oracle_id: required("oracle_id"),
     name: required("name"),
     mana_cost: optional("mana_cost"),
+    mana_value: typeof row.mana_value === "number" ? row.mana_value : null,
     type_line: required("type_line"),
     oracle_text: optional("oracle_text"),
     colors: required("colors"),
+    color_identity: required("color_identity"),
+    legalities: required("legalities"),
     set_code: required("set_code"),
     set_name: required("set_name"),
     collector_number: required("collector_number"),
     rarity: required("rarity"),
     image_url: optional("image_url"),
     released_at: optional("released_at"),
+    artist: optional("artist"),
   };
 }

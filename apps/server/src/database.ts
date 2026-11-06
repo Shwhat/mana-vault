@@ -7,15 +7,19 @@ export interface CardRow {
   oracle_id: string;
   name: string;
   mana_cost: string | null;
+  mana_value: number | null;
   type_line: string;
   oracle_text: string | null;
   colors: string;
+  color_identity: string;
+  legalities: string;
   set_code: string;
   set_name: string;
   collector_number: string;
   rarity: string;
   image_url: string | null;
   released_at: string | null;
+  artist: string | null;
 }
 
 export function openDatabase(path = process.env.DATABASE_PATH ?? "data/mana-vault.sqlite"): DatabaseSync {
@@ -33,15 +37,19 @@ export function initializeDatabase(database: DatabaseSync): void {
       oracle_id TEXT NOT NULL,
       name TEXT NOT NULL,
       mana_cost TEXT,
+      mana_value REAL,
       type_line TEXT NOT NULL,
       oracle_text TEXT,
       colors TEXT NOT NULL DEFAULT '',
+      color_identity TEXT NOT NULL DEFAULT '',
+      legalities TEXT NOT NULL DEFAULT '{}',
       set_code TEXT NOT NULL,
       set_name TEXT NOT NULL,
       collector_number TEXT NOT NULL,
       rarity TEXT NOT NULL,
       image_url TEXT,
-      released_at TEXT
+      released_at TEXT,
+      artist TEXT
     );
     CREATE INDEX IF NOT EXISTS cards_name_idx ON cards(name);
     CREATE INDEX IF NOT EXISTS cards_set_code_idx ON cards(set_code);
@@ -60,12 +68,50 @@ export function initializeDatabase(database: DatabaseSync): void {
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
     CREATE TABLE IF NOT EXISTS deck_cards (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
       deck_id TEXT NOT NULL REFERENCES decks(id) ON DELETE CASCADE,
       oracle_id TEXT NOT NULL,
       printing_id TEXT REFERENCES cards(id),
       quantity INTEGER NOT NULL CHECK(quantity > 0),
-      zone TEXT NOT NULL CHECK(zone IN ('main', 'sideboard', 'commander')),
-      PRIMARY KEY (deck_id, oracle_id, zone)
+      zone TEXT NOT NULL CHECK(zone IN ('main', 'sideboard', 'commander'))
+    );
+  `);
+  const columns = new Set(
+    (database.prepare("PRAGMA table_info(cards)").all() as Array<{ name: string }>).map((column) => column.name),
+  );
+  if (!columns.has("mana_value")) database.exec("ALTER TABLE cards ADD COLUMN mana_value REAL");
+  if (!columns.has("color_identity")) database.exec("ALTER TABLE cards ADD COLUMN color_identity TEXT NOT NULL DEFAULT ''");
+  if (!columns.has("legalities")) database.exec("ALTER TABLE cards ADD COLUMN legalities TEXT NOT NULL DEFAULT '{}'");
+  if (!columns.has("artist")) database.exec("ALTER TABLE cards ADD COLUMN artist TEXT");
+  const deckCardColumns = new Set(
+    (database.prepare("PRAGMA table_info(deck_cards)").all() as Array<{ name: string }>).map((column) => column.name),
+  );
+  if (!deckCardColumns.has("id")) {
+    database.exec(`
+      CREATE TABLE deck_cards_v2 (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        deck_id TEXT NOT NULL REFERENCES decks(id) ON DELETE CASCADE,
+        oracle_id TEXT NOT NULL,
+        printing_id TEXT REFERENCES cards(id),
+        quantity INTEGER NOT NULL CHECK(quantity > 0),
+        zone TEXT NOT NULL CHECK(zone IN ('main', 'sideboard', 'commander'))
+      );
+      INSERT INTO deck_cards_v2 (deck_id, oracle_id, printing_id, quantity, zone)
+        SELECT deck_id, oracle_id, printing_id, quantity, zone FROM deck_cards;
+      DROP TABLE deck_cards;
+      ALTER TABLE deck_cards_v2 RENAME TO deck_cards;
+    `);
+  }
+  database.exec(`
+    CREATE UNIQUE INDEX IF NOT EXISTS deck_cards_normal_unique
+      ON deck_cards(deck_id, oracle_id, zone) WHERE printing_id IS NULL;
+    CREATE UNIQUE INDEX IF NOT EXISTS deck_cards_theme_unique
+      ON deck_cards(deck_id, oracle_id, printing_id, zone) WHERE printing_id IS NOT NULL;
+  `);
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS catalog_metadata (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
     );
   `);
 }
@@ -73,21 +119,25 @@ export function initializeDatabase(database: DatabaseSync): void {
 export function cardInsertStatement(database: DatabaseSync) {
   return database.prepare(`
     INSERT INTO cards (
-      id, oracle_id, name, mana_cost, type_line, oracle_text, colors,
-      set_code, set_name, collector_number, rarity, image_url, released_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      id, oracle_id, name, mana_cost, mana_value, type_line, oracle_text, colors,
+      color_identity, legalities, set_code, set_name, collector_number, rarity, image_url, released_at, artist
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(id) DO UPDATE SET
       oracle_id = excluded.oracle_id,
       name = excluded.name,
       mana_cost = excluded.mana_cost,
+      mana_value = excluded.mana_value,
       type_line = excluded.type_line,
       oracle_text = excluded.oracle_text,
       colors = excluded.colors,
+      color_identity = excluded.color_identity,
+      legalities = excluded.legalities,
       set_code = excluded.set_code,
       set_name = excluded.set_name,
       collector_number = excluded.collector_number,
       rarity = excluded.rarity,
       image_url = excluded.image_url,
-      released_at = excluded.released_at
+      released_at = excluded.released_at,
+      artist = excluded.artist
   `);
 }

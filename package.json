@@ -11,6 +11,7 @@
   "scripts": {
     "dev:server": "npm run dev -w @mana-vault/server",
     "dev:web": "npm run dev -w @mana-vault/web",
+    "update:cards": "npm run import:cards -w @mana-vault/server",
     "build": "npm run build --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present"

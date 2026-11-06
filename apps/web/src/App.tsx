@@ -1,15 +1,18 @@
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
+import CardScanner from "./CardScanner";
 
 type Card = {
   id: string;
   name: string;
   mana_cost: string | null;
+  mana_value: number | null;
   type_line: string;
   oracle_text: string | null;
   set_code: string;
   set_name: string;
   collector_number: string;
   rarity: string;
+  colors: string;
   image_url: string | null;
 };
 
@@ -27,6 +30,7 @@ type Deck = {
 };
 
 type DeckCard = Pick<Card, "name" | "mana_cost" | "type_line" | "set_code" | "set_name" | "collector_number" | "image_url"> & {
+  entry_id: number;
   oracle_id: string;
   printing_id: string | null;
   quantity: number;
@@ -39,6 +43,7 @@ type CollectionImportReport = {
   importedQuantity: number;
   unmatched: Array<{ row: number; name: string; reason: string }>;
 };
+type CatalogStatus = { printingCount: number; updatedAt: string | null };
 type Page = "cards" | "collection" | "decks";
 
 function isDeckZone(value: string): value is DeckCard["zone"] {
@@ -51,7 +56,11 @@ function csvCell(value: string | number | boolean | null): string {
 }
 
 function downloadFile(filename: string, content: string, type: string) {
-  const url = URL.createObjectURL(new Blob([content], { type }));
+  downloadBlob(filename, new Blob([content], { type }));
+}
+
+function downloadBlob(filename: string, blob: Blob) {
+  const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
   link.download = filename;
@@ -79,6 +88,10 @@ export default function App() {
   const [type, setType] = useState("");
   const [setCode, setSetCode] = useState("");
   const [color, setColor] = useState("");
+  const [rarity, setRarity] = useState("");
+  const [formatFilter, setFormatFilter] = useState("");
+  const [mvMin, setMvMin] = useState("");
+  const [mvMax, setMvMax] = useState("");
   const [foil, setFoil] = useState(false);
   const [cards, setCards] = useState<Card[]>([]);
   const [collection, setCollection] = useState<CollectionEntry[]>([]);
@@ -92,9 +105,14 @@ export default function App() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [importReport, setImportReport] = useState<CollectionImportReport | null>(null);
+  const [deckImportReport, setDeckImportReport] = useState<CollectionImportReport | null>(null);
+  const [catalog, setCatalog] = useState<CatalogStatus | null>(null);
+  const [scannerOpen, setScannerOpen] = useState(false);
   const [dark, setDark] = useState(false);
   const searchInput = useRef<HTMLInputElement>(null);
   const importInput = useRef<HTMLInputElement>(null);
+  const backupInput = useRef<HTMLInputElement>(null);
+  const deckImportInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     function handleShortcut(event: KeyboardEvent) {
@@ -117,6 +135,10 @@ export default function App() {
       if (type.trim()) params.set("type", type.trim());
       if (setCode.trim()) params.set("set", setCode.trim());
       if (color) params.set("color", color);
+      if (rarity) params.set("rarity", rarity);
+      if (formatFilter) params.set("format", formatFilter);
+      if (mvMin) params.set("mvMin", mvMin);
+      if (mvMax) params.set("mvMax", mvMax);
       try {
         setCards(await request<Card[]>(`/api/cards?${params}`, { signal: controller.signal }));
       } catch (reason) {
@@ -129,7 +151,13 @@ export default function App() {
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [page, query, type, setCode, color]);
+  }, [page, query, type, setCode, color, rarity, formatFilter, mvMin, mvMax]);
+
+  useEffect(() => {
+    request<CatalogStatus>("/api/catalog/status")
+      .then(setCatalog)
+      .catch((reason: unknown) => setError(reason instanceof Error ? reason.message : "Could not load card catalog status"));
+  }, []);
 
   useEffect(() => {
     if (page === "collection") {
@@ -205,6 +233,70 @@ export default function App() {
     }
   }
 
+  async function exportBackup() {
+    try {
+      const response = await fetch("/api/backup");
+      if (!response.ok) throw new Error(`Backup failed (${response.status})`);
+      downloadBlob("mana-vault-backup.json", await response.blob());
+      showNotice("Backup downloaded");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Could not download backup");
+    }
+  }
+
+  async function restoreBackupFile(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.currentTarget.files?.[0];
+    event.currentTarget.value = "";
+    if (!file) return;
+    if (file.size > 25 * 1024 * 1024) {
+      setError("Backup file must be no larger than 25 MB");
+      return;
+    }
+    if (!window.confirm("Restore this backup? It will replace your current collection and decks.")) return;
+    try {
+      await request("/api/backup/restore", {
+        method: "POST",
+        headers: { "content-type": "application/vnd.mana-vault.backup+json" },
+        body: await file.text(),
+      });
+      setCollection(await request<CollectionEntry[]>("/api/collection"));
+      setDecks(await request<Deck[]>("/api/decks"));
+      setCatalog(await request<CatalogStatus>("/api/catalog/status"));
+      setSelectedDeck(null);
+      setImportReport(null);
+      setDeckImportReport(null);
+      setError("");
+      showNotice("Backup restored");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Could not restore backup");
+    }
+  }
+
+  async function importDeckFile(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.currentTarget.files?.[0];
+    event.currentTarget.value = "";
+    if (!file || !selectedDeck) return;
+    if (file.size > 5 * 1024 * 1024) {
+      setError("Decklist file must be no larger than 5 MB");
+      return;
+    }
+    try {
+      const contentType = file.name.toLowerCase().endsWith(".csv") ? "text/csv" : "text/plain";
+      const report = await request<CollectionImportReport>(`/api/decks/${selectedDeck.id}/import`, {
+        method: "POST",
+        headers: { "content-type": contentType },
+        body: await file.text(),
+      });
+      setDeckImportReport(report);
+      setSelectedDeck(await request<DeckDetail>(`/api/decks/${selectedDeck.id}`));
+      setDecks(await request<Deck[]>("/api/decks"));
+      setError("");
+      showNotice(`Imported ${report.importedQuantity} cards from ${report.matchedRows} rows`);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Could not import decklist");
+    }
+  }
+
   async function createDeck(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     try {
@@ -214,6 +306,7 @@ export default function App() {
       });
       const detail = await request<DeckDetail>(`/api/decks/${deck.id}`);
       setSelectedDeck(detail);
+      setDeckImportReport(null);
       setDeckName("");
       setDecks(await request<Deck[]>("/api/decks"));
       showNotice(`${deck.name} created`);
@@ -225,6 +318,7 @@ export default function App() {
   async function openDeck(deck: Deck) {
     try {
       setSelectedDeck(await request<DeckDetail>(`/api/decks/${deck.id}`));
+      setDeckImportReport(null);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Could not open deck");
     }
@@ -249,7 +343,7 @@ export default function App() {
     if (!selectedDeck) return;
     try {
       await request(
-        `/api/decks/${selectedDeck.id}/cards/${encodeURIComponent(card.oracle_id)}?zone=${card.zone}`,
+        `/api/decks/${selectedDeck.id}/cards/${encodeURIComponent(card.oracle_id)}?zone=${card.zone}&entryId=${card.entry_id}`,
         { method: "PATCH", body: JSON.stringify({ quantity, zone }) },
       );
       setSelectedDeck(await request<DeckDetail>(`/api/decks/${selectedDeck.id}`));
@@ -263,7 +357,7 @@ export default function App() {
     if (!selectedDeck) return;
     try {
       await request(
-        `/api/decks/${selectedDeck.id}/cards/${encodeURIComponent(card.oracle_id)}?zone=${card.zone}`,
+        `/api/decks/${selectedDeck.id}/cards/${encodeURIComponent(card.oracle_id)}?zone=${card.zone}&entryId=${card.entry_id}`,
         { method: "DELETE" },
       );
       setSelectedDeck(await request<DeckDetail>(`/api/decks/${selectedDeck.id}`));
@@ -341,7 +435,12 @@ export default function App() {
           <button className={page === "decks" ? "side-link selected" : "side-link"} onClick={() => navigate("decks")}><span>▧</span> Decks</button>
           <div className="side-divider" />
           <div className="side-label">DATABASE</div>
-          <p className="side-note">Card printings are stored locally. Import the Scryfall bulk file to begin searching.</p>
+          <p className="side-note">
+            {catalog
+              ? `${catalog.printingCount.toLocaleString()} printings${catalog.updatedAt ? ` · updated ${new Date(catalog.updatedAt).toLocaleDateString()}` : ""}.`
+              : "Loading local card catalog…"}
+          </p>
+          <p className="side-note catalog-hint">Refresh from the latest Scryfall bulk data with the update command in the README.</p>
         </aside>
 
         <section className="content">
@@ -355,8 +454,11 @@ export default function App() {
             {page === "collection" && (
               <div className="collection-actions">
                 <input ref={importInput} className="file-input" type="file" accept=".csv,text/csv" onChange={importCollection} aria-label="Import collection CSV" />
+                <input ref={backupInput} className="file-input" type="file" accept=".json,application/json" onChange={restoreBackupFile} aria-label="Restore Mana Vault backup" />
                 <button className="export-button" onClick={() => importInput.current?.click()}>Import CSV</button>
                 <button className="export-button" onClick={exportCollection} disabled={collection.length === 0}>Moxfield CSV</button>
+                <button className="export-button" onClick={exportBackup}>Backup</button>
+                <button className="export-button" onClick={() => backupInput.current?.click()}>Restore</button>
               </div>
             )}
           </div>
@@ -372,6 +474,15 @@ export default function App() {
               {importReport.unmatched.length > 20 && <p>Showing the first 20 unmatched rows.</p>}
             </details>
           )}
+          {page === "decks" && deckImportReport && (
+            <details className="import-report" open={deckImportReport.unmatched.length > 0}>
+              <summary>{deckImportReport.importedQuantity} cards imported from {deckImportReport.matchedRows} rows; {deckImportReport.unmatched.length} need review</summary>
+              {deckImportReport.unmatched.slice(0, 20).map((item) => (
+                <p key={`${item.row}-${item.name}`}><strong>Row {item.row}{item.name ? ` · ${item.name}` : ""}:</strong> {item.reason}</p>
+              ))}
+              {deckImportReport.unmatched.length > 20 && <p>Showing the first 20 unmatched rows.</p>}
+            </details>
+          )}
 
           {page === "cards" && (
             <>
@@ -379,7 +490,7 @@ export default function App() {
               <div className="search-panel">
                 <label className="search-box">
                   <span aria-hidden="true">⌕</span>
-                  <input ref={searchInput} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search name, type, or rules text..." aria-label="Search cards" />
+                  <input ref={searchInput} value={query} onChange={(event) => setQuery(event.target.value)} placeholder='Search or use Scryfall filters (e.g. t:dragon c:red mv>=4)' aria-label="Search cards" />
                   <kbd>/</kbd>
                 </label>
                 <div className="filters">
@@ -390,14 +501,27 @@ export default function App() {
                       <option value="">Any color</option><option value="W">White</option><option value="U">Blue</option><option value="B">Black</option><option value="R">Red</option><option value="G">Green</option>
                     </select>
                   </label>
+                  <label>Rarity
+                    <select value={rarity} onChange={(event) => setRarity(event.target.value)}>
+                      <option value="">Any rarity</option><option value="common">Common</option><option value="uncommon">Uncommon</option><option value="rare">Rare</option><option value="mythic">Mythic</option>
+                    </select>
+                  </label>
+                  <label>Format
+                    <select value={formatFilter} onChange={(event) => setFormatFilter(event.target.value)}>
+                      <option value="">Any legality</option><option value="commander">Commander</option><option value="standard">Standard</option><option value="pioneer">Pioneer</option><option value="modern">Modern</option><option value="legacy">Legacy</option><option value="pauper">Pauper</option><option value="vintage">Vintage</option>
+                    </select>
+                  </label>
+                  <label>MV <input className="number-filter" type="number" min="0" max="100" step="0.5" value={mvMin} onChange={(event) => setMvMin(event.target.value)} placeholder="Min" /></label>
+                  <label>to <input className="number-filter" type="number" min="0" max="100" step="0.5" value={mvMax} onChange={(event) => setMvMax(event.target.value)} placeholder="Max" /></label>
                   <label className="foil-filter"><input type="checkbox" checked={foil} onChange={(event) => setFoil(event.target.checked)} /> Add as foil</label>
+                  <button className="export-button scan-button" onClick={() => setScannerOpen(true)}>Scan card</button>
                 </div>
               </div>
               {!error && cards.length === 0 && !loading ? (
                 <div className="empty-state">
                   <div className="empty-icon">⌕</div>
-                  <h2>{query || type || setCode || color ? "No matching cards" : "Your card catalog is empty"}</h2>
-                  <p>{query || type || setCode || color ? "Try a different search or remove a filter." : "Run the card import command in the README to load the local catalog."}</p>
+                  <h2>{query || type || setCode || color || rarity || formatFilter || mvMin || mvMax ? "No matching cards" : "Your card catalog is empty"}</h2>
+                  <p>{query || type || setCode || color || rarity || formatFilter || mvMin || mvMax ? "Try a different search or remove a filter." : "Run the card import command in the README to load the local catalog."}</p>
                 </div>
               ) : (
                 <div className="card-list">
@@ -481,6 +605,8 @@ export default function App() {
                     <div className="deck-detail-heading">
                       <div><div className="eyebrow">{selectedDeck.format.toUpperCase()} · {selectedDeck.mode.toUpperCase()} MODE</div><h2>{selectedDeck.name}</h2></div>
                       <div className="deck-export-actions">
+                        <input ref={deckImportInput} className="file-input" type="file" accept=".txt,.csv,text/plain,text/csv" onChange={importDeckFile} aria-label="Import decklist" />
+                        <button className="export-button" onClick={() => deckImportInput.current?.click()}>Import list</button>
                         <button className="export-button" onClick={() => exportDeckText(selectedDeck)} disabled={selectedDeck.cards.length === 0}>Text</button>
                         <button className="export-button" onClick={() => exportDeckCsv(selectedDeck)} disabled={selectedDeck.cards.length === 0}>CSV</button>
                         <button className="add-button" onClick={() => navigate("cards")}>Add cards</button>
@@ -490,7 +616,7 @@ export default function App() {
                     {selectedDeck.cards.length === 0 ? <div className="empty-state compact"><p>This deck is empty. Search cards to add some.</p></div> : (
                       <div className="deck-card-list">
                         {selectedDeck.cards.map((card) => (
-                          <article className="deck-card-row" key={`${card.oracle_id}-${card.zone}`}>
+                          <article className="deck-card-row" key={card.entry_id}>
                             {card.image_url ? <img className="card-thumb" src={card.image_url} alt="" loading="lazy" /> : null}
                             <span className="deck-quantity">{card.quantity}×</span>
                             <div><strong>{card.name} <span className="mana">{card.mana_cost}</span></strong><small>{card.type_line}</small>
@@ -517,6 +643,12 @@ export default function App() {
           <footer>Mana Vault <span>·</span> Local-first collection manager</footer>
         </section>
       </section>
+      {scannerOpen && <CardScanner onClose={() => setScannerOpen(false)} onRecognized={(name) => {
+        setScannerOpen(false);
+        setPage("cards");
+        setQuery(`name:"${name.replaceAll('"', "")}"`);
+        searchInput.current?.focus();
+      }} />}
     </main>
   );
 }
