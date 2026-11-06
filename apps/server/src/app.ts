@@ -1,10 +1,27 @@
 import Fastify, { type FastifyInstance } from "fastify";
 import { randomUUID } from "node:crypto";
+import fastifyStatic from "@fastify/static";
+import { fileURLToPath } from "node:url";
 import { initializeDatabase, openDatabase, type CardRow } from "./database.js";
+import { importCollectionCsv } from "./collection-import.js";
 
-export function buildApp(database = openDatabase()): FastifyInstance {
+export async function buildApp(database = openDatabase()): Promise<FastifyInstance> {
   initializeDatabase(database);
   const app = Fastify({ logger: process.env.NODE_ENV !== "test" });
+
+  app.addContentTypeParser(
+    "text/csv",
+    { parseAs: "string", bodyLimit: 5 * 1024 * 1024 },
+    (_request, body, done) => done(null, body),
+  );
+
+  const webRoot = process.env.WEB_DIST_PATH ?? fileURLToPath(new URL("../../web/dist", import.meta.url));
+  await app.register(fastifyStatic, {
+    root: webRoot,
+    prefix: "/",
+    index: ["index.html"],
+    wildcard: false,
+  });
 
   app.get("/api/health", async () => ({ status: "ok" }));
 
@@ -67,6 +84,17 @@ export function buildApp(database = openDatabase()): FastifyInstance {
        ORDER BY c.name, c.set_code`,
     ).all(),
   );
+
+  app.post<{ Body: string }>("/api/collection/import", async (request, reply) => {
+    if (typeof request.body !== "string" || !request.body.trim()) {
+      return reply.code(400).send({ error: "Upload a non-empty CSV file" });
+    }
+    try {
+      return importCollectionCsv(database, request.body);
+    } catch (error) {
+      return reply.code(400).send({ error: error instanceof Error ? error.message : "Could not import CSV" });
+    }
+  });
 
   app.patch<{ Params: { cardId: string }; Body: { quantity?: number; foil?: boolean } }>(
     "/api/collection/:cardId",

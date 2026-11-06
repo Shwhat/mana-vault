@@ -3,9 +3,9 @@ import { DatabaseSync } from "node:sqlite";
 import { buildApp } from "./app.js";
 import { cardInsertStatement } from "./database.js";
 
-function setup() {
+async function setup() {
   const database = new DatabaseSync(":memory:");
-  const app = buildApp(database);
+  const app = await buildApp(database);
   cardInsertStatement(database).run(
     "printing-1", "oracle-1", "Lightning Bolt", "{R}", "Instant", "Lightning Bolt deals 3 damage to any target.",
     "R", "lea", "Limited Edition Alpha", "161", "common", null, "1993-08-05",
@@ -14,8 +14,17 @@ function setup() {
 }
 
 describe("API", () => {
+  it("serves the built web app from the API origin", async () => {
+    const { app, database } = await setup();
+    const response = await app.inject({ method: "GET", url: "/" });
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toContain("<title>Mana Vault</title>");
+    await app.close();
+    database.close();
+  });
+
   it("reports ok", async () => {
-    const { app, database } = setup();
+    const { app, database } = await setup();
     const res = await app.inject({ method: "GET", url: "/api/health" });
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({ status: "ok" });
@@ -24,7 +33,7 @@ describe("API", () => {
   });
 
   it("searches card names and applies filters", async () => {
-    const { app, database } = setup();
+    const { app, database } = await setup();
     const res = await app.inject({ method: "GET", url: "/api/cards?q=lightning&color=R&type=instant&set=lea" });
     expect(res.statusCode).toBe(200);
     expect(res.json()).toHaveLength(1);
@@ -34,7 +43,7 @@ describe("API", () => {
   });
 
   it("rejects repeated or malformed search parameters", async () => {
-    const { app, database } = setup();
+    const { app, database } = await setup();
     const res = await app.inject({ method: "GET", url: "/api/cards?q=bolt&q=lightning" });
     expect(res.statusCode).toBe(400);
     await app.close();
@@ -42,7 +51,7 @@ describe("API", () => {
   });
 
   it("adds collection quantities by printing and foil status", async () => {
-    const { app, database } = setup();
+    const { app, database } = await setup();
     const first = await app.inject({
       method: "POST",
       url: "/api/collection",
@@ -61,7 +70,7 @@ describe("API", () => {
   });
 
   it("supports editing and removing collection entries", async () => {
-    const { app, database } = setup();
+    const { app, database } = await setup();
     await app.inject({
       method: "POST",
       url: "/api/collection",
@@ -81,8 +90,47 @@ describe("API", () => {
     database.close();
   });
 
+  it("imports Moxfield and generic collection CSV by exact printing", async () => {
+    const { app, database } = await setup();
+    const csv = [
+      '"Count","Tradelist Count","Name","Edition","Condition","Language","Foil","Tags","Last Modified","Collector Number"',
+      '"3","0","Lightning Bolt","Limited Edition Alpha","Near Mint","English","true","","","161"',
+      '"2","0","Missing Card","lea","Near Mint","English","false","","","999"',
+    ].join("\r\n");
+    const imported = await app.inject({
+      method: "POST",
+      url: "/api/collection/import",
+      headers: { "content-type": "text/csv" },
+      payload: csv,
+    });
+    expect(imported.statusCode).toBe(200);
+    expect(imported.json()).toMatchObject({
+      matchedRows: 1,
+      importedQuantity: 3,
+      unmatched: [{ row: 3, name: "Missing Card" }],
+    });
+    const collection = await app.inject({ method: "GET", url: "/api/collection" });
+    expect(collection.json()[0]).toMatchObject({ name: "Lightning Bolt", quantity: 3, foil: 1 });
+    await app.close();
+    database.close();
+  });
+
+  it("rejects CSV without the expected name column", async () => {
+    const { app, database } = await setup();
+    const result = await app.inject({
+      method: "POST",
+      url: "/api/collection/import",
+      headers: { "content-type": "text/csv" },
+      payload: '"Card","Count"\r\n"Lightning Bolt","2"',
+    });
+    expect(result.statusCode).toBe(400);
+    expect(result.json().error).toContain("Name");
+    await app.close();
+    database.close();
+  });
+
   it("creates decks with different printing behavior", async () => {
-    const { app, database } = setup();
+    const { app, database } = await setup();
     const normal = await app.inject({
       method: "POST",
       url: "/api/decks",
@@ -116,7 +164,7 @@ describe("API", () => {
   });
 
   it("updates deck quantities and moves cards between zones", async () => {
-    const { app, database } = setup();
+    const { app, database } = await setup();
     const deck = await app.inject({
       method: "POST",
       url: "/api/decks",
@@ -140,7 +188,7 @@ describe("API", () => {
   });
 
   it("rejects malformed entries and unknown printings", async () => {
-    const { app, database } = setup();
+    const { app, database } = await setup();
     const malformed = await app.inject({
       method: "POST",
       url: "/api/collection",

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 
 type Card = {
   id: string;
@@ -34,6 +34,11 @@ type DeckCard = Pick<Card, "name" | "mana_cost" | "type_line" | "set_code" | "se
 };
 
 type DeckDetail = Deck & { cards: DeckCard[] };
+type CollectionImportReport = {
+  matchedRows: number;
+  importedQuantity: number;
+  unmatched: Array<{ row: number; name: string; reason: string }>;
+};
 type Page = "cards" | "collection" | "decks";
 
 function isDeckZone(value: string): value is DeckCard["zone"] {
@@ -86,8 +91,10 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [importReport, setImportReport] = useState<CollectionImportReport | null>(null);
   const [dark, setDark] = useState(false);
   const searchInput = useRef<HTMLInputElement>(null);
+  const importInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     function handleShortcut(event: KeyboardEvent) {
@@ -175,6 +182,29 @@ export default function App() {
     }
   }
 
+  async function importCollection(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.currentTarget.files?.[0];
+    event.currentTarget.value = "";
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      setError("CSV file must be no larger than 5 MB");
+      return;
+    }
+    try {
+      const report = await request<CollectionImportReport>("/api/collection/import", {
+        method: "POST",
+        headers: { "content-type": "text/csv" },
+        body: await file.text(),
+      });
+      setImportReport(report);
+      setCollection(await request<CollectionEntry[]>("/api/collection"));
+      setError("");
+      showNotice(`Imported ${report.importedQuantity} cards from ${report.matchedRows} rows`);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Could not import collection CSV");
+    }
+  }
+
   async function createDeck(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     try {
@@ -245,8 +275,11 @@ export default function App() {
 
   function exportCollection() {
     const rows = [
-      ["Card Name", "Set Code", "Set Name", "Collector Number", "Quantity", "Foil"],
-      ...collection.map((entry) => [entry.name, entry.set_code, entry.set_name, entry.collector_number, entry.quantity, Boolean(entry.foil)]),
+      ["Count", "Tradelist Count", "Name", "Edition", "Condition", "Language", "Foil", "Tags", "Last Modified", "Collector Number", "Alter", "Proxy", "Purchase Price"],
+      ...collection.map((entry) => [
+        entry.quantity, 0, entry.name, entry.set_name, "", "", Boolean(entry.foil), "", "",
+        entry.collector_number, "", "", "",
+      ]),
     ];
     downloadFile("mana-vault-collection.csv", rows.map((row) => row.map(csvCell).join(",")).join("\r\n"), "text/csv;charset=utf-8");
   }
@@ -319,11 +352,26 @@ export default function App() {
               <p>{page === "cards" ? "Find a printing, then add it to your collection or deck." : page === "collection" ? "Your owned cards, grouped by printing." : "Create and manage decks in either mode."}</p>
             </div>
             {page === "cards" && <span className="result-count">{loading ? "Searching..." : `${cards.length} ${cards.length === 1 ? "result" : "results"}`}</span>}
-            {page === "collection" && <button className="export-button" onClick={exportCollection} disabled={collection.length === 0}>Export CSV</button>}
+            {page === "collection" && (
+              <div className="collection-actions">
+                <input ref={importInput} className="file-input" type="file" accept=".csv,text/csv" onChange={importCollection} aria-label="Import collection CSV" />
+                <button className="export-button" onClick={() => importInput.current?.click()}>Import CSV</button>
+                <button className="export-button" onClick={exportCollection} disabled={collection.length === 0}>Moxfield CSV</button>
+              </div>
+            )}
           </div>
 
           {error && <div className="error-banner" role="alert">{error}</div>}
           {notice && <div className="notice-banner" role="status">{notice}</div>}
+          {page === "collection" && importReport && importReport.unmatched.length > 0 && (
+            <details className="import-report">
+              <summary>{importReport.unmatched.length} CSV rows need review</summary>
+              {importReport.unmatched.slice(0, 20).map((item) => (
+                <p key={`${item.row}-${item.name}`}><strong>Row {item.row}{item.name ? ` · ${item.name}` : ""}:</strong> {item.reason}</p>
+              ))}
+              {importReport.unmatched.length > 20 && <p>Showing the first 20 unmatched rows.</p>}
+            </details>
+          )}
 
           {page === "cards" && (
             <>

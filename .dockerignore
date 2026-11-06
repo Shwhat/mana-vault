@@ -1,0 +1,16 @@
+.git
+.github
+.vscode
+.env
+.env.*
+!.env.example
+node_modules
+**/node_modules
+**/dist
+data
+backups
+*.sqlite
+*.db
+*.csv
+*.download
+*.log

@@ -4,7 +4,7 @@ A self-hosted, local-first Magic: The Gathering collection manager focused on de
 
 ## Current status
 
-The first working slice includes card search, collection tracking, and deck creation with Normal and Theme modes. The app code is local; it does not include Scryfall's card database.
+The working app includes card search, collection tracking, deck creation with Normal and Theme modes, and CSV collection import. The card catalog must still be loaded from Scryfall.
 
 ## Run locally
 
@@ -36,25 +36,32 @@ npm.cmd run import:cards --workspace=@mana-vault/server
 
 This downloads Scryfall's `default_cards` bulk file (a large download) and streams card printings into the local SQLite database. It needs internet access and enough disk space for both the downloaded JSON and database. Set `SCRYFALL_DATA_PATH` or `DATABASE_PATH` to choose different locations.
 
+The container image includes the same importer as `node apps/server/dist/import-cards.js`. In the container, the default database and downloaded bulk JSON both live under `/data`.
+
 ## Included features
 
 - Search card names, types, and rules text; filter by color, type, and set
 - Track quantities per printing, including foil copies
+- Import Moxfield-style collection CSVs using card name, set/edition, collector number, count, and foil
 - Create Normal decks (printing-independent) or Theme decks (printing-specific)
 - Add and remove cards from decks
-- Export collections and decks as generic CSV; export decks as plain text
+- Export collections and decks as CSV; export decks as plain text
 - Compact, responsive interface with light and dark themes
 - Installable PWA shell; the card database and API still require the server to be reachable
 
 ## Not built yet
 
 - Full Scryfall search syntax, more filters, and art-theme search
-- Import from deck and collection files; site-specific CSV layouts
+- Decklist import and other site's CSV layouts
 - Card database updates and backup/restore workflows
 - Offline card data and camera scanning
-- Authentication, Docker packaging, and deployment setup
+- Authentication
 
 The app does not have authentication yet. Keep it on a trusted network; do not expose it directly to the public internet.
+
+## Container image
+
+Every push to `main` builds and publishes `ghcr.io/shwhat/mana-vault:latest` for both `linux/amd64` and `linux/arm64`. Version tags also publish matching image tags. The image contains the API and built web app; mount `/data` persistently for the SQLite database and Scryfall bulk file. Set the GitHub Container Registry package visibility to public if the server should pull without registry credentials.
 
 ## Development checks
 
