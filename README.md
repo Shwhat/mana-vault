@@ -1,33 +1,69 @@
 # mana-vault
-A self-hosted, local-first Magic: The Gathering collection manager with deck building as the main focus.
 
-## Status
+A self-hosted, local-first Magic: The Gathering collection manager focused on deck building.
 
-Early planning. No application code yet.
+## Current status
 
-## Planned first release
+The first working slice includes card search, collection tracking, and deck creation with Normal and Theme modes. The app code is local; it does not include Scryfall's card database.
 
-- Card search by standard fields (Scryfall-style syntax, a subset at first)
-- Collection tracking with quantities, per printing
-- Deck building with two modes:
-  - **Normal mode**: any printing of a card
-  - **Theme mode**: one specific printing per card, chosen for its art
-- Import and export: plain-text decklists and CSV (Moxfield, Archidekt, Deckbox, ManaBox styles)
-- Local SQLite database, kept outside the container
-- Docker deployment on a private server
-- Backup and restore guidance
+## Run locally
 
-## Later
+Requirements: Node.js 22.5 or newer.
 
-- Art-theme search (find cards by what the art shows, such as cats or forests)
-- Camera card scanning
-- Android enhancements
+```powershell
+npm.cmd install
+npm.cmd run dev:server
+```
 
-## Planned stack
+In a second terminal:
 
-TypeScript, Node.js, Fastify, SQLite (Drizzle ORM), React + Vite as a PWA, Docker.
+```powershell
+npm.cmd run dev:web
+```
+
+Open the Vite URL shown in the second terminal (normally `http://localhost:5173`).
+
+The server stores its SQLite database at `data/mana-vault.sqlite` by default. Override this with `DATABASE_PATH` if needed. The `data/` folder is ignored by Git.
+The API listens on `127.0.0.1` by default. Set `HOST=0.0.0.0` only when you intentionally want to accept connections from your trusted local network; there is no login yet.
+
+## Load the card catalog
+
+From the repository root, run:
+
+```powershell
+npm.cmd run import:cards --workspace=@mana-vault/server
+```
+
+This downloads Scryfall's `default_cards` bulk file (a large download) and streams card printings into the local SQLite database. It needs internet access and enough disk space for both the downloaded JSON and database. Set `SCRYFALL_DATA_PATH` or `DATABASE_PATH` to choose different locations.
+
+## Included features
+
+- Search card names, types, and rules text; filter by color, type, and set
+- Track quantities per printing, including foil copies
+- Create Normal decks (printing-independent) or Theme decks (printing-specific)
+- Add and remove cards from decks
+- Export collections and decks as generic CSV; export decks as plain text
+- Compact, responsive interface with light and dark themes
+- Installable PWA shell; the card database and API still require the server to be reachable
+
+## Not built yet
+
+- Full Scryfall search syntax, more filters, and art-theme search
+- Import from deck and collection files; site-specific CSV layouts
+- Card database updates and backup/restore workflows
+- Offline card data and camera scanning
+- Authentication, Docker packaging, and deployment setup
+
+The app does not have authentication yet. Keep it on a trusted network; do not expose it directly to the public internet.
+
+## Development checks
+
+```powershell
+npm.cmd run typecheck
+npm.cmd test
+npm.cmd run build
+```
 
 ## Data and secrets
 
-Collection data lives in a persistent volume on the server, never in this repository.
-Do not commit `.env` files, credentials, or data exports.
+Collection data and card database files stay outside Git in `data/`. Do not commit `.env` files, credentials, backups, or collection exports.

@@ -16,6 +16,8 @@ data/
 *.sqlite-shm
 *.db
 backups/
+*.download
+*.csv
 
 # Editor and OS files
 .vscode/
@@ -23,3 +25,4 @@ backups/
 .DS_Store
 Thumbs.db
 *.log
+*.tsbuildinfo
