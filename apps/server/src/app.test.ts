@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { DatabaseSync } from "node:sqlite";
 import { buildApp } from "./app.js";
 import { cardInsertStatement, initializeDatabase } from "./database.js";
@@ -20,6 +20,51 @@ describe("API", () => {
     const res = await app.inject({ method: "GET", url: "/api/health" });
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({ status: "ok" });
+    await app.close();
+    database.close();
+  });
+
+  it("reports configured catalog refresh status", async () => {
+    const database = new DatabaseSync(":memory:");
+    const updateStatus = {
+      scheduled: true,
+      intervalHours: 168,
+      isUpdating: false,
+      lastAttemptAt: null,
+      lastImportedCount: null,
+      lastError: null,
+    };
+    const app = await buildApp(database, undefined, () => updateStatus);
+    const response = await app.inject({ method: "GET", url: "/api/catalog/status" });
+    expect(response.statusCode).toBe(200);
+    expect(response.json().update).toEqual(updateStatus);
+    await app.close();
+    database.close();
+  });
+
+  it("starts an on-demand catalog update and rejects duplicate requests", async () => {
+    const database = new DatabaseSync(":memory:");
+    let isUpdating = false;
+    const updateStatus = () => ({
+      scheduled: false,
+      intervalHours: null,
+      isUpdating,
+      lastAttemptAt: null,
+      lastImportedCount: null,
+      lastError: null,
+    });
+    const requestUpdate = vi.fn(() => {
+      if (isUpdating) return false;
+      isUpdating = true;
+      return true;
+    });
+    const app = await buildApp(database, undefined, updateStatus, requestUpdate);
+    const started = await app.inject({ method: "POST", url: "/api/catalog/update", payload: {} });
+    const duplicate = await app.inject({ method: "POST", url: "/api/catalog/update", payload: {} });
+    expect(started.statusCode).toBe(202);
+    expect(started.json()).toMatchObject({ status: "started", update: { isUpdating: true } });
+    expect(duplicate.statusCode).toBe(409);
+    expect(requestUpdate).toHaveBeenCalledTimes(2);
     await app.close();
     database.close();
   });
@@ -151,6 +196,15 @@ describe("API", () => {
       '"3","0","Lightning Bolt","Limited Edition Alpha","Near Mint","English","true","","","161"',
       '"2","0","Missing Card","lea","Near Mint","English","false","","","999"',
     ].join("\r\n");
+    const preview = await app.inject({
+      method: "POST",
+      url: "/api/collection/import/preview",
+      headers: { "content-type": "text/csv" },
+      payload: csv,
+    });
+    expect(preview.statusCode).toBe(200);
+    expect(preview.json()).toMatchObject({ matchedRows: 1, importedQuantity: 3 });
+    expect(database.prepare("SELECT COUNT(*) AS count FROM collection_items").get()?.count).toBe(0);
     const imported = await app.inject({
       method: "POST",
       url: "/api/collection/import",
@@ -186,6 +240,14 @@ describe("API", () => {
   it("imports text decklists and reports missing cards", async () => {
     const { app, database } = await setup();
     const deck = await app.inject({ method: "POST", url: "/api/decks", payload: { name: "Imported" } });
+    const preview = await app.inject({
+      method: "POST",
+      url: `/api/decks/${deck.json().id}/import/preview`,
+      headers: { "content-type": "text/plain" },
+      payload: "4x Lightning Bolt (lea) 161\nSB: 2 Missing Card",
+    });
+    expect(preview.statusCode).toBe(200);
+    expect(database.prepare("SELECT COUNT(*) AS count FROM deck_cards").get()?.count).toBe(0);
     const result = await app.inject({
       method: "POST",
       url: `/api/decks/${deck.json().id}/import`,
@@ -238,6 +300,19 @@ describe("API", () => {
     expect(backup.headers["content-disposition"]).toContain("mana-vault-backup.json");
     await app.inject({ method: "DELETE", url: "/api/collection/printing-1" });
     await app.inject({ method: "DELETE", url: `/api/decks/${deck.json().id}/cards/oracle-1` });
+    const validation = await app.inject({
+      method: "POST",
+      url: "/api/backup/validate",
+      headers: { "content-type": "application/vnd.mana-vault.backup+json" },
+      payload: backup.body,
+    });
+    expect(validation.statusCode).toBe(200);
+    expect(validation.json()).toMatchObject({
+      collectionEntryCount: 1,
+      deckCount: 1,
+      deckCardCount: 1,
+    });
+    expect((await app.inject({ method: "GET", url: "/api/collection" })).json()).toHaveLength(0);
     const restored = await app.inject({
       method: "POST",
       url: "/api/backup/restore",

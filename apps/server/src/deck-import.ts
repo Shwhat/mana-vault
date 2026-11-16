@@ -85,6 +85,7 @@ export function importDecklist(
   deckId: string,
   mode: "normal" | "theme",
   content: string,
+  commit = true,
 ): DeckImportResult {
   const rows = parseCsv(content) ?? parseText(content);
   if (!rows.length) throw new Error("Decklist has no card rows");
@@ -146,27 +147,29 @@ export function importDecklist(
     importedQuantity += row.quantity;
   });
 
-  database.exec("BEGIN");
-  try {
-    for (const addition of additions.values()) {
-      const insert = addition.printingId
-        ? database.prepare(
-          `INSERT INTO deck_cards (deck_id, oracle_id, printing_id, quantity, zone) VALUES (?, ?, ?, ?, ?)
-           ON CONFLICT(deck_id, oracle_id, printing_id, zone) WHERE printing_id IS NOT NULL
-           DO UPDATE SET quantity = quantity + excluded.quantity`,
-        )
-        : database.prepare(
-          `INSERT INTO deck_cards (deck_id, oracle_id, printing_id, quantity, zone) VALUES (?, ?, ?, ?, ?)
-           ON CONFLICT(deck_id, oracle_id, zone) WHERE printing_id IS NULL
-           DO UPDATE SET quantity = quantity + excluded.quantity`,
-        );
-      insert.run(deckId, addition.oracleId, addition.printingId, addition.quantity, addition.zone);
+  if (commit) {
+    database.exec("BEGIN");
+    try {
+      for (const addition of additions.values()) {
+        const insert = addition.printingId
+          ? database.prepare(
+            `INSERT INTO deck_cards (deck_id, oracle_id, printing_id, quantity, zone) VALUES (?, ?, ?, ?, ?)
+             ON CONFLICT(deck_id, oracle_id, printing_id, zone) WHERE printing_id IS NOT NULL
+             DO UPDATE SET quantity = quantity + excluded.quantity`,
+          )
+          : database.prepare(
+            `INSERT INTO deck_cards (deck_id, oracle_id, printing_id, quantity, zone) VALUES (?, ?, ?, ?, ?)
+             ON CONFLICT(deck_id, oracle_id, zone) WHERE printing_id IS NULL
+             DO UPDATE SET quantity = quantity + excluded.quantity`,
+          );
+        insert.run(deckId, addition.oracleId, addition.printingId, addition.quantity, addition.zone);
+      }
+      if (additions.size) database.prepare("UPDATE decks SET updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(deckId);
+      database.exec("COMMIT");
+    } catch (error) {
+      database.exec("ROLLBACK");
+      throw error;
     }
-    if (additions.size) database.prepare("UPDATE decks SET updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(deckId);
-    database.exec("COMMIT");
-  } catch (error) {
-    database.exec("ROLLBACK");
-    throw error;
   }
   return { matchedRows, importedQuantity, unmatched };
 }

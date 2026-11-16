@@ -17,6 +17,14 @@ export interface ManaVaultBackup {
   deckCards: Array<{ deck_id: string; oracle_id: string; printing_id: string | null; quantity: number; zone: string }>;
 }
 
+export interface BackupSummary {
+  createdAt: string;
+  printingCount: number;
+  collectionEntryCount: number;
+  deckCount: number;
+  deckCardCount: number;
+}
+
 export function createBackup(database: DatabaseSync): ManaVaultBackup {
   const cards = database.prepare(
     `SELECT ${cardFields.join(", ")} FROM cards
@@ -41,14 +49,12 @@ export function createBackup(database: DatabaseSync): ManaVaultBackup {
   };
 }
 
+export function inspectBackup(source: string): BackupSummary {
+  return summarizeBackup(parseBackup(source));
+}
+
 export function restoreBackup(database: DatabaseSync, source: string): void {
-  let value: unknown;
-  try {
-    value = JSON.parse(source);
-  } catch {
-    throw new Error("Backup file is not valid JSON");
-  }
-  const backup = validateBackup(value);
+  const backup = parseBackup(source);
   const insertCard = cardInsertStatement(database);
   database.exec("BEGIN");
   try {
@@ -79,9 +85,32 @@ export function restoreBackup(database: DatabaseSync, source: string): void {
   }
 }
 
+function parseBackup(source: string): ManaVaultBackup {
+  let value: unknown;
+  try {
+    value = JSON.parse(source);
+  } catch {
+    throw new Error("Backup file is not valid JSON");
+  }
+  return validateBackup(value);
+}
+
+function summarizeBackup(backup: ManaVaultBackup): BackupSummary {
+  return {
+    createdAt: backup.createdAt,
+    printingCount: backup.cards.length,
+    collectionEntryCount: backup.collection.length,
+    deckCount: backup.decks.length,
+    deckCardCount: backup.deckCards.length,
+  };
+}
+
 function validateBackup(value: unknown): ManaVaultBackup {
   if (!isRecord(value) || value.format !== "mana-vault-backup" || value.version !== 1) {
     throw new Error("Unsupported backup file format or version");
+  }
+  if (typeof value.createdAt !== "string" || !Number.isFinite(Date.parse(value.createdAt))) {
+    throw new Error("Backup file has an invalid creation date");
   }
   if (!Array.isArray(value.cards) || !Array.isArray(value.collection) || !Array.isArray(value.decks) || !Array.isArray(value.deckCards)) {
     throw new Error("Backup file is missing required data");
@@ -158,7 +187,7 @@ function validateBackup(value: unknown): ManaVaultBackup {
   return {
     format: "mana-vault-backup",
     version: 1,
-    createdAt: typeof value.createdAt === "string" ? value.createdAt : "",
+    createdAt: value.createdAt,
     cards,
     collection,
     decks,

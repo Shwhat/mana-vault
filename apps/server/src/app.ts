@@ -5,12 +5,22 @@ import { fileURLToPath } from "node:url";
 import { initializeDatabase, openDatabase, type CardRow } from "./database.js";
 import { importCollectionCsv } from "./collection-import.js";
 import { importDecklist } from "./deck-import.js";
-import { createBackup, restoreBackup } from "./backup.js";
+import { createBackup, inspectBackup, restoreBackup } from "./backup.js";
 import { parseCardQuery } from "./card-search.js";
+import { type CatalogUpdateStatus } from "./catalog-updater.js";
 
 export async function buildApp(
   database = openDatabase(),
   webRoot = process.env.WEB_DIST_PATH ?? fileURLToPath(new URL("../../web/dist", import.meta.url)),
+  getCatalogUpdateStatus: () => CatalogUpdateStatus = () => ({
+    scheduled: false,
+    intervalHours: null,
+    isUpdating: false,
+    lastAttemptAt: null,
+    lastImportedCount: null,
+    lastError: null,
+  }),
+  requestCatalogUpdate: () => boolean = () => false,
 ): Promise<FastifyInstance> {
   initializeDatabase(database);
   const app = Fastify({ logger: process.env.NODE_ENV !== "test" });
@@ -38,6 +48,19 @@ export async function buildApp(
     wildcard: false,
   });
 
+  app.post<{ Params: { deckId: string }; Body: string }>("/api/decks/:deckId/import/preview", async (request, reply) => {
+    if (typeof request.body !== "string" || !request.body.trim()) {
+      return reply.code(400).send({ error: "Upload a non-empty decklist file" });
+    }
+    const deck = database.prepare("SELECT id, mode FROM decks WHERE id = ?").get(request.params.deckId);
+    if (!deck) return reply.code(404).send({ error: "Deck not found" });
+    try {
+      return importDecklist(database, request.params.deckId, deck.mode as "normal" | "theme", request.body, false);
+    } catch (error) {
+      return reply.code(400).send({ error: error instanceof Error ? error.message : "Could not preview decklist" });
+    }
+  });
+
   app.post<{ Params: { deckId: string }; Body: string }>("/api/decks/:deckId/import", async (request, reply) => {
     if (typeof request.body !== "string" || !request.body.trim()) {
       return reply.code(400).send({ error: "Upload a non-empty decklist file" });
@@ -56,11 +79,34 @@ export async function buildApp(
   app.get("/api/catalog/status", async () => ({
     printingCount: database.prepare("SELECT COUNT(*) AS count FROM cards").get()?.count ?? 0,
     updatedAt: database.prepare("SELECT value FROM catalog_metadata WHERE key = 'updated_at'").get()?.value ?? null,
+    update: getCatalogUpdateStatus(),
   }));
+
+  app.post("/api/catalog/update", async (_request, reply) => {
+    if (!requestCatalogUpdate()) {
+      const update = getCatalogUpdateStatus();
+      if (update.isUpdating) {
+        return reply.code(409).send({ error: "A card catalog update is already running", update });
+      }
+      return reply.code(503).send({ error: "Card catalog updates are unavailable", update });
+    }
+    return reply.code(202).send({ status: "started", update: getCatalogUpdateStatus() });
+  });
 
   app.get("/api/backup", async (_request, reply) => {
     reply.header("content-disposition", 'attachment; filename="mana-vault-backup.json"');
     return createBackup(database);
+  });
+
+  app.post<{ Body: string }>("/api/backup/validate", async (request, reply) => {
+    if (typeof request.body !== "string" || !request.body.trim()) {
+      return reply.code(400).send({ error: "Choose a Mana Vault backup file" });
+    }
+    try {
+      return inspectBackup(request.body);
+    } catch (error) {
+      return reply.code(400).send({ error: error instanceof Error ? error.message : "Could not validate backup" });
+    }
   });
 
   app.post<{ Body: string }>("/api/backup/restore", async (request, reply) => {
@@ -167,6 +213,17 @@ export async function buildApp(
        ORDER BY c.name, c.set_code`,
     ).all(),
   );
+
+  app.post<{ Body: string }>("/api/collection/import/preview", async (request, reply) => {
+    if (typeof request.body !== "string" || !request.body.trim()) {
+      return reply.code(400).send({ error: "Upload a non-empty CSV file" });
+    }
+    try {
+      return importCollectionCsv(database, request.body, false);
+    } catch (error) {
+      return reply.code(400).send({ error: error instanceof Error ? error.message : "Could not preview collection CSV" });
+    }
+  });
 
   app.post<{ Body: string }>("/api/collection/import", async (request, reply) => {
     if (typeof request.body !== "string" || !request.body.trim()) {

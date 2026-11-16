@@ -17,7 +17,7 @@ function readCell(row: CsvRow, column: string | undefined): string {
   return column ? (row[column] ?? "").trim() : "";
 }
 
-export function importCollectionCsv(database: DatabaseSync, csv: string): CollectionImportResult {
+export function importCollectionCsv(database: DatabaseSync, csv: string, commit = true): CollectionImportResult {
   let rows: CsvRow[];
   try {
     rows = parse(csv, { columns: true, skip_empty_lines: true, bom: true, trim: true, max_record_size: 100_000 });
@@ -89,19 +89,21 @@ export function importCollectionCsv(database: DatabaseSync, csv: string): Collec
     importedQuantity += quantity;
   });
 
-  database.exec("BEGIN");
-  try {
-    const insert = database.prepare(
-      `INSERT INTO collection_items (card_id, quantity, foil) VALUES (?, ?, ?)
-       ON CONFLICT(card_id, foil) DO UPDATE SET quantity = quantity + excluded.quantity`,
-    );
-    for (const addition of additions.values()) {
-      insert.run(addition.cardId, addition.quantity, addition.foil ? 1 : 0);
+  if (commit) {
+    database.exec("BEGIN");
+    try {
+      const insert = database.prepare(
+        `INSERT INTO collection_items (card_id, quantity, foil) VALUES (?, ?, ?)
+         ON CONFLICT(card_id, foil) DO UPDATE SET quantity = quantity + excluded.quantity`,
+      );
+      for (const addition of additions.values()) {
+        insert.run(addition.cardId, addition.quantity, addition.foil ? 1 : 0);
+      }
+      database.exec("COMMIT");
+    } catch (error) {
+      database.exec("ROLLBACK");
+      throw error;
     }
-    database.exec("COMMIT");
-  } catch (error) {
-    database.exec("ROLLBACK");
-    throw error;
   }
 
   return { matchedRows, importedQuantity, unmatched };

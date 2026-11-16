@@ -43,7 +43,27 @@ type CollectionImportReport = {
   importedQuantity: number;
   unmatched: Array<{ row: number; name: string; reason: string }>;
 };
-type CatalogStatus = { printingCount: number; updatedAt: string | null };
+type CatalogStatus = {
+  printingCount: number;
+  updatedAt: string | null;
+  update: {
+    scheduled: boolean;
+    intervalHours: number | null;
+    isUpdating: boolean;
+    lastAttemptAt: string | null;
+    lastImportedCount: number | null;
+    lastError: string | null;
+  };
+};
+type BackupSummary = {
+  createdAt: string;
+  printingCount: number;
+  collectionEntryCount: number;
+  deckCount: number;
+  deckCardCount: number;
+};
+type PendingImport = { fileName: string; content: string; report: CollectionImportReport };
+type PendingDeckImport = PendingImport & { deckId: string; deckName: string };
 type Page = "cards" | "collection" | "decks";
 
 function isDeckZone(value: string): value is DeckCard["zone"] {
@@ -106,13 +126,19 @@ export default function App() {
   const [notice, setNotice] = useState("");
   const [importReport, setImportReport] = useState<CollectionImportReport | null>(null);
   const [deckImportReport, setDeckImportReport] = useState<CollectionImportReport | null>(null);
+  const [pendingCollectionImport, setPendingCollectionImport] = useState<PendingImport | null>(null);
+  const [pendingDeckImport, setPendingDeckImport] = useState<PendingDeckImport | null>(null);
+  const [pendingBackupRestore, setPendingBackupRestore] = useState<{ fileName: string; content: string; summary: BackupSummary } | null>(null);
   const [catalog, setCatalog] = useState<CatalogStatus | null>(null);
+  const [catalogRequestPending, setCatalogRequestPending] = useState(false);
   const [scannerOpen, setScannerOpen] = useState(false);
   const [dark, setDark] = useState(false);
   const searchInput = useRef<HTMLInputElement>(null);
   const importInput = useRef<HTMLInputElement>(null);
   const backupInput = useRef<HTMLInputElement>(null);
   const deckImportInput = useRef<HTMLInputElement>(null);
+  const catalogStatusPoll = useRef<(() => void) | null>(null);
+  const previousCatalogUpdate = useRef<CatalogStatus["update"] | null>(null);
 
   useEffect(() => {
     function handleShortcut(event: KeyboardEvent) {
@@ -154,9 +180,55 @@ export default function App() {
   }, [page, query, type, setCode, color, rarity, formatFilter, mvMin, mvMax]);
 
   useEffect(() => {
-    request<CatalogStatus>("/api/catalog/status")
-      .then(setCatalog)
-      .catch((reason: unknown) => setError(reason instanceof Error ? reason.message : "Could not load card catalog status"));
+    let active = true;
+    let timer: number | undefined;
+    let pending = false;
+    let pollAgainSoon = false;
+    const refreshStatus = async () => {
+      if (pending) {
+        pollAgainSoon = true;
+        return;
+      }
+      pending = true;
+      let nextDelay = 60_000;
+      try {
+        const status = await request<CatalogStatus>("/api/catalog/status");
+        if (!active) return;
+        const previous = previousCatalogUpdate.current;
+        if (previous?.isUpdating && !status.update.isUpdating) {
+          if (status.update.lastError) {
+            setError(`Card database update failed: ${status.update.lastError}`);
+          } else {
+            showNotice(`Card database updated with ${(status.update.lastImportedCount ?? status.printingCount).toLocaleString()} printings.`);
+          }
+        }
+        previousCatalogUpdate.current = status.update;
+        setCatalog(status);
+        if (status.update.isUpdating) nextDelay = 2_000;
+      } catch (reason) {
+        if (active) setError(reason instanceof Error ? reason.message : "Could not load card catalog status");
+      } finally {
+        pending = false;
+        if (active) {
+          if (pollAgainSoon) {
+            pollAgainSoon = false;
+            nextDelay = 0;
+          }
+          timer = window.setTimeout(() => { void refreshStatus(); }, nextDelay);
+        }
+      }
+    };
+    catalogStatusPoll.current = () => {
+      if (timer !== undefined) window.clearTimeout(timer);
+      if (pending) pollAgainSoon = true;
+      else void refreshStatus();
+    };
+    void refreshStatus();
+    return () => {
+      active = false;
+      if (timer !== undefined) window.clearTimeout(timer);
+      catalogStatusPoll.current = null;
+    };
   }, []);
 
   useEffect(() => {
@@ -179,6 +251,25 @@ export default function App() {
   function showNotice(message: string) {
     setNotice(message);
     window.setTimeout(() => setNotice(""), 2500);
+  }
+
+  async function refreshCardCatalog() {
+    setCatalogRequestPending(true);
+    try {
+      const result = await request<{ status: "started"; update: CatalogStatus["update"] }>("/api/catalog/update", {
+        method: "POST",
+        body: JSON.stringify({}),
+      });
+      previousCatalogUpdate.current = result.update;
+      setCatalog((current) => current ? { ...current, update: result.update } : current);
+      setError("");
+      showNotice("Card database update started.");
+      catalogStatusPoll.current?.();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Could not start card database update");
+    } finally {
+      setCatalogRequestPending(false);
+    }
   }
 
   async function addCard(card: Card) {
@@ -214,17 +305,36 @@ export default function App() {
     const file = event.currentTarget.files?.[0];
     event.currentTarget.value = "";
     if (!file) return;
+    setPendingCollectionImport(null);
     if (file.size > 5 * 1024 * 1024) {
       setError("CSV file must be no larger than 5 MB");
       return;
     }
     try {
+      const content = await file.text();
+      const report = await request<CollectionImportReport>("/api/collection/import/preview", {
+        method: "POST",
+        headers: { "content-type": "text/csv" },
+        body: content,
+      });
+      setImportReport(report);
+      setPendingCollectionImport({ fileName: file.name, content, report });
+      setError("");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Could not import collection CSV");
+    }
+  }
+
+  async function confirmCollectionImport() {
+    if (!pendingCollectionImport) return;
+    try {
       const report = await request<CollectionImportReport>("/api/collection/import", {
         method: "POST",
         headers: { "content-type": "text/csv" },
-        body: await file.text(),
+        body: pendingCollectionImport.content,
       });
       setImportReport(report);
+      setPendingCollectionImport(null);
       setCollection(await request<CollectionEntry[]>("/api/collection"));
       setError("");
       showNotice(`Imported ${report.importedQuantity} cards from ${report.matchedRows} rows`);
@@ -248,23 +358,46 @@ export default function App() {
     const file = event.currentTarget.files?.[0];
     event.currentTarget.value = "";
     if (!file) return;
+    setPendingBackupRestore(null);
     if (file.size > 25 * 1024 * 1024) {
       setError("Backup file must be no larger than 25 MB");
       return;
     }
-    if (!window.confirm("Restore this backup? It will replace your current collection and decks.")) return;
+    try {
+      const content = await file.text();
+      const summary = await request<BackupSummary>("/api/backup/validate", {
+        method: "POST",
+        headers: { "content-type": "application/vnd.mana-vault.backup+json" },
+        body: content,
+      });
+      setPendingBackupRestore({ fileName: file.name, content, summary });
+      setError("");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Could not validate backup");
+    }
+  }
+
+  async function confirmBackupRestore() {
+    if (!pendingBackupRestore) return;
+    const { summary, content } = pendingBackupRestore;
+    if (!window.confirm(
+      `Restore backup from ${new Date(summary.createdAt).toLocaleString()}? This will replace your current collection and ${decks.length} deck(s) with ${summary.collectionEntryCount} collection entries and ${summary.deckCount} deck(s).`,
+    )) return;
     try {
       await request("/api/backup/restore", {
         method: "POST",
         headers: { "content-type": "application/vnd.mana-vault.backup+json" },
-        body: await file.text(),
+        body: content,
       });
+      setPendingBackupRestore(null);
       setCollection(await request<CollectionEntry[]>("/api/collection"));
       setDecks(await request<Deck[]>("/api/decks"));
       setCatalog(await request<CatalogStatus>("/api/catalog/status"));
       setSelectedDeck(null);
       setImportReport(null);
       setDeckImportReport(null);
+      setPendingCollectionImport(null);
+      setPendingDeckImport(null);
       setError("");
       showNotice("Backup restored");
     } catch (reason) {
@@ -276,27 +409,48 @@ export default function App() {
     const file = event.currentTarget.files?.[0];
     event.currentTarget.value = "";
     if (!file || !selectedDeck) return;
+    setPendingDeckImport(null);
     if (file.size > 5 * 1024 * 1024) {
       setError("Decklist file must be no larger than 5 MB");
       return;
     }
     try {
       const contentType = file.name.toLowerCase().endsWith(".csv") ? "text/csv" : "text/plain";
-      const report = await request<CollectionImportReport>(`/api/decks/${selectedDeck.id}/import`, {
+      const content = await file.text();
+      const report = await request<CollectionImportReport>(`/api/decks/${selectedDeck.id}/import/preview`, {
         method: "POST",
         headers: { "content-type": contentType },
-        body: await file.text(),
+        body: content,
       });
       setDeckImportReport(report);
-      setSelectedDeck(await request<DeckDetail>(`/api/decks/${selectedDeck.id}`));
+      setPendingDeckImport({ fileName: file.name, content, report, deckId: selectedDeck.id, deckName: selectedDeck.name });
+      setError("");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Could not import decklist");
+    }
+  }
+
+  async function confirmDeckImport() {
+    if (!pendingDeckImport) return;
+    try {
+      const contentType = pendingDeckImport.fileName.toLowerCase().endsWith(".csv") ? "text/csv" : "text/plain";
+      const report = await request<CollectionImportReport>(`/api/decks/${pendingDeckImport.deckId}/import`, {
+        method: "POST",
+        headers: { "content-type": contentType },
+        body: pendingDeckImport.content,
+      });
+      setDeckImportReport(report);
+      if (selectedDeck?.id === pendingDeckImport.deckId) {
+        setSelectedDeck(await request<DeckDetail>(`/api/decks/${pendingDeckImport.deckId}`));
+      }
       setDecks(await request<Deck[]>("/api/decks"));
+      setPendingDeckImport(null);
       setError("");
       showNotice(`Imported ${report.importedQuantity} cards from ${report.matchedRows} rows`);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Could not import decklist");
     }
   }
-
   async function createDeck(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     try {
@@ -306,6 +460,7 @@ export default function App() {
       });
       const detail = await request<DeckDetail>(`/api/decks/${deck.id}`);
       setSelectedDeck(detail);
+      setPendingDeckImport(null);
       setDeckImportReport(null);
       setDeckName("");
       setDecks(await request<Deck[]>("/api/decks"));
@@ -317,6 +472,7 @@ export default function App() {
 
   async function openDeck(deck: Deck) {
     try {
+      setPendingDeckImport(null);
       setSelectedDeck(await request<DeckDetail>(`/api/decks/${deck.id}`));
       setDeckImportReport(null);
     } catch (reason) {
@@ -440,7 +596,13 @@ export default function App() {
               ? `${catalog.printingCount.toLocaleString()} printings${catalog.updatedAt ? ` · updated ${new Date(catalog.updatedAt).toLocaleDateString()}` : ""}.`
               : "Loading local card catalog…"}
           </p>
-          <p className="side-note catalog-hint">Refresh from the latest Scryfall bulk data with the update command in the README.</p>
+          <p className="side-note catalog-hint">
+            {catalog?.update.scheduled
+              ? `Automatic refresh every ${catalog.update.intervalHours} hour(s)${catalog.update.isUpdating ? " · updating now" : ""}.`
+              : "Automatic refresh is off. Use Update card database when needed."}
+            {catalog?.update.lastAttemptAt ? ` Last attempt ${new Date(catalog.update.lastAttemptAt).toLocaleString()}.` : ""}
+            {catalog?.update.lastError ? ` Last refresh failed: ${catalog.update.lastError}` : ""}
+          </p>
         </aside>
 
         <section className="content">
@@ -450,7 +612,18 @@ export default function App() {
               <h1>{heading}</h1>
               <p>{page === "cards" ? "Find a printing, then add it to your collection or deck." : page === "collection" ? "Your owned cards, grouped by printing." : "Create and manage decks in either mode."}</p>
             </div>
-            {page === "cards" && <span className="result-count">{loading ? "Searching..." : `${cards.length} ${cards.length === 1 ? "result" : "results"}`}</span>}
+              {page === "cards" && (
+                <div className="card-heading-actions">
+                  <span className="result-count">{loading ? "Searching..." : `${cards.length} ${cards.length === 1 ? "result" : "results"}`}</span>
+                  <button
+                    className="export-button catalog-update-button"
+                    onClick={refreshCardCatalog}
+                    disabled={catalogRequestPending || !catalog || catalog.update.isUpdating}
+                  >
+                    {catalog?.update.isUpdating ? "Updating database…" : "Update card database"}
+                  </button>
+                </div>
+              )}
             {page === "collection" && (
               <div className="collection-actions">
                 <input ref={importInput} className="file-input" type="file" accept=".csv,text/csv" onChange={importCollection} aria-label="Import collection CSV" />
@@ -464,7 +637,33 @@ export default function App() {
           </div>
 
           {error && <div className="error-banner" role="alert">{error}</div>}
+          {catalog?.update.lastError && <div className="error-banner" role="alert">Last card database update failed: {catalog.update.lastError}</div>}
           {notice && <div className="notice-banner" role="status">{notice}</div>}
+          {page === "collection" && pendingBackupRestore && (
+            <section className="review-panel" aria-label="Backup restore preview">
+              <strong>Backup ready to restore: {pendingBackupRestore.fileName}</strong>
+              <p>
+                Created {new Date(pendingBackupRestore.summary.createdAt).toLocaleString()}. Includes{" "}
+                {pendingBackupRestore.summary.collectionEntryCount} collection entries, {pendingBackupRestore.summary.deckCount} decks,{" "}
+                {pendingBackupRestore.summary.deckCardCount} deck cards, and {pendingBackupRestore.summary.printingCount} required printings.
+                Restoring replaces the current collection and decks; it does not replace the full card catalog.
+              </p>
+              <div className="review-actions">
+                <button className="export-button" onClick={() => setPendingBackupRestore(null)}>Cancel</button>
+                <button className="primary-button" onClick={confirmBackupRestore}>Restore this backup</button>
+              </div>
+            </section>
+          )}
+          {page === "collection" && pendingCollectionImport && (
+            <section className="review-panel" aria-label="Collection import preview">
+              <strong>Import preview: {pendingCollectionImport.fileName}</strong>
+              <p>{pendingCollectionImport.report.matchedRows} matched rows ({pendingCollectionImport.report.importedQuantity} cards) will be added; {pendingCollectionImport.report.unmatched.length} rows will be skipped.</p>
+              <div className="review-actions">
+                <button className="export-button" onClick={() => setPendingCollectionImport(null)}>Cancel</button>
+                <button className="primary-button" onClick={confirmCollectionImport} disabled={pendingCollectionImport.report.matchedRows === 0}>Import matched rows</button>
+              </div>
+            </section>
+          )}
           {page === "collection" && importReport && importReport.unmatched.length > 0 && (
             <details className="import-report">
               <summary>{importReport.unmatched.length} CSV rows need review</summary>
@@ -482,6 +681,16 @@ export default function App() {
               ))}
               {deckImportReport.unmatched.length > 20 && <p>Showing the first 20 unmatched rows.</p>}
             </details>
+          )}
+          {page === "decks" && pendingDeckImport && (
+            <section className="review-panel" aria-label="Deck import preview">
+              <strong>Import preview for {pendingDeckImport.deckName}: {pendingDeckImport.fileName}</strong>
+              <p>{pendingDeckImport.report.matchedRows} matched rows ({pendingDeckImport.report.importedQuantity} cards) will be added; {pendingDeckImport.report.unmatched.length} rows will be skipped.</p>
+              <div className="review-actions">
+                <button className="export-button" onClick={() => setPendingDeckImport(null)}>Cancel</button>
+                <button className="primary-button" onClick={confirmDeckImport} disabled={pendingDeckImport.report.matchedRows === 0}>Import matched rows</button>
+              </div>
+            </section>
           )}
 
           {page === "cards" && (
