@@ -126,7 +126,8 @@ test("collections and decks can be sent to another account", async ({ page, brow
   await expect(status(page)).toHaveText(`Sent to ${other.name}. It is added when they accept it.`);
   await expect(page.locator("dialog[open]")).toHaveCount(0);
 
-  await page.keyboard.press("Control+n");
+  // the menu, not Ctrl+N: Chromium can keep Ctrl+N for itself (new window) instead of passing it to the page
+  await menu(page, "Deck", "New deck...");
   await expect(page.locator("#f-name")).toBeFocused();
   await page.keyboard.type("Shared deck");
   await page.keyboard.press("Enter");
