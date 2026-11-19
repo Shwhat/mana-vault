@@ -15,21 +15,43 @@ export type Card = {
   image_url: string | null;
   released_at?: string | null;
   artist?: string | null;
+  flavor_name?: string | null;
+  prices?: Prices;
 };
 
-export type OwnedIn = { id: string; name: string; regular: number; foil: number; allPrintings: number };
-export type CardDetail = Card & { owned: { regular: number; foil: number; allPrintings: number; collections: OwnedIn[] } };
+export type Prices = { usd: number | null; usd_foil: number | null; usd_etched: number | null; eur: number | null; eur_foil: number | null };
+export type PriceFields = { price_usd: number | null; price_usd_foil: number | null; price_usd_etched: number | null; price_eur: number | null; price_eur_foil: number | null };
+export type Currency = "usd" | "eur";
+/** 0 regular, 1 foil, 2 etched. */
+export type FinishCode = 0 | 1 | 2;
+export type Condition = "M" | "NM" | "LP" | "MP" | "HP" | "DMG";
 
-export type CollectionEntry = Pick<Card, "id" | "name" | "set_code" | "set_name" | "collector_number" | "rarity" | "image_url" | "colors"> & {
-  quantity: number;
-  foil: number;
+export type OwnedIn = { id: string; name: string; wishlist: boolean; regular: number; foil: number; etched: number; trade: number; allPrintings: number };
+export type CardDetail = Card & {
+  owned: { regular: number; foil: number; etched: number; allPrintings: number; collections: OwnedIn[] };
+  wanted: OwnedIn[];
+  pricesUpdatedAt: string | null;
 };
+
+/** One kind of copy in a collection: a printing in one finish, condition and language. */
+export type CopyKey = { cardId: string; foil: FinishCode; condition: Condition; language: string };
+export type CollectionEntry = Pick<Card, "id" | "name" | "set_code" | "set_name" | "collector_number" | "rarity" | "image_url" | "colors" | "mana_cost" | "mana_value" | "type_line"> &
+  PriceFields & {
+    oracle_id: string;
+    quantity: number;
+    foil: FinishCode;
+    condition: Condition;
+    language: string;
+    trade: number;
+  };
+export type TradeEntry = CollectionEntry & { collection_id: string; collection_name: string };
 
 export type Person = { id: number; name: string };
 export type Sharing = { role: "owner" | "member"; owner: Person; displayName: string | null; sharedWith: Person[] };
 
 export type CompletionRule = "main" | "all" | "names";
 export type FinishRule = "any" | "regular" | "foil" | "both";
+export type CollectionKind = "collection" | "wishlist";
 
 export type Collection = Sharing & {
   id: string;
@@ -38,9 +60,12 @@ export type Collection = Sharing & {
   description: string;
   completion: CompletionRule;
   finish: FinishRule;
+  kind: CollectionKind;
   sets: Array<{ code: string; name: string }>;
   entryCount: number;
   cardCount: number;
+  tradeCount: number;
+  value: { usd: number; eur: number; unpricedUsd: number; unpricedEur: number };
   progress: { owned: number; total: number } | null;
 };
 
@@ -131,8 +156,79 @@ export type BackupSummary = {
 
 export type User = { id: number; name: string };
 
-export type View = "cards" | "collection" | "deck" | "about";
-export type CollectionTab = "cards" | "completion" | "missing";
+export type View = "cards" | "collection" | "deck" | "trade" | "about";
+export type CollectionTab = "cards" | "completion" | "missing" | "stats";
+export type DeckTab = "cards" | "ownership" | "stats";
+
+export type Bucket = { key: string; label: string; count: number; value: number };
+export type Stats = {
+  currency: Currency; entries: number; cards: number; value: number; unpriced: number; average: number | null; median: number | null;
+  highest: { name: string; price: number } | null;
+  rarity: Bucket[]; color: Bucket[]; type: Bucket[]; curve: Bucket[]; sets: Bucket[]; finish: Bucket[];
+};
+export type Ownership = {
+  mode: DeckMode; currency: Currency; needed: number; owned: number; missing: number; missingValue: number; unpriced: number;
+  entries: Array<{
+    entryId: number; cardId: string; name: string; zone: Zone; needed: number; owned: number; missing: number; price: number | null;
+    where: Array<{ id: string; name: string; quantity: number }>;
+  }>;
+};
+
+/** Narrowing of the collection list: chosen by clicking a tag on a row or a bar in Statistics. */
+export type Facets = { rarity?: string; color?: string; type?: string; set?: string; curve?: string; finish?: string; trade?: boolean };
+export type CollectionSort = "name" | "price-desc" | "price-asc" | "quantity" | "set";
+
+export const CONDITIONS: Array<[Condition, string]> = [
+  ["M", "Mint"], ["NM", "Near mint"], ["LP", "Lightly played"], ["MP", "Moderately played"], ["HP", "Heavily played"], ["DMG", "Damaged"],
+];
+export const LANGUAGES: Array<[string, string]> = [
+  ["en", "English"], ["es", "Spanish"], ["fr", "French"], ["de", "German"], ["it", "Italian"], ["pt", "Portuguese"],
+  ["ja", "Japanese"], ["ko", "Korean"], ["ru", "Russian"], ["zhs", "Simplified Chinese"], ["zht", "Traditional Chinese"],
+  ["he", "Hebrew"], ["la", "Latin"], ["grc", "Ancient Greek"], ["ar", "Arabic"], ["sa", "Sanskrit"], ["ph", "Phyrexian"],
+];
+export const FINISHES: Array<[FinishCode, string]> = [[0, "Regular"], [1, "Foil"], [2, "Etched"]];
+export const languageName = (code: string) => LANGUAGES.find(([id]) => id === code)?.[1] ?? code;
+export const conditionName = (code: string) => CONDITIONS.find(([id]) => id === code)?.[1] ?? code;
+export const COLOR_NAMES: Record<string, string> = { W: "White", U: "Blue", B: "Black", R: "Red", G: "Green", M: "Multicolor", C: "Colorless" };
+export const CARD_TYPES = ["Creature", "Instant", "Sorcery", "Artifact", "Enchantment", "Planeswalker", "Land", "Battle"] as const;
+
+/** The same rules the server uses for Statistics, so a bar and the list it opens always agree. */
+const frontType = (typeLine: string) => typeLine.split(" // ")[0] ?? typeLine;
+export const cardTypes = (typeLine: string): string[] => {
+  const found = CARD_TYPES.filter((type) => frontType(typeLine).includes(type));
+  return found.length ? found : ["Other"];
+};
+export const colorKey = (colors: string) => (colors.length === 0 ? "C" : colors.length > 1 ? "M" : colors);
+export const curveKey = (manaValue: number | null, typeLine: string) => {
+  if (frontType(typeLine).includes("Land")) return null;
+  const value = Math.floor(manaValue ?? 0);
+  return value >= 7 ? "7+" : String(Math.max(0, value));
+};
+
+/** The price of one copy: etched uses the etched price or else the foil price; EUR has one foil price. */
+export function priceOf(prices: PriceFields, foil: FinishCode, currency: Currency): number | null {
+  if (currency === "eur") return foil === 0 ? prices.price_eur : prices.price_eur_foil;
+  return foil === 0 ? prices.price_usd : foil === 1 ? prices.price_usd_foil : prices.price_usd_etched ?? prices.price_usd_foil;
+}
+export const pricesOf = (card: { prices?: Prices }): PriceFields => ({
+  price_usd: card.prices?.usd ?? null, price_usd_foil: card.prices?.usd_foil ?? null, price_usd_etched: card.prices?.usd_etched ?? null,
+  price_eur: card.prices?.eur ?? null, price_eur_foil: card.prices?.eur_foil ?? null,
+});
+/** A printing's price in any finish, regular first: used where no finish is chosen, such as search results. */
+export const anyPrice = (fields: PriceFields, currency: Currency) => (currency === "eur"
+  ? fields.price_eur ?? fields.price_eur_foil
+  : fields.price_usd ?? fields.price_usd_foil ?? fields.price_usd_etched);
+export function money(value: number | null | undefined, currency: Currency): string {
+  if (value === null || value === undefined) return "No price";
+  return new Intl.NumberFormat(currency === "eur" ? "de-DE" : "en-US", { style: "currency", currency: currency.toUpperCase() }).format(value);
+}
+export const copyKey = (entry: Pick<CollectionEntry, "id" | "foil" | "condition" | "language">): CopyKey =>
+  ({ cardId: entry.id, foil: entry.foil, condition: entry.condition, language: entry.language });
+/** A short description of a copy beyond its printing, such as "Foil, Lightly played, Japanese". Regular, Near mint, English are left out. */
+export function copyLabel(entry: Pick<CollectionEntry, "foil" | "condition" | "language">): string {
+  return [entry.foil ? FINISHES[entry.foil]![1] : "", entry.condition !== "NM" ? conditionName(entry.condition) : "",
+    entry.language !== "en" ? languageName(entry.language) : ""].filter(Boolean).join(", ");
+}
 
 export type Filters = {
   query: string;

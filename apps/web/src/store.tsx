@@ -3,12 +3,13 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { csvCell, downloadBlob, downloadText, pickFile, request, slugify } from "./api";
 import { confirmDialog, dialog } from "./components/Dialog";
 import { activatePanel, clone, type Layout, openPanel, type PanelId, PRESETS, type Workspace } from "./dock";
-import { entryKey, useLibraryState } from "./library-state";
+import { type Counts, entryKey, useLibraryState } from "./library-state";
 import { applyTheme, type Prefs, savePrefs } from "./prefs";
 import {
   type BackupSummary, type Card, type CardDetail, type CatalogStatus, type Collection, type CollectionEntry, type CollectionTab,
-  type CompletionReport, type Deck, type DeckCard,
-  type DeckDetail, type DeckMode, EMPTY_FILTERS, type Filters, type ImportReport, type User, type View, type Zone, capitalize,
+  type CompletionReport, type Deck, type DeckCard, type DeckTab, type Facets, type FinishCode, type Ownership, type PriceFields, type Stats,
+  type DeckDetail, type DeckMode, EMPTY_FILTERS, type Filters, type ImportReport, type TradeEntry, type User, type View, type Zone, capitalize,
+  cardTypes, colorKey, conditionName, copyKey, copyLabel, curveKey, languageName, money, priceOf, pricesOf,
 } from "./types";
 
 export type Selection = { view: "cards" | "collection" | "deck"; key: string; printingId: string } | null;
@@ -16,6 +17,11 @@ export type Flash = { text: string; kind: "ok" | "err"; id: number } | null;
 type UndoEntry = { label: string; undo: () => Promise<void>; redo: () => Promise<void> };
 export type Review = { title: string; report: ImportReport; done: boolean } | null;
 type DeckKey = { deckId: string; oracle_id: string; printing_id: string | null; card_id: string; zone: Zone };
+/** One line of the trade calculator. Lines are kept until the page is reloaded or the trade is cleared. */
+export type TradeLine = {
+  id: string; cardId: string; name: string; set_code: string; collector_number: string; foil: FinishCode; quantity: number; prices: PriceFields; from?: string;
+};
+type TradeSide = "give" | "get";
 
 const UNDO_LIMIT = 150;
 
@@ -38,6 +44,14 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
   const [collections, setCollections] = useState<Collection[] | null>(null);
   const [collectionTab, setCollectionTab] = useState<CollectionTab>("cards");
   const [completion, setCompletion] = useState<CompletionReport | null>(null);
+  const [facets, setFacets] = useState<Facets>({});
+  const [binderPage, setBinderPage] = useState(0);
+  const [collectionStats, setCollectionStats] = useState<Stats | null>(null);
+  const [deckTab, setDeckTab] = useState<DeckTab>("cards");
+  const [deckStats, setDeckStats] = useState<Stats | null>(null);
+  const [ownership, setOwnership] = useState<Ownership | null>(null);
+  const [tradeList, setTradeList] = useState<TradeEntry[] | null>(null);
+  const [trade, setTrade] = useState<Record<TradeSide, TradeLine[]>>({ give: [], get: [] });
   // rows picked in the collection list; the last one clicked is also the selection
   const [checked, setChecked] = useState<Set<string>>(() => new Set());
   const anchor = useRef<string | null>(null);
@@ -60,8 +74,8 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
   const flashTimer = useRef<number | undefined>(undefined);
   const catalogPoll = useRef<(() => void) | null>(null);
   const previousUpdate = useRef<CatalogStatus["update"] | null>(null);
-  const live = useRef({ deck, collection, selection, prefs, collections, view, collectionTab, completion });
-  live.current = { deck, collection, selection, prefs, collections, view, collectionTab, completion };
+  const live = useRef({ deck, collection, selection, prefs, collections, view, collectionTab, completion, collectionStats, deckStats, ownership, tradeList, deckTab });
+  live.current = { deck, collection, selection, prefs, collections, view, collectionTab, completion, collectionStats, deckStats, ownership, tradeList, deckTab };
 
   // ---------- preferences and layout ----------
   const setPrefs = useCallback((change: Partial<Prefs> | ((current: Prefs) => Partial<Prefs>)) => {
@@ -165,6 +179,43 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
     }
   }, [fail]);
 
+  const currencyQuery = () => `currency=${live.current.prefs.currency}`;
+
+  const reloadCollectionStats = useCallback(async () => {
+    const id = live.current.prefs.openCollection;
+    if (!id) return setCollectionStats(null);
+    try {
+      setCollectionStats(await request<Stats>(`/api/collections/${encodeURIComponent(id)}/stats?${currencyQuery()}`));
+    } catch (reason) {
+      fail(reason, "Could not load the statistics.");
+    }
+  }, [fail]);
+
+  const reloadDeckInsights = useCallback(async () => {
+    const current = live.current.deck;
+    if (!current) {
+      setDeckStats(null);
+      setOwnership(null);
+      return;
+    }
+    const base = `/api/decks/${encodeURIComponent(current.id)}`;
+    try {
+      const [stats, owned] = await Promise.all([request<Stats>(`${base}/stats?${currencyQuery()}`), request<Ownership>(`${base}/ownership?${currencyQuery()}`)]);
+      setDeckStats(stats);
+      setOwnership(owned);
+    } catch (reason) {
+      fail(reason, "Could not check the deck.");
+    }
+  }, [fail]);
+
+  const reloadTradeList = useCallback(async () => {
+    try {
+      setTradeList(await request<TradeEntry[]>("/api/trade"));
+    } catch (reason) {
+      fail(reason, "Could not load the trade list.");
+    }
+  }, [fail]);
+
   const reloadDecks = useCallback(async () => {
     try {
       setDecks(await request<Deck[]>("/api/decks"));
@@ -231,16 +282,31 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
   useEffect(() => {
     setCollection(null);
     setCompletion(null);
+    setCollectionStats(null);
+    setFacets({});
+    setBinderPage(0);
     setChecked(new Set());
     anchor.current = null;
   }, [prefs.openCollection]);
+
+  useEffect(() => {
+    if (view === "collection" && collectionTab === "stats") void reloadCollectionStats();
+  }, [view, collectionTab, prefs.openCollection, prefs.currency, reloadCollectionStats]);
+
+  useEffect(() => {
+    if (view === "deck") void reloadDeckInsights();
+  }, [view, deck?.id, prefs.currency, reloadDeckInsights]);
+
+  useEffect(() => {
+    if (view === "trade") void reloadTradeList();
+  }, [view, reloadTradeList]);
 
   useEffect(() => {
     if (view === "collection" && collection === null) void reloadCollection();
   }, [view, collection, reloadCollection, prefs.openCollection]);
 
   useEffect(() => {
-    if (view === "collection" && collectionTab !== "cards") void reloadCompletion();
+    if (view === "collection" && (collectionTab === "completion" || collectionTab === "missing")) void reloadCompletion();
   }, [view, collectionTab, prefs.openCollection, reloadCompletion]);
 
   // ---------- search ----------
@@ -362,8 +428,11 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
       reloadDeck(),
       reloadDecks(),
       reloadCardDetail(),
+      live.current.collectionStats !== null ? reloadCollectionStats() : Promise.resolve(),
+      live.current.view === "deck" ? reloadDeckInsights() : Promise.resolve(),
+      live.current.tradeList !== null ? reloadTradeList() : Promise.resolve(),
     ]);
-  }, [reloadCollection, reloadCompletion, reloadCollections, reloadDeck, reloadDecks, reloadCardDetail]);
+  }, [reloadCollection, reloadCompletion, reloadCollections, reloadDeck, reloadDecks, reloadCardDetail, reloadCollectionStats, reloadDeckInsights, reloadTradeList]);
 
   /** Undo and redo run one at a time, in the order they were pressed. */
   const step = useCallback((direction: "undo" | "redo") => {
@@ -393,7 +462,7 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
 
   // ---------- collection ----------
   /** Sets exact counts in a collection; a count of 0 removes the entry. */
-  const setCounts = useCallback(async (collectionId: string, items: Array<{ cardId: string; foil: boolean; quantity: number }>) => {
+  const setCounts = useCallback(async (collectionId: string, items: Counts) => {
     if (!items.length) return;
     await request(`/api/collections/${encodeURIComponent(collectionId)}/cards`, { method: "PUT", body: JSON.stringify({ items }) });
   }, []);
@@ -407,16 +476,17 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
       return;
     }
     const foil = foilOverride ?? prefs.foil;
+    const key = { cardId, foil: (foil ? 1 : 0) as FinishCode, condition: "NM" as const, language: "en" };
     try {
       const entry = await request<CollectionEntry>(`/api/collections/${encodeURIComponent(target)}/cards`, {
-        method: "POST", body: JSON.stringify({ cardId, quantity: 1, foil }),
+        method: "POST", body: JSON.stringify({ ...key, quantity: 1 }),
       });
       const after = entry.quantity;
       const where = collectionName(target);
       pushUndo({
         label: `Add ${name}${foil ? " (foil)" : ""}`,
-        undo: () => setCounts(target, [{ cardId, foil, quantity: after - 1 }]),
-        redo: () => setCounts(target, [{ cardId, foil, quantity: after }]),
+        undo: () => setCounts(target, [{ ...key, quantity: after - 1 }]),
+        redo: () => setCounts(target, [{ ...key, quantity: after }]),
       });
       flash(`${name}${foil ? " (foil)" : ""} added to ${where}`);
       await refreshAfterChange();
@@ -428,17 +498,17 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
   const setCollectionQuantity = useCallback(async (entry: CollectionEntry, quantity: number) => {
     const target = live.current.prefs.openCollection;
     if (!target) return;
-    const foil = Boolean(entry.foil);
+    const key = copyKey(entry);
     const from = entry.quantity;
     const to = Math.max(0, Math.min(10000, quantity));
     if (from === to) return;
     try {
-      await setCounts(target, [{ cardId: entry.id, foil, quantity: to }]);
+      await setCounts(target, [{ ...key, quantity: to }]);
       const label = to === 0 ? `Remove ${entry.name}` : `${entry.name} quantity ${to}`;
       pushUndo({
         label,
-        undo: () => setCounts(target, [{ cardId: entry.id, foil, quantity: from }]),
-        redo: () => setCounts(target, [{ cardId: entry.id, foil, quantity: to }]),
+        undo: () => setCounts(target, [{ ...key, quantity: from, trade: entry.trade }]),
+        redo: () => setCounts(target, [{ ...key, quantity: to }]),
       });
       if (to === 0) flash(`${entry.name} removed from ${collectionName(target)}`);
       await refreshAfterChange();
@@ -604,7 +674,8 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
       if (!entries.length) return flash(`${collectionName(id)} is empty, so there is nothing to export`, "err");
       const rows = [
         ["Count", "Tradelist Count", "Name", "Edition", "Condition", "Language", "Foil", "Tags", "Last Modified", "Collector Number", "Alter", "Proxy", "Purchase Price"],
-        ...entries.map((entry) => [entry.quantity, 0, entry.name, entry.set_name, "", "", Boolean(entry.foil), "", "", entry.collector_number, "", "", ""]),
+        ...entries.map((entry) => [entry.quantity, entry.trade, entry.name, entry.set_code, MOXFIELD_CONDITIONS[entry.condition] ?? conditionName(entry.condition),
+          languageName(entry.language), entry.foil === 2 ? "etched" : entry.foil === 1 ? "foil" : "", "", "", entry.collector_number, "", "", ""]),
       ];
       downloadText(`${slugify(collectionName(id))}.csv`, rows.map((row) => row.map(csvCell).join(",")).join("\r\n"), "text/csv;charset=utf-8");
       flash(`${collectionName(id)} exported`);
@@ -746,12 +817,106 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
   // ---------- selection helpers for the keyboard ----------
   const visibleCollection = useMemo(() => {
     const term = collectionFilter.trim().toLowerCase();
-    const entries = collection ?? [];
-    return term ? entries.filter((entry) => `${entry.name} ${entry.set_name} ${entry.set_code}`.toLowerCase().includes(term)) : entries;
-  }, [collection, collectionFilter]);
+    const currency = prefs.currency;
+    const shown = (collection ?? []).filter((entry) =>
+      (!term || `${entry.name} ${entry.set_name} ${entry.set_code}`.toLowerCase().includes(term)) &&
+      (!facets.rarity || entry.rarity === facets.rarity) &&
+      (!facets.color || colorKey(entry.colors) === facets.color) &&
+      (!facets.type || cardTypes(entry.type_line).includes(facets.type)) &&
+      (!facets.set || entry.set_code === facets.set) &&
+      (!facets.curve || curveKey(entry.mana_value, entry.type_line) === facets.curve) &&
+      (!facets.finish || String(entry.foil) === facets.finish) &&
+      (!facets.trade || entry.trade > 0));
+    const price = (entry: CollectionEntry) => priceOf(entry, entry.foil, currency);
+    const byName = (a: CollectionEntry, b: CollectionEntry) => a.name.localeCompare(b.name) || a.set_code.localeCompare(b.set_code);
+    const sorts: Record<string, (a: CollectionEntry, b: CollectionEntry) => number> = {
+      name: () => 0,
+      "price-desc": (a, b) => (price(b) ?? -1) - (price(a) ?? -1) || byName(a, b),
+      "price-asc": (a, b) => (price(a) ?? Infinity) - (price(b) ?? Infinity) || byName(a, b),
+      quantity: (a, b) => b.quantity - a.quantity || byName(a, b),
+      set: (a, b) => a.set_name.localeCompare(b.set_name) || a.collector_number.localeCompare(b.collector_number, undefined, { numeric: true }) || byName(a, b),
+    };
+    return prefs.collectionSort === "name" ? shown : [...shown].sort(sorts[prefs.collectionSort]);
+  }, [collection, collectionFilter, facets, prefs.currency, prefs.collectionSort]);
+
+  const setFacet = useCallback((change: Facets) => {
+    setFacets((current) => {
+      const next: Facets = { ...current, ...change };
+      for (const key of Object.keys(next) as Array<keyof Facets>) if (next[key] === undefined || next[key] === false) delete next[key];
+      return next;
+    });
+    setBinderPage(0);
+  }, []);
+
+  // ---------- trade calculator ----------
+  const addTradeLine = useCallback((side: TradeSide, line: Omit<TradeLine, "id" | "quantity">) => {
+    setTrade((current) => {
+      const same = current[side].find((item) => item.cardId === line.cardId && item.foil === line.foil && item.from === line.from);
+      const lines = same
+        ? current[side].map((item) => (item === same ? { ...item, quantity: item.quantity + 1 } : item))
+        : [...current[side], { ...line, id: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`, quantity: 1 }];
+      return { ...current, [side]: lines };
+    });
+    flash(`${line.name} added to ${side === "give" ? "what you give" : "what you get"}`);
+  }, [flash]);
+
+  const setTradeQuantity = useCallback((side: TradeSide, id: string, quantity: number) => {
+    setTrade((current) => ({
+      ...current,
+      [side]: quantity <= 0 ? current[side].filter((item) => item.id !== id) : current[side].map((item) => (item.id === id ? { ...item, quantity: Math.min(999, quantity) } : item)),
+    }));
+  }, []);
+
+  const tradeTotal = useCallback((side: TradeSide) => trade[side].reduce((sum, line) => sum + (priceOf(line.prices, line.foil, prefs.currency) ?? 0) * line.quantity, 0),
+    [trade, prefs.currency]);
+
+  const clearTrade = useCallback(() => {
+    setTrade({ give: [], get: [] });
+    flash("Trade cleared");
+  }, [flash]);
+
+  const copyTradeSummary = useCallback(async () => {
+    const currency = live.current.prefs.currency;
+    if (!trade.give.length && !trade.get.length) return flash("Add cards to the trade first", "err");
+    const lines = (side: TradeSide) => trade[side].map((line) => {
+      const finish = line.foil === 2 ? " (etched)" : line.foil === 1 ? " (foil)" : "";
+      return `${line.quantity} ${line.name} (${line.set_code.toUpperCase()}) ${line.collector_number}${finish}: ${money((priceOf(line.prices, line.foil, currency) ?? 0) * line.quantity, currency)}`;
+    });
+    const give = tradeTotal("give");
+    const get = tradeTotal("get");
+    const text = [
+      `You give (${money(give, currency)})`, ...lines("give"), "",
+      `You get (${money(get, currency)})`, ...lines("get"), "",
+      `Difference: ${money(Math.abs(get - give), currency)} ${get >= give ? "in your favor" : "in their favor"}`,
+    ].join("\n");
+    try {
+      await navigator.clipboard.writeText(text);
+      flash("Trade summary copied");
+    } catch {
+      flash("Could not copy to the clipboard", "err");
+    }
+  }, [trade, tradeTotal, flash]);
+
+  const giveEntry = useCallback((entry: CollectionEntry, from?: string) => {
+    addTradeLine("give", {
+      cardId: entry.id, name: entry.name, set_code: entry.set_code, collector_number: entry.collector_number, foil: entry.foil, prices: entry,
+      from: from ?? collectionName(live.current.prefs.openCollection),
+    });
+  }, [addTradeLine, collectionName]);
+
+  const getCard = useCallback(async (cardId: string) => {
+    try {
+      const card = await request<CardDetail>(`/api/cards/${encodeURIComponent(cardId)}`);
+      addTradeLine("get", {
+        cardId, name: card.name, set_code: card.set_code, collector_number: card.collector_number, foil: live.current.prefs.foil ? 1 : 0, prices: pricesOf(card),
+      });
+    } catch (reason) {
+      fail(reason, "Could not add the card to the trade.");
+    }
+  }, [addTradeLine, fail]);
 
   const library = useLibraryState({
-    userId: user.id, live, flash, fail, setPrefs, pushUndo, clearUndo, setCounts, refreshAfterChange, reloadCollections, reloadDecks,
+    userId: user.id, live, currency: () => live.current.prefs.currency, flash, fail, setPrefs, pushUndo, clearUndo, setCounts, refreshAfterChange, reloadCollections, reloadDecks,
     openDeck, closeDeck: () => { setDeck(null); setPrefs({ lastDeckId: null }); }, collectionName, checked, setChecked, visibleCollection,
   });
 
@@ -764,7 +929,7 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
 
   const listItems = useCallback((): Array<NonNullable<Selection>> => {
     if (view === "cards") return cards.map((card) => ({ view: "cards", key: card.id, printingId: card.id }));
-    if (view === "collection") return visibleCollection.map((entry) => ({ view: "collection", key: `${entry.id}:${entry.foil}`, printingId: entry.id }));
+    if (view === "collection") return visibleCollection.map((entry) => ({ view: "collection", key: entryKey(entry), printingId: entry.id }));
     if (view === "deck" && deck) return sortDeck(deck.cards).map((card) => ({ view: "deck", key: String(card.entry_id), printingId: card.card_id }));
     return [];
   }, [view, cards, visibleCollection, deck]);
@@ -785,7 +950,7 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
   const selectedCard = useMemo((): { id: string; name: string } | null => {
     if (!selection) return null;
     const name = selection.view === "cards" ? cards.find((card) => card.id === selection.key)?.name
-      : selection.view === "collection" ? collection?.find((entry) => `${entry.id}:${entry.foil}` === selection.key)?.name
+      : selection.view === "collection" ? collection?.find((entry) => entryKey(entry) === selection.key)?.name
         : deck?.cards.find((card) => String(card.entry_id) === selection.key)?.name;
     const fallback = cardDetail?.id === selection.printingId ? cardDetail.name : undefined;
     const resolved = name ?? fallback;
@@ -796,7 +961,9 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
     user, prefs, setPrefs, setLayout, showPanel, focusPanel,
     view, setView, lastView, aboutSlug, openAbout, closeAbout,
     filters, setFilters, filtersActive, cards, loading, searchError, searchInput,
-    collection, visibleCollection, collectionFilter, setCollectionFilter, reloadCollection,
+    collection, visibleCollection, collectionFilter, setCollectionFilter, reloadCollection, facets, setFacet, binderPage, setBinderPage,
+    collectionStats, deckTab, setDeckTab, deckStats, ownership, tradeList, reloadTradeList,
+    trade, addTradeLine, setTradeQuantity, tradeTotal, clearTrade, copyTradeSummary, giveEntry, getCard,
     collections, reloadCollections, collectionName, collectionTab, setCollectionTab, completion, reloadCompletion,
     checked, setChecked, pickRow, selectMode, setSelectMode, ...library,
     decks, deck, openDeck, reloadDecks, createDeck,
@@ -811,6 +978,11 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
     scannerOpen, setScannerOpen,
   };
 }
+
+/** The condition names Moxfield uses in its CSV files. */
+const MOXFIELD_CONDITIONS: Record<string, string> = {
+  M: "Mint", NM: "Near Mint", LP: "Lightly Played", MP: "Moderately Played", HP: "Heavily Played", DMG: "Damaged",
+};
 
 const ZONE_ORDER: Record<Zone, number> = { commander: 0, main: 1, sideboard: 2 };
 export function sortDeck(cards: DeckCard[]): DeckCard[] {

@@ -38,6 +38,16 @@ Messages appear at the right end of the status bar (on the phone, in a banner ab
 | Light theme, Dark theme, or System theme | Changing the theme |
 | Workspace name, Workspace name saved, Workspace name deleted | Using, saving or deleting a workspace |
 | Ribbon reset | Reset ribbon |
+| Prices in US dollars, or Prices in euros | Changing the currency |
+| Card name changed | Copy details |
+| Card name marked for trade, or N entries marked for trade | Mark for trade |
+| Card name no longer for trade | Unmark for trade |
+| N cards added to wishlist name | Adding to the wishlist |
+| Missing cards exported (N cards) | Export missing deck cards |
+| Card name added to what you give, or to what you get | Adding to the trade calculator |
+| Trade summary copied | Copy trade summary |
+| Trade cleared | Clear trade |
+| Binder layout, or List layout | Switching the collection layout |
 | Searching for card name. Check the results before adding a card. | A successful scan |
 
 ## Problems shown by Mana Vault
@@ -65,6 +75,14 @@ Messages appear at the right end of the status bar (on the phone, in a banner ab
 | Deck name is empty, so there is nothing to export | Export deck on an empty deck | Add cards first |
 | The CSV file must be 5 MB or smaller | Collection import file too large | Split the file |
 | The decklist file must be 5 MB or smaller | Decklist file too large | Split the file |
+| Select a row in the collection first | Copy details with no collection row selected | Click a row |
+| Select a row in a collection first | Add to trade (you give) with no collection row selected | Click a row, or use Give on the trade list |
+| Enter a number for trade from 0 to N | Copy details with For trade outside the row's count | Enter a valid number |
+| Those copies are already for trade, or None of those copies are for trade | Mark or Unmark for trade with nothing to change | |
+| There is nothing to add to the wishlist | Adding nothing to the wishlist | |
+| You own every card in deck name | Add missing to wishlist or Export missing with nothing missing | |
+| Add cards to the trade first | Copy trade summary with both sides empty | Add cards to the trade |
+| Could not copy to the clipboard | The browser refused clipboard access | Allow clipboard access for the site, or use a secure (HTTPS) address |
 | Could not action. | The action failed and the server gave no reason, often because the server could not be reached | Check the connection and try again |
 
 ## Problems reported by the server
@@ -95,6 +113,9 @@ Messages appear at the right end of the status bar (on the phone, in a banner ab
 | Only a copied or transferred collection can be merged | Merging a share |
 | Only the owner can stop sharing with someone | Removing another person from an item shared with you |
 | Choose a supported deck format | The format is not in the list |
+| Each card needs a cardId, a finish, a known condition and language, and a quantity from 0 (or 1) to 10,000 | A collection change was sent with a value Mana Vault does not know; reload the page |
+| The number for trade must be a whole number from 0 to the quantity | A number for trade above the count; reload the page |
+| A collection is either a collection or a wishlist | The collection kind was not recognized; reload the page |
 | This request is missing its safety header. Reload the page and try again. | The page is out of date; reload it |
 | The server answered with an error (code) | An unexpected server error; check the server logs |
 
@@ -108,6 +129,9 @@ These reasons appear in the import preview and the Import review panel.
 | Quantity must be a whole number from 1 to 10,000 | Collection row count is not valid |
 | Quantity must be a whole number from 1 to 100 | Decklist row count is not valid, or a text line has no count |
 | Unrecognized foil value "x" | The Foil column holds something other than the accepted values |
+| Unrecognized condition "x" | The Condition column holds something other than the accepted values |
+| Unrecognized language "x" | The Language column holds an unknown language |
+| Tradelist count must be a whole number of 0 or more | The Tradelist Count column is not a whole number |
 | No card with this name exists in the local catalog | The name does not match any card; check the spelling or update the card database |
 | No printing matched set number | No printing has that set and collector number |
 | No printing matched the supplied set and collector number | The same, for decklists |

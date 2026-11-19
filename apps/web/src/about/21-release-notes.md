@@ -2,6 +2,21 @@
 
 The installed version is shown at the top of this guide.
 
+## 0.3.0 (2026-11-18): Prices, statistics, deck ownership, wishlists and trading
+
+- Prices: every card database update stores each printing's US dollar (regular, foil, etched) and euro (regular, foil) prices. Prices show in search results, the Card panel, collection rows, the binder, the trade view and the Collections panel, in US dollars or euros (PRICES in the status bar).
+- Collection and deck values, sorting a collection by price, quantity or set, and the `usd` and `eur` search filters.
+- Statistics tabs for collections and decks: stat tiles and charts for mana curve, color, type, rarity, finish and top sets. Clicking a collection chart bar lists those cards.
+- Deck ownership: an Ownership tab and owned badges show which deck cards you own, where they are and what the missing cards cost. Missing cards export as text or go to the wishlist.
+- Wishlists: any collection can be a wishlist. Its cards are wanted, not owned. Add a card (W), a set's missing cards or a deck's missing cards in one step.
+- Trading: mark copies for trade, see them in the trade list, and compare both sides in the trade calculator (key 4), with a copyable summary.
+- Copy details (E): each row now has a finish (regular, foil or etched), condition and language, and a number for trade. Collection imports and the Moxfield export carry condition, language, etched and tradelist counts.
+- Filter tags: click a set code or rarity on a collection row to list only matching cards; click a set code or rarity in search to filter by it.
+- Binder layout (B): a collection as pages of nine cards, turned with Page Up and Page Down.
+- Search and imports match flavor names (such as Godzilla series names) and the front face of two-faced cards.
+- Backups are version 3 and keep copy details and wishlists. Older backups still restore.
+- After updating, run Update card database once to load prices and flavor names. Existing copies become regular, near mint, English, or foil when they were foil.
+
 ## 0.2.0 (2026-11-18): Collections, set completion and sending
 
 - Collections: any number per account, each with a name, description, linked sets, completion rule and finish rule. Every new account starts with a Main collection.

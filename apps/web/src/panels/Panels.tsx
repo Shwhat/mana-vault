@@ -3,7 +3,7 @@ import { useState } from "react";
 import type { Action } from "../actions";
 import { Icon } from "../icons";
 import { useApp, zoneLabel } from "../store";
-import { capitalize, FORMATS } from "../types";
+import { capitalize, FORMATS, money, type OwnedIn } from "../types";
 import { Meter } from "../views/CollectionView";
 import { NoDeck, Quantity, zoneGroups } from "../views/Views";
 
@@ -58,6 +58,7 @@ export function CollectionsPanel({ actions }: { actions: Record<string, Action> 
             onClick={() => { store.openCollection(item.id); store.setView("collection"); }}>
             <span className="colline">
               <span className="nl">{item.name}</span>
+              {item.kind === "wishlist" && <span className="badge wish" title="Cards here are wanted, not owned">Wishlist</span>}
               {item.role === "member" && <span className="badge" title={`Shared by ${item.owner.name}`}>Shared</span>}
               {item.role === "owner" && item.sharedWith.length > 0 && <span className="badge" title={`Shared with ${item.sharedWith.map((person) => person.name).join(", ")}`}>Shared</span>}
               <button type="button" className={target ? "tgt on" : "tgt"} title={target ? "Add to collection puts cards here" : "Make this the collection new cards go to"}
@@ -65,7 +66,7 @@ export function CollectionsPanel({ actions }: { actions: Record<string, Action> 
                 onClick={(event) => { event.stopPropagation(); store.setTargetCollection(item.id); }}>{target ? "Adds here" : "Add here"}</button>
             </span>
             <span className="colline sub">
-              <span className="cnt">{item.cardCount} cards</span>
+              <span className="cnt">{item.cardCount} cards, {money(item.value[store.prefs.currency], store.prefs.currency)}</span>
               {item.progress && <><Meter owned={item.progress.owned} total={item.progress.total} label={`${item.name} completion`} />
                 <span className="cnt">{item.progress.total ? Math.floor((item.progress.owned / item.progress.total) * 100) : 0}%</span></>}
             </span>
@@ -106,6 +107,10 @@ export function CardPanel({ actions }: { actions: Record<string, Action> }) {
   const card = store.cardDetail;
   if (!card) return <div className="pbody"><p className="note">Select a card in a list to see its details here.</p></div>;
   const owned = card.owned;
+  const currency = store.prefs.currency;
+  const prices = card.prices;
+  const copies = (item: Pick<OwnedIn, "regular" | "foil" | "etched">) =>
+    [`${item.regular} regular`, `${item.foil} foil`, ...(item.etched ? [`${item.etched} etched`] : [])].join(", ");
   return (
     <div className="pbody">
       {card.image_url && <img className="cardimg" src={card.image_url} alt={card.name} />}
@@ -114,6 +119,8 @@ export function CardPanel({ actions }: { actions: Record<string, Action> }) {
       <div className="btnrow">
         <button type="button" className="btn primary" onClick={actions.addCollection?.run}>Add to collection</button>
         <button type="button" className="btn" disabled={!store.deck} onClick={actions.addDeck?.run}>Add to deck</button>
+        <button type="button" className="btn" onClick={actions["wishlist.add"]?.run}>Add to wishlist</button>
+        <button type="button" className="btn" onClick={actions["trade.get"]?.run}>You get</button>
       </div>
       <div className="pgrp">
         <h4>Card</h4>
@@ -128,16 +135,29 @@ export function CardPanel({ actions }: { actions: Record<string, Action> }) {
         <div className="prow"><label>Rarity</label><span>{capitalize(card.rarity)}</span></div>
         {card.artist && <div className="prow"><label>Artist</label><span>{card.artist}</span></div>}
         {card.released_at && <div className="prow"><label>Released</label><span>{card.released_at}</span></div>}
+        {card.flavor_name && <div className="prow"><label>Also printed as</label><span>{card.flavor_name}</span></div>}
+      </div>
+      <div className="pgrp">
+        <h4>Prices</h4>
+        <div className="prow"><label>Regular</label><span>{money(currency === "usd" ? prices?.usd : prices?.eur, currency)}</span></div>
+        <div className="prow"><label>Foil</label><span>{money(currency === "usd" ? prices?.usd_foil : prices?.eur_foil, currency)}</span></div>
+        {currency === "usd" && prices?.usd_etched !== null && prices?.usd_etched !== undefined && (
+          <div className="prow"><label>Etched</label><span>{money(prices.usd_etched, currency)}</span></div>)}
+        <p className="note">{card.pricesUpdatedAt ? `From the card database update on ${new Date(card.pricesUpdatedAt).toLocaleDateString()}.` : "Prices arrive with the next card database update."}</p>
       </div>
       <div className="pgrp">
         <h4>Owned</h4>
-        <div className="prow"><label>This printing</label><span>{owned.regular} regular, {owned.foil} foil</span></div>
+        <div className="prow"><label>This printing</label><span>{copies(owned)}</span></div>
         <div className="prow"><label>All printings</label><span>{owned.allPrintings}</span></div>
         {owned.collections.map((item) => (
           <div className="prow" key={item.id}><label title={item.name}>{item.name}</label>
-            <span>{item.regular || item.foil ? `${item.regular} regular, ${item.foil} foil` : "Other printings only"}{item.allPrintings > item.regular + item.foil ? ` (${item.allPrintings} with other printings)` : ""}</span></div>
+            <span>{item.regular || item.foil || item.etched ? copies(item) : "Other printings only"}
+              {item.allPrintings > item.regular + item.foil + item.etched ? ` (${item.allPrintings} with other printings)` : ""}{item.trade ? `, ${item.trade} for trade` : ""}</span></div>
         ))}
         {!owned.collections.length && <p className="note">Not in any of your collections.</p>}
+        {card.wanted.map((item) => (
+          <div className="prow" key={item.id}><label title={item.name}>{item.name}</label><span>Wanted: {item.allPrintings} {item.allPrintings === 1 ? "copy" : "copies"} (wishlist)</span></div>
+        ))}
       </div>
     </div>
   );

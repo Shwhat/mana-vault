@@ -1,5 +1,6 @@
 import { parse } from "csv-parse/sync";
 import type { DatabaseSync } from "node:sqlite";
+import { type Condition, type FinishCode, readCondition, readLanguage } from "./copies.js";
 
 type CsvRow = Record<string, string>;
 
@@ -7,6 +8,11 @@ export interface CollectionImportResult {
   matchedRows: number;
   importedQuantity: number;
   unmatched: Array<{ row: number; name: string; reason: string }>;
+}
+
+/** A name matches a card's name, its flavor name, or the front face of a two-faced card. */
+export function nameMatch(name: string): [string, string, string] {
+  return [name, name, `${name.replace(/[\\%_]/g, "\\$&")} // %`];
 }
 
 function findColumn(columns: string[], ...names: string[]): string | undefined {
@@ -34,17 +40,20 @@ export function importCollectionCsv(database: DatabaseSync, csv: string, commit 
   const quantityColumn = findColumn(columns, "count", "quantity", "qty");
   const setColumn = findColumn(columns, "edition", "set", "set code", "set name");
   const collectorColumn = findColumn(columns, "collector number", "collector_number", "number");
-  const foilColumn = findColumn(columns, "foil");
+  const foilColumn = findColumn(columns, "foil", "finish", "printing");
+  const conditionColumn = findColumn(columns, "condition");
+  const languageColumn = findColumn(columns, "language", "lang");
+  const tradeColumn = findColumn(columns, "tradelist count", "trade count", "trade");
   const findPrinting = database.prepare(
     `SELECT id FROM cards
-     WHERE name = ? COLLATE NOCASE
+     WHERE (name = ? COLLATE NOCASE OR flavor_name = ? COLLATE NOCASE OR name LIKE ? ESCAPE '\\')
        AND (? = '' OR lower(set_code) = lower(?) OR set_name = ? COLLATE NOCASE)
        AND (? = '' OR collector_number = ?)
-     ORDER BY released_at DESC, set_code, collector_number
+     ORDER BY name = ? COLLATE NOCASE DESC, released_at DESC, set_code, collector_number
      LIMIT 1`,
   );
   const unmatched: CollectionImportResult["unmatched"] = [];
-  const additions = new Map<string, { cardId: string; foil: boolean; quantity: number }>();
+  const additions = new Map<string, { cardId: string; foil: FinishCode; condition: Condition; language: string; quantity: number; trade: number }>();
   let matchedRows = 0;
   let importedQuantity = 0;
 
@@ -63,14 +72,30 @@ export function importCollectionCsv(database: DatabaseSync, csv: string, commit 
     }
 
     const foilText = readCell(row, foilColumn).toLowerCase();
-    if (!["", "false", "no", "n", "0", "true", "yes", "y", "1", "foil", "nonfoil", "non-foil"].includes(foilText)) {
+    if (!["", "false", "no", "n", "0", "true", "yes", "y", "1", "foil", "nonfoil", "non-foil", "normal", "regular", "etched"].includes(foilText)) {
       unmatched.push({ row: index + 2, name, reason: `Unrecognized foil value "${foilText}"` });
       return;
     }
-    const foil = ["true", "yes", "y", "1", "foil"].includes(foilText);
+    const foil: FinishCode = foilText === "etched" ? 2 : ["true", "yes", "y", "1", "foil"].includes(foilText) ? 1 : 0;
+    const condition = readCondition(readCell(row, conditionColumn));
+    if (!condition) {
+      unmatched.push({ row: index + 2, name, reason: `Unrecognized condition "${readCell(row, conditionColumn)}"` });
+      return;
+    }
+    const language = readLanguage(readCell(row, languageColumn));
+    if (!language) {
+      unmatched.push({ row: index + 2, name, reason: `Unrecognized language "${readCell(row, languageColumn)}"` });
+      return;
+    }
+    const tradeText = readCell(row, tradeColumn) || "0";
+    const trade = Number(tradeText);
+    if (!Number.isInteger(trade) || trade < 0) {
+      unmatched.push({ row: index + 2, name, reason: "Tradelist count must be a whole number of 0 or more" });
+      return;
+    }
     const set = readCell(row, setColumn);
     const collectorNumber = readCell(row, collectorColumn);
-    const printing = findPrinting.get(name, set, set, set, collectorNumber, collectorNumber) as { id: string } | undefined;
+    const printing = findPrinting.get(...nameMatch(name), set, set, set, collectorNumber, collectorNumber, name) as { id: string } | undefined;
     if (!printing) {
       const details = [set, collectorNumber].filter(Boolean).join(" ");
       unmatched.push({
@@ -81,9 +106,10 @@ export function importCollectionCsv(database: DatabaseSync, csv: string, commit 
       return;
     }
 
-    const key = `${printing.id}\u0000${foil ? "1" : "0"}`;
-    const addition = additions.get(key) ?? { cardId: printing.id, foil, quantity: 0 };
+    const key = [printing.id, foil, condition, language].join("\u0000");
+    const addition = additions.get(key) ?? { cardId: printing.id, foil, condition, language, quantity: 0, trade: 0 };
     addition.quantity += quantity;
+    addition.trade += Math.min(trade, quantity);
     additions.set(key, addition);
     matchedRows += 1;
     importedQuantity += quantity;
@@ -93,11 +119,12 @@ export function importCollectionCsv(database: DatabaseSync, csv: string, commit 
     database.exec("BEGIN");
     try {
       const insert = database.prepare(
-        `INSERT INTO collection_cards (collection_id, card_id, quantity, foil) VALUES (?, ?, ?, ?)
-         ON CONFLICT(collection_id, card_id, foil) DO UPDATE SET quantity = MIN(10000, quantity + excluded.quantity)`,
+        `INSERT INTO collection_cards (collection_id, card_id, foil, condition, language, quantity, trade) VALUES (?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(collection_id, card_id, foil, condition, language) DO UPDATE SET quantity = MIN(10000, quantity + excluded.quantity),
+           trade = MIN(MIN(10000, quantity + excluded.quantity), trade + excluded.trade)`,
       );
       for (const addition of additions.values()) {
-        insert.run(collectionId, addition.cardId, addition.quantity, addition.foil ? 1 : 0);
+        insert.run(collectionId, addition.cardId, addition.foil, addition.condition, addition.language, Math.min(10_000, addition.quantity), Math.min(10_000, addition.trade));
       }
       database.exec("COMMIT");
     } catch (error) {

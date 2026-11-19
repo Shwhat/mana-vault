@@ -6,7 +6,7 @@ import { entryKey } from "../library-state";
 import type { Store } from "../store";
 import { useApp } from "../store";
 import {
-  type Collection, type CollectionEntry, COMPLETION_RULES, FINISH_RULES, type Offer, SEND_MODES, type SetInfo,
+  type Collection, type CollectionEntry, COMPLETION_RULES, CONDITIONS, FINISH_RULES, FINISHES, type FinishCode, LANGUAGES, type Offer, SEND_MODES, type SetInfo,
 } from "../types";
 import { customDialog, dialog } from "./Dialog";
 
@@ -63,10 +63,12 @@ export function collectionDialog(store: Store, existing?: Collection) {
     ["description", "Description", existing?.description ?? ""],
     ["completion", "Completion rule", existing?.completion ?? "main", "select", COMPLETION_RULES],
     ["finish", "Finish rule", existing?.finish ?? "any", "select", FINISH_RULES],
+    ["wishlist", "Wishlist", existing?.kind === "wishlist", "check"],
   ], async (values) => {
     const input: CollectionInput = {
       name: String(values.name), description: String(values.description),
-      completion: values.completion as CollectionInput["completion"], finish: values.finish as CollectionInput["finish"], sets: holder.sets,
+      completion: values.completion as CollectionInput["completion"], finish: values.finish as CollectionInput["finish"],
+      kind: values.wishlist ? "wishlist" : "collection", sets: holder.sets,
     };
     if (!input.name) {
       store.flash("Enter a collection name", "err");
@@ -89,9 +91,34 @@ export function collectionDialog(store: Store, existing?: Collection) {
         Completion rules: Main set counts the numbered cards printed in the set. Every printing also counts variants and promos.
         Each card name once needs one copy of each card, printed in a linked set. Finish rules decide whether regular, foil or both copies count.
       </p>
+      <p className="note">A wishlist holds cards you want. Its cards do not count as owned in the Card panel or the deck ownership check, and they are not on your trade list.</p>
       {existing?.role === "member" && <p className="note">This collection is shared with you by {existing.owner.name}. Your changes apply for both of you.</p>}
     </>
   ), 620);
+}
+
+/** Finish, condition, language and the number for trade of one collection row. */
+export function copyDialog(store: Store, entry: CollectionEntry) {
+  dialog(`Copy details: ${entry.name}`, [
+    ["foil", "Finish", String(entry.foil), "select", FINISHES.map(([code, label]) => [String(code), label])],
+    ["condition", "Condition", entry.condition, "select", CONDITIONS],
+    ["language", "Language", entry.language, "select", LANGUAGES],
+    ["trade", "For trade", String(entry.trade), "number"],
+  ], async (values) => {
+    const trade = Number(values.trade);
+    if (!Number.isInteger(trade) || trade < 0 || trade > entry.quantity) {
+      store.flash(`Enter a number for trade from 0 to ${entry.quantity}`, "err");
+      return false;
+    }
+    await store.editCopy(entry, {
+      foil: Number(values.foil) as FinishCode, condition: values.condition as CollectionEntry["condition"], language: String(values.language), trade,
+    });
+  }, "Save", (
+    <p className="note">
+      {entry.quantity} {entry.quantity === 1 ? "copy" : "copies"} of {entry.set_name} {entry.collector_number}. All copies in this row change together.
+      If another row already has the new finish, condition and language, the two rows are merged. For trade is how many of these copies are on your trade list.
+    </p>
+  ), 460);
 }
 
 export function moveDialog(store: Store, entries: CollectionEntry[]) {

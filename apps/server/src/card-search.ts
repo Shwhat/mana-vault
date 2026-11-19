@@ -16,8 +16,8 @@ export function parseCardQuery(query: string): SearchClause[] {
     if (!filter) {
       const term = token.replace(/^"|"$/g, "");
       if (term) clauses.push({
-        sql: "(name LIKE ? ESCAPE '\\' OR type_line LIKE ? ESCAPE '\\' OR oracle_text LIKE ? ESCAPE '\\')",
-        values: Array(3).fill(pattern(term)),
+        sql: "(name LIKE ? ESCAPE '\\' OR type_line LIKE ? ESCAPE '\\' OR oracle_text LIKE ? ESCAPE '\\' OR flavor_name LIKE ? ESCAPE '\\')",
+        values: Array(4).fill(pattern(term)),
       });
       continue;
     }
@@ -35,8 +35,8 @@ export function parseCardQuery(query: string): SearchClause[] {
       let sql: string;
       let values: string[];
       if (key === "name") {
-        sql = "name LIKE ? ESCAPE '\\'";
-        values = [pattern(value)];
+        sql = "(name LIKE ? ESCAPE '\\' OR flavor_name LIKE ? ESCAPE '\\')";
+        values = [pattern(value), pattern(value)];
       } else if (key === "type" || key === "t") {
         sql = "type_line LIKE ? ESCAPE '\\'";
         values = [pattern(value)];
@@ -80,6 +80,16 @@ export function parseCardQuery(query: string): SearchClause[] {
       const amount = Number(value);
       if (!Number.isFinite(amount) || amount < 0 || amount > 100) throw new Error("Mana value must be from 0 to 100");
       clauses.push({ sql: `${negate}(mana_value ${operator === ":" ? "=" : operator} ?)`, values: [String(amount)] });
+      continue;
+    }
+
+    if (key === "usd" || key === "eur") {
+      if (!["=", ":", ">", "<", ">=", "<="].includes(operator)) throw new Error(`${rawKey} needs a comparison operator`);
+      const amount = Number(value);
+      if (!Number.isFinite(amount) || amount < 0 || amount > 1_000_000) throw new Error("Prices must be a number of 0 or more");
+      // the regular price, or the foil price for printings that only come in foil
+      const field = key === "usd" ? "COALESCE(price_usd, price_usd_foil, price_usd_etched)" : "COALESCE(price_eur, price_eur_foil)";
+      clauses.push({ sql: `${negate}(${field} ${operator === ":" ? "=" : operator} CAST(? AS REAL))`, values: [String(amount)] });
       continue;
     }
 

@@ -2,7 +2,8 @@
 import type { Action } from "../actions";
 import { Icon } from "../icons";
 import { sortDeck, useApp, zoneLabel } from "../store";
-import { capitalize, type DeckCard, ZONES, type Zone } from "../types";
+import { anyPrice, capitalize, type DeckCard, type DeckTab, money, pricesOf, ZONES, type Zone } from "../types";
+import { StatsPanel } from "./StatsView";
 
 export function Thumb({ url, small }: { url: string | null; small?: boolean }) {
   return url
@@ -70,10 +71,22 @@ export function CardsView({ actions, onFilters }: { actions: Record<string, Acti
               <div className="rowmain">
                 <div className="rowtitle"><b>{card.name}</b><span className="mana">{card.mana_cost}</span></div>
                 <div className="rowsub">{card.type_line}</div>
-                <div className="rowmeta">{card.set_name} <span className="badge">{card.set_code.toUpperCase()}</span> {card.collector_number} <span className={`rar ${card.rarity}`}>{capitalize(card.rarity)}</span></div>
+                <div className="rowmeta">{card.set_name}{" "}
+                  <button type="button" className="tag badge" title={`Show only cards from ${card.set_name}`}
+                    onClick={(event) => { event.stopPropagation(); store.setFilters({ set: card.set_code }); }}>{card.set_code.toUpperCase()}</button>{" "}
+                  {card.collector_number}{" "}
+                  <button type="button" className={`tag rar ${card.rarity}`} title={`Show only ${card.rarity} cards`}
+                    onClick={(event) => { event.stopPropagation(); store.setFilters({ rarity: card.rarity }); }}>{capitalize(card.rarity)}</button>
+                  {card.flavor_name && <span className="copylbl"> Also printed as {card.flavor_name}</span>}
+                </div>
               </div>
+              <span className="price">{money(anyPrice(pricesOf(card), store.prefs.currency), store.prefs.currency)}</span>
               <div className="rowact">
                 <button type="button" className="btn small" title="Add to collection (Enter)" onClick={(event) => { event.stopPropagation(); void store.addToCollection(card.id, card.name); }}>+ Collection</button>
+                <button type="button" className="btn small" title="Add to wishlist (W)" onClick={(event) => {
+                  event.stopPropagation();
+                  void store.addToWishlist([{ cardId: card.id, foil: store.prefs.foil ? 1 : 0, condition: "NM", language: "en", quantity: 1 }], card.name);
+                }}>+ Wishlist</button>
                 {deck && <button type="button" className="btn small" title="Add to deck (Shift+Enter)" onClick={(event) => { event.stopPropagation(); void store.addToDeck(card.id, card.name); }}>+ Deck</button>}
               </div>
             </div>
@@ -118,11 +131,52 @@ export function zoneGroups(cards: DeckCard[]): Array<{ zone: Zone; cards: DeckCa
     .filter((group) => group.cards.length);
 }
 
+function OwnershipTab({ actions }: { actions: Record<string, Action> }) {
+  const store = useApp();
+  const report = store.ownership;
+  if (!report) return <div className="emptynote">Checking which cards you own</div>;
+  const currency = report.currency;
+  const percent = report.needed ? Math.floor((report.owned / report.needed) * 1000) / 10 : 0;
+  return (
+    <div className="list compwrap">
+      <div className="stattile">
+        <div className="stlabel">Cards you own</div>
+        <div className="stvalue">{percent}%</div>
+        <div className="stsub">{report.owned} of {report.needed} owned, {report.missing} missing{report.missing ? `, ${money(report.missingValue, currency)} to buy` : ""}
+          {report.unpriced ? ` (${report.unpriced} without a price)` : ""}</div>
+        <span className="meter" role="meter" aria-label="Cards you own" aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent}>
+          <span className="meterfill" style={{ width: `${percent}%` }} /></span>
+      </div>
+      <div className="rulesline">
+        <span>{report.mode === "theme" ? "Theme deck: only the exact printing counts." : "Normal deck: any printing counts."} Copies in your collections count, wishlists do not. Each copy counts once.</span>
+        <button type="button" className="btn small" disabled={!report.missing} onClick={actions["deck.missingWishlist"]?.run}>Add missing to wishlist</button>
+        <button type="button" className="btn small" disabled={!report.missing} onClick={actions["deck.exportMissing"]?.run}>Export missing</button>
+      </div>
+      <div className="meterlist" role="table" aria-label="Deck ownership">
+        <div className="mrow orow mhead" role="row"><span role="columnheader">Card</span><span role="columnheader">Owned</span><span role="columnheader">Where</span>
+          <span role="columnheader" className="mnum">To buy</span></div>
+        {report.entries.map((entry) => (
+          <div className={`mrow orow${entry.missing ? "" : " done"}`} role="row" key={entry.entryId}
+            onClick={() => store.select({ view: "deck", key: String(entry.entryId), printingId: entry.cardId })}>
+            <span role="cell" className="mname">{entry.name}{entry.zone !== "main" && <span className="badge"> {zoneLabel(entry.zone)}</span>}</span>
+            <span role="cell"><span className={entry.missing ? "badge" : "badge own"}>{entry.owned} of {entry.needed}</span></span>
+            <span role="cell" className="sub">{entry.where.length ? entry.where.map((place) => `${place.name} (${place.quantity})`).join(", ") : "Not in your collections"}</span>
+            <span role="cell" className="mnum">{entry.missing ? `${entry.missing} x ${money(entry.price, currency)}` : "Owned"}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function DeckView({ actions }: { actions: Record<string, Action> }) {
   const store = useApp();
   const { deck, selection } = store;
   if (!deck) return <div className="view"><div id="pagetabs"><span className="phname">Deck</span></div><NoDeck actions={actions} /></div>;
   const total = deck.cards.reduce((sum, card) => sum + card.quantity, 0);
+  const tabs: Array<[DeckTab, string]> = [["cards", "Cards"], ["ownership", "Ownership"], ["stats", "Statistics"]];
+  const owned = new Map((store.ownership?.entries ?? []).map((entry) => [entry.entryId, entry]));
+  const currency = store.prefs.currency;
   return (
     <div className="view" id="view-deck">
       <div id="pagetabs">
@@ -131,10 +185,18 @@ export function DeckView({ actions }: { actions: Record<string, Action> }) {
         <span className={deck.mode === "theme" ? "badge main" : "badge"}>{deck.mode === "theme" ? "Theme" : "Normal"}</span>
         {deck.role === "member" && <span className="badge">Shared by {deck.owner?.name}</span>}
         {deck.role === "owner" && (deck.sharedWith?.length ?? 0) > 0 && <span className="badge">Shared with {deck.sharedWith!.map((person) => person.name).join(", ")}</span>}
+        <div className="seg" role="tablist" aria-label="Deck view">
+          {tabs.map(([id, label]) => (
+            <button key={id} type="button" role="tab" aria-selected={store.deckTab === id} className={store.deckTab === id ? "on" : ""} onClick={() => store.setDeckTab(id)}>{label}</button>
+          ))}
+        </div>
         <span className="phwhere">{deck.mode === "theme" ? "Each card keeps the exact printing you selected" : "Cards are tracked by name; any printing counts"}</span>
-        <span className="phpos">{total} cards</span>
+        <span className="phpos">{total} cards{store.deckStats ? `, value ${money(store.deckStats.value, currency)}` : ""}
+          {store.ownership && store.ownership.needed > 0 ? `, ${store.ownership.owned} owned` : ""}</span>
       </div>
-      <div className="list" role="listbox" aria-label="Deck cards">
+      {store.deckTab === "ownership" && <OwnershipTab actions={actions} />}
+      {store.deckTab === "stats" && <StatsPanel stats={store.deckStats} kind="deck" />}
+      {store.deckTab === "cards" && <div className="list" role="listbox" aria-label="Deck cards">
         {deck.cards.length === 0 && (
           <div className="empty">
             <Icon name="deck" />
@@ -161,6 +223,10 @@ export function DeckView({ actions }: { actions: Record<string, Action> }) {
                     <div className="rowsub">{card.type_line}</div>
                     <div className="rowmeta">{card.printing_id ? <>{card.set_name} <span className="badge">{card.set_code.toUpperCase()}</span> {card.collector_number}</> : "Any printing"}</div>
                   </div>
+                  {owned.has(card.entry_id) && (
+                    <span className={owned.get(card.entry_id)!.missing ? "badge" : "badge own"} title={owned.get(card.entry_id)!.where.map((place) => `${place.name}: ${place.quantity}`).join(", ") || "Not in your collections"}>
+                      Own {owned.get(card.entry_id)!.owned} of {card.quantity}</span>
+                  )}
                   <Quantity value={card.quantity} name={card.name} max={100} onChange={(quantity) => void store.setDeckQuantity(card, quantity)} />
                   <select className="zonesel" aria-label={`Move ${card.name} to zone`} value={card.zone}
                     onClick={(event) => event.stopPropagation()}
@@ -174,7 +240,7 @@ export function DeckView({ actions }: { actions: Record<string, Action> }) {
             })}
           </div>
         ))}
-      </div>
+      </div>}
     </div>
   );
 }

@@ -53,6 +53,18 @@ function useKeyboard(store: Store, actions: Record<string, Action>) {
         case "1": run("view.cards"); break;
         case "2": run("view.collection"); break;
         case "3": run("view.deck"); break;
+        case "4": run("view.trade"); break;
+        case "w": case "W": run("wishlist.add"); break;
+        case "e": case "E": run("copy.details"); break;
+        case "b": case "B": run("collection.binder"); break;
+        case "t": case "T": run("trade.give"); break;
+        case "g": case "G": run("trade.get"); break;
+        case "PageDown": case "PageUp":
+          if (store.view === "collection" && store.prefs.collectionLayout === "binder") {
+            event.preventDefault();
+            store.setBinderPage(Math.max(0, store.binderPage + (event.key === "PageDown" ? 1 : -1)));
+          }
+          break;
         case "f": case "F": run("foil"); break;
         case "z": case "Z": run("zone.cycle"); break;
         case "c": case "C": run("collection.target"); break;

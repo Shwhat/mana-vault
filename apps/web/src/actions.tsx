@@ -1,13 +1,13 @@
 // ---------- actions: every command is defined once and called by name from menus, ribbon and keys ----------
 import { useMemo } from "react";
 import { request } from "./api";
-import { customDialog, dialog } from "./components/Dialog";
+import { confirmDialog, customDialog, dialog } from "./components/Dialog";
 import { RibbonCustomize } from "./components/RibbonCustomize";
-import { collectionDialog, inboxDialog, moveDialog, renameDeckDialog, sendDialog, sharingDialog } from "./components/LibraryDialogs";
+import { collectionDialog, copyDialog, inboxDialog, moveDialog, renameDeckDialog, sendDialog, sharingDialog } from "./components/LibraryDialogs";
 import { isOpen, type PanelId, PANELS, PRESET_NAMES, removePanel } from "./dock";
 import { DEFAULT_RIBBON } from "./ribbon";
 import { type Store, useApp } from "./store";
-import { capitalize, FORMATS, type Zone } from "./types";
+import { capitalize, type CollectionTab, type DeckTab, FORMATS, type Zone } from "./types";
 
 export type Action = {
   label: string;
@@ -26,15 +26,22 @@ export const SHORTCUTS: Array<[group: string, key: string, action: string]> = [
   ["Search", "1", "view.cards"],
   ["Search", "2", "view.collection"],
   ["Search", "3", "view.deck"],
+  ["Search", "4", "view.trade"],
   ["Search", "Up, Down", "Select the previous or next row"],
   ["Adding cards", "Enter", "addCollection"],
   ["Adding cards", "Shift+Enter", "addDeck"],
   ["Adding cards", "F", "foil"],
   ["Adding cards", "Z", "zone.cycle"],
   ["Adding cards", "C", "collection.target"],
+  ["Adding cards", "W", "wishlist.add"],
   ["Collections", "Ctrl+A", "pickAll"],
   ["Collections", "Ctrl+click, Shift+click", "Pick more rows, or a range of rows"],
   ["Collections", "Delete", "removePicked"],
+  ["Collections", "E", "copy.details"],
+  ["Collections", "B", "collection.binder"],
+  ["Collections", "Page Up, Page Down", "Show the previous or next binder page"],
+  ["Trade", "T", "trade.give"],
+  ["Trade", "G", "trade.get"],
   ["Editing", "Ctrl+Z", "undo"],
   ["Editing", "Ctrl+Y", "redo"],
   ["Decks", "Ctrl+N", "newDeck"],
@@ -50,10 +57,21 @@ export function useActions(store: Store): Record<string, Action> {
     const target = store.collections?.find((item) => item.id === prefs.targetCollection) ?? null;
     const picked = store.checked.size;
     const noCollection = () => store.flash("Create a collection first (Collection menu, New collection)", "err");
-    const showTab = (tab: "cards" | "completion" | "missing") => {
+    const showTab = (tab: CollectionTab) => {
       store.setView("collection");
       store.setCollectionTab(tab);
     };
+    const showDeckTab = (tab: DeckTab) => {
+      store.setView("deck");
+      store.setDeckTab(tab);
+    };
+    const entry = store.view === "collection" && store.selection?.view === "collection"
+      ? store.collection?.find((item) => `${item.id}:${item.foil}:${item.condition}:${item.language}` === store.selection?.key) ?? null : null;
+    const markable = store.view === "collection" ? store.pickedEntries() : [];
+    const currency = (value: "usd" | "eur", label: string): Action => ({
+      label, short: value.toUpperCase(), icon: value, on: prefs.currency === value,
+      run: () => { store.setPrefs({ currency: value }); store.flash(label); },
+    });
     const setZone = (zone: Zone) => {
       store.setPrefs({ zone });
       store.flash(`New deck cards go to ${zone === "main" ? "the main deck" : `the ${zone}`}`);
@@ -116,6 +134,70 @@ export function useActions(store: Store): Record<string, Action> {
         run: () => inboxDialog(store),
       },
       "view.deck": { label: "Deck view", short: "Deck", icon: "deck", key: "3", on: store.view === "deck", run: () => store.setView("deck") },
+      "view.trade": { label: "Trade view", short: "Trade", icon: "trade", key: "4", on: store.view === "trade", run: () => store.setView("trade") },
+      "collection.stats": {
+        label: "Collection statistics", short: "Statistics", icon: "stats", on: store.view === "collection" && store.collectionTab === "stats", run: () => showTab("stats"),
+      },
+      "collection.binder": {
+        label: "Binder layout", short: "Binder", icon: "binder", key: "B", on: prefs.collectionLayout === "binder",
+        run: () => {
+          const next = prefs.collectionLayout === "binder" ? "list" : "binder";
+          store.setPrefs({ collectionLayout: next });
+          if (store.view !== "collection" || store.collectionTab !== "cards") showTab("cards");
+          store.flash(next === "binder" ? "Binder layout" : "List layout");
+        },
+      },
+      "copy.details": {
+        label: "Copy details...", short: "Details", icon: "edit", key: "E", disabled: !entry,
+        run: () => (entry ? copyDialog(store, entry) : store.flash("Select a row in the collection first", "err")),
+      },
+      "trade.mark": {
+        label: "Mark for trade", short: "For trade", icon: "trade", disabled: !markable.length,
+        run: () => void store.markTrade(markable, true),
+      },
+      "trade.unmark": {
+        label: "Unmark for trade", short: "Not for trade", icon: "clear", disabled: !markable.length,
+        run: () => void store.markTrade(markable, false),
+      },
+      "trade.give": {
+        label: "Add to trade (you give)", short: "You give", icon: "trade", key: "T", disabled: !entry,
+        run: () => (entry ? store.giveEntry(entry) : store.flash("Select a row in a collection first", "err")),
+      },
+      "trade.get": {
+        label: "Add to trade (you get)", short: "You get", icon: "trade", key: "G", disabled: !selected,
+        run: () => (selected ? void store.getCard(selected.id) : store.flash("Select a card first", "err")),
+      },
+      "trade.copy": {
+        label: "Copy trade summary", short: "Copy summary", icon: "copy", disabled: !store.trade.give.length && !store.trade.get.length,
+        run: () => void store.copyTradeSummary(),
+      },
+      "trade.clear": {
+        label: "Clear trade...", short: "Clear trade", icon: "clear", disabled: !store.trade.give.length && !store.trade.get.length,
+        run: () => void confirmDialog("Clear trade", <>Remove every card from both sides of the trade?</>, "Clear trade").then((ok) => { if (ok) store.clearTrade(); }),
+      },
+      "wishlist.add": {
+        label: "Add to wishlist", short: "Wishlist", icon: "wish", key: "W", disabled: !selected,
+        run: () => (selected
+          ? void store.addToWishlist([{ cardId: selected.id, foil: prefs.foil ? 1 : 0, condition: "NM", language: "en", quantity: 1 }], selected.name)
+          : store.flash("Select a card first", "err")),
+      },
+      "wishlist.missing": {
+        label: "Add missing cards to wishlist", short: "Missing to wishlist", icon: "wish", disabled: !open?.sets.length || open.kind === "wishlist",
+        run: () => void store.addMissingToWishlist(),
+      },
+      "deck.cards": { label: "Deck cards", short: "Cards", icon: "deck", on: store.view === "deck" && store.deckTab === "cards", run: () => showDeckTab("cards") },
+      "deck.ownership": { label: "Deck ownership", short: "Ownership", icon: "owned", on: store.view === "deck" && store.deckTab === "ownership", run: () => showDeckTab("ownership") },
+      "deck.stats": { label: "Deck statistics", short: "Statistics", icon: "stats", on: store.view === "deck" && store.deckTab === "stats", run: () => showDeckTab("stats") },
+      "deck.missingWishlist": {
+        label: "Add missing deck cards to wishlist", short: "Missing to wishlist", icon: "wish", disabled: !deck,
+        run: () => void store.addDeckMissingToWishlist(),
+      },
+      "deck.exportMissing": {
+        label: "Export missing deck cards (text)", short: "Missing text", icon: "txt", disabled: !deck,
+        run: () => void store.exportDeckMissing(),
+      },
+      "currency.usd": currency("usd", "Prices in US dollars"),
+      "currency.eur": currency("eur", "Prices in euros"),
       find: {
         label: "Find card", short: "Find", icon: "find", key: "/",
         run: () => {

@@ -4,7 +4,7 @@ import { chain } from "stream-chain";
 import { parser } from "stream-json";
 import { streamArray } from "stream-json/streamers/stream-array.js";
 import { DatabaseSync } from "node:sqlite";
-import { cardExtrasStatement, cardInsertStatement } from "./database.js";
+import { cardExtrasStatement, cardInsertStatement, cardPricesStatement } from "./database.js";
 
 export async function importBulkFile(
   dataPath: string,
@@ -13,6 +13,7 @@ export async function importBulkFile(
 ): Promise<number> {
   const insertCard = cardInsertStatement(database);
   const insertExtras = cardExtrasStatement(database);
+  const insertPrices = cardPricesStatement(database);
   let imported = 0;
   const importValue = (value: unknown) => {
     const card = parsePrinting(value);
@@ -37,6 +38,8 @@ export async function importBulkFile(
       card.artist,
     );
     insertExtras.run(card.finishes.join(","), card.promo ? 1 : 0, card.variation ? 1 : 0, card.id);
+    const prices = card.prices;
+    insertPrices.run(prices.usd, prices.usd_foil, prices.usd_etched, prices.eur, prices.eur_foil, card.flavorName, card.id);
     imported += 1;
     if (imported % 25_000 === 0) onProgress?.(imported);
   };
@@ -123,6 +126,19 @@ interface Printing {
   finishes: string[];
   promo: boolean;
   variation: boolean;
+  prices: Record<"usd" | "usd_foil" | "usd_etched" | "eur" | "eur_foil", number | null>;
+  flavorName: string | null;
+}
+
+/** Scryfall sends prices as decimal strings or null; anything else is treated as no price. */
+function parsePrices(value: unknown): Printing["prices"] {
+  const record = value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+  const read = (key: string) => {
+    const text = record[key];
+    const number = typeof text === "string" ? Number(text) : typeof text === "number" ? text : NaN;
+    return Number.isFinite(number) && number >= 0 ? number : null;
+  };
+  return { usd: read("usd"), usd_foil: read("usd_foil"), usd_etched: read("usd_etched"), eur: read("eur"), eur_foil: read("eur_foil") };
 }
 
 function parsePrinting(value: unknown): Printing {
@@ -171,6 +187,9 @@ function parsePrinting(value: unknown): Printing {
     finishes: Array.isArray(record.finishes) ? record.finishes.filter((finish): finish is string => typeof finish === "string") : [],
     promo: record.promo === true,
     variation: record.variation === true,
+    prices: parsePrices(record.prices),
+    flavorName: typeof record.flavor_name === "string" && record.flavor_name ? record.flavor_name
+      : typeof cardFaceRecord?.flavor_name === "string" && cardFaceRecord.flavor_name ? cardFaceRecord.flavor_name : null,
   };
 }
 

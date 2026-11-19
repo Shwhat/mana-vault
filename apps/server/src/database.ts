@@ -150,14 +150,7 @@ function initializeLibrary(database: DatabaseSync): void {
       set_code TEXT NOT NULL,
       PRIMARY KEY (collection_id, set_code)
     );
-    CREATE TABLE IF NOT EXISTS collection_cards (
-      collection_id TEXT NOT NULL REFERENCES collections(id) ON DELETE CASCADE,
-      card_id TEXT NOT NULL REFERENCES cards(id) ON DELETE CASCADE,
-      foil INTEGER NOT NULL DEFAULT 0 CHECK(foil IN (0, 1)),
-      quantity INTEGER NOT NULL CHECK(quantity > 0),
-      PRIMARY KEY (collection_id, card_id, foil)
-    );
-    CREATE INDEX IF NOT EXISTS collection_cards_card_idx ON collection_cards(card_id);
+    CREATE TABLE IF NOT EXISTS collection_cards (${COLLECTION_CARDS_COLUMNS});
     CREATE TABLE IF NOT EXISTS members (
       kind TEXT NOT NULL CHECK(kind IN ('collection', 'deck')),
       item_id TEXT NOT NULL,
@@ -178,6 +171,7 @@ function initializeLibrary(database: DatabaseSync): void {
       answered_at TEXT
     );
   `);
+  upgradeCopies(database);
   const legacy = database.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'collection_items'").get();
   if (legacy) {
     database.exec("BEGIN");
@@ -200,6 +194,62 @@ function initializeLibrary(database: DatabaseSync): void {
   assignUnowned(database);
 }
 
+/**
+ * One row per kind of copy in a collection: printing, finish (0 regular, 1 foil, 2 etched), condition and language.
+ * trade is how many of those copies are offered for trade.
+ */
+const COLLECTION_CARDS_COLUMNS = `
+      collection_id TEXT NOT NULL REFERENCES collections(id) ON DELETE CASCADE,
+      card_id TEXT NOT NULL REFERENCES cards(id) ON DELETE CASCADE,
+      foil INTEGER NOT NULL DEFAULT 0 CHECK(foil IN (0, 1, 2)),
+      condition TEXT NOT NULL DEFAULT 'NM' CHECK(condition IN ('M', 'NM', 'LP', 'MP', 'HP', 'DMG')),
+      language TEXT NOT NULL DEFAULT 'en',
+      quantity INTEGER NOT NULL CHECK(quantity > 0),
+      trade INTEGER NOT NULL DEFAULT 0 CHECK(trade >= 0),
+      PRIMARY KEY (collection_id, card_id, foil, condition, language)`;
+
+/** Prices, flavor names, wishlists and copy details (0.3.0). Rebuilds collection_cards from 0.2.0 with the new key. */
+function upgradeCopies(database: DatabaseSync): void {
+  const cardColumns = new Set(
+    (database.prepare("PRAGMA table_info(cards)").all() as Array<{ name: string }>).map((column) => column.name),
+  );
+  for (const column of ["price_usd", "price_usd_foil", "price_usd_etched", "price_eur", "price_eur_foil"]) {
+    if (!cardColumns.has(column)) database.exec(`ALTER TABLE cards ADD COLUMN ${column} REAL`);
+  }
+  if (!cardColumns.has("flavor_name")) database.exec("ALTER TABLE cards ADD COLUMN flavor_name TEXT");
+  database.exec("CREATE INDEX IF NOT EXISTS cards_oracle_idx ON cards(oracle_id)");
+  database.exec("CREATE INDEX IF NOT EXISTS cards_flavor_idx ON cards(flavor_name) WHERE flavor_name IS NOT NULL");
+  const collectionColumns = new Set(
+    (database.prepare("PRAGMA table_info(collections)").all() as Array<{ name: string }>).map((column) => column.name),
+  );
+  if (!collectionColumns.has("kind")) {
+    database.exec("ALTER TABLE collections ADD COLUMN kind TEXT NOT NULL DEFAULT 'collection' CHECK(kind IN ('collection', 'wishlist'))");
+  }
+  const copyColumns = new Set(
+    (database.prepare("PRAGMA table_info(collection_cards)").all() as Array<{ name: string }>).map((column) => column.name),
+  );
+  if (!copyColumns.has("condition")) {
+    database.exec("PRAGMA foreign_keys = OFF");
+    database.exec("BEGIN");
+    try {
+      database.exec(`
+        CREATE TABLE collection_cards_v3 (${COLLECTION_CARDS_COLUMNS});
+        INSERT INTO collection_cards_v3 (collection_id, card_id, foil, quantity)
+          SELECT collection_id, card_id, foil, quantity FROM collection_cards;
+        DROP TABLE collection_cards;
+        ALTER TABLE collection_cards_v3 RENAME TO collection_cards;
+      `);
+      database.exec("COMMIT");
+    } catch (error) {
+      database.exec("ROLLBACK");
+      throw error;
+    } finally {
+      database.exec("PRAGMA foreign_keys = ON");
+    }
+  }
+  database.exec("CREATE INDEX IF NOT EXISTS collection_cards_card_idx ON collection_cards(card_id)");
+}
+
 /** Collections and decks without an owner (from before accounts owned data) go to the oldest account. */
 export function assignUnowned(database: DatabaseSync): void {
   const oldest = database.prepare("SELECT id FROM users ORDER BY id LIMIT 1").get();
@@ -211,6 +261,13 @@ export function assignUnowned(database: DatabaseSync): void {
 /** Card details that 0.2.0 added; kept separate so older callers of cardInsertStatement keep working. */
 export function cardExtrasStatement(database: DatabaseSync) {
   return database.prepare("UPDATE cards SET finishes = ?, promo = ?, variation = ? WHERE id = ?");
+}
+
+/** Prices and the flavor name (0.3.0), stored on each card database update. */
+export function cardPricesStatement(database: DatabaseSync) {
+  return database.prepare(
+    "UPDATE cards SET price_usd = ?, price_usd_foil = ?, price_usd_etched = ?, price_eur = ?, price_eur_foil = ?, flavor_name = ? WHERE id = ?",
+  );
 }
 
 export function cardInsertStatement(database: DatabaseSync) {

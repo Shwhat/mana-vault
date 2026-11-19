@@ -6,7 +6,7 @@ Card search finds printings in the local card database. The search box and the F
 
 - Press **/** (or **Find**) to jump to the search box. Press Down to move from the box into the results.
 - Results update a quarter of a second after you stop typing.
-- A plain word matches a card whose name, type line or rules text contains it. Several words must all match.
+- A plain word matches a card whose name, flavor name, type line or rules text contains it. Several words must all match. A flavor name is the other name some printings carry, such as a Godzilla series name; results show it as "Also printed as".
 - Put words in double quotes to search for a phrase, for example `"draw a card"`.
 - Up to 40 results are shown, sorted by name and then by newest printing first. Narrow the search to see more specific results.
 
@@ -16,7 +16,7 @@ A filter is a key, an operator and a value with no spaces, such as `t:dragon`. P
 
 | Filter | Matches | Example |
 |---|---|---|
-| `name:` | Card name contains the text | `name:bolt` |
+| `name:` | Card name or flavor name contains the text | `name:bolt` |
 | `t:` or `type:` | Type line contains the text | `t:legendary` |
 | `o:` or `oracle:` | Rules text contains the text | `o:"enters the battlefield"` |
 | `m:` or `mana:` | Mana cost contains the text | `m:{R}{R}` |
@@ -27,6 +27,7 @@ A filter is a key, an operator and a value with no spaces, such as `t:dragon`. P
 | `c:c` or `c:colorless` | Card has no color (with `id:`, no color identity) | `c:c` |
 | `mv` or `cmc` | Mana value compared with =, :, <, >, <= or >= | `mv>=4` |
 | `legal:` or `f:` | Card is legal in the format | `legal:commander` |
+| `usd`, `eur` | Price compared with =, :, <, >, <= or >=. The regular price, or the foil price for printings only in foil. Printings without a price never match | `usd<1`, `eur>=20` |
 
 Colors are W (white), U (blue), B (black), R (red) and G (green), or a color name. Mana values run from 0 to 100.
 
@@ -40,6 +41,8 @@ Colors are W (white), U (blue), B (black), R (red) and G (green), or a color nam
 | Invalid color filter "x" | The value contains something other than W, U, B, R, G or a color name |
 | Mana value needs a comparison operator | `mv` was followed by something other than =, :, <, >, <= or >= |
 | Mana value must be from 0 to 100 | The number is outside the range |
+| usd needs a comparison operator (or eur) | `usd` or `eur` was followed by something other than =, :, <, >, <= or >= |
+| Prices must be a number of 0 or more | The price is not a number, or is below 0 |
 | Invalid format "x" | The format name has characters other than letters, digits or dashes |
 
 ## Filters panel
@@ -55,6 +58,10 @@ Colors are W (white), U (blue), B (black), R (red) and G (green), or a color nam
 
 Changing a field switches the work area to the card search. **Clear filters** empties the search box and every field.
 
+## Result rows
+
+Each result shows the image, name, mana cost, type line, set, set code, collector number, rarity and price. Clicking the set code fills the Set code filter; clicking the rarity sets the Rarity filter. **+ Collection**, **+ Wishlist** and, while a deck is open, **+ Deck** appear when you point at a row.
+
 ## The selected card
 
 Click a result (or move to it with Up and Down) to select it. The Card panel shows its details. From the selected card:
@@ -63,6 +70,8 @@ Click a result (or move to it with Up and Down) to select it. The Card panel sho
 |---|---|
 | Add one copy to the collection | Enter, **+ Collection**, double-click, **Add to collection** |
 | Add one copy to the open deck, in the target zone | Shift+Enter, **+ Deck**, **Add to deck** |
+| Add one copy to the wishlist | W, **+ Wishlist**, **Add to wishlist** |
+| Add one copy to the trade calculator's You get side | G, **Add to trade (you get)**, **You get** |
 
 ## Empty results
 

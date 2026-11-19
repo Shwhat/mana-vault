@@ -16,13 +16,13 @@ The data folder can also hold default-cards.json, the last downloaded card catal
 
 | Part | Contents |
 |---|---|
-| Collections | Every collection you own, with its name, description, completion rule, finish rule, linked sets and dates |
-| Collection cards | Every entry: collection, printing, count and foil |
+| Collections | Every collection you own, with its name, description, completion rule, finish rule, whether it is a wishlist, linked sets and dates |
+| Collection cards | Every entry: collection, printing, count, finish, condition, language and number for trade |
 | Decks | Every deck you own, with its name, format, mode and dates |
 | Deck cards | Every card in those decks, with zone, count and printing for Theme decks |
 | Cards | The card records they use, so a backup can be restored on a server with an empty card database |
 
-A backup does not contain collections or decks shared with you by others, accounts, preferences or the full card database.
+A backup does not contain collections or decks shared with you by others, accounts, preferences, prices, the trade calculator or the full card database. Prices return with the next card database update.
 
 ## Restoring a backup
 
@@ -31,7 +31,7 @@ A backup does not contain collections or decks shared with you by others, accoun
 3. Choose **Restore backup** to go ahead, or **Cancel**.
 4. Your own collections and decks are replaced by the backup's. Items you had shared stop being shared, and offers of them are cancelled. Collections and decks shared with you by others, and other accounts' data, are not changed. The card records in the backup are added to the card database; the rest of the card database is unchanged.
 
-A restore cannot be undone, and it clears the undo history. Backups made before version 0.2.0 hold a single collection; they restore as a collection named Main collection. Download a backup first if the current data might be needed.
+A restore cannot be undone, and it clears the undo history. Backups made before version 0.2.0 hold a single collection; they restore as a collection named Main collection. Backups made before version 0.3.0 restore every copy as near mint English with none for trade, and every collection as a collection (not a wishlist). Download a backup first if the current data might be needed.
 
 ### Restore messages
 

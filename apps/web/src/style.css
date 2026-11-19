@@ -432,3 +432,91 @@ dialog::backdrop{background:rgba(20,28,40,.35)}
 .phone .colhead .seg{flex:1 1 100%}
 .phone .row .rowmain{flex:1 1 150px}
 .phone.picking .row .rowtitle b{white-space:normal}
+
+/* ---------- 0.3.0: prices, tags, trade, wishlists, binder, statistics ---------- */
+.tag{border:0;font:inherit;cursor:pointer;padding:0 5px;background:none}
+.tag.rar{padding:0;background:none}
+.tag:hover{text-decoration:underline}
+.tag.badge{background:#e3e7ee;color:var(--muted)}
+.copylbl{color:var(--muted)}
+.badge.trade{background:#dff0e0;color:#1e5e2a;font-weight:600;margin-left:4px}
+.badge.wish{background:#f9e0e0;color:#8a2a2a;font-weight:600}
+.badge.own{background:#dff0e0;color:#1e5e2a}
+.colhead .phpos{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.price{min-width:74px;text-align:right;font-variant-numeric:tabular-nums;color:var(--muted);flex:none;font-size:11.5px}
+.row .badge.foil{margin-left:4px}
+
+.binderwrap{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;align-items:center;padding:12px;gap:10px}
+.binder{display:grid;grid-template-columns:repeat(3,minmax(0,min(170px,calc((100vh - 330px) / 3 * 63 / 88))));gap:10px;padding:12px;border:1px solid #c9b48a;border-radius:6px;background:#f4ead6}
+.pocket{position:relative;aspect-ratio:63/88;border-radius:6px;background:var(--panel2);border:1px solid var(--line);overflow:hidden;cursor:pointer}
+.pocket img{width:100%;height:100%;object-fit:cover;display:block}
+.pocket.active{outline:3px solid var(--sel);outline-offset:1px}
+.emptypocket{background:rgba(255,255,255,.45);border-style:dashed;cursor:default}
+.pocketname{display:flex;height:100%;align-items:center;justify-content:center;text-align:center;padding:8px;font-weight:600}
+.pocketqty{position:absolute;right:4px;top:4px;min-width:20px;padding:0 5px;border-radius:8px;background:#2b3442;color:#fff;font-size:11px;font-weight:700;line-height:18px;text-align:center}
+.pocketfoil{position:absolute;left:4px;top:4px}
+.pockettrade{position:absolute;left:4px;bottom:22px;margin:0}
+.pocketprice{position:absolute;left:0;right:0;bottom:0;padding:1px 6px;background:rgba(20,28,40,.72);color:#fff;font-size:11px;font-variant-numeric:tabular-nums;text-align:right}
+.binderpager{display:flex;align-items:center;gap:10px;color:var(--muted);font-variant-numeric:tabular-nums}
+
+.statswrap{padding:12px}
+.tilerow{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;max-width:1100px}
+.stattile.small{max-width:none}
+.stattile.small .stvalue{font-size:22px}
+.stattile.small .stsub{margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chartgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:10px;max-width:1100px}
+.chartcard{position:relative;border:1px solid var(--line);border-radius:4px;background:var(--panel);padding:8px 10px}
+.chartcard.wide{grid-column:1 / -1}
+.chartcard h4{margin:0 0 6px;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;color:var(--muted)}
+.chartcard h4 .sub{text-transform:none;letter-spacing:0;font-weight:400}
+.bars{display:flex;flex-direction:column}
+.barrow{position:relative;display:grid;grid-template-columns:110px 1fr;gap:8px;align-items:center;min-height:22px;border-radius:3px;outline:none}
+.barrow.pickable{cursor:pointer}
+.barrow.hover{background:var(--hover)}
+.barlabel{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-left:4px}
+.bartrack{display:flex;align-items:center;gap:6px;min-width:0}
+.barfill{display:block;height:12px;border-radius:0 4px 4px 0;background:var(--accent);flex:none;max-width:calc(100% - 70px)}
+.barfig{font-variant-numeric:tabular-nums;color:var(--text);font-size:11.5px;white-space:nowrap}
+.bartip{position:absolute;z-index:5;left:110px;top:-26px;padding:3px 8px;border-radius:4px;background:#2b3442;color:#fff;font-size:11.5px;white-space:nowrap;pointer-events:none;box-shadow:0 6px 18px rgba(0,0,0,.18)}
+.cvs{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:8px;height:150px;align-items:end}
+.cvitem{position:relative;display:flex;flex-direction:column;align-items:center;height:100%;border-radius:3px;outline:none}
+.cvitem.pickable{cursor:pointer}
+.cvitem.hover{background:var(--hover)}
+.cvitem .bartip{left:50%;transform:translateX(-50%);top:-8px}
+.cvfig{font-size:11.5px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.cvtrack{flex:1;width:100%;display:flex;align-items:flex-end;justify-content:center}
+.cvfill{display:block;width:min(24px,70%);border-radius:4px 4px 0 0;background:var(--accent)}
+.cvlabel{font-size:11.5px;color:var(--muted);border-top:1px solid var(--line);width:100%;text-align:center}
+
+.orow{grid-template-columns:minmax(160px,1.2fr) 80px minmax(120px,2fr) 130px;cursor:pointer}
+.orow.done .mname{color:var(--muted)}
+.orow .sub{margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.tradegrid{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr)}
+.tradelist{display:flex;flex-direction:column;min-height:0;border-right:1px solid var(--line)}
+.tradelist .filterbar .search{flex:1;max-width:240px}
+.tradecalc{overflow:auto;padding:12px;display:flex;flex-direction:column;gap:10px}
+.tradesides{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px}
+.tradeside{min-width:0}
+.tradeside{border:1px solid var(--line);border-radius:4px;background:var(--panel)}
+.tradehead{display:flex;align-items:center;padding:6px 10px;border-bottom:1px solid var(--line2)}
+.tradesum{margin-left:auto;font-weight:600;font-variant-numeric:tabular-nums}
+.tradeline{cursor:default}
+.tradeline .nl{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.tradeline .sub{margin:0}
+.tradeline .qty .qn{display:inline}
+
+:root[data-theme=dark] .tag.badge{background:#323a45;color:#b8c1cc}
+:root[data-theme=dark] .badge.trade,:root[data-theme=dark] .badge.own{background:#1f3b26;color:#b8e6c1}
+:root[data-theme=dark] .badge.wish{background:#4a2626;color:#f3c4c4}
+:root[data-theme=dark] .binder{background:#2d2a22;border-color:#5a4d33}
+:root[data-theme=dark] .emptypocket{background:rgba(0,0,0,.2)}
+:root[data-theme=dark] .bartip{background:#e3e7ec;color:#1d232c}
+
+.phone .tradegrid{display:flex;flex-direction:column;overflow:auto}
+.phone .tradelist{border-right:0;min-height:260px}
+.phone .tradesides{grid-template-columns:1fr}
+.phone .binder{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;padding:6px;width:100%}
+.phone .orow{grid-template-columns:1fr 80px}
+.phone .orow > span:nth-child(3){grid-column:1 / -1}
+.phone .price{min-width:60px}

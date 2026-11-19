@@ -8,6 +8,7 @@ import { importDecklist } from "./deck-import.js";
 import { createBackup, inspectBackup, restoreBackup } from "./backup.js";
 import { parseCardQuery } from "./card-search.js";
 import { type CatalogUpdateStatus } from "./catalog-updater.js";
+import { registerInsightRoutes } from "./insights.js";
 import { access, createCollection, forgetItem, itemSharing, registerLibraryRoutes } from "./library.js";
 import {
   AuthStore, COOKIE_NAME, DEFAULT_ITERATIONS, GUARD_HEADER, Limiter, readCookie, SESSION_DAYS, sessionCookie,
@@ -127,6 +128,7 @@ export async function buildApp(
   });
 
   registerLibraryRoutes(app, database);
+  registerInsightRoutes(app, database);
 
   app.post<{ Params: { deckId: string }; Body: string }>("/api/decks/:deckId/import/preview", async (request, reply) => {
     if (typeof request.body !== "string" || !request.body.trim()) {
@@ -186,7 +188,7 @@ export async function buildApp(
     assignUnowned(database);
     // every account starts with a collection, so Add to collection works at once
     if (!database.prepare("SELECT 1 FROM collections WHERE owner_id = ?").get(user.id)) {
-      createCollection(database, user.id, { name: "Main collection", description: "", completion: "main", finish: "any", sets: [] });
+      createCollection(database, user.id, { name: "Main collection", description: "", completion: "main", finish: "any", kind: "collection", sets: [] });
     }
     return startSession(request, reply, user);
   });
@@ -366,7 +368,7 @@ export async function buildApp(
       const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
       const rows = database.prepare(
         `SELECT id, oracle_id, name, mana_cost, mana_value, type_line, oracle_text, colors, color_identity, legalities,
-                set_code, set_name, collector_number, rarity, image_url, released_at, artist
+                set_code, set_name, collector_number, rarity, image_url, released_at, artist, ${CARD_PRICE_COLUMNS}
          FROM cards ${where} ORDER BY name, released_at DESC LIMIT ?`,
       ).all(...values, parsedLimit);
       return rows.map(toCardRow);
@@ -376,16 +378,18 @@ export async function buildApp(
   app.get<{ Params: { cardId: string } }>("/api/cards/:cardId", async (request, reply) => {
     const row = database.prepare(
       `SELECT id, oracle_id, name, mana_cost, mana_value, type_line, oracle_text, colors, color_identity, legalities,
-              set_code, set_name, collector_number, rarity, image_url, released_at, artist
+              set_code, set_name, collector_number, rarity, image_url, released_at, artist, ${CARD_PRICE_COLUMNS}
        FROM cards WHERE id = ?`,
     ).get(request.params.cardId);
     if (!row) return reply.code(404).send({ error: "Card printing not found" });
     const card = toCardRow(row);
     const userId = request.user!.id;
     const collections = database.prepare(
-      `SELECT col.id, COALESCE(m.display_name, col.name) AS name,
+      `SELECT col.id, COALESCE(m.display_name, col.name) AS name, col.kind,
               COALESCE(SUM(CASE WHEN i.card_id = ? AND i.foil = 0 THEN i.quantity END), 0) AS regular,
               COALESCE(SUM(CASE WHEN i.card_id = ? AND i.foil = 1 THEN i.quantity END), 0) AS foil,
+              COALESCE(SUM(CASE WHEN i.card_id = ? AND i.foil = 2 THEN i.quantity END), 0) AS etched,
+              COALESCE(SUM(i.trade), 0) AS trade,
               COALESCE(SUM(i.quantity), 0) AS all_printings
        FROM collections col
        LEFT JOIN members m ON m.kind = 'collection' AND m.item_id = col.id AND m.user_id = ?
@@ -393,17 +397,18 @@ export async function buildApp(
        JOIN cards c ON c.id = i.card_id AND c.oracle_id = ?
        WHERE col.owner_id = ? OR m.user_id IS NOT NULL
        GROUP BY col.id ORDER BY col.created_at, col.rowid`,
-    ).all(card.id, card.id, userId, card.oracle_id, userId).map((row) => ({
-      id: String(row.id), name: String(row.name), regular: Number(row.regular), foil: Number(row.foil), allPrintings: Number(row.all_printings),
+    ).all(card.id, card.id, card.id, userId, card.oracle_id, userId).map((row) => ({
+      id: String(row.id), name: String(row.name), wishlist: row.kind === "wishlist", regular: Number(row.regular), foil: Number(row.foil),
+      etched: Number(row.etched), trade: Number(row.trade), allPrintings: Number(row.all_printings),
     }));
+    // copies in wishlists are wanted, not owned
+    const owned = collections.filter((item) => !item.wishlist);
+    const sum = (key: "regular" | "foil" | "etched" | "allPrintings") => owned.reduce((total, item) => total + item[key], 0);
     return {
       ...card,
-      owned: {
-        regular: collections.reduce((sum, item) => sum + item.regular, 0),
-        foil: collections.reduce((sum, item) => sum + item.foil, 0),
-        allPrintings: collections.reduce((sum, item) => sum + item.allPrintings, 0),
-        collections,
-      },
+      owned: { regular: sum("regular"), foil: sum("foil"), etched: sum("etched"), allPrintings: sum("allPrintings"), collections: owned },
+      wanted: collections.filter((item) => item.wishlist),
+      pricesUpdatedAt: String(database.prepare("SELECT value FROM catalog_metadata WHERE key = 'updated_at'").get()?.value ?? "") || null,
     };
   });
 
@@ -619,7 +624,7 @@ export async function buildApp(
   return app;
 }
 
-function toCardRow(row: Record<string, unknown>): CardRow {
+function toCardRow(row: Record<string, unknown>): CardRow & { flavor_name: string | null; prices: Record<string, number | null> } {
   const required = (key: string): string => {
     const value = row[key];
     if (typeof value !== "string") throw new Error(`Invalid card database value for ${key}`);
@@ -648,5 +653,13 @@ function toCardRow(row: Record<string, unknown>): CardRow {
     image_url: optional("image_url"),
     released_at: optional("released_at"),
     artist: optional("artist"),
+    flavor_name: optional("flavor_name"),
+    prices: {
+      usd: price(row.price_usd), usd_foil: price(row.price_usd_foil), usd_etched: price(row.price_usd_etched),
+      eur: price(row.price_eur), eur_foil: price(row.price_eur_foil),
+    },
   };
 }
+
+const price = (value: unknown) => (typeof value === "number" ? value : null);
+const CARD_PRICE_COLUMNS = "flavor_name, price_usd, price_usd_foil, price_usd_etched, price_eur, price_eur_foil";

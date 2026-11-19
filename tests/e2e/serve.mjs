@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { fileURLToPath } from "node:url";
 import { buildApp } from "../../apps/server/dist/app.js";
-import { cardExtrasStatement, cardInsertStatement, initializeDatabase } from "../../apps/server/dist/database.js";
+import { cardExtrasStatement, cardInsertStatement, cardPricesStatement, initializeDatabase } from "../../apps/server/dist/database.js";
 import { saveSets } from "../../apps/server/dist/sets.js";
 
 const port = Number(process.env.E2E_PORT ?? 4317);
@@ -26,11 +26,19 @@ const cards = [
   ["serra", "o-serra", "Serra Angel", "{3}{W}{W}", 5, "Creature - Angel", "Flying, vigilance", "W", "lea", "Limited Edition Alpha", "39", "uncommon", "1993-08-05", "Douglas Shuler"],
   ["atraxa", "o-atraxa", "Atraxa, Praetors' Voice", "{G}{W}{U}{B}", 4, "Legendary Creature - Phyrexian Angel Horror", "Flying, vigilance, deathtouch, lifelink\nAt the beginning of your end step, proliferate.", "WUBG", "c16", "Commander 2016", "28", "mythic", "2016-11-11", "Victor Adame Minguez"],
 ];
+// USD regular, USD foil, USD etched, EUR regular, EUR foil; Sol Ring has no price; Shivan Dragon is also printed as "Shivan the Mighty"
+const prices = {
+  "bolt-lea": [400, null, null, 350, null], "bolt-m10": [2.5, 12, null, 2, 10], shivan: [900, null, null, 800, null], counterspell: [150, null, null, 130, null],
+  llanowar: [60, null, null, 55, null], swords: [120, null, null, 110, null], "dark-ritual": [40, null, null, 35, null], serra: [80, null, null, 70, null],
+  atraxa: [12, 25, 30, 11, 22],
+};
 const insert = cardInsertStatement(database);
 const extras = cardExtrasStatement(database);
+const priced = cardPricesStatement(database);
 for (const [id, oracle, name, cost, mv, type, text, colors, set, setName, number, rarity, released, artist] of cards) {
   insert.run(id, oracle, name, cost, mv, type, text, colors, colors, legal, set, setName, number, rarity, null, released, artist);
   extras.run("nonfoil,foil", 0, 0, id);
+  priced.run(...(prices[id] ?? [null, null, null, null, null]), id === "shivan" ? "Shivan the Mighty" : null, id);
 }
 // Limited Edition Alpha is treated as a 9-card set here so set completion has something to count
 saveSets(database, { data: [

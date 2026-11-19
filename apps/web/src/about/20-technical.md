@@ -52,6 +52,9 @@ The container checks itself every 30 seconds by running the server with `-health
 - Imports accept files up to 5 MB and 5,000 rows; backups up to 25 MB.
 - Set completion needs Scryfall's set list for printed sizes; it arrives with the first card database update after installing 0.2.0.
 - Card images need internet access to Scryfall's image servers.
+- Prices are as old as the last card database update, and are not kept over time.
+- The trade calculator is kept in the browser until the page is reloaded.
+- Ownership counts copies once per deck; two decks may count the same copies.
 
 ## Third-party components
 
