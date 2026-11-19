@@ -20,7 +20,7 @@ export function HomeView({ actions }: { actions: Record<string, Action> }) {
   );
   return (
     <div className="view" id="view-home">
-      <div id="pagetabs"><span className="phname">Home</span></div>
+      <div id="pagetabs" className="homehead"><span className="phname">Home</span></div>
       <div className="list homewrap">
         <div className="hometiles">
           {tile("Cards owned", cards.toLocaleString(), () => store.setView("collection"))}

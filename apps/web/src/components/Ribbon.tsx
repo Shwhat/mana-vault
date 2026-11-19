@@ -81,6 +81,7 @@ export function Ribbon({ actions }: { actions: Record<string, Action> }) {
   const active = ribbon.find((tab) => tab.id === store.prefs.ribbonTab) ?? ribbon[0];
   const shown = useGroupShown();
   const [open, setOpen] = useState<Open>(null);
+  const [wsOpen, setWsOpen] = useState<{ x: number; y: number } | null>(null);
 
   // opening a deck shows the Decks tab, where its commands appear
   const deckId = store.deck?.id;
@@ -106,14 +107,16 @@ export function Ribbon({ actions }: { actions: Record<string, Action> }) {
             {tab.name}
           </div>
         ))}
-        <label className="wsbox">
+        <div className="wsbox">
           Workspace
-          <select aria-label="Workspace" value={workspaceNames.includes(store.prefs.workspace) ? store.prefs.workspace : ""}
-            onChange={(event) => store.applyWorkspace(event.target.value)}>
-            {!workspaceNames.includes(store.prefs.workspace) && <option value="">Custom</option>}
-            {workspaceNames.map((name) => <option key={name} value={name}>{name}</option>)}
-          </select>
-        </label>
+          <button type="button" className="wsbtn" aria-haspopup="menu" aria-expanded={wsOpen !== null}
+            onMouseDown={(event) => {
+              event.stopPropagation();
+              if (wsOpen) return setWsOpen(null);
+              const rect = event.currentTarget.getBoundingClientRect();
+              setWsOpen({ x: Math.max(4, rect.right - 230), y: rect.bottom });
+            }}>{workspaceNames.includes(store.prefs.workspace) ? store.prefs.workspace : "Custom"} ▾</button>
+        </div>
       </div>
       <div className="rpanel" role="toolbar" aria-label={active?.name}>
         {active?.groups.filter(shown).map((group, index) => {
@@ -155,6 +158,39 @@ export function Ribbon({ actions }: { actions: Record<string, Action> }) {
         })}
       </div>
       {open && <DropDown open={open} actions={actions} onClose={() => setOpen(null)} />}
+      {wsOpen && <WorkspaceMenu at={wsOpen} names={workspaceNames} actions={actions} onClose={() => setWsOpen(null)} />}
+    </div>
+  );
+}
+
+/** The workspace list at the end of the ribbon tabs: every workspace, then the workspace commands. */
+function WorkspaceMenu({ at, names, actions, onClose }: { at: { x: number; y: number }; names: string[]; actions: Record<string, Action>; onClose: () => void }) {
+  const store = useApp();
+  useEffect(() => {
+    const close = () => onClose();
+    const key = (event: KeyboardEvent) => { if (event.key === "Escape") close(); };
+    window.addEventListener("mousedown", close);
+    window.addEventListener("keydown", key);
+    window.addEventListener("resize", close);
+    return () => {
+      window.removeEventListener("mousedown", close);
+      window.removeEventListener("keydown", key);
+      window.removeEventListener("resize", close);
+    };
+  }, [onClose]);
+  return (
+    <div id="dropdown" role="menu" aria-label="Workspaces" style={{ left: at.x, top: at.y }} onMouseDown={(event) => event.stopPropagation()}>
+      {names.map((name) => (
+        <div key={name} role="menuitem" className="dd" onClick={() => { onClose(); store.applyWorkspace(name); }}>
+          <span className="ck">{store.prefs.workspace === name ? "✓" : ""}</span><span className="dl">{name}</span><span className="k" />
+        </div>
+      ))}
+      <div className="ddsep" />
+      {["workspace.save", "workspace.manage", "workspace.reset"].map((id) => actions[id] && (
+        <div key={id} role="menuitem" className="dd" onClick={() => { onClose(); actions[id]!.run(); }}>
+          <span className="ck" /><span className="dl">{actions[id]!.label}</span><span className="k" />
+        </div>
+      ))}
     </div>
   );
 }

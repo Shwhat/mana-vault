@@ -27,7 +27,7 @@ A new account starts with an empty collection named **Main collection** that is 
 
 **Add to collection** always puts cards into the **target collection**. The status bar shows it as ADD TO: name.
 
-- Change it with **Cycle target collection** (C), by clicking ADD TO in the status bar, with **Add here** on a row of the Collections panel, or with **Add cards here** in the collection view header.
+- Change it with **Cycle target collection** (C), by clicking ADD TO in the status bar, with **Add here** on a row of the Collections panel, or with **+ Add** in the collection view header.
 - The target is kept for your account. If it is deleted, the first remaining collection becomes the target.
 - In the Missing tab, **+ Collection** adds the card to the open collection instead, in the finish that is missing.
 
@@ -82,27 +82,32 @@ Press **2** (or **Collection** on the Home ribbon tab) to open it. The header ho
 
 | Item | Use |
 |---|---|
-| Collection list | Switches the open collection |
+| Collection switcher | The button with the collection's name. It opens a list of your collections with their card counts and values (see below) |
 | Cards, Completion, Missing, Statistics | The tabs; see [Set completion](/about/set-completion) for Completion and Missing (shown only with a completion rule), and [Prices and statistics](/about/prices-and-statistics) for Statistics |
-| Adds here, or Add cards here | Shows that the open collection is the target, or makes it the target |
 | Wishlist | Shown when the collection is a wishlist |
 | Shared by name, or Shared with names | Shown for shared collections |
 | Filter box | Keeps the rows whose card name, set name or set code contains the text (Cards tab) |
-| Select | Turns on checkboxes for picking rows by tap or click (Cards tab) |
-| Count | Cards in the open collection |
+| Options | Sort, layout, card size, deck and trade filters and picking (Cards tab, see below). An amber number shows how many of its filters are on |
+| + Add | Makes the open collection the target collection and goes to the card search, so the cards you add go here |
+| Count | Cards and unique rows in the collection and its value (wanted value for a wishlist), such as "1,122 cards (314 unique), $390.32". While a filter hides rows, it adds "showing N of M" |
 
-Above the rows of the Cards tab, a bar holds:
+### The collection switcher
+
+The switcher lists every collection, including those shared with you, with a Wishlist or Shared badge. Type to find a collection by name; Up and Down move through the list, Enter opens the highlighted collection and Esc closes the list. **Sort** orders the list by Recently opened, Name, Date created, Card count or Value, and is kept for your account. **New collection...** is at the bottom of the list. On a phone the list opens as a full sheet. Opening a collection closes the About guide.
+
+### Options
 
 | Item | Use |
 |---|---|
 | Sort | Name, Price, highest first, Price, lowest first, Quantity, or Set and number. Kept for your account |
-| List, Binder | Shows rows, or binder pages of nine cards. **Binder layout** (B) switches between them |
+| Layout | Grid, Binder or List (see Card layouts) |
+| Card size | Small, Medium or Large, for the Grid layout. Kept for your account |
+| Decks | **In decks or not**, **In a deck** (rows whose copies fill a deck) or **Not in a deck** |
 | For trade only | Keeps only rows with copies for trade |
-| In decks or not | **In a deck** keeps rows whose copies fill a deck; **Not in a deck** keeps the others |
-| Filter tags | One tag for each active filter, with **×** to remove it, and **Clear tags** when there are two or more |
-| Count and value | The rows shown of all rows, and the collection's value (wanted value for a wishlist) |
+| Select several cards | Turns on checkboxes for picking rows by tap or click |
+| Done | Closes Options |
 
-Each row in the list shows the card image, name, a FOIL or ETCHED badge, a PROXY badge, a FOR TRADE badge with the number for trade, set, set code, collector number, rarity, the condition and language when not near mint English, a green tag for each deck its copies fill (with ×N for more than one; clicking it opens the deck), the row's value (Proxy for proxies), the count with minus and plus buttons, and details, move and remove buttons. Copies in no deck are free.
+Above the cards, a tag shows each active filter, with **×** to remove it, and **Clear tags** when there are two or more.
 
 ## Filter tags
 
@@ -121,21 +126,35 @@ Clicking the set code or rarity on a row keeps only the rows that share it, and 
 
 Tags are cleared when you open another collection.
 
-## Binder layout
+## Card layouts
 
-The binder shows the rows in the current sort and filter as pages of nine cards in three rows. Each card shows its count, a FOIL or ETCHED badge, a TRADE badge, and the price of one copy. **Previous page** and **Next page**, or Page Up and Page Down, turn the pages. Click a card to select it, Ctrl+click or Shift+click to pick several, and double-click to open Copy details.
+The Cards tab shows the rows in the current sort and filter in one of three layouts. Each layout is kept for your account, separately for the desktop and the phone. New accounts start with Grid. Change it in **Options**, with **Grid layout**, **Binder layout** and **List layout** on the Collection ribbon tab, or with **B**, which switches between Binder and Grid.
+
+| Layout | Shows |
+|---|---|
+| Grid | Card pictures that fill the width of the work area, as many in a row as fit (on a phone, 4, 3 or 2 in a row for Small, Medium and Large). More cards appear as you scroll, with no pages |
+| Binder | Pages of nine cards in three rows, like a binder sheet, as large as the work area allows |
+| List | One row per entry, as described below |
+
+Each card picture shows its count, a FOIL or ETCHED badge, a PROXY badge, a TRADE badge, and the price of one copy. Click a card to select it, Ctrl+click or Shift+click to pick several, double-click to open Copy details, and right-click (or long press on a phone) for its menu.
+
+In the Binder, **First**, **Previous page**, **Next page** and **Last**, or Page Up and Page Down, turn the pages. Type a page number in the page box and press Enter to go to that page.
+
+## List layout
+
+In the List layout, each row shows the card image, name, a FOIL or ETCHED badge, a PROXY badge, a FOR TRADE badge with the number for trade, set, set code, collector number, rarity, the condition and language when not near mint English, a green tag for each deck its copies fill (with ×N for more than one; clicking it opens the deck), the row's value (Proxy for proxies), the count with minus and plus buttons, and details, move and remove buttons. Copies in no deck are free.
 
 ## Picking several rows
 
 | To | Do |
 |---|---|
 | Pick one row | Click it, or move to it with Up and Down |
-| Add or remove a row from the picked rows | Ctrl+click it (Cmd+click on a Mac), or tap it with **Select** turned on |
+| Add or remove a row from the picked rows | Ctrl+click it (Cmd+click on a Mac), or tap it with **Select several cards** turned on |
 | Pick a range | Click the first row, then Shift+click the last |
 | Pick every row the filter box shows | Ctrl+A, **Select all rows**, or **Select all** in the picked bar |
 | Drop the picked rows | Esc, or **Done** in the picked bar |
 
-When more than one row is picked (or Select is on), a bar above the list shows how many entries and cards are picked, with **Select all**, **Move...**, **For trade**, **Not for trade**, **Remove...** and **Done**. For trade and Not for trade work like Mark for trade and Unmark for trade; see [Wishlists and trading](/about/wishlists-and-trading). The status bar also shows the number picked.
+When more than one row is picked (or Select several cards is on), a bar above the list shows how many entries and cards are picked, with **Select all**, **Move...**, **For trade**, **Not for trade**, **Remove...** and **Done**. For trade and Not for trade work like Mark for trade and Unmark for trade; see [Wishlists and trading](/about/wishlists-and-trading). The status bar also shows the number picked.
 
 ## Removing cards
 
@@ -158,7 +177,7 @@ The Card panel's Owned group shows, for the selected printing, the regular, foil
 
 ## Collections panel
 
-The Collections panel lists your collections, including those shared with you, with the number of cards, their value and, for collections linked to sets, a completion bar and percentage. Click a collection to open it in the collection view. **Add here** makes it the target; the target shows **Adds here**. A **Shared** badge marks collections shared with or by you, and a **Wishlist** badge marks wishlists.
+The Collections panel lists your collections, including those shared with you, with the number of cards, their value and, for collections linked to sets, a completion bar and percentage. One click on a collection opens it in the collection view. **Add here** makes it the target; the target shows **Adds here**. A **Shared** badge marks collections shared with or by you, and a **Wishlist** badge marks wishlists.
 
 ## Undo
 

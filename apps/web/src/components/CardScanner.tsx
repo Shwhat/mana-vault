@@ -532,7 +532,7 @@ function LastCard({ item }: { item: ScanItem }) {
         <span className="scanlastname"><b>{item.quantity}x {item.card.name}</b><span>{item.card.set_name} {printingLabel(item.card)}
           {item.foil ? " Foil" : ""}{item.proxy ? " Proxy" : ""}{show && owned !== null ? `, ${owned} in collection` : ""}</span></span>
       </button>
-      <button type="button" className="btn small" title="Edit" aria-label={`Edit ${item.card.name}`} onClick={() => void editItem(store, item)}><Icon name="rename" /></button>
+      <button type="button" className="btn small scanedit" aria-label={`Edit ${item.card.name}`} onClick={() => void editItem(store, item)}><Icon name="rename" /><span>Edit</span></button>
     </div>
   );
 }

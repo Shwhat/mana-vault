@@ -202,6 +202,7 @@ function collectionSummary(database: DatabaseSync, id: string, userId: number) {
     value: collectionValue(database, id),
     progress: progress ? progress.overall : null,
     updatedAt: String(row.updated_at),
+    createdAt: String(row.created_at),
     ...sharing,
   };
 }

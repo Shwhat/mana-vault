@@ -39,7 +39,9 @@ test("copy details change finish, condition, language and trade, sort by price, 
   await signUp(page);
   await add(page, ["Shivan Dragon", "Llanowar Elves", "Sol Ring"]);
   await openCollection(page);
-  await page.locator("#view-collection .filterbar select").first().selectOption("price-desc");
+  await page.getByRole("button", { name: /Options/ }).click();
+  await page.locator("#opt-sort").selectOption("price-desc");
+  await page.locator(".optpop").getByRole("button", { name: "Done" }).click();
   await expect(rows(page).locator(".rowtitle b")).toHaveText(["Shivan Dragon", "Llanowar Elves", "Sol Ring"]);
   await expect(rows(page).nth(2).locator(".price")).toHaveText("No price");
 
@@ -83,9 +85,11 @@ test("tags and statistics bars filter the collection, and the binder shows pages
   await page.keyboard.press("b");
   await expect(status(page)).toHaveText("Binder layout");
   await expect(page.locator(".pocket:not(.emptypocket)")).toHaveCount(4);
-  await expect(page.locator(".binderpager")).toContainText("Page 1 of 1");
+  await expect(page.locator(".binderpager .pagebox")).toHaveValue("1");
+  await expect(page.locator(".binderpager")).toContainText("of 1");
   await page.keyboard.press("b");
-  await expect(rows(page)).toHaveCount(4);
+  await expect(status(page)).toHaveText("Grid layout");
+  await expect(page.locator(".cardgrid .pocket")).toHaveCount(4);
 });
 
 test("deck cards are linked to collection copies, and missing cards go to a wishlist", async ({ page }) => {

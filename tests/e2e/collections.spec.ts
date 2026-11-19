@@ -1,5 +1,5 @@
 import type { Browser, Page } from "@playwright/test";
-import { menu, signUp, status, test, expect } from "./fixtures";
+import { menu, signUp, status, test, expect, useWorkspace, switchTo } from "./fixtures";
 
 const rows = (page: Page) => page.locator("#view-collection .row");
 
@@ -37,9 +37,11 @@ test("a new account has a Main collection that receives cards", async ({ page })
 test("collections link sets, show completion and missing cards", async ({ page }) => {
   await signUp(page);
   await newCollection(page, "Alpha binder", ["Limited Edition Alpha"]);
-  await expect(page.locator("#view-collection .colpick")).toHaveValue(/.+/);
+  await expect(page.locator("#view-collection .switcher")).toContainText("Alpha binder");
   await expect(page.locator(".colhead .badge.main")).toHaveCount(0);
-  await page.locator(".colhead .lnk", { hasText: "Add cards here" }).click();
+  await page.locator(".colhead .addbtn").click();
+  await expect(page.locator("#view-cards")).toBeVisible();
+  await page.keyboard.press("Escape");
   await expect(page.locator("#st-toggles")).toContainText("ADD TO: ALPHA BINDER");
   await page.keyboard.press("c");
   await expect(status(page)).toHaveText("New cards go to Main collection");
@@ -82,8 +84,8 @@ test("rows can be picked in bulk, removed, restored and moved", async ({ page })
   await signUp(page);
   await addFromSearch(page, ["Sol Ring", "Dark Ritual", "Counterspell", "Serra Angel"]);
   await newCollection(page, "Trade box");
-  await page.locator(".wsbox select").selectOption("Collection");
-  await page.locator("#view-collection .colpick").selectOption({ label: "Main collection" });
+  await useWorkspace(page, "Collection");
+  await switchTo(page, "collection", "Main collection");
   await expect(rows(page)).toHaveCount(4);
 
   await rows(page).nth(0).locator(".rowtitle").click();

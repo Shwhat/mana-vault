@@ -8,17 +8,24 @@ Preferences are saved for your account on the server and follow you to every bro
 |---|---|---|---|
 | Theme | Light, Dark, System | Light | Theme list on the View ribbon tab, phone Menu |
 | Add as foil | On, Off | Off | Home ribbon tab, FOIL in the status bar, F |
-| Target zone | Main deck, Sideboard, Commander | Main deck | Target zone list on the Decks ribbon tab, Deck list panel, ZONE in the status bar, Z |
+| Target zone | Main deck, Sideboard, Commander, Maybeboard | Main deck | Zone list beside Quick add, Target zone list on the Decks ribbon tab, Deck list panel, ZONE in the status bar, Z |
 | Target collection | Any of your collections | Your first collection | Home ribbon tab, ADD TO in the status bar, Collections panel, C |
-| Open collection | Any of your collections | Your first collection | Collection list in the collection view, Collections panel |
+| Open collection | Any of your collections | Your first collection | Collection switcher, Collections panel |
+| Switcher sort (collections, decks) | Recently opened, Name, Date created, Card count, Value (collections), Format and Commander (decks) | Recently opened | Sort in the switcher list |
+| Recently opened | When each collection and deck was last opened | None | Opening a collection or deck |
 | Prices (currency) | US dollars, Euros | US dollars | Currency list on the View ribbon tab, PRICES in the status bar, Statistics tabs |
-| Collection sort | Name, Price, highest first, Price, lowest first, Quantity, Set and number | Name | Sort list above the collection's rows |
-| Collection layout | List, Binder | List | List and Binder above the collection's rows, Binder layout, B |
+| Collection sort | Name, Price, highest first, Price, lowest first, Quantity, Set and number | Name | Options in the collection view |
+| Collection layout, desktop | Grid, Binder, List | Grid (List for accounts from before 0.7.0 that used it) | Options in the collection view, Grid layout, Binder layout, List layout, B |
+| Collection layout, phone | Grid, Binder, List | Grid, or the layout chosen before 0.7.0 | Options in the collection view on a phone |
+| Card size | Small, Medium, Large | Medium | Options in the collection view (Grid layout) |
+| Deck view | List, Text, Stacks, Grid | List | The deck's Cards tab |
+| Deck groups | Type, Mana value, Color, Rarity, Tag, None | Type | Group on the deck's Cards tab |
+| Deck sort | Name, Mana value, Price | Name | Sort on the deck's Cards tab |
 | Ribbon layout | Any arrangement | Standard ribbon | Customize ribbon... |
 | Button size | Large buttons, Compact buttons, Icons only | Large buttons | Button size list on the View ribbon tab |
 | Selected ribbon tab | Any tab | Home | Click a tab |
 | Panel layout | Any arrangement | Deck building workspace | Drag panels, Panels list on the View ribbon tab |
-| Workspace | Built-in or saved | Deck building | Workspace list on the ribbon, Manage workspaces... |
+| Workspace | Built-in or saved | Deck building | Workspace button on the ribbon, Manage workspaces... |
 | Saved workspaces | Any number | None | Save workspace..., Manage workspaces... |
 | Last open deck | Any deck | None | Open a deck |
 | Quick mode | On, Off | Off | Scanner settings |
@@ -40,7 +47,7 @@ System follows the device's light or dark setting and changes with it. A new ver
 
 ## Undo and redo
 
-- Undo (Ctrl+Z) reverses the last collection or deck edit: adding a card (and the wishlist wants it lowered), changing a count, removing an entry or deck card (one or many at once), moving cards between collections, Copy details, marking or unmarking for trade, adding to the wishlist, moving a deck card between zones, linking copies to a deck card, and adding a scanned list (one step for the whole list, including the deck links). Redo (Ctrl+Y or Ctrl+Shift+Z) repeats it.
+- Undo (Ctrl+Z) reverses the last collection or deck edit: adding a card (and the wishlist wants it lowered), changing a count, removing an entry or deck card (one or many at once), moving cards between collections, Copy details, marking or unmarking for trade, adding to the wishlist, moving a deck card between zones, linking copies to a deck card, and adding a scanned list (one step for the whole list, including the deck links), tags on deck cards, and Edit as text. Redo (Ctrl+Y or Ctrl+Shift+Z) repeats it.
 - Up to 150 edits are kept. The history lasts until the page is reloaded.
 - Imports, backup restores, creating, changing or deleting collections and decks, sending and accepting, card database updates, preference changes and trade calculator changes cannot be undone. A backup restore, or deleting or leaving a collection or deck, clears the history.
 - An undo sets the counts back to what they were before the edit. If someone else changed the same card in the meantime, their change to that card is replaced.
@@ -68,7 +75,7 @@ Shortcuts work when no text box, menu or window has focus, except the Ctrl short
 | Enter | Add the selected card to the collection |
 | Shift+Enter | Add the selected card to the open deck |
 | F | Switch Add as foil on or off |
-| Z | Cycle zone (cycle the target zone) |
+| Z | Cycle zone (cycle the target zone: Main deck, Sideboard, Commander, Maybeboard) |
 | C | Cycle target collection |
 | W | Add to wishlist |
 
@@ -80,7 +87,7 @@ Shortcuts work when no text box, menu or window has focus, except the Ctrl short
 | Ctrl+click, Shift+click | Pick more rows, or a range of rows |
 | Delete | Remove selected... |
 | E | Copy details... |
-| B | Binder layout (switch between list and binder) |
+| B | Binder layout (switch between binder and grid) |
 | Page Up, Page Down | Show the previous or next binder page |
 
 ### Trade
@@ -104,6 +111,9 @@ Shortcuts work when no text box, menu or window has focus, except the Ctrl short
 |---|---|
 | Ctrl+N | New deck... |
 | Ctrl+O | Open deck... |
+| Q | Go to Quick add in the open deck |
+
+In the collection and deck switchers, type to find, Up and Down move, Enter opens and Esc closes the list.
 
 ### General
 

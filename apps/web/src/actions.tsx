@@ -8,11 +8,12 @@ import { confirmDialog, customDialog, dialog } from "./components/Dialog";
 import { RibbonCustomize } from "./components/RibbonCustomize";
 import { collectionDialog, copyDialog, inboxDialog, linkDialog, moveDialog, newDeckDialog, renameDeckDialog, sendDialog, sharingDialog } from "./components/LibraryDialogs";
 import { exportWindow, importWindow } from "./components/FileWindows";
+import { editTextDialog, formatDialog, tagsDialog } from "./components/DeckDialogs";
 import { entryKey } from "./library-state";
 import { isOpen, type PanelId, PANELS, PRESET_NAMES, removePanel } from "./dock";
 import { DEFAULT_RIBBON, RIBBON_MENUS, type RibbonSize } from "./ribbon";
 import { type Store, useApp } from "./store";
-import { capitalize, type CollectionTab, type DeckTab, type Zone } from "./types";
+import { capitalize, type CollectionTab, type DeckTab, formatName, type Zone } from "./types";
 
 export type Action = {
   label: string;
@@ -39,6 +40,7 @@ export const SHORTCUTS: Array<[group: string, key: string, action: string]> = [
   ["Adding cards", "Shift+Enter", "addDeck"],
   ["Adding cards", "F", "foil"],
   ["Adding cards", "Z", "zone.cycle"],
+  ["Decks", "Q", "Go to Quick add in the open deck"],
   ["Adding cards", "C", "collection.target"],
   ["Adding cards", "W", "wishlist.add"],
   ["Collections", "Ctrl+A", "pickAll"],
@@ -125,7 +127,8 @@ export function useActions(store: Store): Record<string, Action> {
       "menu.panels": { label: "Panels", short: "Panels", icon: "panels", run: () => undefined },
       "menu.workspace": { label: "Workspace", short: "Workspace", icon: "workspace", run: () => undefined },
       "menu.zone": {
-        label: "Target zone", short: prefs.zone === "main" ? "Main deck" : capitalize(prefs.zone), icon: prefs.zone === "sideboard" ? "zside" : prefs.zone === "commander" ? "zcmd" : "zmain",
+        label: "Target zone", short: prefs.zone === "main" ? "Main deck" : capitalize(prefs.zone),
+        icon: prefs.zone === "sideboard" ? "zside" : prefs.zone === "commander" ? "zcmd" : prefs.zone === "maybeboard" ? "zmaybe" : "zmain",
         disabled: !deck, run: () => undefined,
       },
       "menu.backup": { label: "Backup", short: "Backup", icon: "backup", run: () => undefined },
@@ -175,13 +178,21 @@ export function useActions(store: Store): Record<string, Action> {
         label: "Collection statistics", short: "Statistics", icon: "stats", on: store.view === "collection" && store.collectionTab === "stats", run: () => showTab("stats"),
       },
       "collection.binder": {
-        label: "Binder layout", short: "Binder", icon: "binder", key: "B", on: prefs.collectionLayout === "binder",
+        label: "Binder layout", short: "Binder", icon: "binder", key: "B", on: store.layout === "binder",
         run: () => {
-          const next = prefs.collectionLayout === "binder" ? "list" : "binder";
-          store.setPrefs({ collectionLayout: next });
+          const next = store.layout === "binder" ? "grid" : "binder";
+          store.setCollectionLayout(next);
           if (store.view !== "collection" || store.collectionTab !== "cards") showTab("cards");
-          store.flash(next === "binder" ? "Binder layout" : "List layout");
+          store.flash(next === "binder" ? "Binder layout" : "Grid layout");
         },
+      },
+      "collection.grid": {
+        label: "Grid layout", short: "Grid", icon: "grid", on: store.layout === "grid",
+        run: () => { store.setCollectionLayout("grid"); if (store.view !== "collection" || store.collectionTab !== "cards") showTab("cards"); },
+      },
+      "collection.list": {
+        label: "List layout", short: "List", icon: "listview", on: store.layout === "list",
+        run: () => { store.setCollectionLayout("list"); if (store.view !== "collection" || store.collectionTab !== "cards") showTab("cards"); },
       },
       "copy.details": {
         label: "Copy details...", short: "Details", icon: "edit", key: "E", disabled: !entry,
@@ -224,6 +235,14 @@ export function useActions(store: Store): Record<string, Action> {
       "deck.cards": { label: "Deck cards", short: "Cards", icon: "deck", on: store.view === "deck" && store.deckTab === "cards", run: () => showDeckTab("cards") },
       "deck.ownership": { label: "Deck ownership", short: "Ownership", icon: "owned", on: store.view === "deck" && store.deckTab === "ownership", run: () => showDeckTab("ownership") },
       "deck.stats": { label: "Deck statistics", short: "Statistics", icon: "stats", on: store.view === "deck" && store.deckTab === "stats", run: () => showDeckTab("stats") },
+      "deck.playtest": { label: "Playtest", short: "Playtest", icon: "playtest", disabled: !deck, on: store.view === "deck" && store.deckTab === "playtest", run: () => showDeckTab("playtest") },
+      "deck.history": { label: "Deck history", short: "History", icon: "history", disabled: !deck, on: store.view === "deck" && store.deckTab === "history", run: () => showDeckTab("history") },
+      "deck.format": { label: "Deck format...", short: "Format", icon: "legal", disabled: !deck, run: () => formatDialog(store) },
+      "deck.editText": { label: "Edit as text...", short: "Edit as text", icon: "edittext", disabled: !deck, run: () => editTextDialog(store) },
+      "deck.tags": {
+        label: "Tags...", short: "Tags", icon: "tag", disabled: !deckCard,
+        run: () => (deckCard ? tagsDialog(store, deckCard) : store.flash("Select a card in the deck first", "err")),
+      },
       "deck.missingWishlist": {
         label: "Add missing deck cards to wishlist", short: "Missing to wishlist", icon: "wish", disabled: !deck,
         run: () => void store.addDeckMissingToWishlist(),
@@ -266,9 +285,10 @@ export function useActions(store: Store): Record<string, Action> {
       "zone.main": { label: "Main deck", short: "Main", icon: "zmain", on: prefs.zone === "main", run: () => setZone("main") },
       "zone.sideboard": { label: "Sideboard", short: "Sideboard", icon: "zside", on: prefs.zone === "sideboard", run: () => setZone("sideboard") },
       "zone.commander": { label: "Commander", short: "Commander", icon: "zcmd", on: prefs.zone === "commander", run: () => setZone("commander") },
+      "zone.maybeboard": { label: "Maybeboard", short: "Maybeboard", icon: "zmaybe", on: prefs.zone === "maybeboard", run: () => setZone("maybeboard") },
       "zone.cycle": {
         label: "Cycle target zone", short: "Cycle zone", icon: "zone", key: "Z",
-        run: () => setZone(prefs.zone === "main" ? "sideboard" : prefs.zone === "sideboard" ? "commander" : "main"),
+        run: () => setZone(prefs.zone === "main" ? "sideboard" : prefs.zone === "sideboard" ? "commander" : prefs.zone === "commander" ? "maybeboard" : "main"),
       },
       updateCatalog: {
         label: "Update card database", short: "Update database", icon: "update",
@@ -289,7 +309,7 @@ export function useActions(store: Store): Record<string, Action> {
           }
           dialog("Open deck", [
             ["deck", "Deck", deck?.id ?? store.decks[0]?.id ?? "", "select",
-              store.decks.map((item) => [item.id, `${item.name} (${capitalize(item.format)}, ${item.card_count ?? 0} cards)`])],
+              store.decks.map((item) => [item.id, `${item.name} (${formatName(item.format)}, ${item.card_count ?? 0} cards)`])],
           ], async (values) => { await store.openDeck(String(values.deck)); store.setView("deck"); }, "Open");
         },
       },

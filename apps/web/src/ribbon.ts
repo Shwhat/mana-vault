@@ -23,7 +23,7 @@ export const DEFAULT_RIBBON: RibbonTab[] = [
     id: "collection", name: "Collection", groups: [
       { name: "Collection", items: ["collection.new", "collection.settings", "collection.delete"] },
       { name: "Selection", context: "collection", items: ["pickAll", "movePicked", "removePicked", "copy.details", "trade.toggle"] },
-      { name: "Layout", context: "collection", items: ["collection.binder"] },
+      { name: "Layout", context: "collection", items: ["collection.grid", "collection.binder", "collection.list"] },
       { name: "Wishlist", context: "collection", items: ["wishlist.missing"] },
       { name: "Share", items: ["collection.send", "collection.sharing"] },
     ],
@@ -31,13 +31,15 @@ export const DEFAULT_RIBBON: RibbonTab[] = [
   {
     id: "decks", name: "Decks", groups: [
       { name: "Deck", items: ["newDeck", "openDeck", "deck.rename", "deck.delete"] },
-      { name: "Build", context: "deck", items: ["addDeck", "menu.zone", "deck.link"] },
+      { name: "Build", context: "deck", items: ["addDeck", "menu.zone", "deck.link", "deck.tags", "deck.editText"] },
+      { name: "Check", context: "deck", items: ["deck.format", "deck.playtest", "deck.history"] },
       { name: "Missing", context: "deck", items: ["deck.missingWishlist"] },
       { name: "Share", context: "deck", items: ["deck.send", "deck.sharing"] },
     ],
   },
   {
     id: "trade", name: "Trade", groups: [
+      { name: "Open", items: ["view.trade"] },
       { name: "Trade", items: ["trade.give", "trade.get"] },
       { name: "Summary", items: ["trade.copy", "trade.clear"] },
     ],
@@ -63,7 +65,7 @@ export const RIBBON_MENUS: Record<string, string[]> = {
   "menu.currency": ["currency.usd", "currency.eur"],
   "menu.panels": ["panel.filters", "panel.collections", "panel.decks", "panel.card", "panel.decklist", "panel.review"],
   "menu.workspace": ["workspace.save", "workspace.manage", "workspace.reset"],
-  "menu.zone": ["zone.main", "zone.sideboard", "zone.commander"],
+  "menu.zone": ["zone.main", "zone.sideboard", "zone.commander", "zone.maybeboard"],
   "menu.backup": ["backup", "restore"],
   "menu.ribbonSize": ["ribbon.large", "ribbon.compact", "ribbon.icons"],
 };

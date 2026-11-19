@@ -1,4 +1,5 @@
 import { StrictMode, useEffect, useRef, useState } from "react";
+import { useNarrow } from "./narrow";
 import { createRoot } from "react-dom/client";
 import { type Action, useActions } from "./actions";
 import { request, SignedOutError } from "./api";
@@ -13,18 +14,6 @@ import { applyTheme, loadPrefs, type Prefs, watchSystemTheme } from "./prefs";
 import { type Store, StoreContext, useStoreState } from "./store";
 import type { User } from "./types";
 import "./style.css";
-
-function useNarrow() {
-  const query = "(max-width: 899px)";
-  const [narrow, setNarrow] = useState(() => window.matchMedia(query).matches);
-  useEffect(() => {
-    const media = window.matchMedia(query);
-    const listener = () => setNarrow(media.matches);
-    media.addEventListener("change", listener);
-    return () => media.removeEventListener("change", listener);
-  }, []);
-  return narrow;
-}
 
 function isTyping(target: EventTarget | null) {
   const element = target as HTMLElement | null;
@@ -64,13 +53,18 @@ function useKeyboard(store: Store, actions: Record<string, Action>) {
         case "t": case "T": run("trade.give"); break;
         case "g": case "G": run("trade.get"); break;
         case "PageDown": case "PageUp":
-          if (store.view === "collection" && store.prefs.collectionLayout === "binder") {
+          if (store.view === "collection" && store.layout === "binder") {
             event.preventDefault();
             store.setBinderPage(Math.max(0, store.binderPage + (event.key === "PageDown" ? 1 : -1)));
           }
           break;
         case "f": case "F": run("foil"); break;
         case "z": case "Z": run("zone.cycle"); break;
+        case "q": case "Q": {
+          const box = document.getElementById("quickadd");
+          if (box) { event.preventDefault(); box.focus(); }
+          break;
+        }
         case "c": case "C": run("collection.target"); break;
         case "Delete":
           if (store.view === "collection" && store.checked.size) { event.preventDefault(); run("removePicked"); }

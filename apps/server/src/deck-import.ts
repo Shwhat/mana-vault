@@ -2,8 +2,8 @@ import { nameMatch } from "./collection-import.js";
 import { parse } from "csv-parse/sync";
 import type { DatabaseSync } from "node:sqlite";
 
-type Zone = "main" | "sideboard" | "commander";
-type DeckImportRow = { name: string; quantity: number; set: string; collectorNumber: string; zone: Zone | null; sourceRow?: number };
+type Zone = "main" | "sideboard" | "commander" | "maybeboard";
+export type DeckImportRow = { name: string; quantity: number; set: string; collectorNumber: string; zone: Zone | null; sourceRow?: number };
 
 export interface DeckImportResult {
   matchedRows: number;
@@ -22,6 +22,7 @@ function zoneFrom(value: string, fallback: Zone): Zone | null {
   if (["main", "mainboard", "deck"].includes(normalized)) return "main";
   if (["side", "sideboard", "sb"].includes(normalized)) return "sideboard";
   if (["commander", "command zone"].includes(normalized)) return "commander";
+  if (["maybe", "maybeboard", "considering"].includes(normalized)) return "maybeboard";
   return null;
 }
 
@@ -48,7 +49,7 @@ function parseCsv(text: string): DeckImportRow[] | null {
   });
 }
 
-function parseText(text: string): DeckImportRow[] {
+export function parseText(text: string): DeckImportRow[] {
   let zone: Zone = "main";
   const result: DeckImportRow[] = [];
   for (const [lineIndex, line] of text.split(/\r?\n/).entries()) {
@@ -56,7 +57,7 @@ function parseText(text: string): DeckImportRow[] {
     if (!trimmed) continue;
     const section = trimmed.replace(/^(?:\/\/|#)\s*/, "").trim();
     const sectionZone = zoneFrom(section, zone);
-    if (/^(?:(?:\/\/|#)\s*)?(?:main(?:board)?|deck|side(?:board)?|commander)(?:\s*:)?$/i.test(trimmed)) {
+    if (/^(?:(?:\/\/|#)\s*)?(?:main(?:board)?|deck|side(?:board)?|commander|maybe(?:board)?|considering)(?:\s*:)?$/i.test(trimmed)) {
       if (sectionZone) zone = sectionZone;
       continue;
     }
@@ -127,7 +128,7 @@ export function importDecklist(
       return;
     }
     if (!row.zone) {
-      unmatched.push({ row: sourceRow, name: row.name, reason: "Zone must be Main, Sideboard, or Commander" });
+      unmatched.push({ row: sourceRow, name: row.name, reason: "Zone must be Main, Sideboard, Commander or Maybeboard" });
       return;
     }
     // every deck keeps a printing: the one named, or the newest printing of the card
@@ -169,4 +170,18 @@ export function importDecklist(
     }
   }
   return { matchedRows, importedQuantity, unmatched };
+}
+
+/** Finds the printing for a name, with an optional set and collector number: the named printing, or the newest one. */
+export function printingFinder(database: DatabaseSync) {
+  const statement = database.prepare(
+    `SELECT id, oracle_id, name FROM cards
+     WHERE (name = ? COLLATE NOCASE OR flavor_name = ? COLLATE NOCASE OR name LIKE ? ESCAPE '\\')
+       AND (? = '' OR lower(set_code) = lower(?) OR set_name = ? COLLATE NOCASE)
+       AND (? = '' OR collector_number = ?)
+     ORDER BY name = ? COLLATE NOCASE DESC, released_at DESC, set_code, collector_number
+     LIMIT 1`,
+  );
+  return (name: string, set = "", number = "") =>
+    statement.get(...nameMatch(name), set, set, set, number, number, name) as { id: string; oracle_id: string; name: string } | undefined;
 }

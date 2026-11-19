@@ -103,7 +103,7 @@ A deck exports its cards with their printings (and the finish of the first linke
 One card per line: a count, an optional "x", then the card name, for example `4 Lightning Bolt` or `1x Sol Ring`. Card names match the same way as collection rows: exact name, flavor name, or front face.
 
 - A printing can follow the name as a set code in brackets or parentheses and an optional collector number: `1 Lightning Bolt (M10) 146` or `1 Sol Ring [LEA] #269`. Without one, the newest printing is used.
-- A line reading `Main`, `Mainboard`, `Deck`, `Side`, `Sideboard` or `Commander` (optionally after `//` or `#`, optionally ending with a colon) starts that zone. Lines before any heading go to the main deck.
+- A line reading `Main`, `Mainboard`, `Deck`, `Side`, `Sideboard`, `Commander`, `Maybe`, `Maybeboard` or `Considering` (optionally after `//` or `#`, optionally ending with a colon) starts that zone. Lines before any heading go to the main deck.
 - A line can start with `SB:` or `Commander:` to put just that card in the sideboard or commander zone.
 - Other lines starting with `//` or `#` are comments and are skipped.
 
@@ -117,7 +117,7 @@ A CSV file is read as a decklist when its first line has a Name or Card Name col
 | Quantity | Count, Qty | No | Copies, 1 to 100. Empty means 1 |
 | Set | Set Code, Edition | No | Set code or name. Without it the newest printing is used |
 | Collector Number | collector_number, Number | No | Collector number |
-| Zone | Board, Section, Location | No | Main, Mainboard, Deck, Side, Sideboard, SB, Commander or Command zone. Empty means main deck |
+| Zone | Board, Section, Location | No | Main, Mainboard, Deck, Side, Sideboard, SB, Commander, Command zone, Maybe, Maybeboard or Considering. Empty means main deck |
 
 ### Decklist rules
 
@@ -127,7 +127,7 @@ A CSV file is read as a decklist when its first line has a Name or Card Name col
 | Counts are whole numbers from 1 to 100 | Quantity must be a whole number from 1 to 100 |
 | The card must be in the card database | No card with this name exists in the local catalog |
 | A given set and number must match a printing | No printing matched the supplied set and collector number |
-| The zone must be recognized | Zone must be Main, Sideboard, or Commander |
+| The zone must be recognized | Zone must be Main, Sideboard, Commander or Maybeboard |
 
 ## Import review panel
 

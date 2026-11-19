@@ -125,7 +125,7 @@ export function NoDeck({ actions, compact }: { actions: Record<string, Action>; 
 
 export function zoneGroups(cards: DeckCard[]): Array<{ zone: Zone; cards: DeckCard[]; count: number }> {
   const sorted = sortDeck(cards);
-  return (["commander", "main", "sideboard"] as Zone[])
+  return (["commander", "main", "sideboard", "maybeboard"] as Zone[])
     .map((zone) => {
       const inZone = sorted.filter((card) => card.zone === zone);
       return { zone, cards: inZone, count: inZone.reduce((sum, card) => sum + card.quantity, 0) };
@@ -133,7 +133,7 @@ export function zoneGroups(cards: DeckCard[]): Array<{ zone: Zone; cards: DeckCa
     .filter((group) => group.cards.length);
 }
 
-function OwnershipTab({ actions }: { actions: Record<string, Action> }) {
+export function OwnershipTab({ actions }: { actions: Record<string, Action> }) {
   const store = useApp();
   const report = store.ownership;
   if (!report) return <div className="emptynote">Checking which cards you own</div>;
@@ -166,98 +166,6 @@ function OwnershipTab({ actions }: { actions: Record<string, Action> }) {
           </div>
         ))}
       </div>
-    </div>
-  );
-}
-
-export function DeckView({ actions }: { actions: Record<string, Action> }) {
-  const store = useApp();
-  const { deck, selection } = store;
-  if (!deck) return <div className="view"><div id="pagetabs"><span className="phname">Deck</span></div><NoDeck actions={actions} /></div>;
-  const total = deck.cards.reduce((sum, card) => sum + card.quantity, 0);
-  const tabs: Array<[DeckTab, string]> = [["cards", "Cards"], ["ownership", "Ownership"], ["stats", "Statistics"]];
-  const currency = store.prefs.currency;
-  return (
-    <div className="view" id="view-deck">
-      <div id="pagetabs">
-        <span className="phname">{deck.name}</span>
-        <span className="phdesc">{capitalize(deck.format)}</span>
-        {deck.role === "member" && <span className="badge">Shared by {deck.owner?.name}</span>}
-        {deck.role === "owner" && (deck.sharedWith?.length ?? 0) > 0 && <span className="badge">Shared with {deck.sharedWith!.map((person) => person.name).join(", ")}</span>}
-        <div className="seg" role="tablist" aria-label="Deck view">
-          {tabs.map(([id, label]) => (
-            <button key={id} type="button" role="tab" aria-selected={store.deckTab === id} className={store.deckTab === id ? "on" : ""} onClick={() => store.setDeckTab(id)}>{label}</button>
-          ))}
-        </div>
-        <span className="phpos">{total} cards{store.deckStats ? `, value ${money(store.deckStats.value, currency)}` : ""}
-          {store.ownership && store.ownership.needed > 0 ? `, ${store.ownership.owned} owned` : ""}</span>
-      </div>
-      {store.deckTab === "ownership" && <OwnershipTab actions={actions} />}
-      {store.deckTab === "stats" && <StatsPanel stats={store.deckStats} kind="deck" />}
-      {store.deckTab === "cards" && <div className="list" role="listbox" aria-label="Deck cards">
-        {deck.cards.length === 0 && (
-          <div className="empty">
-            <Icon name="deck" />
-            <b>This deck is empty</b>
-            <span className="btnrow">
-              <button type="button" className="btn primary" onClick={() => store.setView("cards")}>Search cards</button>
-              <button type="button" className="btn" onClick={actions.importDeck?.run}>Import decklist...</button>
-            </span>
-          </div>
-        )}
-        {zoneGroups(deck.cards).map((group) => (
-          <div key={group.zone}>
-            <div className="zonehead">{zoneLabel(group.zone)} <span>{group.count}</span></div>
-            {group.cards.map((card) => {
-              const key = String(card.entry_id);
-              const active = selection?.view === "deck" && selection.key === key;
-              const missing = card.missing ?? 0;
-              return (
-                <div key={key} data-key={key} role="option" aria-selected={active} className={active ? "row active" : "row"}
-                  onClick={() => store.select({ view: "deck", key, printingId: card.card_id })}
-                  {...rowMenu(store, card.name, () => [
-                    { label: "Card page", run: () => store.setCardPage(card.card_id) },
-                    { label: "Link copies...", run: () => void linkDialog(store, card) },
-                    missing > 0 && { label: "Add missing to wishlist", run: () => void store.addToWishlist([{ cardId: card.card_id, foil: 0, condition: "NM", language: "en", proxy: false, quantity: missing }], card.name) },
-                    { label: "Remove from deck", run: () => void store.setDeckQuantity(card, 0) },
-                  ])}>
-                  <Thumb url={card.image_url} />
-                  <div className="rowmain">
-                    <div className="rowtitle"><b>{card.name}</b><span className="mana">{card.mana_cost}</span></div>
-                    <div className="rowsub">{card.type_line}</div>
-                    <div className="rowmeta">{card.set_name} <span className="badge">{card.set_code.toUpperCase()}</span> {card.collector_number}</div>
-                    <div className="rowtags">
-                      {(card.links ?? []).map((link) => (
-                        <button key={`${link.collectionId}:${link.cardId}:${link.foil}:${link.condition}:${link.language}:${link.proxy ? 1 : 0}`} type="button" className="tag badge col"
-                          title={`${link.quantity} from ${link.collectionName}${copyLabel(link) ? `, ${copyLabel(link)}` : ""}`}
-                          onClick={(event) => { event.stopPropagation(); store.openCollection(link.collectionId); store.setView("collection"); }}>
-                          {link.collectionName}{link.quantity > 1 ? ` ×${link.quantity}` : ""}</button>
-                      ))}
-                      {(card.links ?? []).some((link) => link.proxy) && <span className="badge proxy">PROXY</span>}
-                      {missing > 0 && <span className="badge miss">Missing{missing < card.quantity ? ` ${missing}` : ""}</span>}
-                      {missing > 0 && (
-                        <button type="button" className="tag badge wish" title={`Add ${missing} ${card.name} to your wishlist`}
-                          onClick={(event) => { event.stopPropagation(); void store.addToWishlist([{ cardId: card.card_id, foil: 0, condition: "NM", language: "en", proxy: false, quantity: missing }], card.name); }}>
-                          + Wishlist</button>
-                      )}
-                    </div>
-                  </div>
-                  <button type="button" className="btn small icon-only" title={`Link copies of ${card.name}`} aria-label={`Link copies of ${card.name}`}
-                    onClick={(event) => { event.stopPropagation(); void linkDialog(store, card); }}><Icon name="link" /></button>
-                  <Quantity value={card.quantity} name={card.name} max={100} onChange={(quantity) => void store.setDeckQuantity(card, quantity)} />
-                  <select className="zonesel" aria-label={`Move ${card.name} to zone`} value={card.zone}
-                    onClick={(event) => event.stopPropagation()}
-                    onChange={(event) => void store.moveDeckCard(card, event.target.value as Zone)}>
-                    {ZONES.map((zone) => <option key={zone.id} value={zone.id}>{zone.label}</option>)}
-                  </select>
-                  <button type="button" className="btn small icon-only" title={`Remove ${card.name}`} aria-label={`Remove ${card.name} from deck`}
-                    onClick={(event) => { event.stopPropagation(); void store.setDeckQuantity(card, 0); }}><Icon name="del" /></button>
-                </div>
-              );
-            })}
-          </div>
-        ))}
-      </div>}
     </div>
   );
 }

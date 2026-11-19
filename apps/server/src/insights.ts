@@ -125,7 +125,7 @@ function deckRows(database: DatabaseSync, deckId: string, currency: Currency) {
                  ELSE (SELECT MIN(${anyFinishPrice(currency, "p")}) FROM cards p WHERE p.oracle_id = dc.oracle_id) END AS price
      FROM deck_cards dc JOIN cards c ON c.id = COALESCE(
        dc.printing_id, (SELECT p.id FROM cards p WHERE p.oracle_id = dc.oracle_id ORDER BY p.released_at DESC LIMIT 1))
-     WHERE dc.deck_id = ?
+     WHERE dc.deck_id = ? AND dc.zone != 'maybeboard'
      ORDER BY CASE dc.zone WHEN 'commander' THEN 0 WHEN 'main' THEN 1 ELSE 2 END, c.name`,
   ).all(deckId).map((row) => ({
     entry_id: Number(row.entry_id), oracle_id: String(row.oracle_id), printing_id: row.printing_id === null ? null : String(row.printing_id),

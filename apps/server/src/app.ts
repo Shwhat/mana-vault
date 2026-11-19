@@ -13,7 +13,8 @@ import { createBackup, inspectBackup, restoreBackup } from "./backup.js";
 import { parseCardQuery } from "./card-search.js";
 import { type CatalogUpdateStatus } from "./catalog-updater.js";
 import { registerInsightRoutes } from "./insights.js";
-import { registerDeckRoutes } from "./decks.js";
+import { logDeck, registerDeckRoutes } from "./decks.js";
+import { registerDeckBuilderRoutes } from "./deck-builder.js";
 import { deviceUser, handleCrossOrigin, registerMobileRoutes, Revision } from "./mobile.js";
 import { access, createCollection, forgetItem, itemSharing, registerLibraryRoutes } from "./library.js";
 import {
@@ -150,6 +151,7 @@ export async function buildApp(
 
   registerLibraryRoutes(app, database);
   registerDeckRoutes(app, database);
+  registerDeckBuilderRoutes(app, database);
   registerInsightRoutes(app, database);
   registerScanRoutes(app, database);
 
@@ -173,7 +175,9 @@ export async function buildApp(
     const deck = database.prepare("SELECT id, mode FROM decks WHERE id = ?").get(request.params.deckId);
     if (!deck) return reply.code(404).send({ error: "Deck not found" });
     try {
-      return importDecklist(database, request.params.deckId, deck.mode as "normal" | "theme", request.body);
+      const result = importDecklist(database, request.params.deckId, deck.mode as "normal" | "theme", request.body);
+      if (result.importedQuantity) logDeck(database, request.params.deckId, String(request.user?.name ?? ""), `Imported ${result.importedQuantity} cards`);
+      return result;
     } catch (error) {
       return reply.code(400).send({ error: error instanceof Error ? error.message : "Could not import decklist" });
     }

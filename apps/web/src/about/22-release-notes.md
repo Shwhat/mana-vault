@@ -2,6 +2,26 @@
 
 The installed version is shown at the top of this guide.
 
+## 0.7.0 (2026-11-19): Deck builder, switchers and card grid
+
+- Deck builder: Quick add (type "2 Sol Ring", with names suggested), Edit as text with Check and Apply as one undo step, and the views List, Text, Stacks and Grid, grouped by type, mana value, color, rarity or tag and sorted by name, mana value or price.
+- Maybeboard: a fourth deck zone for cards being considered, left out of the deck's size, value, statistics, ownership and legality.
+- Format and legality: 21 formats. Decks are checked for size, sideboard size, copies, banned and not legal cards and the commander's color identity; problems are listed above the cards and cards that break a rule are marked Not legal.
+- Tags on deck cards, used as groups.
+- Deck tabs Playtest (opening hand, mulligan, draw, play, tap), Description (with a cover card) and History (every change with date and person).
+- Deck statistics start with Mana symbols and sources. The deck lists the tokens its cards make, and pointing at a card name on the desktop shows a large picture.
+- Switchers: collections and decks open from the same searchable list, with sorting (Recently opened, Name, Date created, Card count, Value, Format, Commander), card counts, values, commanders and formats, and keyboard use. On a phone the list is a full sheet. The phone's Decks button is replaced by the switcher.
+- Collections show as a Grid of card pictures that loads more while scrolling (Small, Medium or Large), Binder pages as large as the work area with First, Last and a page box, or a List. Grid is the default for new accounts; the desktop and phone each remember their layout.
+- The collection header has Options (sort, layout, card size, deck and trade filters, Select several cards) with a count of active filters, + Add, and one count line such as "1,122 cards (314 unique), $390.32".
+- One click on a deck or collection in a panel opens it. Opening a collection, deck, card or view closes the About guide.
+- Floating panels dock onto other panels, panel edges and window edges when dragged by their grip, and snap to each other's edges. Panel tabs wrap onto more rows instead of being cut off.
+- The Trade ribbon tab always has the Trade button. The Workspace list uses the program's own menu.
+- The card database update also stores the mana each card makes and the tokens it creates. Run an update after installing.
+- Backups keep each deck's description, cover card and tags.
+- Fixed: the right-click menu was hard to read in the dark theme.
+- Fixed: on phones, icons in the Home buttons and the scanner's edit button were drawn far too large, and an empty bar showed at the top of Home.
+- Fixed: a link in a deck description could run script; only web addresses become links.
+
 ## 0.6.0 (2026-11-19): Linked deck cards, import formats, ManaBox-style scanner and a new ribbon
 
 - Deck cards are linked to the copies in your collections that fill them. A copy fills one deck at a time; a second deck that needs the card shows it as missing. Collection rows show their decks, deck cards show their collection, and Link copies changes the copy. Links follow copies that move, and removing a copy makes the deck card missing.

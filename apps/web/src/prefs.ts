@@ -3,7 +3,7 @@ import { request, APP_VERSION } from "./api";
 import { isApp } from "./android/platform";
 import { DEFAULT_WORKSPACE, isOpen, openPanel, PRESETS, type Layout, type Workspace, validLayout } from "./dock";
 import type { RibbonSize, RibbonTab } from "./ribbon";
-import type { CollectionSort, Currency, Zone } from "./types";
+import type { CollectionLayout, CollectionSort, Currency, DeckGroup, DeckSort, DeckView, GridSize, SwitchSort, Zone } from "./types";
 
 export type Theme = "light" | "dark" | "system";
 
@@ -23,8 +23,21 @@ export type Prefs = {
   openCollection: string | null;
   currency: Currency;
   collectionSort: CollectionSort;
-  /** List shows rows, Binder shows pages of nine card images. */
-  collectionLayout: "list" | "binder";
+  /** List shows rows, Binder shows pages of nine card images, Grid shows card images that fill the width. On the desktop. */
+  collectionLayout: CollectionLayout;
+  /** The same choice on a phone. */
+  collectionLayoutPhone: CollectionLayout;
+  /** The size of card pictures in Grid. */
+  gridSize: GridSize;
+  /** How the collection and deck switchers sort their lists. */
+  collectionSwitchSort: SwitchSort;
+  deckSwitchSort: SwitchSort;
+  /** When each collection and deck was last opened, by id. */
+  recent: Record<string, number>;
+  /** The deck's Cards tab: how cards are shown, grouped and sorted. */
+  deckView: DeckView;
+  deckGroup: DeckGroup;
+  deckSort: DeckSort;
   /** Scanner: vibrate when a card is recognized. */
   scanVibrate: boolean;
   /** Scanner: finish given to newly scanned cards. */
@@ -55,7 +68,8 @@ export function defaultPrefs(): Prefs {
   return {
     theme: "light", foil: false, zone: "main", ribbon: null, ribbonTab: "home", layout: preset.layout,
     workspace: DEFAULT_WORKSPACE, workspaces: {}, lastDeckId: null, targetCollection: null, openCollection: null,
-    currency: "usd", collectionSort: "name", collectionLayout: "list",
+    currency: "usd", collectionSort: "name", collectionLayout: "grid", collectionLayoutPhone: "grid", gridSize: "m",
+    collectionSwitchSort: "recent", deckSwitchSort: "recent", recent: {}, deckView: "list", deckGroup: "type", deckSort: "name",
     scanVibrate: true, scanFoil: false, scanCamera: "environment", scanQuick: false, scanSounds: true, scanSets: [], scanIgnorePromos: false,
     scanProxy: false, scanCondition: "NM", scanLanguage: "en", scanShowTotal: false, scanShowOwned: false, ribbonSize: "large", appVersion: APP_VERSION,
   };
@@ -70,7 +84,7 @@ export function mergePrefs(saved: unknown): Prefs {
   return {
     theme: value.theme === "dark" || value.theme === "system" ? value.theme : "light",
     foil: value.foil === true,
-    zone: value.zone === "sideboard" || value.zone === "commander" ? value.zone : "main",
+    zone: value.zone === "sideboard" || value.zone === "commander" || value.zone === "maybeboard" ? value.zone : "main",
     ribbon: sameVersion && Array.isArray(value.ribbon) ? value.ribbon : null,
     ribbonTab: typeof value.ribbonTab === "string" ? value.ribbonTab : base.ribbonTab,
     // a new version adds the panels it introduced (Collections in 0.2.0) to a saved layout
@@ -86,7 +100,18 @@ export function mergePrefs(saved: unknown): Prefs {
     openCollection: typeof value.openCollection === "string" ? value.openCollection : null,
     currency: value.currency === "eur" ? "eur" : "usd",
     collectionSort: ["price-desc", "price-asc", "quantity", "set"].includes(String(value.collectionSort)) ? value.collectionSort as CollectionSort : "name",
-    collectionLayout: value.collectionLayout === "binder" ? "binder" : "list",
+    // accounts from before 0.7.0 keep the layout they used; new accounts start with Grid
+    collectionLayout: layoutOf(value.collectionLayout, "grid"),
+    collectionLayoutPhone: layoutOf(value.collectionLayoutPhone, layoutOf(value.collectionLayout, "grid")),
+    gridSize: value.gridSize === "s" || value.gridSize === "l" ? value.gridSize : "m",
+    collectionSwitchSort: switchSortOf(value.collectionSwitchSort, ["recent", "name", "created", "cards", "value"]),
+    deckSwitchSort: switchSortOf(value.deckSwitchSort, ["recent", "name", "created", "cards", "format", "commander"]),
+    recent: value.recent && typeof value.recent === "object"
+      ? Object.fromEntries(Object.entries(value.recent).filter(([, time]) => typeof time === "number").sort((a, b) => b[1] - a[1]).slice(0, 300))
+      : {},
+    deckView: (["list", "text", "stacks", "grid"] as const).find((item) => item === value.deckView) ?? "list",
+    deckGroup: (["type", "mana", "color", "rarity", "tag", "none"] as const).find((item) => item === value.deckGroup) ?? "type",
+    deckSort: (["name", "mana", "price"] as const).find((item) => item === value.deckSort) ?? "name",
     scanVibrate: value.scanVibrate !== false,
     scanFoil: value.scanFoil === true,
     scanCamera: value.scanCamera === "user" ? "user" : "environment",
@@ -103,6 +128,10 @@ export function mergePrefs(saved: unknown): Prefs {
     appVersion: APP_VERSION,
   };
 }
+
+const layoutOf = (value: unknown, fallback: CollectionLayout): CollectionLayout =>
+  value === "list" || value === "binder" || value === "grid" ? value : fallback;
+const switchSortOf = (value: unknown, allowed: SwitchSort[]): SwitchSort => allowed.find((item) => item === value) ?? "recent";
 
 export async function loadPrefs(): Promise<Prefs> {
   return mergePrefs(await request<unknown>("/api/prefs").catch(() => null));

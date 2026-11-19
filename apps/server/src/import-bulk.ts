@@ -4,7 +4,7 @@ import { chain } from "stream-chain";
 import { parser } from "stream-json";
 import { streamArray } from "stream-json/streamers/stream-array.js";
 import { DatabaseSync } from "node:sqlite";
-import { cardExtrasStatement, cardInsertStatement, cardPricesStatement } from "./database.js";
+import { cardBuilderStatement, cardExtrasStatement, cardInsertStatement, cardPricesStatement } from "./database.js";
 
 export async function importBulkFile(
   dataPath: string,
@@ -15,6 +15,7 @@ export async function importBulkFile(
   const insertExtras = cardExtrasStatement(database);
   const insertPrices = cardPricesStatement(database);
   const insertStats = database.prepare("UPDATE cards SET power = ?, toughness = ? WHERE id = ?");
+  const insertBuilder = cardBuilderStatement(database);
   let imported = 0;
   const importValue = (value: unknown) => {
     const card = parsePrinting(value);
@@ -42,6 +43,7 @@ export async function importBulkFile(
     const prices = card.prices;
     insertPrices.run(prices.usd, prices.usd_foil, prices.usd_etched, prices.eur, prices.eur_foil, card.flavorName, card.id);
     insertStats.run(card.power, card.toughness, card.id);
+    insertBuilder.run(card.producedMana.join(""), card.tokens.length ? JSON.stringify(card.tokens) : "", card.id);
     imported += 1;
     if (imported % 25_000 === 0) onProgress?.(imported);
   };
@@ -132,6 +134,10 @@ interface Printing {
   flavorName: string | null;
   power: string | null;
   toughness: string | null;
+  /** W, U, B, R, G and C for the colors of mana the card can make. */
+  producedMana: string[];
+  /** The tokens the card creates, by printing id and name. */
+  tokens: Array<{ id: string; name: string }>;
 }
 
 /** Scryfall sends prices as decimal strings or null; anything else is treated as no price. */
@@ -198,6 +204,14 @@ function parsePrinting(value: unknown): Printing {
       : typeof cardFaceRecord?.flavor_name === "string" && cardFaceRecord.flavor_name ? cardFaceRecord.flavor_name : null,
     power: optionalString(record, "power") ?? (cardFaceRecord ? optionalString(cardFaceRecord, "power") : null),
     toughness: optionalString(record, "toughness") ?? (cardFaceRecord ? optionalString(cardFaceRecord, "toughness") : null),
+    producedMana: Array.isArray(record.produced_mana)
+      ? ["W", "U", "B", "R", "G", "C"].filter((color) => (record.produced_mana as unknown[]).includes(color)) : [],
+    tokens: Array.isArray(record.all_parts)
+      ? record.all_parts.flatMap((part) => {
+        if (!part || typeof part !== "object") return [];
+        const item = part as Record<string, unknown>;
+        return item.component === "token" && typeof item.id === "string" && typeof item.name === "string" ? [{ id: item.id, name: item.name }] : [];
+      }).slice(0, 20) : [],
   };
 }
 

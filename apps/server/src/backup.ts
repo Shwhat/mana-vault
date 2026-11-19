@@ -30,8 +30,13 @@ export interface ManaVaultBackup {
   cards: BackupCard[];
   collections: BackupCollection[];
   collectionCards: BackupCopy[];
-  decks: Array<{ id: string; name: string; format: string; mode: "normal" | "theme"; collection_id?: string | null; created_at: string; updated_at: string }>;
-  deckCards: Array<{ deck_id: string; oracle_id: string; printing_id: string | null; quantity: number; zone: string }>;
+  decks: Array<{
+    id: string; name: string; format: string; mode: "normal" | "theme"; collection_id?: string | null; created_at: string; updated_at: string;
+    /** 0.7.0: the deck description and cover card. */
+    description?: string; cover_card_id?: string | null;
+  }>;
+  /** tags (0.7.0) holds the deck card's tags, one per line. */
+  deckCards: Array<{ deck_id: string; oracle_id: string; printing_id: string | null; quantity: number; zone: string; tags?: string }>;
   /** Version 4: the collection copies that fill each deck card. */
   deckLinks: BackupLink[];
 }
@@ -70,10 +75,10 @@ export function createBackup(database: DatabaseSync, userId: number): ManaVaultB
        FROM collection_cards WHERE collection_id IN (SELECT id FROM collections WHERE owner_id = ?) ORDER BY collection_id, card_id, foil, condition, language, proxy`,
     ).all(userId) as ManaVaultBackup["collectionCards"],
     decks: database.prepare(
-      "SELECT id, name, format, mode, collection_id, created_at, updated_at FROM decks WHERE owner_id = ? ORDER BY id",
+      "SELECT id, name, format, mode, collection_id, created_at, updated_at, description, cover_card_id FROM decks WHERE owner_id = ? ORDER BY id",
     ).all(userId) as ManaVaultBackup["decks"],
     deckCards: database.prepare(
-      `SELECT deck_id, oracle_id, printing_id, quantity, zone FROM deck_cards
+      `SELECT deck_id, oracle_id, printing_id, quantity, zone, tags FROM deck_cards
        WHERE deck_id IN (SELECT id FROM decks WHERE owner_id = ?) ORDER BY deck_id, zone, oracle_id`,
     ).all(userId) as ManaVaultBackup["deckCards"],
     deckLinks: database.prepare(
@@ -133,12 +138,14 @@ export function restoreBackup(database: DatabaseSync, source: string, userId: nu
     }
     const deckIds = new Map<string, string>();
     const insertDeck = database.prepare(
-      "INSERT INTO decks (id, owner_id, name, format, mode, collection_id, created_at, updated_at) VALUES (?, ?, ?, ?, 'theme', ?, ?, ?)",
+      "INSERT INTO decks (id, owner_id, name, format, mode, collection_id, created_at, updated_at, description, cover_card_id) VALUES (?, ?, ?, ?, 'theme', ?, ?, ?, ?, ?)",
     );
     for (const deck of backup.decks) {
       const id = randomUUID();
       deckIds.set(deck.id, id);
-      insertDeck.run(id, userId, deck.name, deck.format, deck.collection_id ? collectionIds.get(deck.collection_id) ?? null : null, deck.created_at, deck.updated_at);
+      const cover = typeof deck.cover_card_id === "string" && database.prepare("SELECT 1 FROM cards WHERE id = ?").get(deck.cover_card_id) ? deck.cover_card_id : null;
+      insertDeck.run(id, userId, deck.name, deck.format, deck.collection_id ? collectionIds.get(deck.collection_id) ?? null : null, deck.created_at, deck.updated_at,
+        typeof deck.description === "string" ? deck.description.slice(0, 20000) : "", cover);
     }
     // a deck card without a printing (Normal decks before 0.6.0) takes the newest printing of the card
     const newest = database.prepare("SELECT id FROM cards WHERE oracle_id = ? ORDER BY released_at IS NULL, released_at DESC, promo, variation LIMIT 1");
@@ -148,7 +155,12 @@ export function restoreBackup(database: DatabaseSync, source: string, userId: nu
     );
     for (const card of backup.deckCards) {
       const printing = card.printing_id ?? (newest.get(card.oracle_id)?.id as string | undefined) ?? null;
-      if (printing) insertDeckCard.run(deckIds.get(card.deck_id)!, card.oracle_id, printing, card.quantity, card.zone);
+      if (printing) {
+        insertDeckCard.run(deckIds.get(card.deck_id)!, card.oracle_id, printing, card.quantity, card.zone);
+        if (typeof card.tags === "string" && card.tags) {
+          database.prepare("UPDATE deck_cards SET tags = ? WHERE deck_id = ? AND printing_id = ? AND zone = ?").run(card.tags.slice(0, 600), deckIds.get(card.deck_id)!, printing, card.zone);
+        }
+      }
       else database.prepare("INSERT INTO deck_cards (deck_id, oracle_id, printing_id, quantity, zone) VALUES (?, ?, NULL, ?, ?)").run(deckIds.get(card.deck_id)!, card.oracle_id, card.quantity, card.zone);
     }
     const deckCardOf = database.prepare("SELECT id FROM deck_cards WHERE deck_id = ? AND printing_id = ? AND zone = ?");
@@ -284,7 +296,7 @@ function validateBackup(value: unknown): ManaVaultBackup {
     if (!isRecord(entry) || typeof entry.deck_id !== "string" || typeof entry.oracle_id !== "string" ||
       (entry.printing_id !== null && typeof entry.printing_id !== "string") ||
       !validPositiveInteger(entry.quantity) ||
-      !["main", "sideboard", "commander"].includes(String(entry.zone))) {
+      !["main", "sideboard", "commander", "maybeboard"].includes(String(entry.zone))) {
       throw new Error(`Backup deck card ${index + 1} is invalid`);
     }
     return entry as ManaVaultBackup["deckCards"][number];
