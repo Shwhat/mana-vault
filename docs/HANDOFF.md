@@ -117,4 +117,4 @@ None known.
 
 ## Where work stopped
 
-0.1.0 is merged to main and published. 0.2.0 is on branch `collections-0.2.0` (pushed, not merged). 0.3.0 is built on local branch `features-0.3.0`, started from `collections-0.2.0`, and all checks pass (`PW_CHANNEL=chrome npm run test:all`: typecheck, 81 server tests, 7 static checks, 22 browser tests). An upgrade of a real 0.2.0 database was checked by hand. Nothing is committed yet. After merging, run Update card database once to load prices and flavor names.
+0.1.0 is merged to main and published. 0.2.0 is on branch `collections-0.2.0` (pushed, not merged). 0.3.0 is on branch `features-0.3.0` (pushed, not merged), started from `collections-0.2.0`, so merging it also brings in 0.2.0. All checks pass (`PW_CHANNEL=chrome npm run test:all`: typecheck, 81 server tests, 7 static checks, 22 browser tests). An upgrade of a real 0.2.0 database was checked by hand. After merging, run Update card database once to load prices and flavor names.
