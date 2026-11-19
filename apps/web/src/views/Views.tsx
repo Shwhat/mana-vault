@@ -36,7 +36,6 @@ export function CardsView({ actions, onFilters }: { actions: Record<string, Acti
           <kbd>/</kbd>
         </label>
         {onFilters && <button type="button" className={anyFilter ? "btn on" : "btn"} onClick={onFilters}>Filters</button>}
-        {onFilters && <button type="button" className="btn" onClick={actions.scan?.run}>Scan</button>}
         <span className="phpos">{loading ? "Searching" : `${cards.length} ${cards.length === 1 ? "result" : "results"}`}</span>
       </div>
       {deck && (

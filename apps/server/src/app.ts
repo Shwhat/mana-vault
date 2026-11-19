@@ -1,6 +1,7 @@
 import Fastify, { type FastifyInstance } from "fastify";
 import { randomUUID } from "node:crypto";
 import fastifyStatic from "@fastify/static";
+import { registerScanRoutes } from "./scan.js";
 import { fileURLToPath } from "node:url";
 import { assignUnowned, initializeDatabase, openDatabase, type CardRow } from "./database.js";
 import { importCollectionCsv } from "./collection-import.js";
@@ -129,6 +130,7 @@ export async function buildApp(
 
   registerLibraryRoutes(app, database);
   registerInsightRoutes(app, database);
+  registerScanRoutes(app, database);
 
   app.post<{ Params: { deckId: string }; Body: string }>("/api/decks/:deckId/import/preview", async (request, reply) => {
     if (typeof request.body !== "string" || !request.body.trim()) {

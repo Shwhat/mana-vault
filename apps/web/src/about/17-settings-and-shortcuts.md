@@ -2,7 +2,7 @@
 
 ## Preferences
 
-Preferences are saved for your account on the server and follow you to every browser and device.
+Preferences are saved for your account on the server and follow you to every browser and device. The scanned list is the exception: it is kept on each device (see [Scanning cards](/about/scanning-cards)).
 
 | Setting | Choices | Default | Where to change it |
 |---|---|---|---|
@@ -20,12 +20,15 @@ Preferences are saved for your account on the server and follow you to every bro
 | Workspace | Built-in or saved | Deck building | Workspace list on the ribbon, Manage workspaces... |
 | Saved workspaces | Any number | None | Save workspace..., Manage workspaces... |
 | Last open deck | Any deck | None | Open a deck |
+| Vibrate when a card is added | On, Off | On | Scanner settings |
+| New scans are foil | On, Off | Off | Scanner settings |
+| Camera | Back camera, Front camera | Back camera | Scanner settings |
 
 System follows the device's light or dark setting and changes with it. A new version of Mana Vault resets the ribbon layout so new buttons appear; all other preferences are kept.
 
 ## Undo and redo
 
-- Undo (Ctrl+Z) reverses the last collection or deck edit: adding a card, changing a count, removing an entry or deck card (one or many at once), moving cards between collections, Copy details, marking or unmarking for trade, adding to the wishlist, and moving a deck card between zones. Redo (Ctrl+Y or Ctrl+Shift+Z) repeats it.
+- Undo (Ctrl+Z) reverses the last collection or deck edit: adding a card, changing a count, removing an entry or deck card (one or many at once), moving cards between collections, Copy details, marking or unmarking for trade, adding to the wishlist, moving a deck card between zones, and adding a scanned list (one step for the whole list). Redo (Ctrl+Y or Ctrl+Shift+Z) repeats it.
 - Up to 150 edits are kept. The history lasts until the page is reloaded.
 - Imports, backup restores, creating, changing or deleting collections and decks, sending and accepting, card database updates, preference changes and trade calculator changes cannot be undone. A backup restore, or deleting or leaving a collection or deck, clears the history.
 - An undo sets the counts back to what they were before the edit. If someone else changed the same card in the meantime, their change to that card is replaced.
@@ -94,7 +97,7 @@ Shortcuts work when no text box, menu or window has focus, except the Ctrl short
 
 | Key | Action |
 |---|---|
-| Esc | Close the window, menu, sheet or About guide, or clear the selection and the picked rows |
+| Esc | Close the window, menu, sheet, scanner or About guide, or clear the selection and the picked rows |
 | Enter | Confirm the open window |
 
 On a Mac, Cmd works in place of Ctrl.

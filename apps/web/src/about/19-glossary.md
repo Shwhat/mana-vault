@@ -37,6 +37,8 @@
 | Theme mode | A deck mode that keeps the exact printing of each card |
 | Zone | Where a card sits in a deck: main deck, sideboard or commander |
 | Target zone | The zone that Add to deck puts cards into |
+| Scanned list | Cards recognized by the scanner or added by name, waiting on this device to be added to a collection or deck |
+| Information line | The small text at the bottom left of a card printed since 2019, with the collector number, rarity letter, set code and language |
 | Open deck | The deck that Add to deck, the Deck list panel and the deck view work with |
 | Format | A deck's label (Commander, Standard and so on). Mana Vault does not check format rules |
 | Mana value | The total mana in a card's cost, used by the mv filter |

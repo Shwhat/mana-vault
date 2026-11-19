@@ -46,7 +46,7 @@ export const SHORTCUTS: Array<[group: string, key: string, action: string]> = [
   ["Editing", "Ctrl+Y", "redo"],
   ["Decks", "Ctrl+N", "newDeck"],
   ["Decks", "Ctrl+O", "openDeck"],
-  ["General", "Esc", "Close the dialog, menu or About guide, or clear the selection"],
+  ["General", "Esc", "Close the dialog, menu, scanner or About guide, or clear the selection"],
 ];
 
 export function useActions(store: Store): Record<string, Action> {

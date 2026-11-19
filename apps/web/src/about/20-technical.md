@@ -8,7 +8,8 @@
 | Server | Node.js 22 with Fastify, serving the interface and a JSON API |
 | Database | SQLite (built into Node.js), one file in the data folder |
 | Card data | Scryfall Default Cards bulk data, read as a stream |
-| Card text recognition | Tesseract.js, running in the browser |
+| Card text recognition | Tesseract.js with the English model, running in the browser; its files are served by Mana Vault from /ocr |
+| Scan matching | The server compares the text read from a card with every card name (edit distance over a three-letter index) and with set codes and collector numbers |
 | Sign-in | PBKDF2-SHA256 password hashes (600,000 rounds), HTTP-only session cookie, request safety header on every change |
 | Container | Docker image for amd64 and arm64, running as user 65532, published to ghcr.io/shwhat/mana-vault |
 
@@ -55,6 +56,7 @@ The container checks itself every 30 seconds by running the server with `-health
 - Prices are as old as the last card database update, and are not kept over time.
 - The trade calculator is kept in the browser until the page is reloaded.
 - Ownership counts copies once per deck; two decks may count the same copies.
+- The scanner's live camera needs HTTPS or a local address.
 
 ## Third-party components
 
@@ -62,7 +64,8 @@ The container checks itself every 30 seconds by running the server with `-health
 |---|---|---|
 | React, React DOM | Interface | MIT |
 | Vite | Building the interface | MIT |
-| Tesseract.js | Card text recognition | Apache 2.0 |
+| Tesseract.js, Tesseract.js core | Card text recognition | Apache 2.0 |
+| Tesseract English model (@tesseract.js-data/eng) | Card text recognition | Apache 2.0 |
 | Fastify, @fastify/static | Web server | MIT |
 | csv-parse | Reading CSV files | MIT |
 | stream-json, stream-chain | Reading the card catalog | BSD 3-Clause |

@@ -48,7 +48,6 @@ Messages appear at the right end of the status bar (on the phone, in a banner ab
 | Trade summary copied | Copy trade summary |
 | Trade cleared | Clear trade |
 | Binder layout, or List layout | Switching the collection layout |
-| Searching for card name. Check the results before adding a card. | A successful scan |
 
 ## Problems shown by Mana Vault
 

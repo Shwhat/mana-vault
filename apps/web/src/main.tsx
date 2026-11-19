@@ -102,17 +102,7 @@ function App({ user, prefs }: { user: User; prefs: Prefs }) {
     <StoreContext.Provider value={store}>
       {narrow ? <PhoneShell actions={actions} /> : <DesktopShell actions={actions} />}
       <DialogHost />
-      {store.scannerOpen && (
-        <CardScanner
-          onClose={() => store.setScannerOpen(false)}
-          onRecognized={(name) => {
-            store.setScannerOpen(false);
-            store.setView("cards");
-            store.setFilters({ query: `name:"${name.replaceAll('"', "")}"` });
-            store.flash(`Searching for ${name}. Check the results before adding a card.`);
-          }}
-        />
-      )}
+      {store.scannerOpen && !narrow && <CardScanner onClose={() => store.setScannerOpen(false)} />}
     </StoreContext.Provider>
   );
 }

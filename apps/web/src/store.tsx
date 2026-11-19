@@ -4,6 +4,7 @@ import { csvCell, downloadBlob, downloadText, pickFile, request, slugify } from 
 import { confirmDialog, dialog } from "./components/Dialog";
 import { activatePanel, clone, type Layout, openPanel, type PanelId, PRESETS, type Workspace } from "./dock";
 import { type Counts, entryKey, useLibraryState } from "./library-state";
+import { useScanState } from "./scan-state";
 import { applyTheme, type Prefs, savePrefs } from "./prefs";
 import {
   type BackupSummary, type Card, type CardDetail, type CatalogStatus, type Collection, type CollectionEntry, type CollectionTab,
@@ -920,6 +921,8 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
     openDeck, closeDeck: () => { setDeck(null); setPrefs({ lastDeckId: null }); }, collectionName, checked, setChecked, visibleCollection,
   });
 
+  const scan = useScanState({ userId: user.id, live, flash, fail, pushUndo, setCounts, writeDeck, loadDeck, refreshAfterChange });
+
   /** Clicking a collection row: plain click picks it, Ctrl adds or removes it, Shift picks a range. */
   const pickRow = useCallback((entry: CollectionEntry, modifiers: { ctrl: boolean; shift: boolean }) => {
     const key = entryKey(entry);
@@ -975,7 +978,7 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
     addToCollection, setCollectionQuantity, addToDeck, setDeckQuantity, moveDeckCard,
     importCollection, exportCollection, downloadBackup, restoreBackup, importDeck, exportDeckText, exportDeckCsv,
     applyWorkspace, saveWorkspace, deleteWorkspace,
-    scannerOpen, setScannerOpen,
+    scannerOpen, setScannerOpen, ...scan,
   };
 }
 
