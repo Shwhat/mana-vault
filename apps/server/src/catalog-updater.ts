@@ -17,11 +17,11 @@ interface CatalogUpdaterOptions {
   onError?: (error: unknown) => void;
 }
 
-export function catalogUpdateIntervalFromEnvironment(value = process.env.CARD_UPDATE_INTERVAL_HOURS): number {
+export function catalogUpdateIntervalFromEnvironment(value = process.env.MANAVAULT_CARD_UPDATE_INTERVAL_HOURS ?? process.env.CARD_UPDATE_INTERVAL_HOURS): number {
   if (value === undefined || value === "") return 0;
   const intervalHours = Number(value);
   if (!Number.isInteger(intervalHours) || intervalHours < 0 || intervalHours > 8760) {
-    throw new Error("CARD_UPDATE_INTERVAL_HOURS must be 0 (disabled) or a whole number from 1 to 8760");
+    throw new Error("MANAVAULT_CARD_UPDATE_INTERVAL_HOURS must be 0 (disabled) or a whole number from 1 to 8760");
   }
   return intervalHours;
 }

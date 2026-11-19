@@ -20,7 +20,7 @@ describe("static app hosting", () => {
     await writeFile(join(root, "assets", "app.js"), "export const app = true;", "utf8");
 
     const database = new DatabaseSync(":memory:");
-    const app = await buildApp(database, root);
+    const app = await buildApp(database, root, undefined, undefined, { requireSignIn: false });
     try {
       const page = await app.inject({ method: "GET", url: "/" });
       const asset = await app.inject({ method: "GET", url: "/assets/app.js" });
@@ -28,6 +28,26 @@ describe("static app hosting", () => {
       expect(page.body).toContain("<title>Mana Vault test</title>");
       expect(asset.statusCode).toBe(200);
       expect(asset.body).toContain("app = true");
+    } finally {
+      await app.close();
+      database.close();
+    }
+  });
+});
+
+describe("app addresses", () => {
+  it("serves the app page for addresses inside the app and 404 for unknown files", async () => {
+    const root = await mkdtemp(join(tmpdir(), "mana-vault-web-"));
+    temporaryDirectories.push(root);
+    await writeFile(join(root, "index.html"), "<!doctype html><title>Mana Vault app</title>", "utf8");
+    const database = new DatabaseSync(":memory:");
+    const app = await buildApp(database, root, undefined, undefined, { requireSignIn: false });
+    try {
+      const about = await app.inject({ method: "GET", url: "/about/decks" });
+      expect(about.statusCode).toBe(200);
+      expect(about.body).toContain("Mana Vault app");
+      expect((await app.inject({ method: "GET", url: "/missing.js" })).statusCode).toBe(404);
+      expect((await app.inject({ method: "GET", url: "/api/missing" })).statusCode).toBe(404);
     } finally {
       await app.close();
       database.close();

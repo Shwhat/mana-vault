@@ -129,6 +129,9 @@ function validateBackup(value: unknown): ManaVaultBackup {
         }
       } else if (["mana_cost", "oracle_text", "image_url", "released_at", "artist"].includes(field)) {
         if (fieldValue !== null && typeof fieldValue !== "string") throw new Error(`Backup card ${index + 1} has invalid ${field}`);
+      } else if (field === "colors" || field === "color_identity") {
+        // colorless cards (artifacts, lands) have no colors, stored as an empty string
+        if (typeof fieldValue !== "string" || !/^[WUBRG]*$/.test(fieldValue)) throw new Error(`Backup card ${index + 1} has invalid ${field}`);
       } else if (typeof fieldValue !== "string" || !fieldValue) {
         throw new Error(`Backup card ${index + 1} has invalid ${field}`);
       }

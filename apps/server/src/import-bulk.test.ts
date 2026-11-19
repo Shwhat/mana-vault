@@ -52,7 +52,7 @@ describe("Scryfall bulk importer", () => {
       {
         id: "token-1",
         name: "Goblin",
-        type_line: "Token Creature — Goblin",
+        type_line: "Token Creature \u2014 Goblin",
         set: "tlea",
         set_name: "Limited Edition Alpha Tokens",
         collector_number: "1",
@@ -145,7 +145,7 @@ describe("Scryfall bulk importer", () => {
         oracle_id: "oracle-face",
         name: "Front // Back",
         type_line: null,
-        card_faces: [{ type_line: "Creature — Human" }, { type_line: "Creature — Werewolf" }],
+        card_faces: [{ type_line: "Creature \u2014 Human" }, { type_line: "Creature \u2014 Werewolf" }],
         set: "tst",
         set_name: "Test Set",
         collector_number: "1",
@@ -166,7 +166,7 @@ describe("Scryfall bulk importer", () => {
     try {
       expect(await importBulkFile(dataPath, database)).toBe(2);
       expect(database.prepare("SELECT type_line FROM cards WHERE id = 'printing-face'").get()?.type_line)
-        .toBe("Creature — Human // Creature — Werewolf");
+        .toBe("Creature \u2014 Human // Creature \u2014 Werewolf");
       expect(database.prepare("SELECT type_line FROM cards WHERE id = 'printing-no-type'").get()?.type_line).toBe("");
     } finally {
       database.close();

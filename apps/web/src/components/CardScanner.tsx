@@ -15,7 +15,7 @@ export default function CardScanner({ onClose, onRecognized }: Props) {
   const stream = useRef<MediaStream | null>(null);
   const worker = useRef<OcrWorker | null>(null);
   const photoInput = useRef<HTMLInputElement>(null);
-  const [message, setMessage] = useState("Starting camera…");
+  const [message, setMessage] = useState("Starting camera");
   const [busy, setBusy] = useState(false);
   const [facingMode, setFacingMode] = useState<"environment" | "user">("environment");
 
@@ -25,7 +25,7 @@ export default function CardScanner({ onClose, onRecognized }: Props) {
       setMessage("Camera access is unavailable. Use HTTPS or localhost, or choose a photo instead.");
       return;
     }
-    setMessage("Starting camera…");
+    setMessage("Starting camera");
     navigator.mediaDevices.getUserMedia({
       video: {
         facingMode: { ideal: facingMode },
@@ -70,13 +70,13 @@ export default function CardScanner({ onClose, onRecognized }: Props) {
 
   async function recognize(source: OcrImage) {
     setBusy(true);
-    setMessage("Reading card text…");
+    setMessage("Reading card text");
     try {
       if (!worker.current) {
         const { createWorker } = await import("tesseract.js");
         worker.current = await createWorker("eng", undefined, {
           logger: (event) => {
-            if (event.status === "recognizing text") setMessage(`Reading card text… ${Math.round(event.progress * 100)}%`);
+            if (event.status === "recognizing text") setMessage(`Reading card text, ${Math.round(event.progress * 100)}%`);
           },
         });
       }
@@ -139,38 +139,40 @@ export default function CardScanner({ onClose, onRecognized }: Props) {
     <div className="scanner-backdrop" role="presentation" onMouseDown={(event) => {
       if (event.target === event.currentTarget && !busy) onClose();
     }}>
-      <section className="scanner-panel" role="dialog" aria-modal="true" aria-labelledby="scanner-title">
-        <div className="scanner-heading">
-          <div><div className="eyebrow">CAMERA TOOL</div><h2 id="scanner-title">Scan a card</h2></div>
-          <button className="export-button" onClick={onClose} disabled={busy}>Close</button>
+      <section className="scanner-panel" role="dialog" aria-modal="true" aria-labelledby="scanner-title"
+        onKeyDown={(event) => { if (event.key === "Escape" && !busy) onClose(); }}>
+        <div className="dlghead" id="scanner-title">Scan card</div>
+        <div className="scanner-body">
+          <p className="note">Center the card in the frame, or take or choose a photo. Text recognition runs on this device. Check the search results before adding a card.</p>
+          <div className="camera-frame">
+            <video ref={video} autoPlay playsInline muted aria-label="Live camera preview" />
+            <div className="camera-guide" aria-hidden="true" />
+          </div>
+          <p className="scanner-message" role="status">{message}</p>
+          <input
+            ref={photoInput}
+            className="file-input"
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={readPhoto}
+            aria-label="Take or choose a card photo"
+          />
+          <p className="note">Live camera access needs HTTPS (or localhost). The first scan downloads the English text recognition model; later scans reuse it.</p>
         </div>
-        <p>Center the card in the frame or take a photo. Text recognition runs on this device; check the search results before adding a card.</p>
-        <div className="camera-frame">
-          <video ref={video} autoPlay playsInline muted aria-label="Live camera preview" />
-          <div className="camera-guide" aria-hidden="true" />
-        </div>
-        {message && <p className="scanner-message" role="status">{message}</p>}
-        <input
-          ref={photoInput}
-          className="file-input"
-          type="file"
-          accept="image/*"
-          capture="environment"
-          onChange={readPhoto}
-          aria-label="Take or choose a card photo"
-        />
-        <div className="scanner-actions">
-          <button className="primary-button" onClick={captureAndRead} disabled={busy || !video.current?.srcObject}>
-            {busy ? "Reading…" : "Capture live view"}
-          </button>
-          <button className="export-button" onClick={() => setFacingMode((current) => current === "environment" ? "user" : "environment")} disabled={busy}>
+        <div className="dlgbtns scanner-actions">
+          <button type="button" className="btn" onClick={() => setFacingMode((current) => current === "environment" ? "user" : "environment")} disabled={busy}>
             Switch camera
           </button>
-          <button className="export-button" onClick={() => photoInput.current?.click()} disabled={busy}>
+          <button type="button" className="btn" onClick={() => photoInput.current?.click()} disabled={busy}>
             Take or choose photo
           </button>
+          <span className="grow" />
+          <button type="button" className="btn" onClick={onClose} disabled={busy}>Close</button>
+          <button type="button" className="btn primary" onClick={captureAndRead} disabled={busy || !video.current?.srcObject}>
+            {busy ? "Reading" : "Capture live view"}
+          </button>
         </div>
-        <p className="scanner-note">Live camera access requires HTTPS (except on localhost). The first scan downloads the English OCR model; later scans reuse it.</p>
       </section>
     </div>
   );

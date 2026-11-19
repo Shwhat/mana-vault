@@ -1,122 +1,194 @@
-# mana-vault
+# Mana Vault
 
-A self-hosted, local-first Magic: The Gathering collection manager focused on deck building.
+A self-hosted Magic: The Gathering collection and deck manager. Version 0.1.0.
 
-## Current status
+Mana Vault runs on your own server as one Docker container and is used from a desktop browser or a phone (installable as a home screen app). It keeps a local copy of the Scryfall card catalog, your collection and your decks in one SQLite database, behind a sign-in.
 
-The working app includes card search, collection tracking, deck creation with Normal and Theme modes, and CSV collection import. The card catalog must still be loaded from Scryfall.
+The full user guide is built into the app: Help menu, **About Mana Vault**. The pages are in `apps/web/src/about`.
 
-## Run locally
+## Features
+
+- Card search across every printing, with filter syntax (`t:dragon c:red mv>=4`, `o:draw`, `set:lea`, `r:rare`, `id:wubg`, `legal:commander`, negation with `-`) and a Filters panel.
+- Collection tracking per printing, regular and foil, with plus, minus and remove controls.
+- Decks in Normal mode (any printing counts) or Theme mode (exact printing kept), with main deck, sideboard and commander zones and a target zone for adding.
+- Undo and redo for collection and deck edits (150 steps).
+- Collection CSV import (Moxfield and similar) and decklist import (text or CSV), each with a preview and an Import review panel for skipped rows.
+- Exports: collection as Moxfield CSV, decks as text or CSV.
+- JSON backup and restore of the collection, decks and the card records they use.
+- Card database updates from Scryfall on demand or on a schedule.
+- Camera card scanner with in-browser text recognition.
+- Sign-in with accounts, password changes, 30-day sessions and protection against password guessing. New accounts can be turned off.
+- Desktop interface in the OpenSchem style: menu bar, customizable ribbon with a contextual Deck tab, dockable and floating panels (Filters, Decks, Card, Deck list, Import review), saved workspaces, status bar and light, dark or system theme.
+- Phone layout with bottom tabs, full-screen sheets and 44 pixel touch targets.
+- Preferences (theme, foil, target zone, ribbon, panels, workspaces, last deck) saved per account on the server.
+- Built-in About guide with release notes.
+
+## Keyboard shortcuts
+
+| Key | Action |
+|---|---|
+| / | Find card |
+| 1, 2, 3 | Card search, collection, deck view |
+| Up, Down | Previous or next row |
+| Enter | Add the selected card to the collection |
+| Shift+Enter | Add the selected card to the open deck |
+| F | Switch Add as foil |
+| Z | Cycle the target zone |
+| Ctrl+Z, Ctrl+Y (or Ctrl+Shift+Z) | Undo, redo |
+| Ctrl+N, Ctrl+O | New deck, open deck |
+| Esc | Close the window, menu or About guide, or clear the selection |
+
+## Install with Dockhand
+
+Mana Vault is published as `ghcr.io/shwhat/mana-vault:latest` (amd64 and arm64) by GitHub Actions on every push to `main`. The GitHub package must be public, or Dockhand needs registry credentials for ghcr.io.
+
+**1. On the Docker host**, check the port is free (no output means free), then create the data folder for the container's user (UID 65532):
+
+```bash
+sudo ss -ltnp | grep ':3417 '
+sudo mkdir -p /opt/mana-vault/data
+sudo chown -R 65532:65532 /opt/mana-vault/data
+```
+
+**2. In Dockhand**, add a Git stack:
+
+- Repository: `https://github.com/Shwhat/mana-vault`
+- Compose path: `docker-compose.yml`
+- Environment variables: the ones in `.env.example` (see Configuration below). Change `MANAVAULT_PORT` if 3417 is taken.
+
+Deploy the stack and check its logs for `Server listening`.
+
+**3. On the Docker host**, confirm it answers locally:
+
+```bash
+curl -I http://127.0.0.1:3417
+```
+
+A `302` redirect to `/login` means it is running.
+
+**4. In the Cloudflare Tunnel** (on its own LXC), add a public hostname that points to `http://SERVER_IP:3417`. No `cloudflared` or reverse proxy is needed in this stack. The session cookie is marked secure automatically for HTTPS requests through the tunnel.
+
+**5. In the browser**, open the address, choose **Create account**, then load the card catalog with **Database**, **Update card database**. When everyone who needs an account has one, set `MANAVAULT_SIGNUP=off` in Dockhand and redeploy.
+
+## Automatic updates
+
+In Dockhand, turn on automatic image updates for the `app` container with a schedule (for example weekly). Dockhand pulls each new image published by GitHub Actions and recreates the container; the data folder is kept. Optionally turn on Git auto sync or a webhook for the stack so changes to `docker-compose.yml` redeploy it.
+
+## Install from the command line
+
+**On the Docker host:**
+
+```bash
+sudo mkdir -p /opt/mana-vault/data
+cd /opt/mana-vault
+sudo curl -fsSLo docker-compose.yml https://raw.githubusercontent.com/Shwhat/mana-vault/main/docker-compose.yml
+sudo curl -fsSLo .env.example https://raw.githubusercontent.com/Shwhat/mana-vault/main/.env.example
+sudo cp .env.example .env
+sudo nano .env
+sudo chmod 600 .env
+sudo chown -R 65532:65532 /opt/mana-vault/data
+sudo docker compose config -q
+sudo docker compose pull
+sudo docker compose up -d
+sudo docker compose ps
+sudo docker compose logs --tail=100
+curl -I http://127.0.0.1:3417
+```
+
+## Manual update
+
+**In Dockhand:** pull and redeploy the stack, then check its logs.
+
+**On the Docker host (command line install):**
+
+```bash
+cd /opt/mana-vault
+sudo cp docker-compose.yml docker-compose.yml.backup-$(date +%Y%m%d-%H%M%S)
+sudo cp .env .env.backup-$(date +%Y%m%d-%H%M%S)
+sudo docker compose pull
+sudo docker compose up -d
+sudo docker compose logs --tail=100
+```
+
+Never remove the stack together with its volumes and never run `docker compose down -v`. An update never requires deleting or recreating the data folder.
+
+## Moving from the earlier mana-vault-data volume
+
+Versions before 0.1.0 kept the database in a Docker volume named `mana-vault-data`, ran as a different user, and were reachable only on localhost. **On the Docker host**, with the old stack stopped, copy the data into the new folder and set its owner:
+
+```bash
+sudo mkdir -p /opt/mana-vault/data
+sudo docker run --rm -v mana-vault-data:/from -v /opt/mana-vault/data:/to alpine sh -c 'cp -a /from/. /to/'
+sudo chown -R 65532:65532 /opt/mana-vault/data
+```
+
+Then deploy as above. Rename `CARD_UPDATE_INTERVAL_HOURS` to `MANAVAULT_CARD_UPDATE_INTERVAL_HOURS` (the old name still works). Keep the old volume until the new install is confirmed working.
+
+## Backup
+
+Back up, and keep one copy off the Docker host:
+
+- `/opt/mana-vault/data` (the database, including accounts). For a consistent copy, stop the stack first, or copy while the app is idle.
+- The stack's environment values (in Dockhand, or `/opt/mana-vault/.env`).
+- `docker-compose.yml`.
+
+**On the Docker host:**
+
+```bash
+sudo tar -czf ~/mana-vault-backup-$(date +%Y%m%d).tar.gz -C /opt/mana-vault data
+```
+
+The in-app **Download backup** (File menu) saves the collection and decks as JSON and can be restored from the app; it does not include accounts or the full card catalog. A Docker volume is not a backup.
+
+To restore a server backup: stop the stack, extract the archive into `/opt/mana-vault`, run `sudo chown -R 65532:65532 /opt/mana-vault/data`, and start the stack.
+
+## Configuration
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `MANAVAULT_PORT` | `3417` | Host port the app is published on |
+| `MANAVAULT_DATA_DIR` | `/opt/mana-vault/data` | Host folder for the database, owned by 65532:65532 |
+| `MANAVAULT_SIGNUP` | `on` | `on` shows Create account; `off` turns new accounts off |
+| `MANAVAULT_SECURE_COOKIE` | `auto` | `auto` marks the session cookie secure for HTTPS requests, including through a proxy; `always` or `never` force it |
+| `MANAVAULT_CARD_UPDATE_INTERVAL_HOURS` | `168` | Hours between automatic Scryfall updates, 1 to 8760; `0` turns them off |
+| `TZ` | `America/Los_Angeles` | Time zone for logs |
+
+The image sets `HOST`, `PORT` (3000 inside the container), `DATABASE_PATH`, `SCRYFALL_DATA_PATH` and `WEB_DIST_PATH`.
+
+## Development
 
 Requirements: Node.js 22.5 or newer.
 
-```powershell
-npm.cmd install
-npm.cmd run dev:server
+```bash
+npm install
+npm run dev:server     # API on 127.0.0.1:3000
+npm run dev:web        # interface on http://localhost:5173
+npm run update:cards   # load the Scryfall catalog into data/mana-vault.sqlite
 ```
 
-In a second terminal:
+### Checks
 
-```powershell
-npm.cmd run dev:web
+```bash
+npm run typecheck
+npm test               # server tests and static checks (About guide, versions, banned characters)
+npm run test:e2e       # builds, then runs the Playwright browser suite against a sample database
+npm run test:all       # all of the above
 ```
 
-Open the Vite URL shown in the second terminal (normally `http://localhost:5173`).
+The browser suite uses Playwright's Chromium (`npx playwright install chromium` once). Set `PW_CHANNEL=chrome` to use an installed Chrome instead.
 
-The server stores its SQLite database at `data/mana-vault.sqlite` by default. Override this with `DATABASE_PATH` if needed. The `data/` folder is ignored by Git.
-The API listens on `127.0.0.1` by default. Set `HOST=0.0.0.0` only when you intentionally want to accept connections from your trusted local network; there is no login yet.
+### Project layout
 
-## Use on an Android phone
-
-Mana Vault is an installable web app. Open its HTTPS address in Chrome on Android, open the browser menu, and choose **Install app** or **Add to Home screen**. The app includes Android-sized home-screen icons and a camera scanner that can use the rear/front camera or scan a photo selected from the phone.
-
-The browser requires HTTPS for camera access, except on `localhost`. The local Docker Compose setup binds only to the computer itself, so a phone cannot reach it by default. Do not expose this unauthenticated app to the public internet; only make it reachable to trusted users through a private, HTTPS-protected setup. The API and database must remain reachable while using the installed app; the PWA shell does not provide offline collection access.
-
-## Load the card catalog
-
-From the repository root, run:
-
-```powershell
-npm.cmd run import:cards --workspace=@mana-vault/server
-```
-
-This reads the current `default_cards` URL from Scryfall's bulk-data metadata, downloads the compressed JSONL feed, decompresses it as a stream, and imports one record at a time into SQLite. Cards without a top-level type line use the available card-face type lines, or an empty type line if Scryfall omits both. The prior uncompressed JSON-array feed is still accepted for compatibility. Download progress and periodic import counts are printed to the console. To refresh the catalog later, run:
-
-```powershell
-npm.cmd run update:cards
-```
-
-You can also select **Cards → Update card database** in the app. The server downloads and imports the latest catalog in the background; the app shows when it is running and reports failures. Refreshes update existing card records in place and preserve collection quantities and decks. The catalog status and last successful refresh time appear in the sidebar. To opt in to an automatic refresh, set `CARD_UPDATE_INTERVAL_HOURS` to a whole number from `1` to `8760` before starting the server; for example, `168` refreshes weekly. The default `0` disables scheduled refreshes. The first scheduled refresh runs after the configured interval, so load the catalog once manually first. The download needs internet access and enough disk space for the compressed download, expanded JSONL file, and database. Set `SCRYFALL_DATA_PATH` or `DATABASE_PATH` to choose different locations.
-
-The container image includes the same importer as `node apps/server/dist/import-cards.js`. In the container, the default database and downloaded/decompressed bulk data both live under `/data`.
-
-## Included features
-
-- Search card names, types, and rules text; filter by color, type, set, rarity, format legality, and mana value
-- Use common Scryfall-style filters such as `t:dragon c:red mv>=4`, `o:draw`, `set:lea`, `r:rare`, and `legal:commander` (filters combine with AND)
-- Track quantities per printing, including foil copies
-- Refresh the local card catalog from the app; scheduled refreshes are optional
-- Import Moxfield-style collection CSVs using card name, set/edition, collector number, count, and foil
-- Preview collection CSV and decklist matches before choosing to import; unmatched rows are listed for review. Theme decks require an exact set and collector number.
-- Create Normal decks (printing-independent) or Theme decks (printing-specific)
-- Add and remove cards from decks
-- Export collections and decks as CSV; export decks as plain text
-- Download and restore a JSON backup of your collection, decks, and the card printings those records need. Backups are validated and summarized before you confirm a restore. Restore replaces the current collection and decks; it does not include the full Scryfall catalog.
-- Scan a card with a desktop or phone camera; in-browser OCR suggests a name search that you confirm before adding a printing
-- Compact, responsive interface with light and dark themes
-- Installable PWA shell; the card database and API still require the server to be reachable
-
-## Still to come
-
-- Full Scryfall search syntax (for example OR groups), other site-specific CSV layouts, and art-theme search
-- Offline card data and more advanced camera identification
-- Authentication
-
-The app does not have authentication yet. Keep it on a trusted network; do not expose it directly to the public internet.
-Camera access requires HTTPS except on `localhost`. The first OCR scan downloads the English recognition model from the Tesseract model host; live camera frames and selected photos are processed in the browser and are not uploaded to Mana Vault.
-
-## Container image
-
-Every push to `main` builds and publishes `ghcr.io/shwhat/mana-vault:latest` for both `linux/amd64` and `linux/arm64`. Version tags also publish matching image tags. The image contains the API and built web app; mount `/data` persistently for the SQLite database and Scryfall bulk file. Set the GitHub Container Registry package visibility to public if the server should pull without registry credentials.
-
-## Local Docker deployment
-
-Docker Compose builds the image locally, persists the database and card catalog in a named volume, and binds the app to localhost. From the repository root:
-
-```powershell
-docker compose up -d --build
-```
-
-Open `http://localhost:3000`. To enable scheduled catalog refreshes, create a `.env` file containing `CARD_UPDATE_INTERVAL_HOURS=168` before starting Compose. The default is disabled. The service includes a health check and restarts unless stopped.
-
-The Compose setup is intentionally localhost-only because the app has no authentication. Do not expose port 3000 to the internet or an untrusted network.
-
-For a full recovery archive, stop the app before copying the volume so SQLite files are consistent. These PowerShell commands save the database and downloaded Scryfall data together; protect the resulting archive because it contains your collection and decks:
-
-```powershell
-docker compose stop app
-docker run --rm -v mana-vault-data:/data -v "${PWD}:/backup" alpine tar -czf /backup/mana-vault-data.tar.gz -C /data .
-docker compose start app
-```
-
-Restore a full archive with the app stopped:
-
-```powershell
-docker compose stop app
-docker run --rm -v mana-vault-data:/data -v "${PWD}:/backup" alpine tar -xzf /backup/mana-vault-data.tar.gz -C /data
-docker compose start app
-```
-
-The in-app JSON backup is another option for moving collection and deck records, but it does not include the complete card catalog. Keep backups off the host and verify they are readable before relying on them.
-
-## Development checks
-
-```powershell
-npm.cmd run typecheck
-npm.cmd test
-npm.cmd run build
-```
+| Path | Contents |
+|---|---|
+| `apps/server/src` | Fastify server: API, sign-in (`auth.ts`), search, imports, backups, catalog updates |
+| `apps/web/src` | React interface: `store.tsx` (state), `actions.tsx` (every command), `ribbon.ts` (ribbon and menus as data), `dock.ts` (panel layout model), `components/`, `panels/`, `views/`, `about/` (guide pages), `style.css` |
+| `apps/web/public` | Sign-in page, icons, manifest and service worker |
+| `tests/e2e` | Playwright browser tests and the sample-data test server |
+| `docs/HANDOFF.md` | Project handoff: rules, code map, open items |
 
 ## Data and secrets
 
-Collection data and card database files stay outside Git in `data/`. Do not commit `.env` files, credentials, backups, or collection exports.
+Collection data and card database files stay outside Git. Do not commit `.env` files, credentials, backups or collection exports.
+
+Mana Vault is not produced by or endorsed by Scryfall or Wizards of the Coast.

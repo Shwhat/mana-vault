@@ -33,10 +33,10 @@ COPY apps/server/package.json apps/server/package.json
 COPY --from=build /app/apps/server/dist apps/server/dist
 COPY --from=build /app/apps/web/dist apps/web/dist
 
-RUN mkdir -p /data && chown node:node /data
-USER node
+RUN mkdir -p /data && chown 65532:65532 /data
+USER 65532:65532
 VOLUME ["/data"]
 EXPOSE 3000
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD node -e "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+  CMD ["node", "apps/server/dist/index.js", "-healthcheck"]
 CMD ["node", "apps/server/dist/index.js"]

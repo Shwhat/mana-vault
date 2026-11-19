@@ -1,0 +1,261 @@
+// ---------- actions: every command is defined once and called by name from menus, ribbon and keys ----------
+import { useMemo } from "react";
+import { request } from "./api";
+import { customDialog, dialog } from "./components/Dialog";
+import { RibbonCustomize } from "./components/RibbonCustomize";
+import { isOpen, type PanelId, PANELS, PRESET_NAMES, removePanel } from "./dock";
+import { DEFAULT_RIBBON } from "./ribbon";
+import { type Store, useApp } from "./store";
+import { capitalize, FORMATS, type Zone } from "./types";
+
+export type Action = {
+  label: string;
+  /** Short label for ribbon buttons. */
+  short?: string;
+  icon: string;
+  key?: string;
+  run: () => void;
+  on?: boolean;
+  disabled?: boolean;
+};
+
+/** Every keyboard shortcut, in the order the shortcut list shows them. */
+export const SHORTCUTS: Array<[group: string, key: string, action: string]> = [
+  ["Search", "/", "find"],
+  ["Search", "1", "view.cards"],
+  ["Search", "2", "view.collection"],
+  ["Search", "3", "view.deck"],
+  ["Search", "Up, Down", "Select the previous or next row"],
+  ["Adding cards", "Enter", "addCollection"],
+  ["Adding cards", "Shift+Enter", "addDeck"],
+  ["Adding cards", "F", "foil"],
+  ["Adding cards", "Z", "zone.cycle"],
+  ["Editing", "Ctrl+Z", "undo"],
+  ["Editing", "Ctrl+Y", "redo"],
+  ["Decks", "Ctrl+N", "newDeck"],
+  ["Decks", "Ctrl+O", "openDeck"],
+  ["General", "Esc", "Close the dialog, menu or About guide, or clear the selection"],
+];
+
+export function useActions(store: Store): Record<string, Action> {
+  return useMemo(() => {
+    const { prefs, deck } = store;
+    const selected = store.selectedCard;
+    const setZone = (zone: Zone) => {
+      store.setPrefs({ zone });
+      store.flash(`New deck cards go to ${zone === "main" ? "the main deck" : `the ${zone}`}`);
+    };
+    const panelAction = (panel: PanelId): Action => ({
+      label: `${PANELS[panel].title} panel`,
+      short: PANELS[panel].title,
+      icon: PANELS[panel].icon,
+      on: isOpen(prefs.layout, panel),
+      run: () => {
+        if (isOpen(prefs.layout, panel)) store.setLayout(removePanel(prefs.layout, panel));
+        else store.showPanel(panel);
+      },
+    });
+    const theme = (value: "light" | "dark" | "system", label: string, icon: string): Action => ({
+      label, icon, on: prefs.theme === value,
+      run: () => { store.setPrefs({ theme: value }); store.flash(label); },
+    });
+
+    const actions: Record<string, Action> = {
+      "view.cards": { label: "Card search", short: "Cards", icon: "cards", key: "1", on: store.view === "cards", run: () => store.setView("cards") },
+      "view.collection": { label: "My collection", short: "Collection", icon: "collection", key: "2", on: store.view === "collection", run: () => store.setView("collection") },
+      "view.deck": { label: "Deck view", short: "Deck", icon: "deck", key: "3", on: store.view === "deck", run: () => store.setView("deck") },
+      find: {
+        label: "Find card", short: "Find", icon: "find", key: "/",
+        run: () => {
+          const focus = () => { store.searchInput.current?.focus(); store.searchInput.current?.select(); };
+          // focus at once when the search box is on screen, so typed keys are never lost
+          if (store.view === "cards" && store.searchInput.current) focus();
+          else {
+            store.setView("cards");
+            window.setTimeout(focus, 0);
+          }
+        },
+      },
+      clearFilters: {
+        label: "Clear filters", short: "Clear filters", icon: "clear", disabled: !store.filtersActive,
+        run: () => { store.setFilters({ query: "", type: "", set: "", color: "", rarity: "", format: "", mvMin: "", mvMax: "" }); store.flash("Filters cleared"); },
+      },
+      scan: { label: "Scan card...", short: "Scan card", icon: "scan", run: () => store.setScannerOpen(true) },
+      addCollection: {
+        label: "Add to collection", short: "Add to collection", icon: "addcol", key: "Enter", disabled: !selected,
+        run: () => { if (selected) void store.addToCollection(selected.id, selected.name); else store.flash("Select a card first", "err"); },
+      },
+      addDeck: {
+        label: "Add to deck", short: "Add to deck", icon: "adddeck", key: "Shift+Enter", disabled: !selected || !deck,
+        run: () => { if (selected) void store.addToDeck(selected.id, selected.name); else store.flash("Select a card first", "err"); },
+      },
+      foil: {
+        label: "Add as foil", short: "Add as foil", icon: "foil", key: "F", on: prefs.foil,
+        run: () => { store.setPrefs({ foil: !prefs.foil }); store.flash(prefs.foil ? "Cards are added as regular copies" : "Cards are added as foil"); },
+      },
+      "zone.main": { label: "Main deck", short: "Main", icon: "zmain", on: prefs.zone === "main", run: () => setZone("main") },
+      "zone.sideboard": { label: "Sideboard", short: "Sideboard", icon: "zside", on: prefs.zone === "sideboard", run: () => setZone("sideboard") },
+      "zone.commander": { label: "Commander", short: "Commander", icon: "zcmd", on: prefs.zone === "commander", run: () => setZone("commander") },
+      "zone.cycle": {
+        label: "Cycle target zone", short: "Cycle zone", icon: "zone", key: "Z",
+        run: () => setZone(prefs.zone === "main" ? "sideboard" : prefs.zone === "sideboard" ? "commander" : "main"),
+      },
+      updateCatalog: {
+        label: "Update card database", short: "Update database", icon: "update",
+        disabled: store.catalogRequestPending || !store.catalog || store.catalog.update.isUpdating,
+        run: () => void store.updateCatalog(),
+      },
+      importCollection: { label: "Import collection CSV...", short: "Import CSV", icon: "csvin", run: () => void store.importCollection() },
+      exportCollection: { label: "Export collection (Moxfield CSV)", short: "Moxfield CSV", icon: "csv", run: () => void store.exportCollection() },
+      backup: { label: "Download backup", short: "Backup", icon: "backup", run: () => void store.downloadBackup() },
+      restore: { label: "Restore backup...", short: "Restore", icon: "restore", run: () => void store.restoreBackup() },
+      newDeck: {
+        label: "New deck...", short: "New deck", icon: "newdeck", key: "Ctrl+N",
+        run: () => dialog("New deck", [
+          ["name", "Deck name", ""],
+          ["format", "Format", "commander", "select", FORMATS.map((format) => [format, capitalize(format)])],
+          ["mode", "Deck mode", "normal", "select", [["normal", "Normal (any printing works)"], ["theme", "Theme (keeps each selected printing)"]]],
+        ], async (values) => {
+          const name = String(values.name);
+          if (!name) {
+            store.flash("Enter a deck name", "err");
+            return false;
+          }
+          if (name.length > 100) {
+            store.flash("Deck names can be up to 100 characters", "err");
+            return false;
+          }
+          try {
+            await store.createDeck(name, String(values.format), values.mode === "theme" ? "theme" : "normal");
+          } catch (reason) {
+            store.fail(reason, "Could not create the deck.");
+            return false;
+          }
+        }, "Create deck", <p className="note">Normal decks track each card by name, so any printing counts. Theme decks keep the exact printing and artwork you add.</p>),
+      },
+      openDeck: {
+        label: "Open deck...", short: "Open deck", icon: "opendeck", key: "Ctrl+O",
+        run: () => {
+          if (!store.decks.length) {
+            store.flash("There are no decks yet. Use New deck to create one.", "err");
+            return;
+          }
+          dialog("Open deck", [
+            ["deck", "Deck", deck?.id ?? store.decks[0]?.id ?? "", "select",
+              store.decks.map((item) => [item.id, `${item.name} (${capitalize(item.format)}, ${item.mode === "theme" ? "Theme" : "Normal"}, ${item.card_count ?? 0} cards)`])],
+          ], async (values) => { await store.openDeck(String(values.deck)); store.setView("deck"); }, "Open");
+        },
+      },
+      importDeck: { label: "Import decklist...", short: "Import list", icon: "listin", disabled: !deck, run: () => void store.importDeck() },
+      exportDeckText: { label: "Export deck (text)", short: "Text", icon: "txt", disabled: !deck, run: store.exportDeckText },
+      exportDeckCsv: { label: "Export deck (CSV)", short: "CSV", icon: "csv", disabled: !deck, run: store.exportDeckCsv },
+      undo: {
+        label: store.undoStack.length ? `Undo ${store.undoStack[store.undoStack.length - 1]!.label}` : "Undo", short: "Undo", icon: "undo", key: "Ctrl+Z",
+        disabled: !store.undoStack.length, run: () => void store.undo(),
+      },
+      redo: {
+        label: store.redoStack.length ? `Redo ${store.redoStack[store.redoStack.length - 1]!.label}` : "Redo", short: "Redo", icon: "redo", key: "Ctrl+Y",
+        disabled: !store.redoStack.length, run: () => void store.redo(),
+      },
+      "theme.light": theme("light", "Light theme", "sun"),
+      "theme.dark": theme("dark", "Dark theme", "theme"),
+      "theme.system": theme("system", "System theme", "system"),
+      "panel.filters": panelAction("filters"),
+      "panel.decks": panelAction("decks"),
+      "panel.card": panelAction("card"),
+      "panel.decklist": panelAction("decklist"),
+      "panel.review": panelAction("review"),
+      "workspace.save": {
+        label: "Save workspace...", short: "Save workspace", icon: "workspace",
+        run: () => dialog("Save workspace", [["name", "Workspace name", PRESET_NAMES.includes(prefs.workspace) ? "" : prefs.workspace]], (values) => {
+          const name = String(values.name);
+          if (!name) { store.flash("Enter a workspace name", "err"); return false; }
+          if (PRESET_NAMES.includes(name)) { store.flash(`${name} is a built-in workspace. Choose another name.`, "err"); return false; }
+          store.saveWorkspace(name);
+        }, "Save", <p className="note">A workspace keeps the panel layout and the current view. Saving with an existing name replaces it.</p>),
+      },
+      "workspace.manage": {
+        label: "Manage workspaces...", short: "Manage", icon: "panels",
+        run: () => customDialog("Manage workspaces", () => <WorkspaceList />, 420),
+      },
+      "workspace.reset": {
+        label: "Reset panels", short: "Reset panels", icon: "panels",
+        run: () => store.applyWorkspace(PRESET_NAMES.includes(prefs.workspace) ? prefs.workspace : "Deck building"),
+      },
+      "ribbon.customize": {
+        label: "Customize ribbon...", short: "Customize", icon: "ribbon",
+        run: () => customDialog("Customize ribbon", () => <RibbonCustomize />, 900),
+      },
+      shortcuts: {
+        label: "Keyboard shortcuts", short: "Shortcuts", icon: "keyboard",
+        run: () => customDialog("Keyboard shortcuts", () => <ShortcutList actions={actions} />, 460),
+      },
+      about: { label: "About Mana Vault", short: "About", icon: "info", run: () => store.openAbout() },
+      password: {
+        label: "Change password...", short: "Password", icon: "key",
+        run: () => dialog("Change password", [
+          ["old", "Current password", "", "password"],
+          ["new", "New password", "", "password"],
+          ["repeat", "Repeat new password", "", "password"],
+        ], async (values) => {
+          if (values.new !== values.repeat) { store.flash("The new passwords do not match", "err"); return false; }
+          try {
+            await request("/api/password", { method: "POST", body: JSON.stringify({ old: values.old, new: values.new }) });
+            store.flash("Password changed. Other devices are signed out.");
+          } catch (reason) {
+            store.fail(reason, "Could not change the password.");
+            return false;
+          }
+        }, "Change password", <p className="note">Passwords need at least 8 characters. Changing it signs out every other device.</p>),
+      },
+      signout: {
+        label: "Sign out", short: "Sign out", icon: "signout",
+        run: () => {
+          void request("/api/logout", { method: "POST", body: "{}" }).finally(() => { window.location.href = "/login"; });
+        },
+      },
+    };
+    return actions;
+  }, [store]);
+}
+
+function ShortcutList({ actions }: { actions: Record<string, Action> }) {
+  const groups = [...new Set(SHORTCUTS.map(([group]) => group))];
+  return (
+    <div className="kbdlist">
+      {groups.map((group) => (
+        <div key={group}>
+          <h4>{group}</h4>
+          <div className="kbd">
+            {SHORTCUTS.filter(([item]) => item === group).map(([, key, action]) => (
+              <span className="kbdrow" key={key}><b>{key}</b><span>{actions[action]?.label.replace(/^Undo .+/, "Undo").replace(/^Redo .+/, "Redo") ?? action}</span></span>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function WorkspaceList() {
+  const store = useApp();
+  const names = Object.keys(store.prefs.workspaces);
+  return (
+    <div>
+      {PRESET_NAMES.map((name) => (
+        <div className="wsrow" key={name}><span>{name} <span className="badge">Built in</span></span>
+          <button type="button" className="btn small" onClick={() => store.applyWorkspace(name)}>Use</button></div>
+      ))}
+      {names.map((name) => (
+        <div className="wsrow" key={name}><span>{name}</span>
+          <span className="btnrow">
+            <button type="button" className="btn small" onClick={() => store.applyWorkspace(name)}>Use</button>
+            <button type="button" className="btn small" onClick={() => store.deleteWorkspace(name)}>Delete</button>
+          </span></div>
+      ))}
+      {!names.length && <p className="note">Saved workspaces appear here. Use Save workspace to add one.</p>}
+    </div>
+  );
+}
+
+export const DEFAULT_RIBBON_IDS = DEFAULT_RIBBON.flatMap((tab) => tab.groups.flatMap((group) => group.items));

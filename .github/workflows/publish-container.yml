@@ -32,6 +32,11 @@ jobs:
           npm test
           npm run build
 
+      - name: Browser tests
+        run: |
+          npx playwright install --with-deps chromium
+          npm run test:e2e:run
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 

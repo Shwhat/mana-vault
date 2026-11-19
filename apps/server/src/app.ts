@@ -8,6 +8,35 @@ import { importDecklist } from "./deck-import.js";
 import { createBackup, inspectBackup, restoreBackup } from "./backup.js";
 import { parseCardQuery } from "./card-search.js";
 import { type CatalogUpdateStatus } from "./catalog-updater.js";
+import {
+  AuthStore, COOKIE_NAME, DEFAULT_ITERATIONS, GUARD_HEADER, Limiter, readCookie, SESSION_DAYS, sessionCookie,
+  type User, validName, validPassword,
+} from "./auth.js";
+
+declare module "fastify" {
+  interface FastifyRequest {
+    user: User | null;
+  }
+}
+
+export interface AppOptions {
+  /** Sign-in and the request guard. Only tests of the card and deck logic turn this off. */
+  requireSignIn?: boolean;
+  /** Whether the sign-in page offers "Create account". */
+  signup?: boolean;
+  /** auto marks the session cookie secure when the request arrived over HTTPS (directly or through a proxy). */
+  secureCookie?: "auto" | "always" | "never";
+  passwordIterations?: number;
+  /** Failed sign-ins and new accounts allowed per address in 15 minutes. Raised only by the browser tests. */
+  addressAttemptLimit?: number;
+  version?: string;
+}
+
+// Paths anyone may load without signing in.
+const PUBLIC_PATHS = new Set([
+  "/login", "/login.html", "/icon.svg", "/icon-192.png", "/icon-512.png", "/manifest.webmanifest", "/sw.js",
+  "/api/health", "/api/config", "/api/login", "/api/signup", "/api/logout",
+]);
 
 export async function buildApp(
   database = openDatabase(),
@@ -21,9 +50,41 @@ export async function buildApp(
     lastError: null,
   }),
   requestCatalogUpdate: () => boolean = () => false,
+  options: AppOptions = {},
 ): Promise<FastifyInstance> {
   initializeDatabase(database);
   const app = Fastify({ logger: process.env.NODE_ENV !== "test" });
+  const requireSignIn = options.requireSignIn ?? true;
+  const signupOpen = options.signup ?? true;
+  const secureMode = options.secureCookie ?? "auto";
+  const auth = new AuthStore(database, options.passwordIterations ?? DEFAULT_ITERATIONS);
+  const nameLimiter = new Limiter(5, 5 * 60_000);
+  const addressLimiter = new Limiter(options.addressAttemptLimit ?? 30, 15 * 60_000);
+  app.decorateRequest("user", null);
+
+  app.addHook("onRequest", async (request, reply) => {
+    reply.header("x-content-type-options", "nosniff");
+    reply.header("x-frame-options", "DENY");
+    reply.header("referrer-policy", "same-origin");
+    if (!requireSignIn) return;
+    const path = request.url.split("?")[0] ?? "/";
+    // Every request that changes something must carry the guard header. Browsers do not let other sites
+    // add custom headers without a CORS preflight, which this server never allows.
+    if (path.startsWith("/api/") && request.method !== "GET" && request.method !== "HEAD" && request.headers[GUARD_HEADER] !== "1") {
+      return reply.code(403).send({ error: "This request is missing its safety header. Reload the page and try again." });
+    }
+    const token = readCookie(request.headers.cookie, COOKIE_NAME);
+    request.user = token ? auth.session(token) : null;
+    if (PUBLIC_PATHS.has(path) || request.user) return;
+    if (path.startsWith("/api/")) return reply.code(401).send({ error: "You are signed out. Sign in again to continue." });
+    if (path === "/" || path.endsWith(".html") || !path.includes(".")) return reply.redirect("/login");
+    return reply.code(401).send({ error: "Signed out" });
+  });
+
+  const secure = (request: { protocol: string; headers: Record<string, string | string[] | undefined> }) =>
+    secureMode === "always" ? true : secureMode === "never" ? false
+      : request.protocol === "https" || String(request.headers["x-forwarded-proto"] ?? "").toLowerCase() === "https";
+  const address = (request: { ip: string }) => request.ip;
 
   app.addContentTypeParser(
     "text/csv",
@@ -46,6 +107,16 @@ export async function buildApp(
     prefix: "/",
     index: ["index.html"],
     wildcard: false,
+  });
+
+  // Addresses inside the app (such as /about/decks) load the app page; anything else is not found.
+  app.setNotFoundHandler((request, reply) => {
+    const path = request.url.split("?")[0] ?? "/";
+    if (request.method === "GET" && !path.startsWith("/api/") && !path.includes(".")) {
+      reply.header("cache-control", "no-store");
+      return reply.sendFile("index.html");
+    }
+    return reply.code(404).send({ error: "Not found" });
   });
 
   app.post<{ Params: { deckId: string }; Body: string }>("/api/decks/:deckId/import/preview", async (request, reply) => {
@@ -75,6 +146,89 @@ export async function buildApp(
   });
 
   app.get("/api/health", async () => ({ status: "ok" }));
+
+  // ---------- accounts ----------
+  app.get("/login", async (request, reply) => {
+    if (request.user) return reply.redirect("/");
+    reply.header("cache-control", "no-store");
+    return reply.sendFile("login.html");
+  });
+
+  app.get("/api/config", async () => ({ signup: signupOpen, version: options.version ?? null }));
+
+  const startSession = (request: Parameters<typeof secure>[0], reply: { header: (name: string, value: string) => unknown }, user: User) => {
+    const token = auth.newSession(user.id);
+    reply.header("set-cookie", sessionCookie(token, SESSION_DAYS * 86_400, secure(request)));
+    return { id: user.id, name: user.name };
+  };
+
+  app.post<{ Body: { name?: unknown; password?: unknown } }>("/api/signup", async (request, reply) => {
+    if (!signupOpen) return reply.code(403).send({ error: "New accounts are turned off on this server." });
+    const name = typeof request.body?.name === "string" ? request.body.name.trim() : "";
+    const password = typeof request.body?.password === "string" ? request.body.password : "";
+    if (!validName(name)) {
+      return reply.code(400).send({ error: "User names are 3 to 32 letters, digits, dots, dashes or underscores, starting with a letter or digit." });
+    }
+    if (!validPassword(password)) return reply.code(400).send({ error: "Passwords need at least 8 characters." });
+    if (addressLimiter.blocked(address(request))) return reply.code(429).send({ error: "Too many attempts. Try again in a few minutes." });
+    addressLimiter.hit(address(request));
+    const user = auth.addUser(name, password);
+    if (!user) return reply.code(409).send({ error: "That user name is taken." });
+    return startSession(request, reply, user);
+  });
+
+  app.post<{ Body: { name?: unknown; password?: unknown } }>("/api/login", async (request, reply) => {
+    const name = typeof request.body?.name === "string" ? request.body.name.trim() : "";
+    const password = typeof request.body?.password === "string" ? request.body.password : "";
+    const key = name.toLowerCase();
+    if (nameLimiter.blocked(key) || addressLimiter.blocked(address(request))) {
+      return reply.code(429).send({ error: "Too many attempts. Try again in a few minutes." });
+    }
+    const user = auth.checkPassword(name, password);
+    if (!user) {
+      nameLimiter.hit(key);
+      addressLimiter.hit(address(request));
+      return reply.code(401).send({ error: "Wrong user name or password." });
+    }
+    nameLimiter.reset(key);
+    return startSession(request, reply, user);
+  });
+
+  app.post("/api/logout", async (request, reply) => {
+    const token = readCookie(request.headers.cookie, COOKIE_NAME);
+    if (token) auth.endSession(token);
+    reply.header("set-cookie", sessionCookie("", 0, secure(request)));
+    return { ok: true };
+  });
+
+  app.get("/api/me", async (request) => request.user ?? { id: 0, name: "" });
+
+  app.post<{ Body: { old?: unknown; new?: unknown } }>("/api/password", async (request, reply) => {
+    const user = request.user;
+    if (!user) return reply.code(401).send({ error: "You are signed out. Sign in again to continue." });
+    const key = user.name.toLowerCase();
+    if (nameLimiter.blocked(key)) return reply.code(429).send({ error: "Too many attempts. Try again in a few minutes." });
+    if (!auth.checkPassword(user.name, typeof request.body?.old === "string" ? request.body.old : "")) {
+      nameLimiter.hit(key);
+      return reply.code(401).send({ error: "The current password is wrong." });
+    }
+    const next = typeof request.body?.new === "string" ? request.body.new : "";
+    if (!validPassword(next)) return reply.code(400).send({ error: "Passwords need at least 8 characters." });
+    auth.setPassword(user.id, next);
+    // other sessions were ended; this one continues with a new token
+    return startSession(request, reply, user);
+  });
+
+  app.get("/api/prefs", async (request) => (request.user ? auth.prefs(request.user.id) : {}));
+
+  app.put<{ Body: unknown }>("/api/prefs", { bodyLimit: 1024 * 1024 }, async (request, reply) => {
+    if (!request.user) return reply.code(401).send({ error: "You are signed out. Sign in again to continue." });
+    if (!request.body || typeof request.body !== "object" || Array.isArray(request.body)) {
+      return reply.code(400).send({ error: "Preferences must be an object" });
+    }
+    auth.savePrefs(request.user.id, request.body);
+    return { ok: true };
+  });
 
   app.get("/api/catalog/status", async () => ({
     printingCount: database.prepare("SELECT COUNT(*) AS count FROM cards").get()?.count ?? 0,
@@ -205,6 +359,30 @@ export async function buildApp(
     },
   );
 
+  app.get<{ Params: { cardId: string } }>("/api/cards/:cardId", async (request, reply) => {
+    const row = database.prepare(
+      `SELECT id, oracle_id, name, mana_cost, mana_value, type_line, oracle_text, colors, color_identity, legalities,
+              set_code, set_name, collector_number, rarity, image_url, released_at, artist
+       FROM cards WHERE id = ?`,
+    ).get(request.params.cardId);
+    if (!row) return reply.code(404).send({ error: "Card printing not found" });
+    const card = toCardRow(row);
+    const owned = database.prepare(
+      `SELECT COALESCE(SUM(CASE WHEN i.card_id = ? AND i.foil = 0 THEN i.quantity END), 0) AS regular,
+              COALESCE(SUM(CASE WHEN i.card_id = ? AND i.foil = 1 THEN i.quantity END), 0) AS foil,
+              COALESCE(SUM(i.quantity), 0) AS all_printings
+       FROM collection_items i JOIN cards c ON c.id = i.card_id WHERE c.oracle_id = ?`,
+    ).get(card.id, card.id, card.oracle_id);
+    return {
+      ...card,
+      owned: {
+        regular: Number(owned?.regular ?? 0),
+        foil: Number(owned?.foil ?? 0),
+        allPrintings: Number(owned?.all_printings ?? 0),
+      },
+    };
+  });
+
   app.get("/api/collection", async () =>
     database.prepare(
       `SELECT c.id, c.name, c.set_code, c.set_name, c.collector_number, c.rarity, c.image_url,
@@ -325,7 +503,7 @@ export async function buildApp(
     ).get(request.params.deckId);
     if (!deck) return reply.code(404).send({ error: "Deck not found" });
     const cards = database.prepare(
-      `SELECT dc.id AS entry_id, dc.oracle_id, dc.printing_id, dc.quantity, dc.zone, c.name, c.mana_cost,
+      `SELECT dc.id AS entry_id, c.id AS card_id, dc.oracle_id, dc.printing_id, dc.quantity, dc.zone, c.name, c.mana_cost,
               c.type_line, c.set_code, c.set_name, c.collector_number, c.image_url
        FROM deck_cards dc JOIN cards c ON c.id = COALESCE(
          dc.printing_id,

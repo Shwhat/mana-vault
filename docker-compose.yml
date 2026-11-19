@@ -1,0 +1,21 @@
+name: mana-vault
+
+services:
+  app:
+    image: ghcr.io/shwhat/mana-vault:latest
+    restart: unless-stopped
+    ports:
+      - "${MANAVAULT_PORT:-3417}:3000"
+    environment:
+      TZ: ${TZ:-America/Los_Angeles}
+      MANAVAULT_SIGNUP: ${MANAVAULT_SIGNUP:-on}
+      MANAVAULT_SECURE_COOKIE: ${MANAVAULT_SECURE_COOKIE:-auto}
+      MANAVAULT_CARD_UPDATE_INTERVAL_HOURS: ${MANAVAULT_CARD_UPDATE_INTERVAL_HOURS:-168}
+    volumes:
+      - ${MANAVAULT_DATA_DIR:-/opt/mana-vault/data}:/data
+    healthcheck:
+      test: ["CMD", "node", "apps/server/dist/index.js", "-healthcheck"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
