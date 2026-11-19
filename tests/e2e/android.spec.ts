@@ -1,0 +1,206 @@
+import type { Page } from "@playwright/test";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
+import { expect, test } from "./fixtures";
+
+const dist = join(__dirname, "../../apps/web/dist");
+
+// The Android app runs the same interface inside Capacitor. These tests stand in for its native plugin
+// (window.__manaVaultApp) and use the test server as the server the phone signs in to.
+
+async function fakePhone(page: Page) {
+  // the app carries its own copy of the interface, like Capacitor serving the bundled files
+  await page.route((url) => !url.pathname.startsWith("/api/"), async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    const file = join(dist, path);
+    await route.fulfill({ path: path !== "/" && existsSync(file) ? file : join(dist, "index.html") });
+  });
+  await page.addInitScript(() => {
+    const key = "test.native";
+    const read = () => JSON.parse(localStorage.getItem(key) ?? "{}") as Record<string, unknown>;
+    const listeners: Record<string, Array<(data: unknown) => void>> = {};
+    const calls: unknown[][] = [];
+    const scope = window as unknown as Record<string, unknown>;
+    scope.__nativeCalls = calls;
+    scope.__nativeFire = (event: string, data?: unknown) => (listeners[event] ?? []).forEach((listener) => listener(data));
+    // the daily update check stays quiet in tests
+    localStorage.setItem("mana-vault.updateCheck", String(Date.now()));
+    window.__manaVaultApp = {
+      getSettings: async () => read(),
+      setSettings: async (change) => { localStorage.setItem(key, JSON.stringify({ ...read(), ...change })); },
+      clearSettings: async () => { localStorage.removeItem(key); },
+      recognize: async () => ({ lines: [], width: 0, height: 0 }),
+      setNotifications: async (options) => { calls.push(["notifications", options]); return { granted: true }; },
+      takeLaunchOffer: async () => ({ offer: null }),
+      saveFile: async (options) => { calls.push(["saveFile", options.name]); },
+      minimize: async () => { calls.push(["minimize"]); },
+      appInfo: async () => ({ version: "test", android: "15", device: "Test Phone" }),
+      addListener: (async (event: string, listener: (data: unknown) => void) => {
+        (listeners[event] ??= []).push(listener);
+        return { remove: async () => { listeners[event] = (listeners[event] ?? []).filter((item) => item !== listener); } };
+      }) as never,
+    };
+  });
+}
+
+const calls = (page: Page) => page.evaluate(() => (window as unknown as { __nativeCalls: unknown[][] }).__nativeCalls);
+const fire = (page: Page, event: string) => page.evaluate((name) => (window as unknown as { __nativeFire: (event: string) => void }).__nativeFire(name), event);
+const chip = (page: Page) => page.locator(".syncchip");
+
+/** Waits until the card list is on the phone and nothing is waiting to sync. */
+async function synced(page: Page) {
+  await expect.poll(() => page.evaluate(() => new Promise<boolean>((resolve) => {
+    const open = indexedDB.open("mana-vault-app", 1);
+    open.onsuccess = () => {
+      const get = open.result.transaction("meta").objectStore("meta").get("catalogVersion");
+      get.onsuccess = () => resolve(!!get.result);
+      get.onerror = () => resolve(false);
+    };
+    open.onerror = () => resolve(false);
+  })), { timeout: 15_000 }).toBe(true);
+  await expect(chip(page)).toHaveCount(0);
+}
+
+async function signUpOnPhone(page: Page, baseURL: string, prefix: string): Promise<string> {
+  const name = `${prefix}${Date.now().toString(36)}`;
+  await page.goto("/");
+  await page.fill("#server", baseURL);
+  await page.getByRole("button", { name: "Continue" }).click();
+  await expect(page.locator(".appcard")).toContainText("(version test)");
+  await expect(page.locator(".appcard .warn")).toContainText("not encrypted");
+  await page.getByRole("button", { name: "Create account" }).first().click();
+  await page.fill("#name", name);
+  await page.fill("#pw", "correct horse");
+  await page.fill("#pw2", "correct horse");
+  await page.locator(".appcard .go").click();
+  await expect(page.locator("#ptabs")).toBeVisible();
+  await synced(page);
+  return name;
+}
+
+async function addFromSearch(page: Page, query: string, name: string) {
+  await page.locator(".ptab", { hasText: "Cards" }).click();
+  await page.getByRole("textbox", { name: "Search cards" }).fill(query);
+  await page.locator("#view-cards .row", { hasText: name }).first().click();
+  await expect(page.locator(".sheet .ident")).toHaveText(name);
+  await page.locator(".sheet").getByRole("button", { name: "Add to collection" }).click();
+  await expect(page.locator(".ptoast")).toHaveText(`${name} added to Main collection`);
+  await page.locator(".sheethead .btn").click();
+}
+
+async function serverCards(page: Page, baseURL: string): Promise<string[]> {
+  const token = await page.evaluate(() => (JSON.parse(localStorage.getItem("test.native") ?? "{}") as { token: string }).token);
+  const headers = { authorization: `Bearer ${token}` };
+  const collections = await (await page.request.get(`${baseURL}/api/collections`, { headers })).json() as Array<{ id: string }>;
+  const cards = await (await page.request.get(`${baseURL}/api/collections/${collections[0]!.id}/cards`, { headers })).json() as Array<{ name: string; quantity: number }>;
+  return cards.map((card) => `${card.quantity} ${card.name}`);
+}
+
+test.describe("Android app", () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+
+  test("signs in with a server address, works offline and sends the changes when back online", async ({ page, context, baseURL }) => {
+    await fakePhone(page);
+    await signUpOnPhone(page, baseURL!, "droid");
+    await expect(page.locator("#menubar")).toHaveCount(0);
+    await addFromSearch(page, "Counterspell", "Counterspell");
+
+    await context.setOffline(true);
+    // the search and the card details come from the card list on the phone
+    await addFromSearch(page, "shivan", "Shivan Dragon");
+    await expect(chip(page)).toContainText("Offline");
+    await expect(chip(page).locator(".cbadge")).toHaveText("1");
+    await page.locator(".ptab", { hasText: "Collection" }).click();
+    await expect(page.locator("#view-collection .row", { hasText: "Shivan Dragon" }).first()).toBeVisible();
+    await expect(page.locator("#view-collection .row", { hasText: "Counterspell" }).first()).toBeVisible();
+    // things that need the server say so
+    await page.locator(".ptab", { hasText: "More" }).click();
+    await page.locator(".pmrow", { hasText: "Devices..." }).click();
+    await expect(page.locator("#dlg")).toContainText("cannot be reached");
+    await page.locator("#dlg .dlgbtns .btn").last().click();
+
+    // the app syncs by itself when the connection returns
+    await context.setOffline(false);
+    await expect(chip(page)).toHaveCount(0);
+    expect((await serverCards(page, baseURL!)).sort()).toEqual(["1 Counterspell", "1 Shivan Dragon"]);
+  });
+
+  test("Back button, devices, notifications and sign out", async ({ page, baseURL }) => {
+    await fakePhone(page);
+    await signUpOnPhone(page, baseURL!, "back");
+
+    await page.locator(".ptab", { hasText: "More" }).click();
+    await expect(page.locator(".sheet")).toBeVisible();
+    await fire(page, "backButton");
+    await expect(page.locator(".sheet")).toHaveCount(0);
+    await page.locator(".ptab", { hasText: "Decks" }).click();
+    await fire(page, "backButton");
+    await expect(page.locator(".ptab.on")).toHaveText("Cards");
+    await fire(page, "backButton");
+    expect(await calls(page)).toContainEqual(["minimize"]);
+
+    await page.locator(".ptab", { hasText: "More" }).click();
+    await page.locator(".pmrow", { hasText: "Devices..." }).click();
+    await expect(page.locator(".devlist")).toContainText("Test Phone");
+    await expect(page.locator(".devlist")).toContainText("This phone");
+    await fire(page, "backButton");
+    await expect(page.locator("#dlg[open]")).toHaveCount(0);
+
+    await page.locator(".ptab", { hasText: "More" }).click();
+    await page.locator(".pmrow", { hasText: "Notifications..." }).click();
+    await page.getByLabel("Notify me about new offers in the Inbox").check();
+    await page.locator("#dlg .dlgbtns .primary").click();
+    await expect(page.locator(".ptoast")).toHaveText("Notifications on");
+    expect(await calls(page)).toContainEqual(["notifications", { enabled: true, wifiOnly: false }]);
+
+    await page.locator(".ptab", { hasText: "More" }).click();
+    await page.locator(".pmrow", { hasText: "Sign out" }).click();
+    await page.locator("#dlg .dlgbtns .primary").click();
+    await expect(page.locator("#server")).toBeVisible();
+    expect(await page.evaluate(() => localStorage.getItem("test.native"))).toBeNull();
+  });
+
+  test("changes the server refuses are listed after sync", async ({ page, context, baseURL }) => {
+    await fakePhone(page);
+    await signUpOnPhone(page, baseURL!, "refuse");
+    await page.locator(".ptab", { hasText: "Collection" }).click();
+    await context.setOffline(true);
+    await addFromSearch(page, "serra", "Serra Angel");
+    await expect(chip(page).locator(".cbadge")).toHaveText("1");
+    // meanwhile the collection is deleted on the server
+    const token = await page.evaluate(() => (JSON.parse(localStorage.getItem("test.native") ?? "{}") as { token: string }).token);
+    const headers = { authorization: `Bearer ${token}`, "x-mana-vault": "1" };
+    const collections = await (await page.request.get(`${baseURL}/api/collections`, { headers })).json() as Array<{ id: string }>;
+    expect((await page.request.delete(`${baseURL}/api/collections/${collections[0]!.id}`, { headers })).ok()).toBe(true);
+    await context.setOffline(false);
+    await expect(page.locator("#dlg")).toContainText("Changes not applied");
+    await expect(page.locator("#dlg")).toContainText("Add 1 Serra Angel to Main collection");
+    await expect(chip(page)).toHaveCount(0);
+  });
+
+  test("the scanner matches cards on the phone while offline", async ({ page, context, baseURL }) => {
+    await fakePhone(page);
+    await page.addInitScript(() => {
+      const queue: Array<{ lines: string[]; info: string } | null> = [];
+      (window as unknown as { __scanQueue: typeof queue }).__scanQueue = queue;
+      window.__manaVaultScanText = () => queue.shift() ?? null;
+    });
+    await signUpOnPhone(page, baseURL!, "scanoff");
+    await context.setOffline(true);
+    await page.locator(".ptab", { hasText: "Scan" }).click();
+    await page.evaluate(() => {
+      const queue = (window as unknown as { __scanQueue: unknown[] }).__scanQueue;
+      queue.push({ lines: ["Lightning Bolt"], info: "0146 C\nM10 EN" }, { lines: ["Lightning Bolt"], info: "0146 C\nM10 EN" }, null, null);
+    });
+    await expect(page.locator(".scanlastname")).toContainText("Lightning Bolt");
+    await page.getByRole("button", { name: "Scanned list", exact: true }).click();
+    await expect(page.locator(".scansheet")).toContainText("M10 #146");
+    await page.getByRole("button", { name: "Add to..." }).click();
+    await page.locator(".dlgbtns .primary").click();
+    await expect(page.locator(".ptoast")).toHaveText("1 card added to Main collection");
+    await expect(chip(page).locator(".cbadge")).toHaveText("1");
+    await context.setOffline(false);
+    await expect(chip(page)).toHaveCount(0);
+    expect(await serverCards(page, baseURL!)).toEqual(["1 Lightning Bolt"]);
+  });
+});

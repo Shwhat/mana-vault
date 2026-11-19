@@ -1,0 +1,11 @@
+{
+  "appId": "com.shwhat.manavault",
+  "appName": "Mana Vault",
+  "webDir": "../web/dist",
+  "android": {
+    "allowMixedContent": true
+  },
+  "server": {
+    "androidScheme": "https"
+  }
+}

@@ -1,4 +1,5 @@
 // ---------- text recognition: reads the name line and the info line from the card in the camera guide ----------
+import { isApp, native } from "./android/platform";
 type OcrWorker = Awaited<ReturnType<typeof import("tesseract.js")["createWorker"]>>;
 
 export type ReadText = { lines: string[]; info: string };
@@ -101,7 +102,8 @@ let loading: Promise<OcrWorker> | null = null;
 
 /** Starts the text recognition engine once. Its files are served by Mana Vault itself (folder /ocr). */
 export function loadRecognizer(): Promise<unknown> {
-  if (window.__manaVaultScanText) return Promise.resolve();
+  // the Android app reads text with the phone's own text recognition, which needs no files
+  if (window.__manaVaultScanText || isApp()) return Promise.resolve();
   if (worker) return Promise.resolve(worker);
   loading ??= (async () => {
     const { createWorker, OEM, PSM } = await import("tesseract.js");
@@ -129,6 +131,7 @@ const linesOf = (text: string) => text.split(/\r?\n/).map((line) => line.trim().
 /** Reads the name and info lines from the card in the guide. */
 export async function readCard(source: HTMLVideoElement, card: Box, mode: ReadMode = "card"): Promise<ReadText | null> {
   if (window.__manaVaultScanText) return window.__manaVaultScanText();
+  if (isApp()) return readOnPhone(source, card, mode);
   if (!worker) await loadRecognizer();
   if (!worker) return null;
   const limit = { width: source.videoWidth, height: source.videoHeight };
@@ -146,4 +149,41 @@ export async function readCard(source: HTMLVideoElement, card: Box, mode: ReadMo
   const name = await read(mode === "card" ? [NAME_PART] : NAME_STRIPS);
   const info = await read(mode === "card" ? [INFO_PART] : INFO_STRIPS);
   return { lines: linesOf(name).slice(0, 8), info: info.slice(0, 300) };
+}
+
+/**
+ * The Android app: one picture of the card and a margin around it goes to the phone's text recognition,
+ * and each line read is sorted into the name line or the info line by where it sits on the card.
+ */
+export async function readOnPhone(source: HTMLVideoElement, card: Box, mode: ReadMode = "card"): Promise<ReadText | null> {
+  const margin = mode === "card" ? 0.08 : 0.2;
+  const left = Math.max(0, card.x - card.width * margin);
+  const top = Math.max(0, card.y - card.height * margin);
+  const right = Math.min(source.videoWidth, card.x + card.width * (1 + margin));
+  const bottom = Math.min(source.videoHeight, card.y + card.height * (1 + margin));
+  if (right <= left || bottom <= top) return null;
+  const scale = Math.min(1, 1280 / (right - left));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round((right - left) * scale);
+  canvas.height = Math.round((bottom - top) * scale);
+  canvas.getContext("2d")?.drawImage(source, left, top, right - left, bottom - top, 0, 0, canvas.width, canvas.height);
+  const image = canvas.toDataURL("image/jpeg", 0.85).replace(/^data:[^,]*,/, "");
+  const { lines } = await native().recognize({ image });
+  const target = mode === "small"
+    ? { x: card.x + (card.width * (1 - SMALL_CARD)) / 2, y: card.y + (card.height * (1 - SMALL_CARD)) / 2, width: card.width * SMALL_CARD, height: card.height * SMALL_CARD }
+    : card;
+  return sortLines(lines.map((line) => ({
+    text: line.text,
+    x: (left + line.left / scale - target.x) / target.width,
+    y: (top + (line.top + line.bottom) / 2 / scale - target.y) / target.height,
+  })), mode);
+}
+
+/** Sorts lines (positions as fractions of the card) into the name line near the top and the info line at the bottom left. */
+export function sortLines(lines: Array<{ text: string; x: number; y: number }>, mode: ReadMode = "card"): ReadText {
+  const slack = mode === "card" ? 0 : 0.12;
+  const ordered = [...lines].sort((a, b) => a.y - b.y);
+  const name = ordered.filter((line) => line.y > -0.06 - slack && line.y < 0.16 + slack && line.x < 0.8).map((line) => line.text.trim().replace(/\s+/g, " "));
+  const info = ordered.filter((line) => line.y > 0.84 - slack && line.y < 1.04 + slack && line.x < 0.65).map((line) => line.text).join("\n");
+  return { lines: name.filter((line) => line.length >= 3).slice(0, 8), info: info.slice(0, 300) };
 }

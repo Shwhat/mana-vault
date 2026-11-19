@@ -1,6 +1,6 @@
 // ---------- state: the one place that holds the app's data and changes it ----------
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { csvCell, downloadBlob, downloadText, pickFile, request, slugify } from "./api";
+import { csvCell, downloadBlob, fetchFile, downloadText, pickFile, request, slugify } from "./api";
 import { confirmDialog, dialog } from "./components/Dialog";
 import { activatePanel, clone, type Layout, openPanel, type PanelId, PRESETS, type Workspace } from "./dock";
 import { type Counts, entryKey, useLibraryState } from "./library-state";
@@ -687,11 +687,7 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
 
   const downloadBackup = useCallback(async () => {
     try {
-      const response = await fetch("/api/backup", { credentials: "same-origin" });
-      if (response.status === 401) {
-        window.location.href = "/login";
-        return;
-      }
+      const response = await fetchFile("/api/backup");
       if (!response.ok) throw new Error(`The backup failed (${response.status}).`);
       downloadBlob("mana-vault-backup.json", await response.blob());
       flash("Backup downloaded");
@@ -979,6 +975,7 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
     importCollection, exportCollection, downloadBackup, restoreBackup, importDeck, exportDeckText, exportDeckCsv,
     applyWorkspace, saveWorkspace, deleteWorkspace,
     scannerOpen, setScannerOpen, ...scan,
+    refreshAfterChange,
   };
 }
 

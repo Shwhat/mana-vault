@@ -8,10 +8,13 @@
 | Server | Node.js 22 with Fastify, serving the interface and a JSON API |
 | Database | SQLite (built into Node.js), one file in the data folder |
 | Card data | Scryfall Default Cards bulk data, read as a stream |
-| Card text recognition | Tesseract.js with the English model, running in the browser; its files are served by Mana Vault from /ocr |
+| Card text recognition | Tesseract.js with the English model, running in the browser; its files are served by Mana Vault from /ocr. In the Android app, Google ML Kit text recognition on the phone |
 | Scan matching | The server compares the text read from a card with every card name (edit distance over a three-letter index) and with set codes and collector numbers |
 | Sign-in | PBKDF2-SHA256 password hashes (600,000 rounds), HTTP-only session cookie, request safety header on every change |
 | Container | Docker image for amd64 and arm64, running as user 65532, published to ghcr.io/shwhat/mana-vault |
+| Android app | The same interface inside Capacitor, with a Java plugin for text recognition, encrypted settings, the background Inbox check (WorkManager), file sharing and the Back button. Its copy of the library is kept in IndexedDB |
+| Phone sign-in | A random device token per phone, sent as a Bearer token; the server stores only its SHA-256 hash. The server accepts requests from the app's page origin (https://localhost) |
+| Sync | Changes made offline are sent in order to /api/sync with a unique id each; the server applies each once and keeps the ids for 30 days. /api/sync/state reports a revision that changes with every change, and new offers |
 
 ## Installation
 
@@ -38,6 +41,7 @@ The image also sets HOST, PORT (3000 inside the container), DATABASE_PATH, SCRYF
 ## Updates
 
 - GitHub Actions checks, tests and publishes a new image for every change to the main branch.
+- For a version tag (vX.Y.Z), GitHub Actions also builds the Android app, signs it with the release key kept in the repository secrets, and attaches `mana-vault-X.Y.Z.apk` to the GitHub release. The app installs over the previous one only when it is signed with the same key.
 - Dockhand installs new images, on a schedule or when you pull and redeploy the stack.
 - Database changes needed by a new version are applied automatically when the server starts. The data folder never needs to be deleted or recreated.
 - The version is shown at the top of this guide.
@@ -56,7 +60,8 @@ The container checks itself every 30 seconds by running the server with `-health
 - Prices are as old as the last card database update, and are not kept over time.
 - The trade calculator is kept in the browser until the page is reloaded.
 - Ownership counts copies once per deck; two decks may count the same copies.
-- The scanner's live camera needs HTTPS or a local address.
+- The scanner's live camera needs HTTPS or a local address (in the browser).
+- The Android app reads English card text, checks for offers about every 15 minutes rather than at once, and signs in to one server and account at a time.
 
 ## Third-party components
 
@@ -66,6 +71,9 @@ The container checks itself every 30 seconds by running the server with `-health
 | Vite | Building the interface | MIT |
 | Tesseract.js, Tesseract.js core | Card text recognition | Apache 2.0 |
 | Tesseract English model (@tesseract.js-data/eng) | Card text recognition | Apache 2.0 |
+| Capacitor (@capacitor/core, @capacitor/android, @capacitor/cli) | Android app | MIT |
+| Google ML Kit text recognition | Card text recognition in the Android app | ML Kit terms of service |
+| AndroidX (AppCompat, WorkManager, Security) | Android app | Apache 2.0 |
 | Fastify, @fastify/static | Web server | MIT |
 | csv-parse | Reading CSV files | MIT |
 | stream-json, stream-chain | Reading the card catalog | BSD 3-Clause |

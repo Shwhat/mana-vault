@@ -1,6 +1,9 @@
 // ---------- actions: every command is defined once and called by name from menus, ribbon and keys ----------
 import { useMemo } from "react";
 import { request } from "./api";
+import { checkForUpdate, DeviceList, signOutApp } from "./android/AppScreens";
+import { syncNow, syncStatus } from "./android/offline";
+import { appSettings, isApp, native, saveSettings } from "./android/platform";
 import { confirmDialog, customDialog, dialog } from "./components/Dialog";
 import { RibbonCustomize } from "./components/RibbonCustomize";
 import { collectionDialog, copyDialog, inboxDialog, moveDialog, renameDeckDialog, sendDialog, sharingDialog } from "./components/LibraryDialogs";
@@ -353,8 +356,53 @@ export function useActions(store: Store): Record<string, Action> {
       signout: {
         label: "Sign out", short: "Sign out", icon: "signout",
         run: () => {
+          if (isApp()) {
+            void confirmDialog("Sign out", "Sign out this phone? Changes not yet sent to the server are lost, and the copy of your library on this phone is removed.", "Sign out")
+              .then((ok) => { if (ok) void signOutApp(); });
+            return;
+          }
           void request("/api/logout", { method: "POST", body: "{}" }).finally(() => { window.location.href = "/login"; });
         },
+      },
+      devices: {
+        label: "Devices...", short: "Devices", icon: "phone",
+        run: () => customDialog("Devices", () => <DeviceList />, 480),
+      },
+      "app.sync": {
+        label: "Sync now", short: "Sync", icon: "sync", disabled: !isApp(),
+        run: () => {
+          store.flash("Syncing");
+          void syncNow(true).then(() => {
+            const status = syncStatus();
+            if (status.state === "offline") store.flash("The server cannot be reached. Changes wait on this phone.", "err");
+            else store.flash(status.pending ? `${status.pending} changes still waiting` : "Synced");
+          });
+        },
+      },
+      "app.notifications": {
+        label: "Notifications...", short: "Notifications", icon: "bell", disabled: !isApp(),
+        run: () => {
+          const settings = appSettings();
+          dialog("Notifications", [
+            ["enabled", "Notify me about new offers in the Inbox", settings.notifications, "check"],
+            ["wifiOnly", "Check only on Wi-Fi", settings.wifiOnly, "check"],
+          ], async (values) => {
+            const enabled = values.enabled === true;
+            const wifiOnly = values.wifiOnly === true;
+            const result = await native().setNotifications({ enabled, wifiOnly }).catch(() => ({ granted: false }));
+            if (enabled && !result.granted) {
+              store.flash("Notifications are not allowed for Mana Vault in the Android settings.", "err");
+              await saveSettings({ notifications: false, wifiOnly });
+              return;
+            }
+            await saveSettings({ notifications: enabled, wifiOnly });
+            store.flash(enabled ? "Notifications on" : "Notifications off");
+          }, "Save", <p className="note">The phone checks the server about every 15 minutes. Android decides the exact time.</p>);
+        },
+      },
+      "app.update": {
+        label: "Check for updates...", short: "Update", icon: "update", disabled: !isApp(),
+        run: () => { void checkForUpdate(true); },
       },
     };
     return actions;

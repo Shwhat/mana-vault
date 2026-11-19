@@ -143,3 +143,27 @@ These reasons appear in the import preview and the Import review panel.
 |---|---|
 | Something went wrong. | The server refused the request without a reason |
 | The server could not be reached. | The browser could not contact the server |
+
+## Android app
+
+| Message | Cause | What to do |
+|---|---|---|
+| Enter the server address, for example https://vault.example.com. | The address is empty or not a web address | Type the address used in a browser |
+| Plain http addresses work only on a home network. Use the https address of the server. | An http:// address outside a home network | Use the https:// address |
+| No Mana Vault server answered at that address. | Nothing answered, or something other than Mana Vault answered | Check the address and that the phone can reach the server |
+| This address is not encrypted. Use it only on your home network. | An http:// address on a home network | None |
+| This phone is signed out. Sign in again to continue. | The phone was removed in Devices, signed out by a password change, or its account is gone | Sign in again |
+| You are offline. This needs a connection to the server. | A command that needs the server was used while offline | Try again when the connection returns |
+| The server cannot be reached. | A window that always needs the server (such as Devices) was opened offline | Try again when the connection returns |
+| The server cannot be reached. Changes wait on this phone. | Sync now found no connection | None; changes are sent when the connection returns |
+| Syncing, Synced, N changes still waiting | Sync now | None |
+| Changes not applied | The server refused changes made offline (see [Android app](/about/android-app)) | Check the listed items |
+| The card list is not on this phone yet. Connect to the server once to download it. | Card search or scanning offline before the first full sync | Connect once and wait for the sync to finish |
+| That card is not on this phone. | A card missing from the phone's card list was added offline | Update the card list by syncing, or add the card online |
+| That card is not in the deck. | A deck card changed offline was already removed | None |
+| Notifications on, Notifications off | Notifications... | None |
+| Notifications are not allowed for Mana Vault in the Android settings. | Android refused notification permission | Allow notifications for Mana Vault in the Android settings, then turn them on again |
+| Update available | A newer app is on GitHub | Open the download page and install it |
+| This phone has the newest version (N). | Check for updates... found nothing newer | None |
+| The release list could not be reached. | Check for updates... could not reach GitHub | Try again later, or open the releases page |
+| The file could not be saved | Android could not write or share an export | Try again |

@@ -1,8 +1,8 @@
 # Mana Vault
 
-A self-hosted Magic: The Gathering collection and deck manager. Version 0.2.0.
+A self-hosted Magic: The Gathering collection and deck manager. Version 0.5.0.
 
-Mana Vault runs on your own server as one Docker container and is used from a desktop browser or a phone (installable as a home screen app). It keeps a local copy of the Scryfall card catalog, your collection and your decks in one SQLite database, behind a sign-in.
+Mana Vault runs on your own server as one Docker container and is used from a desktop browser, a phone browser (installable as a home screen app) or the Android app. It keeps a local copy of the Scryfall card catalog, your collection and your decks in one SQLite database, behind a sign-in.
 
 The full user guide is built into the app: Help menu, **About Mana Vault**. The pages are in `apps/web/src/about`.
 
@@ -32,6 +32,7 @@ The full user guide is built into the app: Help menu, **About Mana Vault**. The 
 - Desktop interface in the OpenSchem style: menu bar, customizable ribbon with a contextual Deck tab, dockable and floating panels (Filters, Collections, Decks, Card, Deck list, Import review), saved workspaces, status bar and light, dark or system theme.
 - Phone layout with bottom tabs, full-screen sheets and 44 pixel touch targets.
 - Preferences (theme, foil, target zone, target and open collection, currency, collection sort and layout, ribbon, panels, workspaces, last deck) saved per account on the server.
+- Android app (Android 8.0 or newer, APK on the GitHub releases page): every phone feature, sign-in per phone with a device list, offline use of collections, decks, card search and scanning with sync when the connection returns, the phone's own text recognition for scanning, and notifications for new Inbox offers.
 - Built-in About guide with release notes.
 
 ## Keyboard shortcuts
@@ -205,11 +206,52 @@ The browser suite uses Playwright's Chromium (`npx playwright install chromium` 
 | `apps/server/src` | Fastify server: API, sign-in (`auth.ts`), collections, set completion and sending (`library.ts`), set list (`sets.ts`), search, imports, backups, catalog updates |
 | `apps/web/src` | React interface: `store.tsx` (state), `library-state.tsx` (collections, picking rows, decks admin, offers), `actions.tsx` (every command), `ribbon.ts` (ribbon and menus as data), `dock.ts` (panel layout model), `components/`, `panels/`, `views/`, `about/` (guide pages), `style.css` |
 | `apps/web/public` | Sign-in page, icons, manifest and service worker |
-| `tests/e2e` | Playwright browser tests and the sample-data test server |
+| `apps/android` | Android app: Capacitor project (`android/`), native plugin, icons |
+| `apps/web/src/android` | The app's side of the interface: platform layer, device sign-in, offline copy and sync (`offline.ts`), card list (`catalog.ts`), app screens |
+| `apps/server/src/mobile.ts` | Device sign-in, cross-origin access for the app, `/api/sync`, `/api/sync/state`, `/api/catalog/compact` |
+| `tests/e2e` | Playwright browser tests (including the Android app with a stand-in for its native plugin) and the sample-data test server |
 | `docs/HANDOFF.md` | Project handoff: rules, code map, open items |
+
+## Android app
+
+The app lives in `apps/android`: a Capacitor project that carries the built interface (`apps/web/dist`) and a Java plugin (`ManaVaultPlugin.java`, `Settings.java`, `InboxWorker.java`) for text recognition, encrypted settings, the background Inbox check, file sharing and the Back button. Its version comes from the root `package.json`.
+
+### Building on a computer
+
+Requirements: Node.js 22.5 or newer, Java 21 and the Android SDK (platform 36, build tools 36). Point `ANDROID_HOME` at the SDK, or put `sdk.dir=...` in `apps/android/android/local.properties`.
+
+```bash
+npm install
+npm run build -w @mana-vault/web
+npm run apk:debug -w @mana-vault/android   # apps/android/android/app/build/outputs/apk/debug/app-debug.apk
+```
+
+### Releases
+
+The `Android app` workflow builds a debug app for pull requests that change the interface or the app. For a version tag (`vX.Y.Z`) it builds the release app, signs it and attaches `mana-vault-X.Y.Z.apk` to the GitHub release.
+
+Signing needs a release key, made once on any computer with Java (keep the file and passwords safe and out of Git; an app signed with another key cannot update the installed app):
+
+```bash
+keytool -genkeypair -v -keystore mana-vault-release.jks -alias manavault -keyalg RSA -keysize 4096 -validity 10000
+base64 -w0 mana-vault-release.jks
+```
+
+Then in GitHub, Settings, Secrets and variables, Actions, add these repository secrets:
+
+| Secret | Value |
+|---|---|
+| `ANDROID_KEYSTORE_BASE64` | The base64 text of the key file |
+| `ANDROID_KEYSTORE_PASSWORD` | The key store password |
+| `ANDROID_KEY_ALIAS` | `manavault` (the alias used above) |
+| `ANDROID_KEY_PASSWORD` | The key password |
+
+To publish a version: merge to main, then tag it, for example `git tag v0.5.0 && git push origin v0.5.0`.
+
+The server needs no change for the app: it accepts the app's requests at the same address used in a browser. When it is reached through Cloudflare Tunnel, the app uses the same https address.
 
 ## Data and secrets
 
-Collection data and card database files stay outside Git. Do not commit `.env` files, credentials, backups or collection exports.
+Collection data and card database files stay outside Git. Do not commit `.env` files, credentials, backups, collection exports or Android signing keys (`*.jks`, `*.keystore`).
 
 Mana Vault is not produced by or endorsed by Scryfall or Wizards of the Coast.

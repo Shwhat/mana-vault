@@ -39,7 +39,7 @@ export interface BackupSummary {
 /** A backup of one account's own collections and decks, with the card records they use. */
 export function createBackup(database: DatabaseSync, userId: number): ManaVaultBackup {
   const collections = database.prepare(
-    "SELECT id, name, description, completion, finish, kind, created_at, updated_at FROM collections WHERE owner_id = ? ORDER BY created_at, id",
+    "SELECT id, name, description, completion, finish, kind, created_at, updated_at FROM collections WHERE owner_id = ? ORDER BY created_at, rowid",
   ).all(userId).map((row) => ({
     ...(row as Omit<BackupCollection, "sets">),
     sets: database.prepare("SELECT set_code FROM collection_sets WHERE collection_id = ? ORDER BY set_code").all(String(row.id)).map((set) => String(set.set_code)),

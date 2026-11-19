@@ -19,6 +19,11 @@ backups/
 *.download
 *.csv
 
+# Android signing keys and local SDK settings
+*.jks
+*.keystore
+local.properties
+
 # Editor and OS files
 .vscode/
 .idea/

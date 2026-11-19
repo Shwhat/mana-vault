@@ -20,7 +20,7 @@ The menu bar holds eight menus, the name of the open deck, and the account menu 
 | Trade | Trade view, Add to trade (you give), Add to trade (you get), Copy trade summary, Clear trade..., Mark for trade, Unmark for trade |
 | View | Card search, Collection view, Deck view, Trade view, Light theme, Dark theme, System theme, Prices in US dollars, Prices in euros, Filters panel, Collections panel, Decks panel, Card panel, Deck list panel, Import review panel, Save workspace..., Manage workspaces..., Reset panels, Customize ribbon... |
 | Help | Keyboard shortcuts, About Mana Vault |
-| Account (your user name) | Inbox... (with the number waiting), Change password..., Sign out |
+| Account (your user name) | Inbox... (with the number waiting), Change password..., Devices..., Sign out |
 
 Undo and Redo show the change they will reverse or repeat, for example "Undo Add Sol Ring".
 
@@ -121,10 +121,10 @@ A workspace is a saved panel layout and view. Three are built in:
 
 Below 900 pixels wide, the menu bar, ribbon, panels and status bar are replaced by:
 
-- A top bar with the deck name or "Mana Vault", an **Inbox** button with a count when offers are waiting, a **Decks** button while in the deck view, and a menu button.
+- A top bar with the deck name or "Mana Vault", in the Android app the sync state (**Offline**, **Waiting** or **Syncing**, with the number of waiting changes; see [Android app](/about/android-app)), an **Inbox** button with a count when offers are waiting, a **Decks** button while in the deck view, and a menu button.
 - The current view, filling the screen. The card search adds a **Filters** button under the search box.
 - A bottom tab bar: **Cards**, **Collection**, **Decks**, **Scan** and **More**. The trade view opens from **Menu** (Trade view). Decks shows the open deck, or the deck list when no deck is open. Scan opens the camera scanner in place of the view (see [Scanning cards](/about/scanning-cards)); the top bar then shows "Scan".
-- Sheets that slide up from the bottom: **Filters**, **Card** (opens when a card is tapped, except while picking rows), **Decks**, the scanned list in the scanner, and **Menu** (every menu command that applies on a phone, plus Inbox, Change password and Sign out).
+- Sheets that slide up from the bottom: **Filters**, **Card** (opens when a card is tapped, except while picking rows), **Decks**, the scanned list in the scanner, and **Menu** (every menu command that applies on a phone, plus Inbox, Change password, Devices and Sign out; the Android app adds Sync now, Notifications and Check for updates).
 - In a collection, **Select** turns on checkboxes; tap rows to pick them and use the bar above the list to move or remove them. Close a sheet with **Close**, by tapping outside it, or with Esc.
 - Messages appear as a short banner above the tab bar.
 

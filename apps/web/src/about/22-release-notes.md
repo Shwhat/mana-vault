@@ -2,6 +2,20 @@
 
 The installed version is shown at the top of this guide.
 
+## 0.5.0 (2026-11-18): Android app
+
+- Android app (Android 8.0 or newer), installed from the APK attached to each GitHub release. It has every feature of the phone layout.
+- First run: enter the server address, then sign in or create an account. Plain http addresses are allowed only on a home network, with a warning.
+- Phones sign in with their own device sign-in. Devices... lists the phones signed in to your account and removes them. Changing your password also signs out your other phones.
+- Offline use: the phone keeps a copy of your collections, decks, Inbox, trade list, preferences and the card list. Browsing, card search by name, card details, editing copies and deck cards, renaming and scanning work without a connection.
+- Sync: changes made offline wait on the phone and are sent when the connection returns, when the app opens, every minute, or with Sync now. Count changes are applied as differences, each change is applied once, and changes the server refuses are listed in Changes not applied.
+- Scanning in the app uses the phone's own text recognition, and matches cards on the phone when offline with the same rules as the server.
+- Notifications for new Inbox offers, checked in the background about every 15 minutes, optionally only on Wi-Fi. Tapping one opens the Inbox.
+- The Back button closes windows and sheets, then returns to the Cards tab. Exports and backups open the Android share sheet.
+- The app checks GitHub once a day for a newer release; Check for updates... checks at once.
+- The server's health check reports its version.
+- Fixed: a backup listed two collections created in the same second in a random order, so they could swap places after a restore.
+
 ## 0.4.0 (2026-11-18): Live card scanner
 
 - Scanner rebuilt: it scans continuously, with no capture button. Each card held in the outline is recognized and added to a scanned list, with a short vibration on phones; a card that stays in view is counted once.

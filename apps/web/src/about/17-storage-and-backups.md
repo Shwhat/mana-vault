@@ -6,7 +6,10 @@ Everything Mana Vault stores is in one SQLite database file, mana-vault.sqlite, 
 
 - the card database
 - every account's collections, decks, shares and offers
-- accounts (with passwords stored only as salted hashes), sessions and per-account preferences
+- accounts (with passwords stored only as salted hashes), sessions, phone device sign-ins (stored only as hashes) and per-account preferences
+- the ids of changes already received from phones, for 30 days, so a change sent twice is applied once
+
+Each phone with the Android app also keeps a copy of its account's library and the card list, and any changes not yet sent (see [Android app](/about/android-app)). That copy is not a backup; it is replaced from the server at each sync.
 
 The data folder can also hold default-cards.json, the last downloaded card catalog file, while an update runs.
 

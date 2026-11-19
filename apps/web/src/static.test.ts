@@ -15,7 +15,9 @@ const version = (JSON.parse(readFileSync(join(root, "package.json"), "utf8")) as
 
 function walk(directory: string): string[] {
   return readdirSync(directory).flatMap((name) => {
-    if (["node_modules", "dist", ".git", "build", "test-results", "playwright-report"].includes(name)) return [];
+    if (["node_modules", "dist", ".git", ".gradle", "build", "test-results", "playwright-report"].includes(name)) return [];
+    // the Android app's copy of the built interface
+    if (name === "public" && directory.endsWith(join("main", "assets"))) return [];
     const path = join(directory, name);
     return statSync(path).isDirectory() ? walk(path) : [path];
   });
@@ -69,7 +71,7 @@ describe("About guide", () => {
 
 describe("source rules", () => {
   it("keeps the version equal everywhere", () => {
-    for (const path of ["apps/web/package.json", "apps/server/package.json"]) {
+    for (const path of ["apps/web/package.json", "apps/server/package.json", "apps/android/package.json"]) {
       expect((JSON.parse(readFileSync(join(root, path), "utf8")) as { version: string }).version).toBe(version);
     }
     const lock = JSON.parse(readFileSync(join(root, "package-lock.json"), "utf8")) as { version: string; packages: Record<string, { version?: string }> };
@@ -77,12 +79,13 @@ describe("source rules", () => {
     expect(lock.packages[""]?.version).toBe(version);
     expect(lock.packages["apps/web"]?.version).toBe(version);
     expect(lock.packages["apps/server"]?.version).toBe(version);
+    expect(lock.packages["apps/android"]?.version).toBe(version);
   });
 
   it("uses no em dashes in source, guide or documentation", () => {
     const paths = [...walk(join(root, "apps")), ...walk(join(root, "docs")), ...walk(join(root, "tests")),
       join(root, "README.md"), join(root, "docker-compose.yml"), join(root, ".env.example")]
-      .filter((path) => /\.(ts|tsx|md|css|html|js|mjs|yml|json|example)$/.test(path) || path.endsWith(".env.example"));
+      .filter((path) => /\.(ts|tsx|md|css|html|js|mjs|yml|json|example|java|xml|gradle)$/.test(path) || path.endsWith(".env.example"));
     const offenders = paths.filter((path) => readFileSync(path, "utf8").includes(String.fromCharCode(0x2014)));
     expect(offenders).toEqual([]);
   });

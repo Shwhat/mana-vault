@@ -91,7 +91,8 @@ This page lists what Mana Vault does in the current version, followed by what is
 ### Accounts
 
 - Sign in with a user name and password. New accounts can be turned off by the server owner.
-- Change your password, which signs out your other devices.
+- Change your password, which signs out your other devices and phones.
+- See the phones signed in to your account in Devices..., and remove any of them.
 - Keep theme, ribbon, panel layout, workspace, target collection and open collection choices per account.
 
 ### Interface
@@ -100,10 +101,20 @@ This page lists what Mana Vault does in the current version, followed by what is
 - Phone layout with bottom tabs, full-screen sheets and an installable home screen app.
 - A built-in About guide (this guide).
 
+### Android app
+
+- An Android app (Android 8.0 or newer) with every feature of the phone layout, installed from the APK on the GitHub releases page.
+- Sign in a phone with a server address, then a user name and password; the phone keeps its own device sign-in.
+- Use collections, decks, card search, card details and the scanner without a connection, with changes sent when the connection returns.
+- Offline count changes are applied as differences, so edits made elsewhere at the same time are kept; changes the server refuses are listed.
+- Scan with the phone's own text recognition, matched against the card list on the phone when offline.
+- Notifications for new offers in the Inbox, checked in the background about every 15 minutes, optionally only on Wi-Fi.
+- The Back button, the Android share sheet for exports and backups, and a daily check for a newer app.
+
 ## Planned
 
 These are part of the release plan and are not available yet.
 
 | Version | Planned features |
 |---|---|
-| Later | Price history; a built-in demo collection |
+| Later | Price history; a built-in demo collection; instant notifications; more than one server or account in the Android app; sharing files into the Android app |

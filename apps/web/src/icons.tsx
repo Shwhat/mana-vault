@@ -64,6 +64,9 @@ export const RI: Record<string, string> = {
   people: '<svg viewBox="0 0 20 20"><circle cx="7" cy="7" r="3" fill="#dbe6f7" stroke="#2b4f91" stroke-width="1.2"/><path d="M1.5 17c0-3 2.5-5 5.5-5s5.5 2 5.5 5" fill="#dbe6f7" stroke="#2b4f91" stroke-width="1.2"/><circle cx="14" cy="8" r="2.5" fill="#fff" stroke="#556" stroke-width="1.1"/><path d="M13 12.2c2.6-.2 5 1.5 5.2 4.3" fill="none" stroke="#556" stroke-width="1.1"/></svg>',
   inbox: '<svg viewBox="0 0 20 20"><path d="M2 11l3-7h10l3 7v6H2z" fill="#fff" stroke="#2b3442" stroke-width="1.2" stroke-linejoin="round"/><path d="M2 11h5l1 2h4l1-2h5" fill="#dbe6f7" stroke="#2b3442" stroke-width="1.2"/></svg>',
   rename: '<svg viewBox="0 0 20 20"><rect x="2" y="6" width="16" height="8" rx="1" fill="#fff" stroke="#556" stroke-width="1.2"/><path d="M5 10h5" stroke="#2b3442" stroke-width="1.4"/><path d="M13 4v12M11.5 4h3M11.5 16h3" stroke="#1f5fbf" stroke-width="1.2"/></svg>',
+  phone: `<svg viewBox="0 0 20 20"><rect x="5.5" y="2" width="9" height="16" rx="1.6" fill="#dbe6f7" stroke="${S}" stroke-width="1.2"/><path d="M8.5 15.5h3" stroke="${S}" stroke-width="1.2"/></svg>`,
+  sync: `<svg viewBox="0 0 20 20"><path d="M15.5 8a6 6 0 0 0-10.6-1.8M4.5 12a6 6 0 0 0 10.6 1.8" fill="none" stroke="#2b4f91" stroke-width="1.5"/><path d="M4.5 3v3.6h3.6M15.5 17v-3.6h-3.6" fill="none" stroke="#2b4f91" stroke-width="1.5"/></svg>`,
+  bell: `<svg viewBox="0 0 20 20"><path d="M5 14V9a5 5 0 0 1 10 0v5l1.5 1.5h-13z" fill="#f4d58d" stroke="#8a6d1d" stroke-width="1.2" stroke-linejoin="round"/><path d="M8.5 17.5h3" stroke="${S}" stroke-width="1.4"/></svg>`,
   menu: `<svg viewBox="0 0 20 20"><path d="M3 5h14M3 10h14M3 15h14" stroke="${S}" stroke-width="1.8"/></svg>`,
 };
 

@@ -10,6 +10,7 @@ import { createBackup, inspectBackup, restoreBackup } from "./backup.js";
 import { parseCardQuery } from "./card-search.js";
 import { type CatalogUpdateStatus } from "./catalog-updater.js";
 import { registerInsightRoutes } from "./insights.js";
+import { deviceUser, handleCrossOrigin, registerMobileRoutes, Revision } from "./mobile.js";
 import { access, createCollection, forgetItem, itemSharing, registerLibraryRoutes } from "./library.js";
 import {
   AuthStore, COOKIE_NAME, DEFAULT_ITERATIONS, GUARD_HEADER, Limiter, readCookie, SESSION_DAYS, sessionCookie,
@@ -19,6 +20,8 @@ import {
 declare module "fastify" {
   interface FastifyRequest {
     user: User | null;
+    /** Set when the request was signed in with an Android app device token. */
+    deviceId?: string;
   }
 }
 
@@ -68,7 +71,13 @@ export async function buildApp(
   const localUser = requireSignIn ? null : (auth.checkPassword("local", "local-test-account") ?? auth.addUser("local", "local-test-account"));
   if (localUser) assignUnowned(database);
 
+  const revision = new Revision();
+  app.addHook("onResponse", async (request, reply) => {
+    if (request.method !== "GET" && request.method !== "HEAD" && request.method !== "OPTIONS" && reply.statusCode < 400 && request.url.startsWith("/api/")) revision.bump();
+  });
+
   app.addHook("onRequest", async (request, reply) => {
+    if (handleCrossOrigin(request, reply)) return reply;
     reply.header("x-content-type-options", "nosniff");
     reply.header("x-frame-options", "DENY");
     reply.header("referrer-policy", "same-origin");
@@ -84,7 +93,14 @@ export async function buildApp(
     }
     const token = readCookie(request.headers.cookie, COOKIE_NAME);
     request.user = token ? auth.session(token) : null;
-    if (PUBLIC_PATHS.has(path) || request.user) return;
+    if (!request.user && request.headers.authorization) {
+      const device = deviceUser(database, request.headers.authorization);
+      if (device) {
+        request.user = { id: device.id, name: device.name };
+        request.deviceId = device.deviceId;
+      }
+    }
+    if (PUBLIC_PATHS.has(path) || request.user || (path === "/api/devices" && request.method === "POST")) return;
     if (path.startsWith("/api/")) return reply.code(401).send({ error: "You are signed out. Sign in again to continue." });
     if (path === "/" || path.endsWith(".html") || !path.includes(".")) return reply.redirect("/login");
     return reply.code(401).send({ error: "Signed out" });
@@ -158,7 +174,7 @@ export async function buildApp(
     }
   });
 
-  app.get("/api/health", async () => ({ status: "ok" }));
+  app.get("/api/health", async () => ({ status: "ok", version: options.version ?? null }));
 
   // ---------- accounts ----------
   app.get("/login", async (request, reply) => {
@@ -195,26 +211,38 @@ export async function buildApp(
     return startSession(request, reply, user);
   });
 
-  app.post<{ Body: { name?: unknown; password?: unknown } }>("/api/login", async (request, reply) => {
-    const name = typeof request.body?.name === "string" ? request.body.name.trim() : "";
-    const password = typeof request.body?.password === "string" ? request.body.password : "";
+  // Checks a name and password with the rate limits. On failure the reply is already sent and null is returned.
+  const signIn = async (name: string, password: string, request: { ip: string }, reply: { code: (status: number) => { send: (body: unknown) => unknown } }) => {
     const key = name.toLowerCase();
     if (nameLimiter.blocked(key) || addressLimiter.blocked(address(request))) {
-      return reply.code(429).send({ error: "Too many attempts. Try again in a few minutes." });
+      reply.code(429).send({ error: "Too many attempts. Try again in a few minutes." });
+      return null;
     }
     const user = auth.checkPassword(name, password);
     if (!user) {
       nameLimiter.hit(key);
       addressLimiter.hit(address(request));
-      return reply.code(401).send({ error: "Wrong user name or password." });
+      reply.code(401).send({ error: "Wrong user name or password." });
+      return null;
     }
     nameLimiter.reset(key);
+    return user;
+  };
+
+  app.post<{ Body: { name?: unknown; password?: unknown } }>("/api/login", async (request, reply) => {
+    const name = typeof request.body?.name === "string" ? request.body.name.trim() : "";
+    const password = typeof request.body?.password === "string" ? request.body.password : "";
+    const user = await signIn(name, password, request, reply);
+    if (!user) return reply;
     return startSession(request, reply, user);
   });
+
+  registerMobileRoutes(app, database, revision, signIn);
 
   app.post("/api/logout", async (request, reply) => {
     const token = readCookie(request.headers.cookie, COOKIE_NAME);
     if (token) auth.endSession(token);
+    if (request.deviceId) database.prepare("DELETE FROM devices WHERE id = ?").run(request.deviceId);
     reply.header("set-cookie", sessionCookie("", 0, secure(request)));
     return { ok: true };
   });
@@ -233,6 +261,8 @@ export async function buildApp(
     const next = typeof request.body?.new === "string" ? request.body.new : "";
     if (!validPassword(next)) return reply.code(400).send({ error: "Passwords need at least 8 characters." });
     auth.setPassword(user.id, next);
+    // phones signed in to the account are signed out too, except the one making the change
+    database.prepare("DELETE FROM devices WHERE user_id = ? AND id IS NOT ?").run(user.id, request.deviceId ?? null);
     // other sessions were ended; this one continues with a new token
     return startSession(request, reply, user);
   });

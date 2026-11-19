@@ -1,0 +1,87 @@
+name: Android app
+
+# Pull requests that touch the interface or the app get a debug build as a check.
+# A version tag (vX.Y.Z) builds the signed release APK and attaches it to the GitHub release.
+on:
+  pull_request:
+    paths:
+      - "apps/web/**"
+      - "apps/android/**"
+      - "apps/server/src/scan-core.ts"
+      - ".github/workflows/android.yml"
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build the interface
+        run: npm run build -w @mana-vault/web
+
+      - name: Copy the interface into the app
+        run: npx cap sync android
+        working-directory: apps/android
+
+      - name: Build the debug app
+        if: github.event_name == 'pull_request'
+        run: ./gradlew --no-daemon assembleDebug
+        working-directory: apps/android/android
+
+      - name: Build and sign the release app
+        if: github.event_name != 'pull_request'
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          MANAVAULT_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          MANAVAULT_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          MANAVAULT_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        working-directory: apps/android/android
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "The repository secret ANDROID_KEYSTORE_BASE64 is missing. See the Android app section of the README." >&2
+            exit 1
+          fi
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
+          export MANAVAULT_KEYSTORE="$RUNNER_TEMP/release.jks"
+          ./gradlew --no-daemon assembleRelease
+          version=$(node -p "require('../../../package.json').version")
+          "$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)/apksigner" verify app/build/outputs/apk/release/app-release.apk
+          mkdir -p "$RUNNER_TEMP/out"
+          cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/out/mana-vault-$version.apk"
+          rm -f "$RUNNER_TEMP/release.jks"
+
+      - name: Keep the APK with this run
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: mana-vault-apk
+          path: ${{ runner.temp }}/out/*.apk
+
+      - name: Attach the APK to the release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ runner.temp }}/out/*.apk

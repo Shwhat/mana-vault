@@ -5,6 +5,11 @@
 | Card | A card by name, such as Lightning Bolt, across all its printings |
 | Printing | One version of a card in one set, with its own set code, collector number, rarity and artwork |
 | Card database | The local catalog of every printing, downloaded from Scryfall |
+| Card list | The smaller copy of the card database that the Android app keeps on the phone for offline search and scanning |
+| Device | A phone signed in with the Android app, listed in Devices... |
+| Offline | The state of the Android app when the server cannot be reached; it works from its copy of the library |
+| Sync | Sending changes made on a phone to the server, then updating the phone's copy |
+| Waiting change | A change made on a phone and not yet sent to the server |
 | Collection | A named place for cards you own, such as a binder, with its own rules for set completion |
 | Collection entry | One printing in one finish, condition and language in a collection, with a count and a number for trade; also called a row |
 | Finish | Regular, foil or etched. Etched is a foil-like finish printed on some cards; it counts as foil for set completion |

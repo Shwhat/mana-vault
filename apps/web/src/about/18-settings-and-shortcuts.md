@@ -23,6 +23,8 @@ Preferences are saved for your account on the server and follow you to every bro
 | Vibrate when a card is added | On, Off | On | Scanner settings |
 | New scans are foil | On, Off | Off | Scanner settings |
 | Camera | Back camera, Front camera | Back camera | Scanner settings |
+| Notify me about new offers in the Inbox (Android app, kept on the phone) | On, Off | Off | Notifications... |
+| Check only on Wi-Fi (Android app, kept on the phone) | On, Off | Off | Notifications... |
 
 System follows the device's light or dark setting and changes with it. A new version of Mana Vault resets the ribbon layout so new buttons appear; all other preferences are kept.
 
