@@ -23,7 +23,7 @@ Every deck keeps the printing of each card. Each printing in a zone is its own r
 | Sideboard | Extra cards kept with the deck |
 | Maybeboard | Cards you are considering. They are not counted in the deck's size, value, statistics, ownership or legality, and they are never missing |
 
-The **target zone** decides where Add to deck and Quick add put a card. It starts at Main deck and is kept for your account. Change it with the zone list beside Quick add, the Target zone list on the Decks ribbon tab, the Deck list panel switch, the ZONE item in the status bar, or **Z** (Main deck, Sideboard, Commander, Maybeboard, then Main deck again).
+The **target zone** decides where Add to deck and Quick add put a card. It starts at Main deck and is kept for your account. Change it with the zone list beside Quick add on the Add tab, the Target zone list on the Decks ribbon tab, the Deck list panel switch, the ZONE item in the status bar, or **Z** (Main deck, Sideboard, Commander, Maybeboard, then Main deck again).
 
 ## Opening decks
 
@@ -71,13 +71,19 @@ Scanned cards added to a deck are new physical cards, so they go into a collecti
 
 ### Quick add
 
-The box at the top of the Cards tab adds a card by typing it: a count and a name, such as `2 Sol Ring`, `2x Sol Ring` or `Sol Ring` (one copy). A set code and collector number pick the printing, such as `1 Sol Ring (C21) 263`; without them the newest printing is used. Names are suggested while you type. Choose the zone in the list beside the box, then press Enter or **Add**. **Q** jumps to the box. The cards are linked to a free copy as described above.
+The box at the top of the Add tab adds a card by typing it: a count and a name, such as `2 Sol Ring`, `2x Sol Ring` or `Sol Ring` (one copy). A set code and collector number pick the printing, such as `1 Sol Ring (C21) 263`; without them the newest printing is used. Names are suggested while you type. Choose the zone in the list beside the box, then press Enter or **Add**. **Q** jumps to the box. The cards are linked to a free copy as described above.
 
 | Message | Cause |
 |---|---|
 | Count and name added to deck name | The card was added (with the zone when not the main deck, and the collection its copy came from) |
 | No card named name in the card database | No card has the typed name, or no printing has the typed set and number |
 | Type a card name, such as 2 Sol Ring | The line has no name, or the count is not 1 to 100 |
+
+### The Add tab
+
+Below Quick add and **Edit as text...**, the Add tab searches the whole card database. Type in the header's **Search cards to add** box; the Filters panel filters the results (Filtering: Deck card search). Results use the card search layout and card size from **Options**.
+
+Each result has **+ Main**, **+ Side**, **+ Maybe** and **+ Commander**. A button with cards of that name already in the zone is highlighted and shows the count. Double-click adds one copy to the target zone; the right-click menu holds Card page, Add to each zone and Add to wishlist. Copies are linked as described above.
 
 ### From the card search
 
@@ -91,7 +97,7 @@ The box at the top of the Cards tab adds a card by typing it: a count and a name
 
 ### Edit as text
 
-**Edit as text...** (the Cards tab, or the Decks ribbon tab) shows the whole deck as text, one line per card such as `1 Sol Ring (C21) 263`, under the headings Commander, Deck, Sideboard and Maybeboard (Main, Mainboard, Side, SB, Maybe and Considering are also understood).
+**Edit as text...** (the Add tab, Options on the Cards tab, or the Decks ribbon tab) shows the whole deck as text, one line per card such as `1 Sol Ring (C21) 263`, under the headings Commander, Deck, Sideboard and Maybeboard (Main, Mainboard, Side, SB, Maybe and Considering are also understood).
 
 1. Change the text: add lines, change counts, delete lines.
 2. **Check** shows how many cards would be added, changed and removed, and lists the lines that did not match with their line number and the reason.
@@ -110,21 +116,26 @@ Press **3** (or **Deck**) to open it. The header holds:
 | Item | Use |
 |---|---|
 | Deck switcher | Opens another deck (see Opening decks) |
-| Format | The deck's format: green when the deck is legal, red when it is not, grey for Casual. Click it to change the format |
+| Cards, Add, Ownership, Statistics, Playtest, Description, History | The tabs. On a phone they scroll sideways |
 | Shared by name, or Shared with names | Shown for shared decks |
-| Cards, Ownership, Statistics, Playtest, Description, History | The tabs |
-| Count | Cards in the main deck and commander zone, the deck's value and how many cards you own |
+| Filter box | Cards tab: **Filter deck cards** keeps the cards whose name, type or set contains the text. Add tab: **Search cards to add** |
+| Options | Cards tab: view, group, sort and Edit as text, with a count of active filters. Add tab: the search layout and card size |
+| Count | The format badge (green when the deck is legal, red when it is not, grey for Casual; click it to change the format), then cards in the main deck and commander zone, the deck's value and how many cards you own; while filters hide cards, "showing N". On the Add tab, the number of results |
+
+The deck's filter box and the Filters panel (Filtering: Deck) stay when another deck opens.
 
 ### Cards tab
 
-Below Quick add, a bar holds:
+The Cards tab shows only the deck's cards. **Options** holds:
 
 | Item | Use |
 |---|---|
-| List, Text, Stacks, Grid | How the cards are shown (kept for your account) |
+| View: List, Text, Stacks, Grid | How the cards are shown (kept for your account) |
 | Group | Type, Mana value, Color, Rarity, Tag or None (kept for your account) |
 | Sort | Name, Mana value or Price, within each group (kept for your account) |
+| Clear filters | Shown while deck filters are on |
 | Edit as text... | See Edit as text |
+| Done | Closes Options |
 
 The cards are shown under a heading for each zone (Commander, Main deck, Sideboard, Maybeboard) with its count, and inside each zone under a heading for each group with its count. Type groups are Creatures, Planeswalkers, Battles, Instants, Sorceries, Artifacts, Enchantments, Lands and Other; a creature that is also an artifact is a creature. Mana value groups go from 0 to 7+, with lands last. A card with several tags is listed under each tag; cards without one are under No tag.
 

@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { expect, test } from "./fixtures";
+import { expect, test, choose } from "./fixtures";
 
 const dist = join(__dirname, "../../apps/web/dist");
 
@@ -78,6 +78,10 @@ async function signUpOnPhone(page: Page, baseURL: string, prefix: string): Promi
   // these tests work with collection rows; new accounts start with the grid
   await page.locator(".ptab", { hasText: "Collection" }).click();
   await page.getByRole("button", { name: /Options/ }).click();
+  await page.locator(".optpop").getByRole("button", { name: "List" }).click();
+  await page.locator(".optpop").getByRole("button", { name: "Done" }).click();
+  await page.locator(".ptab", { hasText: "Search" }).click();
+  await page.locator("#view-cards").getByRole("button", { name: /Options/ }).click();
   await page.locator(".optpop").getByRole("button", { name: "List" }).click();
   await page.locator(".optpop").getByRole("button", { name: "Done" }).click();
   await page.locator(".ptab", { hasText: "Home" }).click();
@@ -208,7 +212,7 @@ test.describe("Android app", () => {
     await expect(page.locator(".scansheet")).toContainText("M10 #146");
     // a new collection can be made offline from Add to
     await page.getByRole("button", { name: "Add to..." }).click();
-    await page.locator("#add-target").selectOption("collection:new-collection");
+    await choose(page, page.locator("#add-target"), "collection:new-collection");
     await page.locator("#add-name").fill("Offline box");
     await page.locator("dialog[open]").getByRole("button", { name: "Add", exact: true }).click();
     await expect(page.locator(".ptoast")).toHaveText("1 card added to Offline box");

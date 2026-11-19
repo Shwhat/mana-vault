@@ -1,6 +1,8 @@
 // ---------- card scanner: live camera, continuous recognition, and the scanned list ----------
+import { choices, Picker } from "./Picker";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type PointerEvent } from "react";
 import { request } from "../api";
+import { isApp, native } from "../android/platform";
 import { Icon } from "../icons";
 import { guideBox, guideInVideo, loadRecognizer, readCard } from "../recognize";
 import { finishCode, finishFor, hasFinish, matchText, scanCount, type ScanCard, type ScanDestination, type ScanItem, type ScanMatch } from "../scan-state";
@@ -25,28 +27,71 @@ export function timeAgo(at: number, now = Date.now()): string {
 
 const printingLabel = (card: Pick<ScanCard, "set_code" | "collector_number">) => `${card.set_code.toUpperCase()} #${card.collector_number}`;
 
-/** Live camera with continuous autofocus, tap to focus and the torch. */
+const TORCH_CAMERA = "mana-vault.torchCamera";
+const savedCamera = () => { try { return window.localStorage.getItem(TORCH_CAMERA); } catch { return null; } };
+const saveCamera = (id: string) => { try { window.localStorage.setItem(TORCH_CAMERA, id); } catch { /* kept for this visit only */ } };
+
+/**
+ * Live camera with continuous autofocus, tap to focus and the light. Phones with several back cameras often give the
+ * browser one without a light, so the back cameras are tried until one with a light is found; that camera is remembered.
+ */
 function useCamera(facing: "environment" | "user") {
   const video = useRef<HTMLVideoElement>(null);
   const track = useRef<MediaStreamTrack | null>(null);
   const [status, setStatus] = useState("Starting camera");
+  const [note, setNote] = useState("");
   const [ready, setReady] = useState(false);
-  const [torch, setTorch] = useState<boolean | null>(null);
+  const [torch, setTorch] = useState(false);
+  const noteTimer = useRef<number | undefined>(undefined);
 
   useEffect(() => {
     let active = true;
     let stream: MediaStream | null = null;
     setReady(false);
-    setTorch(null);
+    setTorch(false);
     if (!navigator.mediaDevices?.getUserMedia) {
       setStatus("Camera access is unavailable. Open Mana Vault over HTTPS (or localhost), or add cards by name.");
       return;
     }
     setStatus("Starting camera");
-    navigator.mediaDevices.getUserMedia({
-      video: { facingMode: { ideal: facing }, width: { ideal: 1920 }, height: { ideal: 1080 } },
-      audio: false,
-    }).then(async (camera) => {
+    const size = { width: { ideal: 1920 }, height: { ideal: 1080 } };
+    const open = (deviceId?: string | null) => navigator.mediaDevices.getUserMedia({
+      video: deviceId ? { deviceId: { exact: deviceId }, ...size } : { facingMode: { ideal: facing }, ...size }, audio: false,
+    });
+    const hasTorch = (camera: MediaStream) => !!((camera.getVideoTracks()[0]?.getCapabilities?.() ?? {}) as Capabilities).torch;
+    (async () => {
+      let camera: MediaStream;
+      const remembered = facing === "environment" ? savedCamera() : null;
+      try {
+        camera = await open(remembered);
+      } catch (reason) {
+        if (!remembered) throw reason;
+        camera = await open();
+      }
+      // look for a back camera with a light
+      if (facing === "environment" && !hasTorch(camera) && navigator.mediaDevices.enumerateDevices) {
+        const current = camera.getVideoTracks()[0]?.getSettings?.().deviceId;
+        const devices = (await navigator.mediaDevices.enumerateDevices())
+          .filter((device) => device.kind === "videoinput" && device.deviceId && device.deviceId !== current && !/front|user|facetime/i.test(device.label));
+        for (const device of devices) {
+          if (!active) break;
+          camera.getTracks().forEach((item) => item.stop());
+          try {
+            const other = await open(device.deviceId);
+            if (hasTorch(other)) {
+              camera = other;
+              saveCamera(device.deviceId);
+              break;
+            }
+            other.getTracks().forEach((item) => item.stop());
+          } catch {
+            // that camera cannot be opened; try the next
+          }
+          camera = await open(current);
+        }
+      }
+      return camera;
+    })().then(async (camera) => {
       if (!active) {
         camera.getTracks().forEach((item) => item.stop());
         return;
@@ -61,7 +106,6 @@ function useCamera(facing: "environment" | "user") {
       const caps = (first?.getCapabilities?.() ?? {}) as Capabilities;
       if (caps.focusMode?.includes("continuous")) await first?.applyConstraints(advanced({ focusMode: "continuous" })).catch(() => undefined);
       if (!active) return;
-      setTorch(caps.torch ? false : null);
       setStatus("");
       setReady(true);
     }).catch((reason: unknown) => {
@@ -79,18 +123,47 @@ function useCamera(facing: "environment" | "user") {
       stream?.getTracks().forEach((item) => item.stop());
       track.current = null;
       if (video.current) video.current.srcObject = null;
+      if (isApp() && torchOnRef.current) void native().setTorch?.({ on: false }).catch(() => undefined);
     };
   }, [facing]);
 
+  const torchOnRef = useRef(false);
+  torchOnRef.current = torch;
+
+  const showNote = useCallback((text: string) => {
+    window.clearTimeout(noteTimer.current);
+    setNote(text);
+    noteTimer.current = window.setTimeout(() => setNote(""), 4000);
+  }, []);
+
+  /** The light: through the camera when it offers one, otherwise through the Android app. */
   const toggleTorch = useCallback(async () => {
-    if (torch === null || !track.current) return;
-    try {
-      await track.current.applyConstraints(advanced({ torch: !torch }));
-      setTorch(!torch);
-    } catch {
-      setTorch(null);
+    const next = !torch;
+    const current = track.current;
+    if (current) {
+      try {
+        await current.applyConstraints(advanced({ torch: next }));
+        const settings = current.getSettings?.() as MediaTrackSettings & { torch?: boolean };
+        const caps = (current.getCapabilities?.() ?? {}) as Capabilities;
+        if (caps.torch || settings?.torch === next) {
+          setTorch(next);
+          return;
+        }
+      } catch {
+        // this camera has no light of its own; the app may still reach one
+      }
     }
-  }, [torch]);
+    if (isApp() && native().setTorch) {
+      const result = await native().setTorch!({ on: next }).catch(() => ({ ok: false, reason: "busy" }));
+      if (result.ok) {
+        setTorch(next);
+        return;
+      }
+      showNote(result.reason === "none" ? "This camera has no light" : "The light could not be turned on while the camera is in use");
+      return;
+    }
+    showNote("This camera has no light");
+  }, [torch, showNote]);
 
   /** Focuses on a point of the preview (0 to 1 across and down) where the camera allows it, then returns to continuous focus. */
   const focusAt = useCallback(async (x: number, y: number) => {
@@ -110,7 +183,7 @@ function useCamera(facing: "environment" | "user") {
     }
   }, []);
 
-  return { video, status, ready, torch, toggleTorch, focusAt };
+  return { video, status, note, ready, torch, toggleTorch, focusAt };
 }
 
 // mode: which areas the next read uses; it stays while reads find a card and moves on after a miss
@@ -303,7 +376,7 @@ export default function CardScanner({ phone = false, onClose }: { phone?: boolea
   };
 
   const filters = prefs.scanSets.length + (prefs.scanIgnorePromos ? 1 : 0);
-  const status = camera.status || warning || hint;
+  const status = camera.status || camera.note || warning || hint;
   const count = scanCount(store.scanItems);
   const last = store.scanItems[0] ?? null;
   const total = useMemo(() => store.scanItems.reduce((sum, item) => sum + (item.proxy ? 0 : (priceOf({
@@ -325,8 +398,8 @@ export default function CardScanner({ phone = false, onClose }: { phone?: boolea
               <Icon name="listin" />{count > 0 && <span className="cbadge">{count}</span>}
             </button>
           )}
-          <button type="button" className={camera.torch ? "scantool on" : "scantool"} aria-label="Torch" title={camera.torch === null ? "Torch (this camera has none)" : "Torch"}
-            aria-pressed={camera.torch === true} disabled={camera.torch === null} onClick={() => void camera.toggleTorch()}>
+          <button type="button" className={camera.torch ? "scantool on" : "scantool"} aria-label="Torch" title="Torch"
+            aria-pressed={camera.torch} disabled={!camera.ready} onClick={() => void camera.toggleTorch()}>
             <Icon name="torch" />
           </button>
           <button type="button" className="scantool" aria-label="Scanner settings" title="Scanner settings" onClick={() => setSettingsOpen(true)}>
@@ -432,9 +505,8 @@ function ScanSettings({ onClose }: { onClose: () => void }) {
         {check("scanVibrate", "Vibrate")}
         {check("scanProxy", "Mark as proxy")}
         <label className="scanselect">Camera
-          <select value={prefs.scanCamera} onChange={(event) => store.setPrefs({ scanCamera: event.target.value === "user" ? "user" : "environment" })}>
-            <option value="environment">Back camera</option><option value="user">Front camera</option>
-          </select>
+          <Picker label="Camera" value={prefs.scanCamera} onChange={(value) => store.setPrefs({ scanCamera: value === "user" ? "user" : "environment" })}
+            options={choices([["environment", "Back camera"], ["user", "Front camera"]])} />
         </label>
         <h4>Filters</h4>
         <input className="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Set" aria-label="Find a set" />
@@ -473,12 +545,10 @@ function NextStrip() {
     <div className="scanstrip" role="group" aria-label="Next scans">
       <button type="button" className={prefs.scanFoil ? "on" : ""} aria-pressed={prefs.scanFoil} title="Normal or foil for the next scans"
         onClick={() => store.setPrefs({ scanFoil: !prefs.scanFoil })}>{prefs.scanFoil ? "Foil" : "Normal"}</button>
-      <select aria-label="Condition for the next scans" value={prefs.scanCondition} onChange={(event) => store.setPrefs({ scanCondition: event.target.value })}>
-        {CONDITIONS.map(([code]) => <option key={code} value={code}>{code}</option>)}
-      </select>
-      <select aria-label="Language for the next scans" value={prefs.scanLanguage} onChange={(event) => store.setPrefs({ scanLanguage: event.target.value })}>
-        {LANGUAGES.map(([code]) => <option key={code} value={code}>{code.toUpperCase()}</option>)}
-      </select>
+      <Picker label="Condition for the next scans" value={prefs.scanCondition} onChange={(value) => store.setPrefs({ scanCondition: value })}
+        options={CONDITIONS.map(([code, name]) => ({ value: code, label: code, detail: name }))} />
+      <Picker label="Language for the next scans" value={prefs.scanLanguage} onChange={(value) => store.setPrefs({ scanLanguage: value })}
+        options={LANGUAGES.map(([code, name]) => ({ value: code, label: code.toUpperCase(), detail: name }))} />
       <button type="button" disabled={!last} title="Add another copy of the last card" onClick={() => last && store.updateScanItem(last.key, { quantity: last.quantity + 1 })}>+1</button>
     </div>
   );
@@ -683,26 +753,20 @@ function AddToWindow({ items, done }: { items: ScanItem[]; done: () => void }) {
   return (
     <div className="iowin">
       <div className="prow"><label htmlFor="add-target">Add {count} to</label>
-        <select id="add-target" value={target} onChange={(event) => setTarget(event.target.value)}>
-          <optgroup label="Collections">
-            {collections.map((item) => <option key={item.id} value={`collection:${item.id}`}>{item.kind === "wishlist" ? `Wishlist: ${item.name}` : item.name}</option>)}
-            <option value={`collection:${NEW_COLLECTION}`}>New collection...</option>
-          </optgroup>
-          <optgroup label="Decks">
-            {store.decks.map((item) => <option key={item.id} value={`deck:${item.id}`}>{item.name}</option>)}
-            <option value={`deck:${NEW_DECK}`}>New deck...</option>
-          </optgroup>
-        </select>
+        <Picker id="add-target" label={`Add ${count} to`} value={target} onChange={setTarget} options={[
+          ...collections.map((item) => ({ value: `collection:${item.id}`, label: item.kind === "wishlist" ? `Wishlist: ${item.name}` : item.name, group: "Collections" })),
+          { value: `collection:${NEW_COLLECTION}`, label: "New collection...", group: "Collections" },
+          ...store.decks.map((item) => ({ value: `deck:${item.id}`, label: item.name, group: "Decks" })),
+          { value: `deck:${NEW_DECK}`, label: "New deck...", group: "Decks" },
+        ]} />
       </div>
       {(id === NEW_COLLECTION || id === NEW_DECK) && (
         <div className="prow"><label htmlFor="add-name">Name</label><input id="add-name" value={name} onChange={(event) => setName(event.target.value)} maxLength={100} /></div>
       )}
       {kind === "deck" && (
         <div className="prow"><label htmlFor="add-receiver">Copies go into</label>
-          <select id="add-receiver" value={receiver} onChange={(event) => setReceiver(event.target.value)}>
-            <option value={DECK_COLLECTION}>{`New collection: ${deckName || "named after the deck"}`}</option>
-            {owned.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-          </select>
+          <Picker id="add-receiver" label="Copies go into" value={receiver} onChange={setReceiver}
+            options={[{ value: DECK_COLLECTION, label: `New collection: ${deckName || "named after the deck"}` }, ...owned.map((item) => ({ value: item.id, label: item.name }))]} />
         </div>
       )}
       <div className="btnrow end"><button type="button" className="btn primary" disabled={busy} onClick={() => void run()}>Add</button></div>

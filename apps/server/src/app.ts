@@ -15,6 +15,7 @@ import { type CatalogUpdateStatus } from "./catalog-updater.js";
 import { registerInsightRoutes } from "./insights.js";
 import { logDeck, registerDeckRoutes } from "./decks.js";
 import { registerDeckBuilderRoutes } from "./deck-builder.js";
+import { registerTradeRoutes } from "./trades.js";
 import { deviceUser, handleCrossOrigin, registerMobileRoutes, Revision } from "./mobile.js";
 import { access, createCollection, forgetItem, itemSharing, registerLibraryRoutes } from "./library.js";
 import {
@@ -105,7 +106,8 @@ export async function buildApp(
         request.deviceId = device.deviceId;
       }
     }
-    if (PUBLIC_PATHS.has(path) || request.user || (path === "/api/devices" && request.method === "POST")) return;
+    // the shared trade binder is the one page that works without signing in
+    if (PUBLIC_PATHS.has(path) || request.user || (path === "/api/devices" && request.method === "POST") || (request.method === "GET" && /^\/share\/[\w-]{10,64}$/.test(path))) return;
     if (path.startsWith("/api/")) return reply.code(401).send({ error: "You are signed out. Sign in again to continue." });
     if (path === "/" || path.endsWith(".html") || !path.includes(".")) return reply.redirect("/login");
     return reply.code(401).send({ error: "Signed out" });
@@ -152,6 +154,7 @@ export async function buildApp(
   registerLibraryRoutes(app, database);
   registerDeckRoutes(app, database);
   registerDeckBuilderRoutes(app, database);
+  registerTradeRoutes(app, database);
   registerInsightRoutes(app, database);
   registerScanRoutes(app, database);
 
@@ -332,11 +335,13 @@ export async function buildApp(
     }
   });
 
-  app.get<{ Querystring: { q?: string; color?: string; type?: string; set?: string; rarity?: string; format?: string; mvMin?: string; mvMax?: string; limit?: string } }>(
+  app.get<{ Querystring: { q?: string; color?: string; type?: string; set?: string; rarity?: string; format?: string; mvMin?: string; mvMax?: string; limit?: string; offset?: string; paged?: string } }>(
     "/api/cards",
     async (request, reply) => {
-      const { q = "", color, type, set, rarity, format, mvMin, mvMax, limit = "40" } = request.query;
+      const { q = "", color, type, set, rarity, format, mvMin, mvMax, limit = "40", offset = "0", paged } = request.query;
       const parsedLimit = Number(limit);
+      const parsedOffset = Number(offset);
+      if (!Number.isInteger(parsedOffset) || parsedOffset < 0 || parsedOffset > 1_000_000) return reply.code(400).send({ error: "Invalid search parameters" });
       if (
         typeof q !== "string" ||
         q.length > 200 ||
@@ -410,9 +415,21 @@ export async function buildApp(
       const rows = database.prepare(
         `SELECT id, oracle_id, name, mana_cost, mana_value, type_line, oracle_text, colors, color_identity, legalities,
                 set_code, set_name, collector_number, rarity, image_url, released_at, artist, ${CARD_PRICE_COLUMNS}
-         FROM cards ${where} ORDER BY name, released_at DESC LIMIT ?`,
-      ).all(...values, parsedLimit);
-      return rows.map(toCardRow);
+         FROM cards ${where} ORDER BY name, released_at DESC LIMIT ? OFFSET ?`,
+      ).all(...values, parsedLimit, parsedOffset);
+      if (paged !== "1") return rows.map(toCardRow);
+      // a page of results with the total number of matches and how many copies of each printing the account owns
+      const total = Number(database.prepare(`SELECT COUNT(*) AS count FROM cards ${where}`).get(...values)?.count ?? 0);
+      const userId = request.user!.id;
+      const ownedOf = database.prepare(
+        `SELECT COALESCE(SUM(i.quantity), 0) AS owned FROM collection_cards i JOIN collections col ON col.id = i.collection_id
+         WHERE i.card_id = ? AND i.proxy = 0 AND col.kind = 'collection'
+           AND (col.owner_id = ? OR EXISTS (SELECT 1 FROM members m WHERE m.kind = 'collection' AND m.item_id = col.id AND m.user_id = ?))`,
+      );
+      return {
+        total,
+        cards: rows.map((row) => ({ ...toCardRow(row), owned: Number(ownedOf.get(String(row.id), userId, userId)?.owned ?? 0) })),
+      };
     },
   );
 

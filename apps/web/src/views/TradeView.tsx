@@ -1,117 +1,290 @@
-// ---------- trade view: the trade list and the trade calculator ----------
-import { useState } from "react";
+// ---------- trade view: saved trades, the two-column builder, the balance, wishlist matches and sharing ----------
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 import type { Action } from "../actions";
+import { request } from "../api";
+import type { CardSearch, FoundCard } from "../card-search";
+import { CardResults, countLine, useViewSearch } from "../components/CardResults";
+import { choices, type Choice, Picker } from "../components/Picker";
+import { acceptTradeDialog, completeTradeDialog, newTradeDialog, renameTradeDialog, sendTradeDialog, shareBinderDialog } from "../components/TradeDialogs";
+import { matchesFilters } from "../filters";
 import { Icon } from "../icons";
-import { type TradeLine, useApp } from "../store";
-import { copyLabel, money, priceOf } from "../types";
-import { Quantity, Thumb } from "./Views";
+import { entryKey } from "../library-state";
+import { useApp } from "../store";
+import { lineEach, sideTotal, type Trade, type TradeLine, type TradeMatch, type TradeSide } from "../trade-state";
+import { CONDITIONS, type CollectionEntry, FINISHES, money, priceOf } from "../types";
+import { Quantity, SearchOptions, Thumb } from "./Views";
 
-function Side({ side, title, empty }: { side: "give" | "get"; title: string; empty: string }) {
+const STATUS: Record<Trade["status"], string> = { open: "Open", done: "Done", cancelled: "Cancelled" };
+const FINISH_CHOICES: Choice[] = FINISHES.map(([value, label]) => ({ value: String(value), label }));
+const CONDITION_CHOICES = choices(CONDITIONS);
+
+/** The trade picker: every saved trade, grouped by status, with whom and whose turn it is. */
+function TradePicker() {
   const store = useApp();
-  const currency = store.prefs.currency;
-  const lines: TradeLine[] = store.trade[side];
-  return (
-    <section className="tradeside" aria-label={title}>
-      <div className="tradehead"><b>{title}</b><span className="tradesum">{money(store.tradeTotal(side), currency)}</span></div>
-      {lines.length === 0 && <p className="note pad">{empty}</p>}
-      {lines.map((line) => {
-        const price = priceOf(line.prices, line.foil, currency);
-        return (
-          <div className="dlrow tradeline" key={line.id}>
-            <span className="nl">{line.name} <span className="badge">{line.set_code.toUpperCase()}</span> {line.collector_number}
-              {line.foil > 0 && <span className="badge foil">{line.foil === 2 ? "ETCHED" : "FOIL"}</span>}
-              {line.from && <span className="sub"> from {line.from}</span>}</span>
-            <span className="price" title={price === null ? "No price in the card database" : `${money(price, currency)} each`}>{money(price === null ? null : price * line.quantity, currency)}</span>
-            <Quantity value={line.quantity} name={line.name} max={999} onChange={(quantity) => store.setTradeQuantity(side, line.id, quantity)} />
-          </div>
-        );
-      })}
-    </section>
-  );
+  const options: Choice[] = (store.trades ?? []).map((trade) => ({
+    value: trade.id, label: trade.name, group: STATUS[trade.status],
+    detail: [trade.with ? `with ${trade.with.name}` : "", trade.status === "open" && trade.turn === "me" ? "your turn" : "",
+      `${trade.lines.reduce((sum, line) => sum + line.quantity, 0)} cards`].filter(Boolean).join(", "),
+  }));
+  if (!options.length) return <span className="phname">Trades</span>;
+  return <Picker id="trade-pick" className="switcher" label="Trade" value={store.openTradeId ?? ""} onChange={store.chooseTrade}
+    options={store.openTradeId && !options.some((item) => item.value === store.openTradeId) ? [{ value: store.openTradeId, label: "Choose a trade" }, ...options] : options} />;
 }
 
-function Calculator({ actions }: { actions: Record<string, Action> }) {
+/** You give against you get: a bar split by value and the difference. */
+function Balance({ trade }: { trade: Trade }) {
   const store = useApp();
   const currency = store.prefs.currency;
-  const give = store.tradeTotal("give");
-  const get = store.tradeTotal("get");
+  const give = sideTotal(trade, "give", currency);
+  const get = sideTotal(trade, "get", currency);
   const difference = get - give;
-  const unpriced = [...store.trade.give, ...store.trade.get].filter((line) => priceOf(line.prices, line.foil, currency) === null).length;
+  const share = give + get > 0 ? (give / (give + get)) * 100 : 50;
+  const unpriced = trade.lines.filter((line) => lineEach(line, currency) === null).length;
   return (
-    <div className="tradecalc">
-      <div className="stattile">
-        <div className="stlabel">Difference</div>
-        <div className="stvalue">{money(Math.abs(difference), currency)}</div>
-        <div className="stsub">{!store.trade.give.length && !store.trade.get.length ? "Add cards to both sides to compare them"
-          : difference === 0 ? "An even trade" : difference > 0 ? "In your favor: you get more than you give" : "In their favor: you give more than you get"}
-          {unpriced ? `. ${unpriced} ${unpriced === 1 ? "line has" : "lines have"} no price and count as nothing` : ""}</div>
-      </div>
-      <div className="btnrow">
-        <button type="button" className="btn" disabled={actions["trade.copy"]?.disabled} onClick={actions["trade.copy"]?.run}>Copy trade summary</button>
-        <button type="button" className="btn" disabled={actions["trade.clear"]?.disabled} onClick={actions["trade.clear"]?.run}>Clear trade...</button>
-      </div>
-      <div className="tradesides">
-        <Side side="give" title="You give" empty="Use Give on your trade list, or select a row in a collection and press T." />
-        <Side side="get" title="You get" empty="Select a card in Card search and press G, or use Add to trade (you get)." />
-      </div>
+    <div className="tradebalance" role="group" aria-label="Trade balance">
+      <span className="tbside"><b>You give</b> {money(give, currency)}</span>
+      <span className="tbbar" aria-hidden="true"><span className="tbgive" style={{ width: `${share}%` }} /><span className="tbget" style={{ width: `${100 - share}%` }} /></span>
+      <span className="tbside right"><b>You get</b> {money(get, currency)}</span>
+      <span className="tbdiff">{!trade.lines.length ? "Add cards to both sides to compare them"
+        : difference === 0 ? "Even trade" : `${money(Math.abs(difference), currency)} ${difference > 0 ? "in your favor" : "in their favor"}`}
+        {unpriced ? `, ${unpriced} without a price` : ""}</span>
     </div>
   );
 }
 
-function TradeList() {
+/** One line: picture, name, count, finish, condition, price (marked when typed in) and remove. */
+function LineRow({ trade, line, editable }: { trade: Trade; line: TradeLine; editable: boolean }) {
   const store = useApp();
   const currency = store.prefs.currency;
-  const list = store.tradeList;
-  const [term, setTerm] = useState("");
-  const shown = (list ?? []).filter((entry) => `${entry.name} ${entry.set_name} ${entry.collection_name}`.toLowerCase().includes(term.trim().toLowerCase()));
-  const total = (list ?? []).reduce((sum, entry) => sum + (priceOf(entry, entry.foil, currency) ?? 0) * entry.trade, 0);
+  const market = priceOf(line, line.foil, currency);
+  const [price, setPrice] = useState(line.price === null ? "" : String(line.price));
+  useEffect(() => setPrice(line.price === null ? "" : String(line.price)), [line.price]);
+  const change = (next: Partial<TradeLine>) => void store.changeLine(trade, line, next);
+  const savePrice = () => {
+    const value = price.trim() === "" ? null : Number(price.replace(",", "."));
+    if (value !== null && (!Number.isFinite(value) || value < 0)) { setPrice(line.price === null ? "" : String(line.price)); return store.flash("A price is a number of 0 or more", "err"); }
+    if (value !== line.price) change({ price: value });
+  };
   return (
-    <section className="tradelist" aria-label="Your trade list">
-      <div className="filterbar">
-        <b>Your trade list</b>
-        <input className="search" value={term} onChange={(event) => setTerm(event.target.value)} placeholder="Find a card" aria-label="Find a card on the trade list" />
-        <span className="phpos">{(list ?? []).reduce((sum, entry) => sum + entry.trade, 0)} cards, {money(total, currency)}</span>
+    <div className={`row tline2${line.price !== null ? " edited" : ""}`} data-key={`${line.side}:${line.cardId}`}>
+      <Thumb url={line.image_url} />
+      <div className="rowmain">
+        <div className="rowtitle"><b>{line.name}</b></div>
+        <div className="rowmeta">{line.set_name} <span className="badge">{line.set_code.toUpperCase()}</span> {line.collector_number}
+          {line.collectionName && <span className="sub"> from {line.collectionName}</span>}</div>
+        <div className="tlctl">
+          <Quantity value={line.quantity} name={line.name} max={999} onChange={(quantity) => (editable ? change({ quantity: Math.max(0, quantity) }) : undefined)} />
+          <Picker label={`Finish of ${line.name}`} value={String(line.foil)} disabled={!editable} options={FINISH_CHOICES}
+            onChange={(value) => change({ foil: Number(value) as TradeLine["foil"] })} />
+          <Picker label={`Condition of ${line.name}`} value={line.condition} disabled={!editable} options={CONDITION_CHOICES}
+            onChange={(value) => change({ condition: value as TradeLine["condition"] })} />
+          <label className="tprice" title={line.price !== null ? `Price changed by hand. Card database price: ${money(market, currency)}` : "Price each from the card database"}>
+            <input inputMode="decimal" value={price} placeholder={market === null ? "No price" : market.toFixed(2)} disabled={!editable} aria-label={`Price each of ${line.name}`}
+              onChange={(event) => setPrice(event.target.value)} onBlur={savePrice} onKeyDown={(event) => { if (event.key === "Enter") (event.target as HTMLInputElement).blur(); }} />
+            {line.price !== null && <span className="badge edited" title="Changed by hand">EDITED</span>}
+          </label>
+          {editable && line.price !== null && <button type="button" className="lnk" onClick={() => change({ price: null })}>Use card price</button>}
+        </div>
       </div>
-      <div className="list" role="listbox" aria-label="Trade list">
-        {list === null && <div className="emptynote">Loading the trade list</div>}
-        {list !== null && list.length === 0 && (
-          <div className="empty">
-            <Icon name="trade" />
-            <b>Nothing is marked for trade</b>
-          </div>
+      <span className="price">{money((lineEach(line, currency) ?? 0) * line.quantity, currency)}</span>
+      {editable && <button type="button" className="btn small icon-only" title={`Remove ${line.name}`} aria-label={`Remove ${line.name} from the trade`}
+        onClick={() => change({ quantity: 0 })}><Icon name="del" /></button>}
+    </div>
+  );
+}
+
+/** A local search over loaded rows, shaped like a card database search so the same result views show it. */
+function useLocalSearch(cards: FoundCard[]): CardSearch {
+  const [count, setCount] = useState(60);
+  useEffect(() => setCount(60), [cards]);
+  return useMemo(() => ({
+    cards: cards.slice(0, count), total: cards.length, loading: false, error: "",
+    more: () => setCount((value) => value + 60), refresh: () => undefined, owned: () => undefined,
+  }), [cards, count]);
+}
+
+/** Cards marked for trade, or every card when the switch is on, as search results for You give. */
+function GiveSearch({ trade, editable }: { trade: Trade | null; editable: boolean }) {
+  const store = useApp();
+  const all = store.prefs.tradeAllCards;
+  const [rows, setRows] = useState<CollectionEntry[] | null>(null);
+  useEffect(() => {
+    let active = true;
+    setRows(null);
+    request<CollectionEntry[]>(all ? "/api/library/cards" : "/api/trade").then((list) => { if (active) setRows(list); }).catch((reason) => store.fail(reason, "Could not load your cards."));
+    return () => { active = false; };
+    // reload when the switch changes or the collections change
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [all, store.collections]);
+  const filters = store.filterSets.tradeGive;
+  const byKey = useMemo(() => new Map((rows ?? []).map((row) => [entryKey(row), row])), [rows]);
+  const cards = useMemo(() => (rows ?? []).filter((row) => matchesFilters(row, filters)).map((row): FoundCard => ({
+    id: entryKey(row), name: row.name, mana_cost: row.mana_cost, mana_value: row.mana_value, type_line: row.type_line, oracle_text: null, set_code: row.set_code,
+    set_name: row.set_name, collector_number: row.collector_number, rarity: row.rarity, colors: row.colors, image_url: row.image_url,
+    prices: { usd: priceOf(row, row.foil, "usd"), usd_foil: null, usd_etched: null, eur: priceOf(row, row.foil, "eur"), eur_foil: null },
+  })), [rows, filters]);
+  const search = useLocalSearch(cards);
+  const give = (card: FoundCard) => { const row = byKey.get(card.id); if (row) store.giveEntry(row); };
+  return (
+    <SideSearch side="give" search={rows === null ? { ...search, loading: true } : search} trade={trade} editable={editable}
+      extra={<label className="optcheck inline"><input type="checkbox" checked={all} onChange={() => store.setPrefs({ tradeAllCards: !all })} /> All cards, not only for trade</label>}
+      onAdd={give} buttonText={(card) => {
+        const row = byKey.get(card.id);
+        return row ? `+ Give${all ? "" : ` (${row.trade} for trade)`}` : "+ Give";
+      }}
+      detail={(card) => byKey.get(card.id)?.collection_name ?? ""} />
+  );
+}
+
+function GetSearch({ trade, editable }: { trade: Trade | null; editable: boolean }) {
+  const store = useApp();
+  const search = useViewSearch(store.filterSets.tradeGet, store.view === "trade");
+  return <SideSearch side="get" search={search} trade={trade} editable={editable} onAdd={(card) => void store.getCard(card.id)} buttonText={() => "+ Get"} />;
+}
+
+function SideSearch({ side, search, trade, editable, onAdd, buttonText, extra, detail }: {
+  side: TradeSide; search: CardSearch; trade: Trade | null; editable: boolean; onAdd: (card: FoundCard) => void; buttonText: (card: FoundCard) => string;
+  extra?: ReactNode; detail?: (card: FoundCard) => string;
+}) {
+  const store = useApp();
+  const scope = side === "give" ? "tradeGive" : "tradeGet";
+  const filters = store.filterSets[scope];
+  const can = editable || !trade;
+  return (
+    <div className="tsearch">
+      <div className="tsearchbar">
+        <label className="searchbox">
+          <Icon name="find" className="nicon" />
+          <input value={filters.query} onFocus={() => store.setTradeSide(scope)} onChange={(event) => store.setScopeFilters({ query: event.target.value }, scope)}
+            placeholder={side === "give" ? "Search your cards" : "Search all cards"} aria-label={side === "give" ? "Search cards you give" : "Search cards you get"} />
+        </label>
+        <span className="sub">{countLine(search)}</span>
+      </div>
+      {extra}
+      <CardResults search={search} layout={store.searchLayout} size={store.prefs.searchSize} label={side === "give" ? "Cards you can give" : "Cards you can get"}
+        resetKey={filters} onPick={() => store.setTradeSide(scope)} onOpen={(card) => { if (can) onAdd(card); }}
+        menu={(card) => [can && { label: side === "give" ? "Add to what you give" : "Add to what you get", run: () => onAdd(card) }]}
+        buttons={(card) => (
+          <>
+            {detail?.(card) && <span className="sub tdetail">{detail(card)}</span>}
+            <button type="button" className="btn small" disabled={!can} onClick={(event) => { event.stopPropagation(); onAdd(card); }}>{buttonText(card)}</button>
+          </>
         )}
-        {shown.map((entry) => {
-          const price = priceOf(entry, entry.foil, currency);
-          const label = copyLabel(entry);
-          return (
-            <div key={`${entry.collection_id}:${entry.id}:${entry.foil}:${entry.condition}:${entry.language}`} className="row" role="option" aria-selected={false}
-              onClick={() => store.select({ view: "cards", key: `trade:${entry.id}`, printingId: entry.id })}>
-              <Thumb url={entry.image_url} />
-              <div className="rowmain">
-                <div className="rowtitle"><b>{entry.name}</b>{entry.foil > 0 && <span className="badge foil">{entry.foil === 2 ? "ETCHED" : "FOIL"}</span>}
-                  <span className="badge trade">{entry.trade} of {entry.quantity}</span></div>
-                <div className="rowmeta">{entry.set_name} <span className="badge">{entry.set_code.toUpperCase()}</span> {entry.collector_number}
-                  {label && <span className="copylbl"> {label}</span>} <span className="sub">in {entry.collection_name}</span></div>
-              </div>
-              <span className="price">{money(price, currency)}</span>
-              <button type="button" className="btn small" title="Add one copy to what you give" onClick={(event) => { event.stopPropagation(); store.giveEntry(entry, entry.collection_name); }}>Give</button>
-            </div>
-          );
-        })}
+        empty={<b>{side === "give" && !store.prefs.tradeAllCards ? "No cards marked for trade match" : "No matching cards"}</b>} />
+    </div>
+  );
+}
+
+function Column({ side, trade, editable }: { side: TradeSide; trade: Trade | null; editable: boolean }) {
+  const store = useApp();
+  const currency = store.prefs.currency;
+  const lines = (trade?.lines ?? []).filter((line) => line.side === side);
+  const title = side === "give" ? "You give" : "You get";
+  return (
+    <section className="tradecol" aria-label={title}>
+      <div className="tradehead"><b>{title}</b><span className="cnt">{lines.reduce((sum, line) => sum + line.quantity, 0)}</span>
+        <span className="tradesum">{money(sideTotal(trade, side, currency), currency)}</span></div>
+      <div className="tlines">
+        {lines.length === 0 && <p className="note pad">No cards yet</p>}
+        {trade && lines.map((line) => <LineRow key={`${line.side}:${line.cardId}:${line.foil}:${line.condition}:${line.language}:${line.collectionId ?? ""}`} trade={trade} line={line} editable={editable} />)}
       </div>
+      {side === "give" ? <GiveSearch trade={trade} editable={editable} /> : <GetSearch trade={trade} editable={editable} />}
+    </section>
+  );
+}
+
+/** Cards other accounts mark for trade that your wishlists want, and your trade cards their wishlists want. */
+function Matches() {
+  const store = useApp();
+  const [open, setOpen] = useState(false);
+  useEffect(() => { if (open) void store.reloadMatches(); }, [open, store.reloadMatches]);
+  const currency = store.prefs.currency;
+  const row = (match: TradeMatch, side: TradeSide) => (
+    <div className="row" key={`${side}:${match.user.id}:${match.cardId}:${match.foil}:${match.condition}:${match.language}:${match.collectionId ?? ""}`}>
+      <Thumb url={match.image_url} />
+      <div className="rowmain">
+        <div className="rowtitle"><b>{match.name}</b>{match.foil > 0 && <span className="badge foil">{match.foil === 2 ? "ETCHED" : "FOIL"}</span>}</div>
+        <div className="rowmeta">{match.set_name} <span className="badge">{match.set_code.toUpperCase()}</span> {match.collector_number}
+          <span className="sub"> {side === "get" ? `${match.user.name} has ${match.quantity}` : `${match.user.name} wants ${match.quantity}`}</span></div>
+      </div>
+      <span className="price">{money(priceOf(match, match.foil, currency), currency)}</span>
+      <button type="button" className="btn small" onClick={() => void store.addLine({
+        side, cardId: match.cardId, foil: match.foil, condition: match.condition, language: match.language, quantity: 1, price: null,
+        collectionId: side === "give" ? match.collectionId : null, collectionName: side === "give" && match.collectionId ? store.collectionName(match.collectionId) : null,
+        name: match.name, set_code: match.set_code, set_name: match.set_name, collector_number: match.collector_number, image_url: match.image_url,
+        price_usd: match.price_usd, price_usd_foil: match.price_usd_foil, price_usd_etched: match.price_usd_etched, price_eur: match.price_eur, price_eur_foil: match.price_eur_foil,
+      })}>{side === "get" ? "+ Get" : "+ Give"}</button>
+    </div>
+  );
+  return (
+    <section className="tmatches">
+      <button type="button" className="lnk" aria-expanded={open} onClick={() => setOpen(!open)}>Wishlist matches {open ? "▴" : "▾"}</button>
+      {open && !store.matches && <p className="note pad">Looking for matches</p>}
+      {open && store.matches && (
+        <div className="tmatchcols">
+          <div><h4>Others have cards you want <span className="cnt">{store.matches.theyHave.length}</span></h4>
+            {store.matches.theyHave.length === 0 && <p className="note pad">No account marks a card for trade that your wishlists want</p>}
+            {store.matches.theyHave.map((match) => row(match, "get"))}</div>
+          <div><h4>Others want your trade cards <span className="cnt">{store.matches.theyWant.length}</span></h4>
+            {store.matches.theyWant.length === 0 && <p className="note pad">No wishlist wants a card you marked for trade</p>}
+            {store.matches.theyWant.map((match) => row(match, "give"))}</div>
+        </div>
+      )}
     </section>
   );
 }
 
 export function TradeView({ actions }: { actions: Record<string, Action> }) {
+  const store = useApp();
+  const trade = store.openTrade;
+  const { reloadTrades } = store;
+  useEffect(() => { void reloadTrades(); }, [reloadTrades]);
+  const editable = !!trade && trade.status === "open";
+  const proposal = !!trade?.with && trade.status === "open";
+  const lines = trade?.lines.reduce((sum, line) => sum + line.quantity, 0) ?? 0;
   return (
     <div className="view" id="view-trade">
-      <div id="pagetabs">
-        <span className="phname">Trade</span>
+      <div id="pagetabs" className="colhead tradetop">
+        <TradePicker />
+        {trade && <span className={`badge status-${trade.status}`}>{STATUS[trade.status]}</span>}
+        {trade?.with && <span className="badge">{trade.mine ? "Sent to" : "From"} {trade.with.name}</span>}
+        {proposal && <span className={trade.turn === "me" ? "badge wish" : "badge"}>{trade.turn === "me" ? "Your turn" : "Waiting for an answer"}</span>}
+        <span className="btnrow tcmds">
+          <button type="button" className="btn small" onClick={() => newTradeDialog(store)}>New...</button>
+          <button type="button" className="btn small" disabled={!trade || trade.status === "done"} onClick={() => trade && renameTradeDialog(store, trade)}>Rename...</button>
+          <button type="button" className="btn small" disabled={actions["trade.cancel"]?.disabled} onClick={actions["trade.cancel"]?.run}>{actions["trade.cancel"]?.label === "Reopen trade" ? "Reopen" : "Cancel"}</button>
+          <button type="button" className="btn small" disabled={actions["trade.delete"]?.disabled} onClick={actions["trade.delete"]?.run}>Delete...</button>
+        </span>
+        <SearchOptions />
+        <span className="phpos">{trade ? `${lines} ${lines === 1 ? "card" : "cards"}, ${STATUS[trade.status].toLowerCase()}` : `${store.trades?.length ?? 0} saved trades`}</span>
       </div>
-      <div className="tradegrid">
-        <TradeList />
-        <Calculator actions={actions} />
+      <div className="tradebody">
+        {!trade && (
+          <div className="empty compact">
+            <Icon name="trade" />
+            <b>{store.trades?.length ? "Choose a trade or start a new one" : "No trades yet"}</b>
+            <span className="btnrow"><button type="button" className="btn primary" onClick={() => newTradeDialog(store)}>New trade...</button>
+              <button type="button" className="btn" onClick={() => shareBinderDialog(store)}>Share trade binder...</button></span>
+          </div>
+        )}
+        {trade && <Balance trade={trade} />}
+        {trade && (
+          <div className="btnrow tradeacts">
+            {!trade.with && trade.status === "open" && <button type="button" className="btn primary" disabled={!trade.lines.length} onClick={() => completeTradeDialog(store, trade)}>Complete trade...</button>}
+            {!trade.with && trade.status === "open" && trade.mine && <button type="button" className="btn" onClick={() => void sendTradeDialog(store, trade)}>Send to another account...</button>}
+            {proposal && trade.turn === "me" && <button type="button" className="btn primary" onClick={() => acceptTradeDialog(store, trade)}>Accept trade...</button>}
+            {proposal && <button type="button" className="btn" onClick={() => void store.cancelTrade(trade)}>{trade.mine ? "Cancel trade" : "Decline"}</button>}
+            <button type="button" className="btn" disabled={!trade.lines.length} onClick={() => void store.copyTrade(trade)}>Copy list</button>
+            <button type="button" className="btn" disabled={!trade.lines.length} onClick={() => store.exportTrade(trade)}>Export...</button>
+            <button type="button" className="btn" onClick={() => shareBinderDialog(store)}>Share trade binder...</button>
+          </div>
+        )}
+        {trade?.status === "done" && <p className="note pad">This trade is done{trade.doneAt ? ` (${new Date(`${String(trade.doneAt).replace(" ", "T")}${String(trade.doneAt).endsWith("Z") ? "" : "Z"}`).toLocaleString()})` : ""}.</p>}
+        <div className="tradecols">
+          <Column side="give" trade={trade} editable={editable} />
+          <Column side="get" trade={trade} editable={editable} />
+        </div>
+        <Matches />
       </div>
     </div>
   );

@@ -1,6 +1,6 @@
 # Mana Vault
 
-A self-hosted Magic: The Gathering collection and deck manager. Version 0.5.0.
+A self-hosted Magic: The Gathering collection and deck manager. Version 0.8.0.
 
 Mana Vault runs on your own server as one Docker container and is used from a desktop browser, a phone browser (installable as a home screen app) or the Android app. It keeps a local copy of the Scryfall card catalog, your collection and your decks in one SQLite database, behind a sign-in.
 
@@ -8,7 +8,10 @@ The full user guide is built into the app: Help tab, **About Mana Vault**. The p
 
 ## Features
 
-- Card search across every printing, with filter syntax (`t:dragon c:red mv>=4`, `o:draw`, `set:lea`, `r:rare`, `id:wubg`, `legal:commander`, `usd<1`, `eur>=20`, negation with `-`), flavor name matching and a Filters panel.
+- Card search across every printing, with filter syntax (`t:dragon c:red mv>=4`, `o:draw`, `set:lea`, `r:rare`, `id:wubg`, `legal:commander`, `usd<1`, `eur>=20`, negation with `-`), flavor name matching and a Filters panel. Results show as a grid of card pictures (the default), binder pages or a list, with prices and owned counts, and load as you scroll with the total in the count line.
+- The Filters panel filters whatever is open: card search, a collection, a deck or a search inside them, each with its own filters that stay when you switch collections or decks.
+- All collections: one list of every row in every collection, with each row's collection (wishlists optional).
+- The app's own choice lists on every screen, the same on desktop and phone.
 - Prices from Scryfall (USD regular, foil, etched; EUR regular, foil) stored with each card database update, shown in USD or EUR, with collection and deck values and sorting by price.
 - Statistics for collections and decks: stat tiles and bar charts for mana curve, color, type, rarity, finish and top sets; clicking a collection bar filters the list.
 - Copy details per collection row: finish (regular, foil, etched), condition, language, proxy, the number for trade, purchase price and currency, date added, misprint, altered and signed.
@@ -17,13 +20,13 @@ The full user guide is built into the app: Help tab, **About Mana Vault**. The p
 - One switcher for collections and decks: a searchable list with sorting (recently opened, name, date created, card count, value, format, commander), details per row and keyboard control. An Options button holds sort, layout, card size, filters and Select.
 - Wishlists: collections whose cards are wanted, not owned; add a card, a set's missing cards or a deck's missing cards in one step.
 - Deck ownership check: which cards you own across your collections, where they are, and the cost of the missing cards; export the missing cards as text.
-- Trade list of the copies marked for trade, and a trade calculator that compares what you give with what you get, with a copyable summary.
+- Saved trades (Open, Done, Cancelled): You give searches your cards for trade, You get searches the card database, each line with its own count, finish, condition and an editable price, and a balance bar. Complete a trade in one undoable step (deck cards are flagged, wishlist wants go down), or send it to another account with counter-offers until one side accepts. Wishlist matches both ways, copy or CSV export, and a public trade binder link that needs no sign-in.
 - Any number of collections per account (binders, boxes, sets being completed), each copy in one place, with a target collection for adding (C cycles it). Every owned card is in a collection.
 - Set completion (off by default for new collections): link a collection to any number of sets; count by main set, every printing or each card name once, and by any finish, regular only, foil only or one of each; Completion and Missing tabs with filters, add-from-list and text or CSV export of the missing list.
 - Bulk editing: pick rows with Ctrl+click, Shift+click, Ctrl+A or Select mode; remove or move them between collections in one undoable step.
 - Collection tracking per printing, regular and foil, with plus, minus, move and remove controls.
 - Decks keep the exact printing, with commander, main deck, sideboard and maybeboard zones and a target zone for adding; rename and delete.
-- Deck builder in the Moxfield style: Quick add ("2 Sol Ring"), Edit as text with a check before applying, List, Text, Stacks and Grid views grouped by type, mana value, color, rarity or tag and sorted by name, mana value or price, tags on deck cards, hover previews and the tokens the deck makes.
+- Deck builder in the Moxfield style, with a header like the collection's (switcher, tabs, filter box, Options, count line) and an Add tab with a card search and + Main, + Side, + Maybe and + Commander buttons that show the count already in the deck: Quick add ("2 Sol Ring"), Edit as text with a check before applying, List, Text, Stacks and Grid views grouped by type, mana value, color, rarity or tag and sorted by name, mana value or price, tags on deck cards, hover previews and the tokens the deck makes.
 - Format checks for 21 formats: deck and sideboard size, copies, banned and not legal cards, and commander color identity.
 - Deck tabs for Playtest (opening hand, mulligan, draw, play), Description with a cover card, and History of every change; mana symbols against mana sources in deck statistics.
 - Linked deck cards: each deck card is linked to a copy in a collection (one deck per copy). Collection rows show their deck, deck rows show their collection, links follow moves, and unlinked cards show as missing with a + Wishlist button. Cards added straight to a deck go into the deck's own collection or a chosen one.

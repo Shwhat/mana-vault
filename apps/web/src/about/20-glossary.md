@@ -17,7 +17,11 @@
 | Copy details | The window that changes a row's finish, condition, language and number for trade |
 | Wishlist | A collection of cards you want. Its cards do not count as owned |
 | Trade list | Every copy marked for trade in the collections you own |
-| Trade calculator | The two sides, You give and You get, that compare the value of a trade |
+| Trade | A saved list of what you give and what you get, with a name and a status: Open, Done or Cancelled |
+| Counter-offer | A change to a trade sent between two accounts; it passes the turn to the other account |
+| Trade binder | The public page, opened by a link without signing in, listing the cards you marked for trade |
+| All collections | The switcher entry that lists the rows of every collection at once |
+| Filtering | The line at the top of the Filters panel naming the view it filters |
 | Price | Scryfall's price for a printing on the day of the last card database update |
 | Value | Price times count, added up for a row, collection or deck |
 | Currency | US dollars or euros, the unit for every price and value on screen |

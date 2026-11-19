@@ -82,18 +82,24 @@ Press **2** (or **Collection** on the Home ribbon tab) to open it. The header ho
 
 | Item | Use |
 |---|---|
-| Collection switcher | The button with the collection's name. It opens a list of your collections with their card counts and values (see below) |
+| Collection switcher | The button with the collection's name. It opens a list of your collections with their card counts and values, with All collections first (see below) |
 | Cards, Completion, Missing, Statistics | The tabs; see [Set completion](/about/set-completion) for Completion and Missing (shown only with a completion rule), and [Prices and statistics](/about/prices-and-statistics) for Statistics |
 | Wishlist | Shown when the collection is a wishlist |
 | Shared by name, or Shared with names | Shown for shared collections |
-| Filter box | Keeps the rows whose card name, set name or set code contains the text (Cards tab) |
+| Filter box | Keeps the rows whose card name, set name, set code or collection name contains the text (Cards tab). The Filters panel also filters the rows (Filtering: Collection) |
 | Options | Sort, layout, card size, deck and trade filters and picking (Cards tab, see below). An amber number shows how many of its filters are on |
-| + Add | Makes the open collection the target collection and goes to the card search, so the cards you add go here |
+| + Add | Makes the open collection the target collection and goes to the card search, so the cards you add go here (not in All collections) |
 | Count | Cards and unique rows in the collection and its value (wanted value for a wishlist), such as "1,122 cards (314 unique), $390.32". While a filter hides rows, it adds "showing N of M" |
 
 ### The collection switcher
 
 The switcher lists every collection, including those shared with you, with a Wishlist or Shared badge. Type to find a collection by name; Up and Down move through the list, Enter opens the highlighted collection and Esc closes the list. **Sort** orders the list by Recently opened, Name, Date created, Card count or Value, and is kept for your account. **New collection...** is at the bottom of the list. On a phone the list opens as a full sheet. Opening a collection closes the About guide.
+
+### All collections
+
+**All collections** is always the first entry of the switcher. It lists every row of every collection you own or that is shared with you, each with a badge naming its collection, and its count line adds up every collection. Wishlists are left out unless **Include wishlists** is on in Options (kept for your account). It has the Cards tab only.
+
+Everything done to a row acts on the row's own collection: counts, Copy details, Remove, Move, marking for trade, and picking several rows across collections (a bulk remove or move is one step for every collection involved, and can be undone).
 
 ### Options
 
@@ -104,6 +110,7 @@ The switcher lists every collection, including those shared with you, with a Wis
 | Card size | Small, Medium or Large, for the Grid layout. Kept for your account |
 | Decks | **In decks or not**, **In a deck** (rows whose copies fill a deck) or **Not in a deck** |
 | For trade only | Keeps only rows with copies for trade |
+| Include wishlists | All collections only: also lists the rows of wishlists |
 | Select several cards | Turns on checkboxes for picking rows by tap or click |
 | Done | Closes Options |
 
@@ -124,7 +131,7 @@ Clicking the set code or rarity on a row keeps only the rows that share it, and 
 | For trade | Row has copies for trade |
 | In a deck, Not in a deck | Row's copies fill a deck, or fill none |
 
-Tags are cleared when you open another collection.
+Tags, the filter box and the Filters panel's collection filters stay when you open another collection.
 
 ## Card layouts
 

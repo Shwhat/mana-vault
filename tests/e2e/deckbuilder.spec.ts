@@ -1,23 +1,34 @@
 // Browser tests for 0.7.0: the deck builder, the switcher, card views and the layout fixes.
 import type { Page } from "@playwright/test";
-import { menu, signUp, status, switchTo, test, expect } from "./fixtures";
+import { menu, signUp, status, switchTo, test, expect, choose } from "./fixtures";
 
 async function newDeck(page: Page, name: string, format = "commander") {
   await page.keyboard.press("Control+n");
   await page.keyboard.type(name);
-  await page.locator("#f-format").selectOption(format);
+  await choose(page, page.locator("#f-format"), format);
   await page.keyboard.press("Enter");
   await expect(page.locator("#docname")).toHaveText(`Deck: ${name}`);
   await expect(page.locator("dialog[open]")).toHaveCount(0);
   await page.keyboard.press("3");
 }
 
+/** Quick add on the deck's Add tab, then back to the Cards tab. */
 async function quickAdd(page: Page, text: string, zone = "main", found = true) {
-  await page.locator(".quickadd select").selectOption(zone);
+  await page.getByRole("tab", { name: "Add", exact: true }).click();
+  await choose(page, page.locator("#quickzone"), zone);
   await page.locator("#quickadd").fill(text);
   await page.locator("#quickadd").press("Enter");
   // the box empties once the card is added
   if (found) await expect(page.locator("#quickadd")).toHaveValue("");
+  else await expect(status(page)).toContainText("No card named");
+  await page.getByRole("tab", { name: "Cards", exact: true }).click();
+}
+
+/** Opens the deck's Options, runs the step, and closes it with Done. */
+async function deckOptions(page: Page, step: () => Promise<void>) {
+  await page.locator("#view-deck").getByRole("button", { name: /^Options/ }).click();
+  await step();
+  await page.getByRole("dialog", { name: "Deck options" }).getByRole("button", { name: "Done" }).click();
 }
 
 test("the deck builder adds by typing, checks the format, groups, shows four views and edits as text", async ({ page }) => {
@@ -45,14 +56,15 @@ test("the deck builder adds by typing, checks the format, groups, shows four vie
   await expect(page.locator("#view-deck .row", { hasText: "Llanowar Elves" }).locator(".badge.illegal")).toBeVisible();
 
   await expect(page.locator("#view-deck .grouphead")).toContainText(["Creatures", "Instants", "Creatures"]);
-  await page.locator(".deckbar select[aria-label='Group by']").selectOption("mana");
+  await deckOptions(page, () => choose(page, page.locator("#deck-group"), "mana"));
   await expect(page.locator("#view-deck .grouphead").first()).toHaveText("Mana value 1 3");
   for (const [view, selector] of [["Text", ".tline"], ["Stacks", ".stack .dcard"], ["Grid", ".dgrid .dcard"]] as const) {
-    await page.getByRole("group", { name: "Show cards as" }).getByRole("button", { name: view }).click();
+    await deckOptions(page, () => page.getByRole("group", { name: "Show cards as" }).getByRole("button", { name: view }).click());
     await expect(page.locator(`#view-deck ${selector}`)).toHaveCount(4);
   }
-  await page.getByRole("group", { name: "Show cards as" }).getByRole("button", { name: "List" }).click();
+  await deckOptions(page, () => page.getByRole("group", { name: "Show cards as" }).getByRole("button", { name: "List" }).click());
 
+  await page.locator("#view-deck").getByRole("button", { name: /^Options/ }).click();
   await page.getByRole("button", { name: "Edit as text..." }).click();
   const text = page.locator("dialog[open] textarea");
   await expect(text).toHaveValue(/^Commander\n1 Atraxa, Praetors' Voice \(C16\) 28\n\nDeck\n1 Lightning Bolt \(M10\) 146\n2 Llanowar Elves \(LEA\) 210/);
@@ -77,7 +89,7 @@ test("tags, description, cover card, history and playtest", async ({ page }) => 
   await page.locator("#f-tags").fill("Ramp, Artifacts");
   await page.keyboard.press("Enter");
   await expect(status(page)).toHaveText("Sol Ring tagged Ramp, Artifacts");
-  await page.locator(".deckbar select[aria-label='Group by']").selectOption("tag");
+  await deckOptions(page, () => choose(page, page.locator("#deck-group"), "tag"));
   await expect(page.locator("#view-deck .grouphead")).toHaveText(["Artifacts 1", "Ramp 1", "No tag 8"]);
 
   await page.getByRole("tab", { name: "Description" }).click();
@@ -88,7 +100,7 @@ test("tags, description, cover card, history and playtest", async ({ page }) => 
   await expect(page.locator(".abpage.desc h1")).toHaveText("Plan");
   await expect(page.locator(".abpage.desc b")).toHaveText("elves");
   await expect(page.locator(".abpage.desc a")).toHaveCount(0);
-  await page.locator("#deck-cover").selectOption({ label: "Sol Ring (LEA)" });
+  await choose(page, page.locator("#deck-cover"), { label: "Sol Ring" });
   await expect(status(page)).toHaveText("Cover card changed");
 
   await page.getByRole("tab", { name: "History" }).click();
@@ -119,7 +131,7 @@ test("the switcher opens collections and decks by search and keyboard, and one c
   await expect(page.locator(".swrow")).toHaveCount(2);
   // the most recently opened deck comes first
   await expect(page.locator(".swrow .swtitle b")).toHaveText(["Burn", "Elves"]);
-  await page.locator(".swhead select").selectOption("name");
+  await choose(page, page.locator(".swhead .picker"), "name");
   await expect(page.locator(".swrow .swtitle b")).toHaveText(["Burn", "Elves"]);
   await page.keyboard.type("elv");
   await expect(page.locator(".swrow")).toHaveCount(1);
@@ -156,7 +168,7 @@ test("new accounts see a grid; binder pages; Options; the Trade tab and the card
   await expect(page.locator("#view-trade, .tradegrid").first()).toBeVisible();
   for (const name of ["Sol Ring", "Counterspell", "Dark Ritual"]) {
     await page.keyboard.press("1");
-    await page.locator("#view-cards .row", { hasText: name }).first().click();
+    await page.locator(`#view-cards .pocket[title^="${name},"]`).first().click();
     await page.keyboard.press("Enter");
   }
   await page.keyboard.press("Escape");

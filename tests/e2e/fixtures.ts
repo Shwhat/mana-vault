@@ -1,4 +1,4 @@
-import { test as base, expect, type Page } from "@playwright/test";
+import { test as base, expect, type Locator, type Page } from "@playwright/test";
 
 let counter = 0;
 
@@ -20,7 +20,7 @@ export async function signUp(page: Page, prefix = "user", grid = false): Promise
     // the app saves its preferences once it has loaded the collections; the change is made after that
     await expect.poll(async () => (await (await page.request.get("/api/prefs")).json()).openCollection ?? null).not.toBeNull();
     const prefs = await (await page.request.get("/api/prefs")).json();
-    await page.request.put("/api/prefs", { headers: { "x-mana-vault": "1" }, data: { ...prefs, collectionLayout: "list", collectionLayoutPhone: "list" } });
+    await page.request.put("/api/prefs", { headers: { "x-mana-vault": "1" }, data: { ...prefs, collectionLayout: "list", collectionLayoutPhone: "list", searchLayout: "list", searchLayoutPhone: "list" } });
     await page.reload();
     await page.waitForSelector("#titlebar, #ptabs");
   }
@@ -32,6 +32,18 @@ export async function switchTo(page: Page, kind: "collection" | "deck", name: st
   await page.locator(`#view-${kind} .switcher`).first().click();
   await page.locator(".swpop input").fill(name);
   await page.locator(".swrow", { hasText: name }).first().click();
+}
+
+/** Chooses in one of the app's pickers: opens it, then clicks the choice by value or by its text. */
+export async function choose(page: Page, picker: Locator, value: string | { label: string }) {
+  await picker.click();
+  const list = page.locator(".pkpop");
+  await expect(list).toBeVisible();
+  const option = typeof value === "string"
+    ? list.locator(`.pkopt[data-value="${value.replace(/"/g, '\\"')}"]`)
+    : list.locator(".pkopt").filter({ has: page.locator(".pktext > span:first-child", { hasText: new RegExp(`^${value.label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`) }) }).first();
+  await option.click();
+  await expect(list).toHaveCount(0);
 }
 
 /** Any page error or console error fails the test. */

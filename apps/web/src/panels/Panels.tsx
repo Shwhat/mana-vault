@@ -3,37 +3,40 @@ import { useState } from "react";
 import type { Action } from "../actions";
 import { Icon } from "../icons";
 import { useApp, zoneLabel } from "../store";
-import { capitalize, FORMATS, formatName, money, type OwnedIn } from "../types";
+import { capitalize, type Filters, FORMATS, formatName, money, type OwnedIn } from "../types";
+import { choices, Picker } from "../components/Picker";
+import { SCOPE_NAMES } from "../filters";
 import { Meter } from "../views/CollectionView";
 import { NoDeck, Quantity, zoneGroups } from "../views/Views";
 
+/** The Filters panel: it filters the open view (card search, the collection, the deck or a search inside it); each keeps its own filters. */
 export function FiltersPanel({ actions }: { actions: Record<string, Action> }) {
   const store = useApp();
-  const { filters } = store;
-  const select = (key: "color" | "rarity" | "format", options: Array<[string, string]>) => (
-    <select id={`flt-${key}`} value={filters[key]} onChange={(event) => { store.setFilters({ [key]: event.target.value }); store.setView("cards"); }}>
-      {options.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-    </select>
+  const filters = store.scopeFilters;
+  const set = (change: Partial<Filters>) => store.setScopeFilters(change);
+  const pick = (key: "color" | "rarity" | "format", options: Array<[string, string]>, label: string) => (
+    <Picker id={`flt-${key}`} label={label} value={filters[key]} onChange={(value) => set({ [key]: value })} options={choices(options)} />
   );
   const text = (key: "type" | "set", placeholder: string) => (
-    <input id={`flt-${key}`} value={filters[key]} placeholder={placeholder} onChange={(event) => { store.setFilters({ [key]: event.target.value }); store.setView("cards"); }} />
+    <input id={`flt-${key}`} value={filters[key]} placeholder={placeholder} onChange={(event) => set({ [key]: event.target.value })} />
   );
   return (
     <div className="pbody">
+      <div className="fltscope" role="status">Filtering: <b>{SCOPE_NAMES[store.filterScope]}</b></div>
       <div className="pgrp">
         <h4>Card</h4>
         <div className="prow"><label htmlFor="flt-type">Type</label>{text("type", "Creature")}</div>
         <div className="prow"><label htmlFor="flt-set">Set code</label>{text("set", "lea")}</div>
-        <div className="prow"><label htmlFor="flt-color">Color</label>{select("color", [["", "Any color"], ["W", "White"], ["U", "Blue"], ["B", "Black"], ["R", "Red"], ["G", "Green"]])}</div>
-        <div className="prow"><label htmlFor="flt-rarity">Rarity</label>{select("rarity", [["", "Any rarity"], ["common", "Common"], ["uncommon", "Uncommon"], ["rare", "Rare"], ["mythic", "Mythic"]])}</div>
-        <div className="prow"><label htmlFor="flt-format">Legal in</label>{select("format", [["", "Any format"], ...FORMATS.filter((f) => f !== "casual").map((f): [string, string] => [f, formatName(f)])])}</div>
+        <div className="prow"><label htmlFor="flt-color">Color</label>{pick("color", [["", "Any color"], ["W", "White"], ["U", "Blue"], ["B", "Black"], ["R", "Red"], ["G", "Green"]], "Color")}</div>
+        <div className="prow"><label htmlFor="flt-rarity">Rarity</label>{pick("rarity", [["", "Any rarity"], ["common", "Common"], ["uncommon", "Uncommon"], ["rare", "Rare"], ["mythic", "Mythic"]], "Rarity")}</div>
+        <div className="prow"><label htmlFor="flt-format">Legal in</label>{pick("format", [["", "Any format"], ...FORMATS.filter((f) => f !== "casual").map((f): [string, string] => [f, formatName(f)])], "Legal in")}</div>
       </div>
       <div className="pgrp">
         <h4>Mana value</h4>
         <div className="prow"><label htmlFor="flt-mvmin">From</label>
-          <input id="flt-mvmin" type="number" min="0" max="100" step="0.5" value={filters.mvMin} placeholder="Min" onChange={(event) => { store.setFilters({ mvMin: event.target.value }); store.setView("cards"); }} /></div>
+          <input id="flt-mvmin" type="number" min="0" max="100" step="0.5" value={filters.mvMin} placeholder="Min" onChange={(event) => set({ mvMin: event.target.value })} /></div>
         <div className="prow"><label htmlFor="flt-mvmax">To</label>
-          <input id="flt-mvmax" type="number" min="0" max="100" step="0.5" value={filters.mvMax} placeholder="Max" onChange={(event) => { store.setFilters({ mvMax: event.target.value }); store.setView("cards"); }} /></div>
+          <input id="flt-mvmax" type="number" min="0" max="100" step="0.5" value={filters.mvMax} placeholder="Max" onChange={(event) => set({ mvMax: event.target.value })} /></div>
       </div>
       <div className="btnrow"><button type="button" className="btn" disabled={actions.clearFilters?.disabled} onClick={actions.clearFilters?.run}>Clear filters</button></div>
     </div>

@@ -7,6 +7,7 @@ import type { Store } from "../store";
 import { useApp } from "../store";
 import type { CollectionEntry, CompletionReport, ImportReport } from "../types";
 import { closeDialog, customDialog } from "./Dialog";
+import { choices as pickerChoices, Picker } from "./Picker";
 
 type ImportKind = "collection" | "deck";
 const NEW = "__new__";
@@ -96,18 +97,14 @@ function ImportWindow({ initial }: { initial: ImportKind }) {
       </div>
       {kind === "collection" && (
         <div className="prow"><label htmlFor="io-format">Format</label>
-          <select id="io-format" value={format} onChange={(event) => setFormat(event.target.value)}>
-            <option value="">{detectedName ? `Detected: ${detectedName}` : "Detect from the file"}</option>
-            {IMPORT_FORMATS.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
-          </select>
+          <Picker id="io-format" label="Format" value={format} onChange={setFormat}
+            options={[{ value: "", label: detectedName ? `Detected: ${detectedName}` : "Detect from the file" }, ...pickerChoices(IMPORT_FORMATS)]} />
         </div>
       )}
       {kind === "collection" ? (
         <div className="prow"><label htmlFor="io-into">Collection</label>
-          <select id="io-into" value={into} onChange={(event) => setInto(event.target.value)}>
-            {collections.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-            <option value={NEW}>New collection...</option>
-          </select>
+          <Picker id="io-into" label="Collection" value={into} onChange={setInto}
+            options={[...collections.map((item) => ({ value: item.id, label: item.name, detail: `${item.cardCount} cards` })), { value: NEW, label: "New collection..." }]} />
         </div>
       ) : (
         <div className="prow"><label>Deck</label><b>{store.deck?.name}</b></div>
@@ -203,14 +200,10 @@ function ExportWindow({ initial }: { initial: ExportWhat }) {
   return (
     <div className="iowin">
       <div className="prow"><label htmlFor="ex-what">Export</label>
-        <select id="ex-what" value={what} onChange={(event) => setWhat(event.target.value as ExportWhat)}>
-          {choices.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
-        </select>
+        <Picker id="ex-what" label="Export" value={what} onChange={(value) => setWhat(value as ExportWhat)} options={choices.map(([value, label]) => ({ value, label }))} />
       </div>
       <div className="prow"><label htmlFor="ex-format">Format</label>
-        <select id="ex-format" value={format} onChange={(event) => setFormat(event.target.value as ExportFormat)}>
-          {EXPORT_FORMATS.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
-        </select>
+        <Picker id="ex-format" label="Format" value={format} onChange={(value) => setFormat(value as ExportFormat)} options={pickerChoices(EXPORT_FORMATS)} />
       </div>
       {error && <p className="note err">{error}</p>}
       <div className="btnrow end"><button type="button" className="btn primary" onClick={() => void run()}>Export</button></div>

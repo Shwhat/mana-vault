@@ -6,6 +6,7 @@ import { syncNow, syncStatus } from "./android/offline";
 import { appSettings, isApp, native, saveSettings } from "./android/platform";
 import { confirmDialog, customDialog, dialog } from "./components/Dialog";
 import { RibbonCustomize } from "./components/RibbonCustomize";
+import { completeTradeDialog, newTradeDialog, renameTradeDialog, sendTradeDialog, shareBinderDialog } from "./components/TradeDialogs";
 import { collectionDialog, copyDialog, inboxDialog, linkDialog, moveDialog, newDeckDialog, renameDeckDialog, sendDialog, sharingDialog } from "./components/LibraryDialogs";
 import { exportWindow, importWindow } from "./components/FileWindows";
 import { editTextDialog, formatDialog, tagsDialog } from "./components/DeckDialogs";
@@ -66,6 +67,8 @@ export function useActions(store: Store): Record<string, Action> {
     const target = store.collections?.find((item) => item.id === prefs.targetCollection) ?? null;
     const picked = store.checked.size;
     const noCollection = () => store.flash("Create a collection first", "err");
+    const openTrade = store.openTrade;
+    const noTrade = () => store.flash("Start or open a trade first", "err");
     const showTab = (tab: CollectionTab) => {
       store.setView("collection");
       store.setCollectionTab(tab);
@@ -169,7 +172,7 @@ export function useActions(store: Store): Record<string, Action> {
       },
       "collection.sharing": { label: "Collection sharing...", short: "Sharing", icon: "people", disabled: !open, run: () => sharingDialog(store, "collection") },
       inbox: {
-        label: store.offers.inbox.length ? `Inbox (${store.offers.inbox.length})...` : "Inbox...", short: "Inbox", icon: "inbox",
+        label: store.offers.inbox.length + store.waitingTrades ? `Inbox (${store.offers.inbox.length + store.waitingTrades})...` : "Inbox...", short: "Inbox", icon: "inbox",
         run: () => inboxDialog(store),
       },
       "view.deck": { label: "Deck view", short: "Deck", icon: "deck", key: "3", on: store.view === "deck", run: () => store.setView("deck") },
@@ -214,14 +217,38 @@ export function useActions(store: Store): Record<string, Action> {
         label: "Add to trade (you get)", short: "You get", icon: "trade", key: "G", disabled: !selected,
         run: () => (selected ? void store.getCard(selected.id) : store.flash("Select a card first", "err")),
       },
+      "trade.new": { label: "New trade...", short: "New trade", icon: "tradenew", run: () => newTradeDialog(store) },
+      "trade.rename": {
+        label: "Rename trade...", short: "Rename", icon: "edit", disabled: !openTrade || openTrade.status === "done",
+        run: () => (openTrade ? renameTradeDialog(store, openTrade) : noTrade()),
+      },
+      "trade.complete": {
+        label: "Complete trade...", short: "Complete", icon: "done",
+        disabled: !openTrade || openTrade.status !== "open" || !!openTrade.with || !openTrade.lines.length,
+        run: () => (openTrade ? completeTradeDialog(store, openTrade) : noTrade()),
+      },
+      "trade.send": {
+        label: "Send trade...", short: "Send", icon: "send", disabled: !openTrade || openTrade.status !== "open" || !openTrade.mine || !!openTrade.with,
+        run: () => (openTrade ? void sendTradeDialog(store, openTrade) : noTrade()),
+      },
+      "trade.cancel": {
+        label: openTrade?.status === "cancelled" && !openTrade.with ? "Reopen trade" : "Cancel trade", short: "Cancel",
+        icon: "clear", disabled: !openTrade || openTrade.status === "done" || (openTrade.status === "cancelled" && !!openTrade.with),
+        run: () => (openTrade ? void store.cancelTrade(openTrade) : noTrade()),
+      },
+      "trade.delete": {
+        label: "Delete trade...", short: "Delete", icon: "del", disabled: !openTrade || !openTrade.mine,
+        run: () => (openTrade ? void store.deleteTrade(openTrade) : noTrade()),
+      },
       "trade.copy": {
-        label: "Copy trade summary", short: "Copy summary", icon: "copy", disabled: !store.trade.give.length && !store.trade.get.length,
-        run: () => void store.copyTradeSummary(),
+        label: "Copy trade list", short: "Copy list", icon: "copy", disabled: !openTrade?.lines.length,
+        run: () => void store.copyTrade(openTrade),
       },
-      "trade.clear": {
-        label: "Clear trade...", short: "Clear trade", icon: "clear", disabled: !store.trade.give.length && !store.trade.get.length,
-        run: () => void confirmDialog("Clear trade", <>Remove every card from both sides of the trade?</>, "Clear trade").then((ok) => { if (ok) store.clearTrade(); }),
+      "trade.export": {
+        label: "Export trade list", short: "Export", icon: "csv", disabled: !openTrade?.lines.length,
+        run: () => store.exportTrade(openTrade),
       },
+      "trade.share": { label: "Share trade binder...", short: "Share binder", icon: "share", run: () => shareBinderDialog(store) },
       "wishlist.add": {
         label: "Add to wishlist", short: "Wishlist", icon: "wish", key: "W", disabled: !selected,
         run: () => (selected
@@ -267,7 +294,7 @@ export function useActions(store: Store): Record<string, Action> {
       },
       clearFilters: {
         label: "Clear filters", short: "Clear filters", icon: "clear", disabled: !store.filtersActive,
-        run: () => { store.setFilters({ query: "", type: "", set: "", color: "", rarity: "", format: "", mvMin: "", mvMax: "" }); store.flash("Filters cleared"); },
+        run: () => { store.clearFilters(); store.flash("Filters cleared"); },
       },
       scan: { label: "Scan card...", short: "Scan card", icon: "scan", run: () => store.setScannerOpen(true) },
       addCollection: {

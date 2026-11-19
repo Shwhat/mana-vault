@@ -50,7 +50,14 @@ export type CollectionEntry = Pick<Card, "id" | "name" | "set_code" | "set_name"
     proxy?: boolean;
     /** The decks this row's copies are linked to. */
     decks?: Array<{ id: string; name: string; quantity: number }>;
+    /** The formats the card is legal in, as a comma list. */
+    legal?: string;
+    /** In All collections: the collection the row belongs to. */
+    collection_id?: string;
+    collection_name?: string;
   } & Partial<CopyExtras>;
+/** The id of the All collections entry in the collection switcher. */
+export const ALL_COLLECTIONS = "all";
 export type TradeEntry = CollectionEntry & { collection_id: string; collection_name: string };
 
 export type Person = { id: number; name: string };
@@ -205,7 +212,7 @@ export type User = { id: number; name: string };
 
 export type View = "home" | "cards" | "collection" | "deck" | "trade" | "about";
 export type CollectionTab = "cards" | "completion" | "missing" | "stats";
-export type DeckTab = "cards" | "ownership" | "stats" | "playtest" | "description" | "history";
+export type DeckTab = "cards" | "add" | "ownership" | "stats" | "playtest" | "description" | "history";
 export type DeckView = "list" | "text" | "stacks" | "grid";
 export type DeckGroup = "type" | "mana" | "color" | "rarity" | "tag" | "none";
 export type DeckSort = "name" | "mana" | "price";

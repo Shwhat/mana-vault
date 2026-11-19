@@ -26,7 +26,7 @@ The data folder can also hold default-cards.json, the last downloaded card catal
 | Deck links | Which copies in your own collections fill each deck card |
 | Cards | The card records they use, so a backup can be restored on a server with an empty card database |
 
-A backup does not contain collections or decks shared with you by others, accounts, preferences, prices, deck history, the trade calculator or the full card database. Prices return with the next card database update.
+A backup does not contain collections or decks shared with you by others, accounts, preferences, prices, deck history, trades, the trade binder link or the full card database. Prices return with the next card database update.
 
 ## Restoring a backup
 

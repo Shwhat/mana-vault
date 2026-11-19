@@ -1,5 +1,6 @@
 // ---------- dialogs: one native dialog element reused for every dialog ----------
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { choices, Picker } from "./Picker";
 
 export type FieldType = "text" | "number" | "password" | "check" | "select";
 export type Field = [key: string, label: string, value: string | boolean, type?: FieldType, options?: Array<[string, string]>];
@@ -82,7 +83,7 @@ export function DialogHost() {
     if (!spec && node.open) node.close();
     if (spec) {
       // the first field is focused with its text selected, so typing replaces it
-      const first = node.querySelector<HTMLInputElement | HTMLSelectElement>("#dlgbody input, #dlgbody select, #dlgbody textarea");
+      const first = node.querySelector<HTMLInputElement | HTMLSelectElement | HTMLButtonElement>("#dlgbody input, #dlgbody .picker, #dlgbody textarea");
       if (first) {
         first.focus();
         if (first instanceof HTMLInputElement && first.type !== "checkbox") first.select();
@@ -127,14 +128,8 @@ export function DialogHost() {
                   <div className="prow" key={key}>
                     <label htmlFor={`f-${key}`}>{label}</label>
                     {type === "select" ? (
-                      <select
-                        id={`f-${key}`}
-                        value={String(values[key] ?? "")}
-                        onChange={(event) => setValues({ ...values, [key]: event.target.value })}
-                        onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void submit(); } }}
-                      >
-                        {(options ?? []).map(([value, text]) => <option key={value} value={value}>{text}</option>)}
-                      </select>
+                      <Picker id={`f-${key}`} label={label} value={String(values[key] ?? "")}
+                        onChange={(value) => setValues({ ...values, [key]: value })} options={choices(options ?? [])} />
                     ) : type === "check" ? (
                       <input
                         id={`f-${key}`}

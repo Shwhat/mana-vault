@@ -53,12 +53,11 @@ The container checks itself every 30 seconds by running the server with `-health
 ## Limits
 
 - Sending is limited to accounts on the same server.
-- Search shows at most 40 results.
 - Imports accept files up to 5 MB and 5,000 rows; backups up to 25 MB.
 - Set completion needs Scryfall's set list for printed sizes; it arrives with the first card database update after installing 0.2.0.
 - Card images need internet access to Scryfall's image servers.
 - Prices are as old as the last card database update, and are not kept over time.
-- The trade calculator is kept in the browser until the page is reloaded.
+- Trades are with accounts on the same server. A trade sent to another account cannot be undone once accepted.
 - A copy fills one deck card at a time; decks from other accounts never use your copies.
 - Power, toughness, two-faced rules text and rulings arrive with the first card database update after installing 0.6.0.
 - The scanner's live camera needs HTTPS or a local address (in the browser).

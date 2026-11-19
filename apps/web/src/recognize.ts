@@ -8,9 +8,12 @@ export type Box = { x: number; y: number; width: number; height: number };
 /** Card proportions (63 x 88 mm). */
 export const CARD_RATIO = 63 / 88;
 
-/** Where the card guide sits in a view of the given size: centered, filling most of the height. */
-export function guideBox(viewWidth: number, viewHeight: number): Box {
-  const height = Math.min(viewHeight * 0.84, (viewWidth * 0.86) / CARD_RATIO);
+/** Space kept clear at each side of the view for the button column on the right (scanned list, light, settings). */
+export const GUIDE_SIDE = 64;
+
+/** Where the card guide sits in a view of the given size: centered, filling most of the height, clear of the button column. */
+export function guideBox(viewWidth: number, viewHeight: number, side = GUIDE_SIDE): Box {
+  const height = Math.min(viewHeight * 0.84, Math.min(viewWidth * 0.86, viewWidth - 2 * side) / CARD_RATIO);
   const width = height * CARD_RATIO;
   return { x: (viewWidth - width) / 2, y: (viewHeight - height) / 2, width, height };
 }

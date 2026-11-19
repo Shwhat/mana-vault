@@ -56,11 +56,38 @@ Colors are W (white), U (blue), B (black), R (red) and G (green), or a color nam
 | Legal in | Any format | Commander, Standard, Pioneer, Modern, Legacy, Pauper or Vintage |
 | Mana value From and To | Empty | Mana value at least From and at most To (0 to 100, in steps of 0.5). From cannot be more than To |
 
-Changing a field switches the work area to the card search. **Clear filters** empties the search box and every field.
+The Filters panel filters the open view, and its first line names it:
 
-## Result rows
+| Filtering | Filters |
+|---|---|
+| Card search | The card search results (also when no other view is open) |
+| Collection | The rows of the open collection, or of All collections |
+| Deck | The cards on the deck's Cards tab |
+| Deck card search | The results on the deck's Add tab |
+| Trade, you give or Trade, you get | The trade search you last used |
 
-Each result shows the image, name, mana cost, type line, set, set code, collector number, rarity and price. Clicking the set code fills the Set code filter; clicking the rarity sets the Rarity filter. **+ Collection**, **+ Wishlist** and, while a deck is open, **+ Deck** appear when you point at a row.
+Each view keeps its own filters. A collection's filters stay when another collection opens, and a deck's filters stay when another deck opens. **Clear filters** (also on the Home ribbon tab) empties the filters of the open view only. Legal in uses each card's own legality, also in collections and decks. On a phone, **Filters** in the top bar opens the panel as a sheet for the collection, the deck and the trade view.
+
+## Results
+
+The count line after the search box shows the number of matching printings, and while more are still to load, how many are loaded. More results load as you scroll, or as you turn binder pages.
+
+**Options** beside the search box holds:
+
+| Item | Use |
+|---|---|
+| Layout | **Grid** (the default), **Binder** (pages of nine with Previous page and Next page) or **List** |
+| Card size | Small, Medium or Large, for the Grid layout |
+| Done | Closes Options |
+
+The desktop and phones each remember their own layout. The deck's Add tab and both trade searches use the same layout and card size.
+
+| Layout | Each result shows |
+|---|---|
+| Grid, Binder | The card picture, its price, and in the top corner how many copies of the printing you own; the buttons are under the picture (in Binder, under the selected one) |
+| List | The image, name, mana cost, type line, set, set code, collector number, rarity, price and an OWNED badge with your copies. Clicking the set code fills the Set code filter; clicking the rarity sets the Rarity filter |
+
+The buttons are **+ Collection**, **+ Wishlist** and, while a deck is open, **+ Deck**. Owned counts are real copies in your collections and collections shared with you, not wishlists or proxies.
 
 ## The selected card
 
@@ -68,10 +95,10 @@ Click a result (or move to it with Up and Down) to select it. The Card panel sho
 
 | Action | Keys and buttons |
 |---|---|
-| Add one copy to the collection | Enter, **+ Collection**, double-click, **Add to collection** |
+| Add one copy to the collection | Enter, **+ Collection**, double-click, **Add to collection** in the right-click menu |
 | Add one copy to the open deck, in the target zone | Shift+Enter, **+ Deck**, **Add to deck** |
 | Add one copy to the wishlist | W, **+ Wishlist**, **Add to wishlist** |
-| Add one copy to the trade calculator's You get side | G, **Add to trade (you get)**, **You get** |
+| Add one copy to what you get in the open trade | G, **Add to trade (you get)** in the right-click menu |
 | Open the card page | **Card page** in the right-click menu; a tap on a phone |
 
 ## Empty results
