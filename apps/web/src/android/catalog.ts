@@ -17,7 +17,7 @@ function expand(stored: Stored): Loaded {
   const cards = stored.rows.map((row) => {
     const card: Record<string, unknown> = {};
     stored.fields.forEach((field, index) => { card[field] = row[index] ?? null; });
-    card.oracle_text = null;
+    if (!("oracle_text" in card)) card.oracle_text = null;
     return card as CompactCard;
   });
   return { version: stored.version, cards, byId: new Map(cards.map((card) => [card.id, card])), names: null };
@@ -55,6 +55,27 @@ async function needCatalog(): Promise<Loaded> {
   const current = await catalog();
   if (!current) throw new OfflineError("The card list is not on this phone yet. Connect to the server once to download it.");
   return current;
+}
+
+/** Downloads every ruling when the server has newer ones. Returns true when they changed. */
+export async function refreshRulings(): Promise<boolean> {
+  const version = (await idbGet<string>("meta", "rulingsVersion")) ?? null;
+  const response = await appFetch("/api/rulings/compact", { headers: version ? { "if-none-match": `"${version}"` } : {} }, 180_000);
+  if (response.status === 304) return false;
+  if (!response.ok) throw new Error(`The rulings could not be downloaded (${response.status}).`);
+  const stored = (await response.json()) as { version: string; rulings: Record<string, Array<[string, string]>> };
+  await idbSet("meta", "rulings", stored.rulings);
+  await idbSet("meta", "rulingsVersion", stored.version);
+  rulings = stored.rulings;
+  return true;
+}
+
+let rulings: Record<string, Array<[string, string]>> | null = null;
+/** A card's rulings from the copy on the phone. */
+export async function rulingsOf(id: string): Promise<Array<{ date: string; text: string }>> {
+  rulings ??= (await idbGet<Record<string, Array<[string, string]>>>("meta", "rulings")) ?? {};
+  const card = await compactCard(id);
+  return card ? (rulings[card.oracle_id] ?? []).map(([date, text]) => ({ date, text })) : [];
 }
 
 export async function compactCard(id: string): Promise<CompactCard | null> {

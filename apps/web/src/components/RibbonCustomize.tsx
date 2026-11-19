@@ -46,7 +46,7 @@ export function RibbonCustomize() {
           <div className="cz-list">
             {ribbon.map((item, index) => (
               <div key={item.id} className={index === tabIndex ? "cz-row on" : "cz-row"} onClick={() => { setTabIndex(index); setGroupIndex(0); setItemIndex(-1); }}>
-                {item.name}{item.contextual ? " (contextual)" : ""}
+                {item.name}
               </div>
             ))}
           </div>
@@ -68,7 +68,7 @@ export function RibbonCustomize() {
           <h4>Groups</h4>
           <div className="cz-list">
             {tab?.groups.map((item, index) => (
-              <div key={`${item.name}-${index}`} className={index === groupIndex ? "cz-row on" : "cz-row"} onClick={() => { setGroupIndex(index); setItemIndex(-1); }}>{item.name}</div>
+              <div key={`${item.name}-${index}`} className={index === groupIndex ? "cz-row on" : "cz-row"} onClick={() => { setGroupIndex(index); setItemIndex(-1); }}>{item.name}{item.context ? ` (${item.context})` : ""}</div>
             ))}
           </div>
           <div className="cz-btns">
@@ -114,12 +114,11 @@ export function RibbonCustomize() {
       </div>
       <div className="prow cz-name">
         <label htmlFor="cz-name">Name</label>
-        <input id="cz-name" value={nameText} onChange={(event) => setNameText(event.target.value)} placeholder="Name for Add or Rename" />
+        <input id="cz-name" value={nameText} onChange={(event) => setNameText(event.target.value)}  />
       </div>
       <div className="btnrow" style={{ marginTop: 10 }}>
         <button type="button" className="btn" onClick={() => { save(clone(DEFAULT_RIBBON)); setTabIndex(0); setGroupIndex(0); store.flash("Ribbon reset"); }}>Reset ribbon</button>
       </div>
-      <p className="note">Changes apply at once and are saved for your account. Type a name, then use Add or Rename under Tabs or Groups. Double-click a command to add it to the selected group.</p>
     </div>
   );
 }

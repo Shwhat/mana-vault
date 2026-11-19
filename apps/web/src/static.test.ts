@@ -2,7 +2,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { DEFAULT_RIBBON, MENUS } from "./ribbon";
+import { DEFAULT_RIBBON } from "./ribbon";
 import { PANELS, PRESET_NAMES } from "./dock";
 
 const root = join(__dirname, "..", "..", "..");
@@ -50,13 +50,12 @@ describe("About guide", () => {
     expect(notes.match(/^## (\S+) /m)?.[1]).toBe(version);
   });
 
-  it("mentions every command, menu, ribbon tab, group, button, panel and workspace", () => {
+  it("mentions every command, ribbon tab, group, button, panel and workspace", () => {
     const labels = [
       ...[...actionsSource.matchAll(/label: "([^"]+)"/g)].map((match) => match[1]!),
       ...[...actionsSource.matchAll(/theme\("\w+", "([^"]+)"/g)].map((match) => match[1]!),
       ...[...actionsSource.matchAll(/short: "([^"]+)"/g)].map((match) => match[1]!),
       ...Object.values(PANELS).flatMap((panel) => [panel.title, `${panel.title} panel`]),
-      ...MENUS.map((menu) => menu.name),
       ...DEFAULT_RIBBON.flatMap((tab) => [tab.name, ...tab.groups.map((group) => group.name)]),
       ...PRESET_NAMES,
     ];

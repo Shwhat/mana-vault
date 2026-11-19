@@ -1,11 +1,12 @@
 // ---------- card scanner: live camera, continuous recognition, and the scanned list ----------
-import { useCallback, useEffect, useRef, useState, type FormEvent, type PointerEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type PointerEvent } from "react";
 import { request } from "../api";
 import { Icon } from "../icons";
 import { guideBox, guideInVideo, loadRecognizer, readCard } from "../recognize";
-import { finishFor, hasFinish, matchText, scanCount, scanTargets, type ScanCard, type ScanItem, type ScanMatch } from "../scan-state";
-import { useApp } from "../store";
-import { confirmDialog, dialog, isDialogOpen } from "./Dialog";
+import { finishCode, finishFor, hasFinish, matchText, scanCount, type ScanCard, type ScanDestination, type ScanItem, type ScanMatch } from "../scan-state";
+import { type Store, useApp } from "../store";
+import { CONDITIONS, type CardDetail, LANGUAGES, money, priceOf, type SetInfo } from "../types";
+import { closeDialog, confirmDialog, customDialog, dialog, isDialogOpen } from "./Dialog";
 
 type Capabilities = MediaTrackCapabilities & { torch?: boolean; focusMode?: string[]; pointsOfInterest?: unknown };
 const advanced = (value: Record<string, unknown>) => ({ advanced: [value] }) as unknown as MediaTrackConstraints;
@@ -114,6 +115,32 @@ function useCamera(facing: "environment" | "user") {
 
 // mode: which areas the next read uses; it stays while reads find a card and moves on after a miss
 type Tracker = { candidate: string | null; hits: number; misses: number; held: string | null; mode: number };
+type Picker = { name: string; options: ScanCard[] };
+
+/** A short tone when a card is added. */
+function beep() {
+  try {
+    const AudioContext = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof window.AudioContext }).webkitAudioContext;
+    if (!AudioContext) return;
+    const context = new AudioContext();
+    const tone = context.createOscillator();
+    const volume = context.createGain();
+    tone.frequency.value = 880;
+    volume.gain.setValueAtTime(0.08, context.currentTime);
+    volume.gain.exponentialRampToValueAtTime(0.001, context.currentTime + 0.15);
+    tone.connect(volume).connect(context.destination);
+    tone.start();
+    tone.stop(context.currentTime + 0.16);
+    tone.onended = () => void context.close();
+  } catch {
+    // no sound is fine
+  }
+}
+
+/** The printings a scan may become under the scanner's set and promo filters, newest first. */
+export function allowedPrintings(options: ScanCard[], sets: string[], ignorePromos: boolean): ScanCard[] {
+  return options.filter((card) => (!sets.length || sets.includes(card.set_code)) && (!ignorePromos || !card.promo));
+}
 
 export default function CardScanner({ phone = false, onClose }: { phone?: boolean; onClose: () => void }) {
   const store = useApp();
@@ -123,11 +150,14 @@ export default function CardScanner({ phone = false, onClose }: { phone?: boolea
   const [hint, setHint] = useState("Loading text recognition");
   const [engine, setEngine] = useState<"loading" | "ready" | "failed">("loading");
   const [listOpen, setListOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [picker, setPicker] = useState<Picker | null>(null);
+  const [warning, setWarning] = useState("");
   const [guide, setGuide] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
   const [focus, setFocus] = useState<{ x: number; y: number; id: number } | null>(null);
   const tracker = useRef<Tracker>({ candidate: null, hits: 0, misses: 0, held: null, mode: 0 });
-  const live = useRef({ store, listOpen });
-  live.current = { store, listOpen };
+  const live = useRef({ store, listOpen, settingsOpen, picker });
+  live.current = { store, listOpen, settingsOpen, picker };
 
   // the outline drawn over the preview, kept in step with the preview size
   useEffect(() => {
@@ -154,12 +184,43 @@ export default function CardScanner({ phone = false, onClose }: { phone?: boolea
     return () => { active = false; };
   }, []);
 
+  /** Adds a printing to the scanned list with the copy details chosen in the bottom strip and settings. */
   const accept = useCallback((card: ScanCard) => {
     const current = live.current.store;
-    current.addScanned(card, finishFor(card, current.prefs.scanFoil));
-    if (current.prefs.scanVibrate) navigator.vibrate?.(60);
+    const { prefs: settings } = current;
+    current.addScanned(card, finishFor(card, settings.scanFoil), 1, { condition: settings.scanCondition, language: settings.scanLanguage, proxy: settings.scanProxy });
+    if (settings.scanVibrate) navigator.vibrate?.(60);
+    if (settings.scanSounds) beep();
+    setWarning("");
     setHint(`Added ${card.name}`);
   }, []);
+
+  /** A card was read: check it against the set filter, then add it, or ask which printing when more than one fits. */
+  const resolve = useCallback(async (match: ScanMatch) => {
+    const card = match.card!;
+    const { scanSets: sets, scanIgnorePromos: ignorePromos, scanQuick: quick } = live.current.store.prefs;
+    if (match.by === "printing") {
+      if (sets.length && !sets.includes(card.set_code)) {
+        setWarning(`Not in set: ${card.name} (${card.set_code.toUpperCase()})`);
+        return;
+      }
+      accept(card);
+      return;
+    }
+    let options: ScanCard[] = [card];
+    try {
+      options = await request<ScanCard[]>(`/api/cards/${encodeURIComponent(card.id)}/printings`);
+    } catch {
+      options = [card];
+    }
+    const allowed = allowedPrintings(options, sets, ignorePromos);
+    if (!allowed.length) {
+      setWarning(`Not in set: ${card.name}`);
+      return;
+    }
+    if (allowed.length === 1 || quick) accept(allowed[0]!);
+    else setPicker({ name: card.name, options: allowed });
+  }, [accept]);
 
   const handle = useCallback((match: ScanMatch | null) => {
     const state = tracker.current;
@@ -188,8 +249,8 @@ export default function CardScanner({ phone = false, onClose }: { phone?: boolea
     }
     if (state.held === match.card.oracle_id) return;
     state.held = match.card.oracle_id;
-    accept(match.card);
-  }, [accept]);
+    void resolve(match);
+  }, [resolve]);
 
   // the scanning loop: about twice a second while the camera and text recognition are ready
   useEffect(() => {
@@ -200,7 +261,8 @@ export default function CardScanner({ phone = false, onClose }: { phone?: boolea
         const started = performance.now();
         const element = camera.video.current;
         const box = frame.current;
-        const paused = document.hidden || isDialogOpen() || live.current.listOpen;
+        const { listOpen: list, settingsOpen: settings, picker: choosing, store: current } = live.current;
+        const paused = document.hidden || isDialogOpen() || list || settings || !!choosing || !!current.cardPage;
         const testing = !!window.__manaVaultScanText;
         if (!paused && box && element && (testing || (camera.ready && element.videoWidth))) {
           try {
@@ -221,16 +283,18 @@ export default function CardScanner({ phone = false, onClose }: { phone?: boolea
   }, [engine, camera.ready, camera.video, handle]);
 
   useEffect(() => {
-    if (phone) return;
     const key = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !isDialogOpen()) onClose();
+      if (event.key !== "Escape" || isDialogOpen()) return;
+      if (live.current.picker) setPicker(null);
+      else if (live.current.settingsOpen) setSettingsOpen(false);
+      else if (!phone && !live.current.store.contextMenu) onClose();
     };
     window.addEventListener("keydown", key);
     return () => window.removeEventListener("keydown", key);
   }, [phone, onClose]);
 
   const tapFocus = (event: PointerEvent<HTMLDivElement>) => {
-    if ((event.target as HTMLElement).closest("button")) return;
+    if ((event.target as HTMLElement).closest("button, .scanpicker, .scansettings")) return;
     const rect = event.currentTarget.getBoundingClientRect();
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
@@ -238,41 +302,55 @@ export default function CardScanner({ phone = false, onClose }: { phone?: boolea
     void camera.focusAt(x / rect.width, y / rect.height);
   };
 
-  const openSettings = () => dialog("Scanner settings", [
-    ["vibrate", "Vibrate when a card is added", prefs.scanVibrate, "check"],
-    ["foil", "New scans are foil", prefs.scanFoil, "check"],
-    ["camera", "Camera", prefs.scanCamera, "select", [["environment", "Back camera"], ["user", "Front camera"]]],
-  ], (values) => {
-    store.setPrefs({ scanVibrate: values.vibrate === true, scanFoil: values.foil === true, scanCamera: values.camera === "user" ? "user" : "environment" });
-    store.flash("Scanner settings saved");
-  }, "Save");
-
-  const status = camera.status || hint;
+  const filters = prefs.scanSets.length + (prefs.scanIgnorePromos ? 1 : 0);
+  const status = camera.status || warning || hint;
   const count = scanCount(store.scanItems);
   const last = store.scanItems[0] ?? null;
+  const total = useMemo(() => store.scanItems.reduce((sum, item) => sum + (item.proxy ? 0 : (priceOf({
+    price_usd: item.card.price_usd ?? null, price_usd_foil: item.card.price_usd_foil ?? null, price_usd_etched: item.card.price_usd_etched ?? null,
+    price_eur: item.card.price_eur ?? null, price_eur_foil: item.card.price_eur_foil ?? null,
+  }, finishCode(item), prefs.currency) ?? 0) * item.quantity), 0), [store.scanItems, prefs.currency]);
 
   const view = (
     <div className="scancam" ref={frame} onPointerUp={tapFocus}>
       <video ref={camera.video} autoPlay playsInline muted aria-label="Live camera preview" />
       {guide && <div className="scanguide" aria-hidden="true" style={{ left: guide.x, top: guide.y, width: guide.width, height: guide.height }}><i /><i /><i /><i /></div>}
       {focus && <div className="scanfocus" key={focus.id} style={{ left: focus.x - 30, top: focus.y - 30 }} aria-hidden="true" />}
-      <p className="scanstatus" role="status">{status}</p>
-      <div className="scantools">
-        {phone && (
-          <button type="button" className="scantool" aria-label="Scanned list" title="Scanned list" onClick={() => setListOpen(true)}>
-            <Icon name="listin" />{count > 0 && <span className="cbadge">{count}</span>}
+      <p className={warning && !camera.status ? "scanstatus warn" : "scanstatus"} role="status">{status}</p>
+      {prefs.scanShowTotal && <p className="scantotal">{money(total, prefs.currency)}</p>}
+      <div className="scanrail">
+        <div className="scantools">
+          {phone && (
+            <button type="button" className="scantool" aria-label="Scanned list" title="Scanned list" onClick={() => setListOpen(true)}>
+              <Icon name="listin" />{count > 0 && <span className="cbadge">{count}</span>}
+            </button>
+          )}
+          <button type="button" className={camera.torch ? "scantool on" : "scantool"} aria-label="Torch" title={camera.torch === null ? "Torch (this camera has none)" : "Torch"}
+            aria-pressed={camera.torch === true} disabled={camera.torch === null} onClick={() => void camera.toggleTorch()}>
+            <Icon name="torch" />
           </button>
-        )}
-        <button type="button" className={camera.torch ? "scantool on" : "scantool"} aria-label="Torch" title={camera.torch === null ? "Torch (this camera has none)" : "Torch"}
-          aria-pressed={camera.torch === true} disabled={camera.torch === null} onClick={() => void camera.toggleTorch()}>
-          <Icon name="torch" />
-        </button>
-        <button type="button" className="scantool" aria-label="Scanner settings" title="Scanner settings" onClick={openSettings}><Icon name="gear" /></button>
+          <button type="button" className="scantool" aria-label="Scanner settings" title="Scanner settings" onClick={() => setSettingsOpen(true)}>
+            <Icon name="gear" />{filters > 0 && <span className="cbadge">{filters}</span>}
+          </button>
+        </div>
+        {prefs.scanSets.map((code) => (
+          <button key={code} type="button" className="scanlock" title={`Only cards from ${code.toUpperCase()}`} onClick={() => setSettingsOpen(true)}>
+            {code.toUpperCase()} <span aria-hidden="true">🔒</span>
+          </button>
+        ))}
+        {prefs.scanProxy && <span className="scanlock proxy">PROXY</span>}
       </div>
+      {picker && <PrintingPicker picker={picker} onPick={(card) => { setPicker(null); accept(card); }} onClose={() => { setPicker(null); setHint("Point the camera at a card and fill the outline"); }} />}
+      {settingsOpen && <ScanSettings onClose={() => setSettingsOpen(false)} />}
     </div>
   );
 
-  const strip = last && <LastCard item={last} onOpen={phone ? () => setListOpen(true) : undefined} />;
+  const strip = (
+    <>
+      {last && <LastCard item={last} />}
+      <NextStrip />
+    </>
+  );
 
   if (phone) {
     return (
@@ -302,8 +380,112 @@ export default function CardScanner({ phone = false, onClose }: { phone?: boolea
   );
 }
 
-/** Opens the edit dialog for a scanned row: quantity, finish and printing. */
-async function editItem(store: ReturnType<typeof useApp>, item: ScanItem) {
+/** Which printing a scan is: a row of card pictures over the lower half of the camera. */
+function PrintingPicker({ picker, onPick, onClose }: { picker: Picker; onPick: (card: ScanCard) => void; onClose: () => void }) {
+  const [filter, setFilter] = useState("");
+  const words = filter.trim().toLowerCase();
+  const shown = picker.options.filter((card) => !words || `${card.set_name} ${card.set_code}`.toLowerCase().includes(words));
+  return (
+    <div className="scanpicker" role="dialog" aria-label={`Choose the printing of ${picker.name}`}>
+      <div className="scanpickhead">
+        <input className="search" value={filter} onChange={(event) => setFilter(event.target.value)} placeholder="Filter sets" aria-label="Filter sets" />
+        <button type="button" className="btn small" onClick={onClose} aria-label="Skip this card">Skip</button>
+      </div>
+      <div className="scanpickrow">
+        {shown.map((card) => (
+          <button key={card.id} type="button" className="scanpick" onClick={() => onPick(card)} aria-label={`${card.set_name} ${card.set_code.toUpperCase()} ${card.collector_number}`}>
+            {card.image_url ? <img src={card.image_url} alt="" /> : <span className="scanpickname">{card.name}</span>}
+            <span className="scanpicklabel">{card.set_name} ({card.set_code.toUpperCase()}) #{card.collector_number}</span>
+          </button>
+        ))}
+        {!shown.length && <p className="note">No set matches</p>}
+      </div>
+    </div>
+  );
+}
+
+/** Scanner settings: how scans are matched, what is added, and what the camera screen shows. */
+function ScanSettings({ onClose }: { onClose: () => void }) {
+  const store = useApp();
+  const { prefs } = store;
+  const [query, setQuery] = useState("");
+  const [sets, setSets] = useState<SetInfo[]>([]);
+  useEffect(() => {
+    if (!query.trim()) {
+      setSets([]);
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      request<SetInfo[]>(`/api/sets?q=${encodeURIComponent(query.trim())}`).then(setSets).catch(() => setSets([]));
+    }, 200);
+    return () => window.clearTimeout(timer);
+  }, [query]);
+  const check = (key: "scanQuick" | "scanSounds" | "scanVibrate" | "scanProxy" | "scanIgnorePromos" | "scanFoil" | "scanShowTotal" | "scanShowOwned", label: string) => (
+    <label className="scancheck"><input type="checkbox" checked={prefs[key]} onChange={(event) => store.setPrefs({ [key]: event.target.checked })} /><span>{label}</span></label>
+  );
+  return (
+    <div className="scansettings" role="dialog" aria-label="Scanner settings">
+      <div className="scanpickhead"><b>Settings</b><button type="button" className="btn small" onClick={onClose}>Done</button></div>
+      <div className="scansetbody">
+        {check("scanQuick", "Quick mode (takes the first matching printing)")}
+        {check("scanSounds", "Play sounds")}
+        {check("scanVibrate", "Vibrate")}
+        {check("scanProxy", "Mark as proxy")}
+        <label className="scanselect">Camera
+          <select value={prefs.scanCamera} onChange={(event) => store.setPrefs({ scanCamera: event.target.value === "user" ? "user" : "environment" })}>
+            <option value="environment">Back camera</option><option value="user">Front camera</option>
+          </select>
+        </label>
+        <h4>Filters</h4>
+        <input className="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Set" aria-label="Find a set" />
+        {sets.length > 0 && (
+          <div className="scansetlist">
+            {sets.slice(0, 30).map((set) => (
+              <button key={set.code} type="button" className="pmrow" onClick={() => {
+                if (!prefs.scanSets.includes(set.code)) store.setPrefs({ scanSets: [...prefs.scanSets, set.code] });
+                setQuery("");
+              }}>{set.name} <span className="badge">{set.code.toUpperCase()}</span></button>
+            ))}
+          </div>
+        )}
+        <div className="chips">
+          {prefs.scanSets.map((code) => (
+            <span className="chip" key={code}>{code.toUpperCase()}
+              <button type="button" aria-label={`Remove ${code.toUpperCase()}`} onClick={() => store.setPrefs({ scanSets: prefs.scanSets.filter((item) => item !== code) })}>×</button></span>
+          ))}
+        </div>
+        {check("scanIgnorePromos", "Ignore promos")}
+        {check("scanFoil", "Prefer foil if possible")}
+        <h4>On screen</h4>
+        {check("scanShowTotal", "Display total value")}
+        {check("scanShowOwned", "Display copies in collection")}
+      </div>
+    </div>
+  );
+}
+
+/** The finish, condition and language the next scans get, and +1 for the last card. */
+function NextStrip() {
+  const store = useApp();
+  const { prefs } = store;
+  const last = store.scanItems[0] ?? null;
+  return (
+    <div className="scanstrip" role="group" aria-label="Next scans">
+      <button type="button" className={prefs.scanFoil ? "on" : ""} aria-pressed={prefs.scanFoil} title="Normal or foil for the next scans"
+        onClick={() => store.setPrefs({ scanFoil: !prefs.scanFoil })}>{prefs.scanFoil ? "Foil" : "Normal"}</button>
+      <select aria-label="Condition for the next scans" value={prefs.scanCondition} onChange={(event) => store.setPrefs({ scanCondition: event.target.value })}>
+        {CONDITIONS.map(([code]) => <option key={code} value={code}>{code}</option>)}
+      </select>
+      <select aria-label="Language for the next scans" value={prefs.scanLanguage} onChange={(event) => store.setPrefs({ scanLanguage: event.target.value })}>
+        {LANGUAGES.map(([code]) => <option key={code} value={code}>{code.toUpperCase()}</option>)}
+      </select>
+      <button type="button" disabled={!last} title="Add another copy of the last card" onClick={() => last && store.updateScanItem(last.key, { quantity: last.quantity + 1 })}>+1</button>
+    </div>
+  );
+}
+
+/** Opens the edit dialog for a scanned row: quantity, finish, printing, condition, language and proxy. */
+async function editItem(store: Store, item: ScanItem) {
   let printings: ScanCard[] = [item.card];
   try {
     printings = await request<ScanCard[]>(`/api/cards/${encodeURIComponent(item.card.id)}/printings`);
@@ -314,6 +496,9 @@ async function editItem(store: ReturnType<typeof useApp>, item: ScanItem) {
     ["quantity", "Quantity", String(item.quantity), "number"],
     ["finish", "Finish", item.foil ? "foil" : "regular", "select", [["regular", "Normal"], ["foil", "Foil"]]],
     ["printing", "Printing", item.card.id, "select", printings.map((card): [string, string] => [card.id, `${card.set_name} (${printingLabel(card)})${card.released_at ? `, ${card.released_at.slice(0, 4)}` : ""}`])],
+    ["condition", "Condition", item.condition ?? "NM", "select", CONDITIONS],
+    ["language", "Language", item.language ?? "en", "select", LANGUAGES],
+    ["proxy", "Proxy", !!item.proxy, "check"],
   ], (values) => {
     const quantity = Number(values.quantity);
     if (!Number.isInteger(quantity) || quantity < 1 || quantity > 999) {
@@ -326,26 +511,28 @@ async function editItem(store: ReturnType<typeof useApp>, item: ScanItem) {
       store.flash(`${printingLabel(card)} is not printed in ${foil ? "foil" : "a normal finish"}`, "err");
       return false;
     }
-    store.updateScanItem(item.key, { quantity, card, foil });
+    store.updateScanItem(item.key, { quantity, card, foil, condition: String(values.condition), language: String(values.language), proxy: values.proxy === true });
   }, "Save");
 }
 
-function LastCard({ item, onOpen }: { item: ScanItem; onOpen?: () => void }) {
+function LastCard({ item }: { item: ScanItem }) {
   const store = useApp();
-  const other = !item.foil;
+  const [owned, setOwned] = useState<number | null>(null);
+  const show = store.prefs.scanShowOwned;
+  useEffect(() => {
+    if (!show) return;
+    let active = true;
+    request<CardDetail>(`/api/cards/${encodeURIComponent(item.card.id)}`).then((detail) => { if (active) setOwned(detail.owned.allPrintings); }).catch(() => setOwned(null));
+    return () => { active = false; };
+  }, [show, item.card.id, store.collections]);
   return (
     <div className="scanlast">
-      <button type="button" className="scanlastcard" onClick={onOpen} disabled={!onOpen} aria-label={onOpen ? "Open the scanned list" : undefined}>
+      <button type="button" className="scanlastcard" onClick={() => store.setCardPage(item.card.id)} aria-label={`Open ${item.card.name}`}>
         {item.card.image_url ? <img className="thumb-img" src={item.card.image_url} alt="" /> : <span className="thumb-img none">No image</span>}
-        <span className="scanlastname"><b>{item.card.name}</b><span>{item.card.set_name} {printingLabel(item.card)}</span></span>
+        <span className="scanlastname"><b>{item.quantity}x {item.card.name}</b><span>{item.card.set_name} {printingLabel(item.card)}
+          {item.foil ? " Foil" : ""}{item.proxy ? " Proxy" : ""}{show && owned !== null ? `, ${owned} in collection` : ""}</span></span>
       </button>
-      <div className="scanpill">
-        <button type="button" className={item.foil ? "on" : ""} disabled={!hasFinish(item.card, other)}
-          title={hasFinish(item.card, other) ? "Switch between normal and foil" : "This printing has one finish"}
-          onClick={() => store.updateScanItem(item.key, { foil: other })}>{item.foil ? "Foil" : "Normal"}</button>
-        <button type="button" title="Choose another printing" onClick={() => void editItem(store, item)}>{printingLabel(item.card)}</button>
-        <button type="button" title="Add another copy" onClick={() => store.updateScanItem(item.key, { quantity: item.quantity + 1 })}>+1</button>
-      </div>
+      <button type="button" className="btn small" title="Edit" aria-label={`Edit ${item.card.name}`} onClick={() => void editItem(store, item)}><Icon name="rename" /></button>
     </div>
   );
 }
@@ -375,7 +562,8 @@ function ScanList({ onClose }: { onClose?: () => void }) {
         store.flash(`No card name is close to "${text}"`, "err");
         return;
       }
-      store.addScanned(match.card, finishFor(match.card, store.prefs.scanFoil));
+      store.addScanned(match.card, finishFor(match.card, store.prefs.scanFoil), 1,
+        { condition: store.prefs.scanCondition, language: store.prefs.scanLanguage, proxy: store.prefs.scanProxy });
       store.flash(`${match.card.name} added to the scanned list`);
       setName("");
     } catch (reason) {
@@ -385,28 +573,9 @@ function ScanList({ onClose }: { onClose?: () => void }) {
     }
   };
 
-  const addTo = () => {
-    const targets = scanTargets(store.collections, store.decks);
-    if (!targets.length) {
-      store.flash("Create a collection first (Collection menu, New collection)", "err");
-      return;
-    }
-    const preferred = targets.find((target) => target.kind === "collection" && target.id === store.prefs.targetCollection) ?? targets[0]!;
-    const zone = store.prefs.zone === "main" ? "the main deck" : `the ${store.prefs.zone}`;
-    dialog("Add scanned cards", [
-      ["target", "Add to", `${preferred.kind}:${preferred.id}`, "select",
-        targets.map((target): [string, string] => [`${target.kind}:${target.id}`, target.label])],
-    ], async (values) => {
-      const target = targets.find((option) => `${option.kind}:${option.id}` === values.target);
-      if (!target) return false;
-      const done = await store.addScannedTo(target, items);
-      if (done) onClose?.();
-    }, "Add", <p className="note">{`${count} card${count === 1 ? "" : "s"} are added as one undo step. Cards added to a deck go to ${zone}.`}</p>);
-  };
-
   const clear = async () => {
     if (!items.length) return;
-    if (await confirmDialog("Clear scanned list", `Remove all ${count} scanned card${count === 1 ? "" : "s"} from the list? Nothing has been added yet.`, "Clear")) {
+    if (await confirmDialog("Clear scanned list", `Remove all ${count} scanned card${count === 1 ? "" : "s"} from the list?`, "Clear")) {
       store.clearScanItems();
       store.flash("Scanned list cleared");
     }
@@ -423,24 +592,125 @@ function ScanList({ onClose }: { onClose?: () => void }) {
         <button type="submit" className="btn" aria-label="Add by name" title="Add by name" disabled={busy || !name.trim()}><b>+</b></button>
       </form>
       <div className="scanrows">
-        {!items.length && <p className="note scanempty">Scanned cards appear here. Nothing is added to a collection or deck until you choose Add to.</p>}
+        {!items.length && <p className="note scanempty">No cards scanned</p>}
         {items.map((item) => (
-          <div className="row scanrow" key={item.key} data-key={item.key}>
+          <div className="row scanrow" key={item.key} data-key={item.key} onClick={() => store.setCardPage(item.card.id)}>
             {item.card.image_url ? <img className="thumb-img" src={item.card.image_url} alt="" /> : <span className="thumb-img none">No image</span>}
             <div className="scanrowtext">
               <b>{item.quantity}x {item.card.name}</b>
-              <span>{item.card.set_name} {printingLabel(item.card)} {item.foil ? <span className="badge foil">Foil</span> : <span className="badge">Normal</span>}</span>
+              <span>{item.card.set_name} {printingLabel(item.card)} {item.foil ? <span className="badge foil">Foil</span> : <span className="badge">Normal</span>}
+                {item.condition && item.condition !== "NM" && <span className="badge">{item.condition}</span>}
+                {item.language && item.language !== "en" && <span className="badge">{item.language.toUpperCase()}</span>}
+                {item.proxy && <span className="badge proxy">PROXY</span>}</span>
               <span className="muted">{timeAgo(item.at)}</span>
             </div>
-            <button type="button" className="btn small" aria-label={`Edit ${item.card.name}`} title="Edit" onClick={() => void editItem(store, item)}><Icon name="rename" /></button>
-            <button type="button" className="btn small" aria-label={`Remove ${item.card.name}`} title="Remove" onClick={() => store.removeScanItem(item.key)}><Icon name="del" /></button>
+            <button type="button" className="btn small" aria-label={`Edit ${item.card.name}`} title="Edit" onClick={(event) => { event.stopPropagation(); void editItem(store, item); }}><Icon name="rename" /></button>
+            <button type="button" className="btn small" aria-label={`Remove ${item.card.name}`} title="Remove" onClick={(event) => { event.stopPropagation(); store.removeScanItem(item.key); }}><Icon name="del" /></button>
           </div>
         ))}
       </div>
       <div className="scanlistfoot">
         <button type="button" className="btn" onClick={() => void clear()} disabled={!items.length}><Icon name="clear" /> Clear</button>
-        <button type="button" className="btn primary" onClick={addTo} disabled={!items.length}>Add to...</button>
+        <button type="button" className="btn primary" onClick={() => addToWindow(store, items, onClose)} disabled={!items.length}>Add to...</button>
       </div>
     </div>
   );
+}
+
+const NEW_COLLECTION = "new-collection";
+const NEW_DECK = "new-deck";
+const DECK_COLLECTION = "deck-collection";
+
+/**
+ * Where the scanned cards go: a collection or a deck, or a new one of either. A deck also asks which collection
+ * receives the copies, filled in with the one used for that deck last time.
+ */
+function AddToWindow({ items, done }: { items: ScanItem[]; done: () => void }) {
+  const store = useApp();
+  const collections = (store.collections ?? []).filter((item) => item.kind === "collection" || items.every((scan) => !scan.proxy));
+  const owned = collections.filter((item) => item.kind === "collection");
+  const preferred = collections.find((item) => item.id === store.prefs.targetCollection)?.id ?? collections[0]?.id ?? NEW_COLLECTION;
+  const [target, setTarget] = useState(`collection:${preferred}`);
+  const [name, setName] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [kind, id] = target.split(":") as ["collection" | "deck", string];
+  const deck = kind === "deck" ? store.decks.find((item) => item.id === id) ?? null : null;
+  const deckName = deck?.name ?? name.trim();
+  const remembered = deck?.collection_id && owned.some((item) => item.id === deck.collection_id) ? deck.collection_id : null;
+  const [receiver, setReceiver] = useState<string>(remembered ?? DECK_COLLECTION);
+  useEffect(() => { setReceiver(remembered ?? DECK_COLLECTION); }, [remembered, target]);
+  const count = scanCount(items);
+
+  const run = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      let destination: ScanDestination;
+      if (kind === "collection") {
+        let collectionId = id;
+        if (id === NEW_COLLECTION) {
+          if (!name.trim()) return store.flash("Enter a name for the new collection", "err");
+          collectionId = (await store.createCollection({ name: name.trim(), description: "", completion: "none", finish: "any", kind: "collection", sets: [] })).id;
+        }
+        destination = { kind: "collection", id: collectionId, name: store.collectionName(collectionId) === "the collection" ? name.trim() : store.collectionName(collectionId) };
+      } else {
+        let deckId = id;
+        if (id === NEW_DECK) {
+          if (!name.trim()) return store.flash("Enter a name for the new deck", "err");
+          deckId = (await store.createDeck(name.trim(), "casual", false)).id;
+        }
+        let collectionId = receiver;
+        if (receiver === DECK_COLLECTION) {
+          collectionId = (await store.createCollection({ name: deckName, description: "", completion: "none", finish: "any", kind: "collection", sets: [] })).id;
+        }
+        if (collectionId !== remembered) {
+          await request(`/api/decks/${encodeURIComponent(deckId)}`, { method: "PATCH", body: JSON.stringify({ collectionId }) }).catch(() => undefined);
+          await store.reloadDecks();
+        }
+        destination = { kind: "deck", id: deckId, name: deckName, collectionId, collectionName: store.collectionName(collectionId) };
+      }
+      if (await store.addScannedTo(destination, items)) {
+        closeDialog();
+        done();
+      }
+    } catch (reason) {
+      store.fail(reason, "Could not add the scanned cards.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="iowin">
+      <div className="prow"><label htmlFor="add-target">Add {count} to</label>
+        <select id="add-target" value={target} onChange={(event) => setTarget(event.target.value)}>
+          <optgroup label="Collections">
+            {collections.map((item) => <option key={item.id} value={`collection:${item.id}`}>{item.kind === "wishlist" ? `Wishlist: ${item.name}` : item.name}</option>)}
+            <option value={`collection:${NEW_COLLECTION}`}>New collection...</option>
+          </optgroup>
+          <optgroup label="Decks">
+            {store.decks.map((item) => <option key={item.id} value={`deck:${item.id}`}>{item.name}</option>)}
+            <option value={`deck:${NEW_DECK}`}>New deck...</option>
+          </optgroup>
+        </select>
+      </div>
+      {(id === NEW_COLLECTION || id === NEW_DECK) && (
+        <div className="prow"><label htmlFor="add-name">Name</label><input id="add-name" value={name} onChange={(event) => setName(event.target.value)} maxLength={100} /></div>
+      )}
+      {kind === "deck" && (
+        <div className="prow"><label htmlFor="add-receiver">Copies go into</label>
+          <select id="add-receiver" value={receiver} onChange={(event) => setReceiver(event.target.value)}>
+            <option value={DECK_COLLECTION}>{`New collection: ${deckName || "named after the deck"}`}</option>
+            {owned.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+          </select>
+        </div>
+      )}
+      <div className="btnrow end"><button type="button" className="btn primary" disabled={busy} onClick={() => void run()}>Add</button></div>
+    </div>
+  );
+}
+
+function addToWindow(store: Store, items: ScanItem[], onClose?: () => void) {
+  customDialog("Add scanned cards", () => <AddToWindow items={items} done={() => onClose?.()} />, 480, "Cancel");
+  void store;
 }

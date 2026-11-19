@@ -1,20 +1,20 @@
 // ---------- offline use in the Android app: a copy of the library on the phone, queued changes and sync ----------
-import type { CardDetail, Collection, CollectionEntry, DeckCard, DeckDetail, Deck, FinishCode } from "../types";
-import { compactCard, matchOnPhone, printingsOf, refreshCatalog, searchCards } from "./catalog";
+import type { CardDetail, Collection, CollectionEntry, DeckCard, DeckDetail, Deck, DeckLink, FinishCode } from "../types";
+import { compactCard, matchOnPhone, printingsOf, refreshCatalog, refreshRulings, rulingsOf, searchCards } from "./catalog";
 import { idbAll, idbDelete, idbGet, idbSet } from "./idb";
 import { appFetch, OfflineError, readJson, SignedOutError } from "./net";
 
 export type SyncState = "online" | "offline" | "syncing";
-export type SyncStatus = { state: SyncState; pending: number; lastSync: number | null };
+export type SyncStatus = { state: SyncState; pending: number; lastSync: number | null; error?: string | null };
 export type SyncProblem = { label: string; error: string };
 
 type Queued = { id: string; seq: number; at: number; method: string; url: string; body?: unknown; base?: unknown; label: string };
-type Item = { cardId: string; foil: FinishCode; condition: string; language: string; quantity: number; trade?: number };
+type Item = { cardId: string; foil: FinishCode; condition: string; language: string; proxy: boolean; quantity: number; trade?: number };
 
 export const SYNCED_EVENT = "mana-vault-synced";
 export const PROBLEM_EVENT = "mana-vault-sync-problems";
 const CHECK_MS = 60_000;
-const RETRY_MS = 30_000;
+const RETRY_MS = 10_000;
 const NEEDS_CONNECTION = "You are offline. This needs a connection to the server.";
 
 let status: SyncStatus = { state: "online", pending: 0, lastSync: null };
@@ -55,11 +55,11 @@ const enc = encodeURIComponent;
 const finishCode = (value: unknown): FinishCode => (value === true || value === 1 ? 1 : value === 2 ? 2 : 0);
 const readItem = (raw: Record<string, unknown>): Item => ({
   cardId: String(raw.cardId ?? ""), foil: finishCode(raw.foil), condition: typeof raw.condition === "string" ? raw.condition : "NM",
-  language: typeof raw.language === "string" ? raw.language : "en", quantity: Number(raw.quantity ?? 1),
+  language: typeof raw.language === "string" ? raw.language : "en", proxy: raw.proxy === true, quantity: Number(raw.quantity ?? 1),
   ...(typeof raw.trade === "number" ? { trade: raw.trade } : {}),
 });
 const sameCopy = (entry: CollectionEntry, item: Item) =>
-  entry.id === item.cardId && entry.foil === item.foil && entry.condition === item.condition && entry.language === item.language;
+  entry.id === item.cardId && entry.foil === item.foil && entry.condition === item.condition && entry.language === item.language && !!entry.proxy === item.proxy;
 
 async function newEntry(item: Item): Promise<CollectionEntry | null> {
   const card = await compactCard(item.cardId);
@@ -68,7 +68,7 @@ async function newEntry(item: Item): Promise<CollectionEntry | null> {
     id: card.id, oracle_id: card.oracle_id, name: card.name, set_code: card.set_code, set_name: card.set_name, collector_number: card.collector_number,
     rarity: card.rarity, image_url: card.image_url, colors: card.colors, mana_cost: card.mana_cost, mana_value: card.mana_value, type_line: card.type_line,
     price_usd: null, price_usd_foil: null, price_usd_etched: null, price_eur: null, price_eur_foil: null,
-    quantity: 0, foil: item.foil, condition: item.condition as CollectionEntry["condition"], language: item.language, trade: 0,
+    quantity: 0, foil: item.foil, condition: item.condition as CollectionEntry["condition"], language: item.language, trade: 0, proxy: item.proxy, decks: [],
   };
 }
 
@@ -186,6 +186,36 @@ async function applyLocally(method: string, url: string, body: Record<string, un
     await setCopy("/api/collections", collections.map((item) => (item.id === id ? saved : item)));
     return { response: saved, label: `Rename ${current.name}` };
   }
+  if (method === "POST" && path === "/api/collections" && typeof body.id === "string" && typeof body.name === "string") {
+    const me = (await getCopy<{ id: number; name: string }>("/api/me")) ?? { id: 0, name: "" };
+    const created: Collection = {
+      id: body.id, name: body.name, realName: body.name, description: typeof body.description === "string" ? body.description : "",
+      completion: "none", finish: "any", kind: body.kind === "wishlist" ? "wishlist" : "collection", sets: [], entryCount: 0, cardCount: 0, tradeCount: 0,
+      value: { usd: 0, eur: 0, unpricedUsd: 0, unpricedEur: 0 }, progress: null, role: "owner", owner: me, displayName: null, sharedWith: [],
+    };
+    if (Array.isArray(body.sets) && body.sets.length) return null;
+    await setCopy("/api/collections", [...((await getCopy<Collection[]>("/api/collections")) ?? []), created]);
+    await setCopy(`/api/collections/${enc(body.id)}/cards`, []);
+    return { response: created, label: `Create ${body.name}` };
+  }
+  if (method === "POST" && path === "/api/decks" && typeof body.id === "string" && typeof body.name === "string") {
+    const me = (await getCopy<{ id: number; name: string }>("/api/me")) ?? { id: 0, name: "" };
+    const created: Deck = {
+      id: body.id, name: body.name, realName: body.name, format: typeof body.format === "string" ? body.format : "casual", mode: "theme", card_count: 0,
+      collection_id: typeof body.collectionId === "string" ? body.collectionId : null, role: "owner", owner: me, displayName: null, sharedWith: [],
+    };
+    await setCopy("/api/decks", [created, ...((await getCopy<Deck[]>("/api/decks")) ?? [])]);
+    await setCopy(`/api/decks/${enc(body.id)}`, { ...created, cards: [] } satisfies DeckDetail);
+    return { response: created, label: `Create ${body.name}` };
+  }
+  if ((match = /^\/api\/decks\/([^/]+)$/.exec(path)) && method === "PATCH" && typeof body.collectionId !== "undefined" && body.name === undefined) {
+    const id = decodeURIComponent(match[1]!);
+    const decks = await getCopy<Deck[]>("/api/decks");
+    if (decks) await setCopy("/api/decks", decks.map((deck) => (deck.id === id ? { ...deck, collection_id: body.collectionId as string | null } : deck)));
+    const detail = await getCopy<DeckDetail>(`/api/decks/${enc(id)}`);
+    if (detail) await setCopy(`/api/decks/${enc(id)}`, { ...detail, collection_id: body.collectionId as string | null });
+    return { response: { status: "saved" }, label: "Deck settings" };
+  }
   if ((match = /^\/api\/decks\/([^/]+)$/.exec(path)) && method === "PATCH" && typeof body.name === "string") {
     const id = decodeURIComponent(match[1]!);
     const detail = await getCopy<DeckDetail>(`/api/decks/${enc(id)}`);
@@ -202,16 +232,30 @@ async function applyLocally(method: string, url: string, body: Record<string, un
     if (!detail || !card) return null;
     const quantity = Number(body.quantity ?? 1);
     const zone = (typeof body.zone === "string" ? body.zone : "main") as DeckCard["zone"];
-    const printing = detail.mode === "theme" ? card.id : null;
-    const existing = detail.cards.find((entry) => entry.oracle_id === card.oracle_id && entry.zone === zone && entry.printing_id === printing);
+    const printing = card.id;
+    let existing = detail.cards.find((entry) => entry.oracle_id === card.oracle_id && entry.zone === zone && entry.printing_id === printing);
     if (existing) existing.quantity += quantity;
     else {
-      detail.cards.push({
+      existing = {
         entry_id: -Date.now() - Math.floor(Math.random() * 1000), card_id: card.id, oracle_id: card.oracle_id, printing_id: printing, quantity, zone,
         name: card.name, mana_cost: card.mana_cost, type_line: card.type_line, set_code: card.set_code, set_name: card.set_name,
-        collector_number: card.collector_number, image_url: card.image_url,
-      });
+        collector_number: card.collector_number, image_url: card.image_url, links: [],
+      };
+      detail.cards.push(existing);
     }
+    // the copies sent with the card fill it on the phone too; the server checks they are free when the change arrives
+    if (Array.isArray(body.links)) {
+      const collections = (await getCopy<Collection[]>("/api/collections")) ?? [];
+      for (const raw of body.links as Array<Record<string, unknown>>) {
+        const item = readItem(raw);
+        const collectionId = String(raw.collectionId ?? "");
+        existing.links = [...(existing.links ?? []), {
+          ...item, collectionId, collectionName: collections.find((entry) => entry.id === collectionId)?.name ?? "a collection",
+          quantity: Math.min(item.quantity, quantity),
+        } as DeckLink];
+      }
+    }
+    existing.missing = Math.max(0, existing.quantity - (existing.links ?? []).reduce((sum, link) => sum + link.quantity, 0));
     await setCopy(`/api/decks/${enc(id)}`, detail);
     return { response: { status: "added" }, label: `Add ${quantity} ${card.name} to ${detail.name}` };
   }
@@ -292,6 +336,7 @@ async function answerOnPhone(url: string): Promise<unknown> {
   if (path === "/api/cards") return searchCards(new URLSearchParams(query));
   let match: RegExpExecArray | null;
   if ((match = /^\/api\/cards\/([^/]+)\/printings$/.exec(path))) return printingsOf(decodeURIComponent(match[1]!));
+  if ((match = /^\/api\/cards\/([^/]+)\/rulings$/.exec(path))) return rulingsOf(decodeURIComponent(match[1]!));
   if ((match = /^\/api\/cards\/([^/]+)$/.exec(path))) return detailOnPhone(decodeURIComponent(match[1]!));
   const copy = await getCopy(url);
   if (copy !== undefined) return copy;
@@ -317,9 +362,39 @@ function parseBody(init: RequestInit): Record<string, unknown> {
   }
 }
 
-function goneOffline() {
+/**
+ * A request failed to reach the server. The app only goes offline when a quick health check also fails: a slow answer
+ * or a busy moment is not a lost connection.
+ */
+let probing: Promise<boolean> | null = null;
+let lastProbe = 0;
+function reachable(): Promise<boolean> {
+  probing ??= (async () => {
+    lastProbe = Date.now();
+    try {
+      const response = await appFetch("/api/health", {}, 5_000);
+      return response.ok;
+    } catch {
+      return false;
+    } finally {
+      probing = null;
+    }
+  })();
+  return probing;
+}
+
+async function goneOffline(): Promise<boolean> {
+  if (await reachable()) return false;
   if (status.state !== "offline") setStatus({ state: "offline" });
   scheduleRetry();
+  return true;
+}
+
+/** While offline, any use of the app checks (at most every 10 seconds) whether the server is back. */
+function checkBack() {
+  if (status.state === "offline" && Date.now() - lastProbe > RETRY_MS) {
+    void reachable().then((ok) => { if (ok) void syncNow(); });
+  }
 }
 
 async function network<T>(url: string, init: RequestInit): Promise<T> {
@@ -332,6 +407,7 @@ const pending = () => status.pending > 0;
 
 export async function appRequest<T>(url: string, init: RequestInit = {}): Promise<T> {
   const method = (init.method ?? "GET").toUpperCase();
+  checkBack();
   if (method === "GET") {
     if (!offline()) {
       if (pending()) await syncNow();
@@ -342,7 +418,7 @@ export async function appRequest<T>(url: string, init: RequestInit = {}): Promis
           return value;
         } catch (reason) {
           if (!(reason instanceof OfflineError)) throw reason;
-          goneOffline();
+          await goneOffline();
         }
       }
     }
@@ -354,7 +430,7 @@ export async function appRequest<T>(url: string, init: RequestInit = {}): Promis
         return await network<T>(url, init);
       } catch (reason) {
         if (!(reason instanceof OfflineError)) throw reason;
-        goneOffline();
+        await goneOffline();
       }
     }
     const body = parseBody(init);
@@ -369,7 +445,7 @@ export async function appRequest<T>(url: string, init: RequestInit = {}): Promis
       return answer;
     } catch (reason) {
       if (!(reason instanceof OfflineError)) throw reason;
-      goneOffline();
+      await goneOffline();
     }
   }
   const body = parseBody(init);
@@ -408,9 +484,12 @@ async function sendQueue(): Promise<SyncProblem[]> {
   }
 }
 
-/** Downloads a fresh copy of the library when anything changed on the server, and a newer card list. */
+/**
+ * Brings the copy on the phone up to date when anything changed on the server: the lists first, then only the
+ * collections and decks whose change time moved. A newer card list and newer rulings are downloaded too.
+ */
 async function refreshCopy(force: boolean): Promise<boolean> {
-  const state = await readJson<{ revision: string; catalog: string | null }>(await appFetch("/api/sync/state"));
+  const state = await readJson<{ revision: string; catalog: string | null; rulings?: string | null }>(await appFetch("/api/sync/state"));
   let changed = false;
   if (force || state.revision !== (await idbGet<string>("meta", "revision"))) {
     const get = async <T>(url: string): Promise<T | null> => {
@@ -423,20 +502,38 @@ async function refreshCopy(force: boolean): Promise<boolean> {
         return null;
       }
     };
+    const oldCollections = new Map(((await getCopy<Collection[]>("/api/collections")) ?? []).map((item) => [item.id, item]));
+    const oldDecks = new Map(((await getCopy<Deck[]>("/api/decks")) ?? []).map((item) => [item.id, item]));
     await Promise.all(["/api/me", "/api/prefs", "/api/shares", "/api/trade"].map((url) => get(url)));
     const collections = (await get<Collection[]>("/api/collections")) ?? [];
     for (const collection of collections) {
-      await get(`/api/collections/${enc(collection.id)}/cards`);
+      const before = oldCollections.get(collection.id);
+      const cardsUrl = `/api/collections/${enc(collection.id)}/cards`;
+      if (!force && before && before.updatedAt === collection.updatedAt && (await getCopy(cardsUrl)) !== undefined) continue;
+      await get(cardsUrl);
       await get(`/api/collections/${enc(collection.id)}/completion`);
     }
     const decks = (await get<Deck[]>("/api/decks")) ?? [];
-    for (const deck of decks) await get(`/api/decks/${enc(deck.id)}`);
+    for (const deck of decks) {
+      const before = oldDecks.get(deck.id) as (Deck & { updated_at?: string }) | undefined;
+      const url = `/api/decks/${enc(deck.id)}`;
+      if (!force && before && before.updated_at === (deck as Deck & { updated_at?: string }).updated_at && (await getCopy(url)) !== undefined) continue;
+      await get(url);
+    }
     await idbSet("meta", "revision", state.revision);
     changed = true;
   }
   if (state.catalog !== ((await idbGet<string | null>("meta", "catalogStamp")) ?? null) || !(await idbGet("meta", "catalogVersion"))) {
     if (await refreshCatalog()) changed = true;
     await idbSet("meta", "catalogStamp", state.catalog);
+  }
+  if (state.rulings && state.rulings !== (await idbGet<string | null>("meta", "rulingsStamp"))) {
+    try {
+      await refreshRulings();
+      await idbSet("meta", "rulingsStamp", state.rulings);
+    } catch (reason) {
+      if (reason instanceof OfflineError || reason instanceof SignedOutError) throw reason;
+    }
   }
   return changed;
 }
@@ -448,12 +545,15 @@ export function syncNow(force = false): Promise<void> {
     try {
       const problems = await sendQueue();
       const changed = await refreshCopy(force || problems.length > 0);
-      setStatus({ state: "online", lastSync: Date.now() });
+      setStatus({ state: "online", lastSync: Date.now(), error: null });
       if (problems.length) window.dispatchEvent(new CustomEvent<SyncProblem[]>(PROBLEM_EVENT, { detail: problems }));
       if (changed) window.dispatchEvent(new Event(SYNCED_EVENT));
     } catch (reason) {
+      // only a lost connection makes the app offline; any other failure keeps it online and is tried again at the next sync
       if (reason instanceof SignedOutError) setStatus({ state: "online" });
-      else goneOffline();
+      else if (reason instanceof OfflineError) {
+        if (!(await goneOffline())) setStatus({ state: "online", error: reason.message });
+      } else setStatus({ state: "online", error: reason instanceof Error ? reason.message : "The sync did not finish." });
     } finally {
       await countQueue();
       flushing = null;

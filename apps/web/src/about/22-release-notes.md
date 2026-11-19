@@ -2,6 +2,27 @@
 
 The installed version is shown at the top of this guide.
 
+## 0.6.0 (2026-11-19): Linked deck cards, import formats, ManaBox-style scanner and a new ribbon
+
+- Deck cards are linked to the copies in your collections that fill them. A copy fills one deck at a time; a second deck that needs the card shows it as missing. Collection rows show their decks, deck cards show their collection, and Link copies changes the copy. Links follow copies that move, and removing a copy makes the deck card missing.
+- Normal decks are gone: every deck keeps the printing of each card. Decks that kept cards by name keep the newest printing they showed. Decklists without a printing take the newest printing.
+- Proxies: a proxy is its own row, marked PROXY everywhere, with no value, out of set completion and the trade list. It can fill a deck card. Add as proxy, the scanner's Mark as proxy, Copy details and imports set it.
+- Copy details also hold the purchase price and currency, date added, and misprint, altered and signed marks.
+- Completion rule None, the default for new collections; it hides the Completion and Missing tabs. Existing collections keep their rule.
+- Wishlist wants go down as copies of the card are added to collections, the oldest want first; undo puts them back.
+- Import and Export windows: one Import and one Export button. Imports read Mana Vault, Moxfield, ManaBox, Archidekt, Deckbox and TCGplayer CSV files and plain text lists, detect the format and let you change it, and can import into a new collection. Exports write the same formats, for the whole collection, the filtered rows, the picked rows, the missing cards or the deck.
+- The scanner works like ManaBox: a settings sheet (Quick mode, Play sounds, Vibrate, Mark as proxy, Camera, a set filter with any number of sets, Ignore promos, Prefer foil if possible, Display total value, Display copies in collection), set chips on the camera, a "Not in set" warning, a printing picker when more than one printing fits, and a strip for the finish, condition and language of the next cards.
+- Add to in the scanner offers New collection... and New deck...; cards added to a deck go into a collection for that deck, remembered per deck, and are linked.
+- The ribbon is the only menu: the menu bar is replaced by a title bar with the account menu. Related commands share one button with a list, commands that do not apply are hidden, and an open deck adds its groups to the Decks tab. Button size: Large buttons, Compact buttons or Icons only.
+- Right-click menus on cards and rows, and a long press on a phone.
+- Card page with art, rules text, power and toughness, every version with market prices, rulings and where you own the card. Rulings are kept on the phone too.
+- Phone layout: Home, Search, Collection, Decks and Scan tabs, a Home view with totals, recent scans and the Inbox, and the menu at the top right with one section per ribbon tab.
+- Explanatory notes were removed from the interface.
+- Android app: it goes offline only when the server cannot be reached, checks again every 10 seconds, and downloads only the collections and decks that changed. The sync button always shows Synced and the time, Waiting, Offline or Syncing, and syncs now when tapped. Collections and decks can be created offline.
+- The card database update also downloads rulings, power and toughness, and the rules text of both faces of two-faced cards. Run an update after installing.
+- Backups are version 4, with proxies, copy details, the collection remembered for each deck, and deck links. Older backups still restore.
+- Fixed: preference changes made just before reloading the page were lost.
+
 ## 0.5.0 (2026-11-18): Android app
 
 - Android app (Android 8.0 or newer), installed from the APK attached to each GitHub release. It has every feature of the phone layout.

@@ -1,10 +1,10 @@
 # Mana Vault handoff
 
-Last updated: 2026-11-18, version 0.5.0.
+Last updated: 2026-11-19, version 0.6.0.
 
 ## Project
 
-Mana Vault is Devon's self-hosted Magic: The Gathering collection and deck manager (repository Shwhat/mana-vault). It runs as one Docker container (Node.js 22, Fastify, SQLite) and serves a React interface for desktop browsers and phones. Version 0.1.0 rebuilt the interface in the OpenSchem design style (program-design-guide skill, "look and shell" adoption), added sign-in, per-account preferences, undo, the About guide and Dockhand-ready deployment. Version 0.2.0 added multiple collections per account, set completion, bulk editing, per-account ownership of collections and decks, sending (copy, share, transfer) with an Inbox, and deck rename and delete. Version 0.3.0 added prices and values, statistics, deck ownership, wishlists, the trade list and trade calculator, copy details (finish, condition, language, trade count), filter tags, the binder layout and flavor name matching. The 0.3.0 features came from a comparison with AeroEagle/mtg-collection-viewer. Version 0.4.0 rebuilt the camera scanner as a continuous, ManaBox-style live scanner with a scanned list. Version 0.5.0 added the Android app (Capacitor around the same interface) with device sign-in, offline use and sync, phone text recognition and Inbox notifications.
+Mana Vault is Devon's self-hosted Magic: The Gathering collection and deck manager (repository Shwhat/mana-vault). It runs as one Docker container (Node.js 22, Fastify, SQLite) and serves a React interface for desktop browsers and phones. Version 0.1.0 rebuilt the interface in the OpenSchem design style (program-design-guide skill, "look and shell" adoption), added sign-in, per-account preferences, undo, the About guide and Dockhand-ready deployment. Version 0.2.0 added multiple collections per account, set completion, bulk editing, per-account ownership of collections and decks, sending (copy, share, transfer) with an Inbox, and deck rename and delete. Version 0.3.0 added prices and values, statistics, deck ownership, wishlists, the trade list and trade calculator, copy details (finish, condition, language, trade count), filter tags, the binder layout and flavor name matching. The 0.3.0 features came from a comparison with AeroEagle/mtg-collection-viewer. Version 0.4.0 rebuilt the camera scanner as a continuous, ManaBox-style live scanner with a scanned list. Version 0.5.0 added the Android app (Capacitor around the same interface) with device sign-in, offline use and sync, phone text recognition and Inbox notifications. Version 0.6.0 linked deck cards to collection copies, added proxies and copy details, import and export windows for seven formats, a ManaBox-style scanner with settings and a printing picker, the card page with rulings, a ribbon-only menu with right-click menus, and the phone Home screen.
 
 ## Rules
 
@@ -14,11 +14,28 @@ Mana Vault is Devon's self-hosted Magic: The Gathering collection and deck manag
 - Never use em dashes anywhere (code, comments, docs, interface text). A static test enforces this.
 - Answer questions simply and directly, without extra unrequested actions.
 - Keep a task list while building, update the README feature list and keep the keyboard shortcut list current (README, About guide page 18 Settings and shortcuts, `SHORTCUTS` in `actions.tsx`, key handling in `main.tsx`).
+- Every update ships the server and the Android app together. Attach a debug APK to each build until the app is closer to finished. The `Android app` workflow builds it for every pull request and push to main (artifact `mana-vault-X.Y.Z-debug`), signed with the shared debug key `apps/android/android/app/debug-shared.p12` so debug builds install over each other. The workspace cannot reach Maven Central, so take the APK from the CI run.
 - Update this handoff (here and in the claude.ai manavault project, identical) with every build.
 - Raise the version in every place with each delivered build: `package.json`, `apps/server/package.json`, `apps/web/package.json`, `apps/android/package.json` and `package-lock.json` (run `npm install --package-lock-only`). Patch for fixes, minor for features, major only when Devon says so. A static test checks they match.
 - Every pull request that changes what the app does, or the rules it follows, also updates the About guide: the affected pages, Capabilities, and a new entry in the release notes. It also raises the version. The version is shown in the guide.
 - Every change gets tests; `npm run test:all` must pass before delivery. Where Playwright cannot download its browser, run it with an installed Chrome: `PW_CHANNEL=chrome npm run test:all`.
 - Deployment follows the docker-server-setup skill: Dockhand only, no Watchtower, absolute data path, UID 65532, no cloudflared or reverse proxy in the stack.
+
+## Decisions (0.6.0 storage, formats, scanner and menus)
+
+- Specification: `docs/SPEC-0.6.0.md` in the claude.ai project.
+- Every owned card is in a collection. A deck card is linked to collection copies (table `deck_links`); one deck per copy, so a second deck shows the card as missing. Decks can hold missing cards, shown with a + Wishlist button. Normal decks were removed: every deck keeps the printing (old Normal decks became theme decks with the newest printing). Linking another printing switches the deck card to that printing. Existing decks are not linked automatically.
+- Adding straight to a deck asks for the deck's own collection (created on first use, named after the deck) or a chosen collection; the choice is remembered per deck (`decks.collection_id`) and confirmed each time. When the card is in more than one collection, the app asks which copy to link.
+- Links follow moves (free copies move first, then linked ones). Removing a linked copy makes the deck card missing. Sending a deck does not carry links.
+- Proxies are part of the copy key: no value, left out of completion, value, statistics and the trade list, can fill a deck slot, and are marked everywhere.
+- Wishlist want counts go down by one per copy added, oldest wishlist entry first (Devon left this choice to me).
+- Completion rule None is the default for new collections and hides the Completion and Missing tabs; existing collections kept their rule.
+- Import detects the format (Mana Vault, Moxfield, ManaBox, Archidekt, Deckbox, TCGplayer, plain text) and lets the user change it. ManaBox extra columns are stored as copy details: purchase price, currency, date added, misprint, altered, signed, proxy. Export works on the whole collection, filtered, selected or missing cards, or a deck.
+- The app goes offline only when a request fails and a health probe also fails; the Sync chip is always shown and is the Sync now button. New collections and decks can be made offline (the phone picks the id).
+- The ribbon is the only menu (the menu bar was removed). Import and Export open windows; other related commands share one dropdown. Deck and collection commands are added to the existing tabs when one is open; commands that do not apply are hidden. Button size: Large, Compact or Icons only. Right-click on rows, long press on phones.
+- Phone: bottom bar Home, Search, Collection, Decks, Scan; the former More items are in the nested top-right menu.
+- Explanatory notes and banners ("AI notes") were removed from the interface; nothing replaces the deck banner.
+- Rulings come from the Scryfall rulings bulk file with each card database update and are kept offline in the app (`/api/rulings/compact`).
 
 ## Decisions (0.5.0 Android app)
 
@@ -91,8 +108,13 @@ Devon said "build all of it now" for the seven proposals without a question roun
 | `apps/server/src/auth.ts` | Users, sessions (token hashes), prefs table, PBKDF2, rate limiter, cookie helpers |
 | `apps/server/src/index.ts` | Startup, environment variables, `-healthcheck` flag |
 | `apps/server/src/database.ts` | Schema and migrations: cards (finishes, promo, variation; prices and flavor_name in 0.3.0), sets, collections (kind), collection_cards (0.3.0 key with condition, language, trade; `upgradeCopies` rebuilds the 0.2.0 table), members, shares, decks.owner_id; `cardPricesStatement` |
-| `apps/server/src/backup.ts` | Backup version 3 per account (collections with kind, copies with finish, condition, language, trade, decks, deck cards, card records); versions 1 and 2 restore with defaults |
+| `apps/server/src/backup.ts` | Backup version 4 per account (proxy, copy details, deck collection, deck links); before that version 3 (collections with kind, copies with finish, condition, language, trade, decks, deck cards, card records); versions 1 and 2 restore with defaults |
 | `apps/server/src/collection-import.ts`, `deck-import.ts`, `card-search.ts`, `catalog-updater.ts`, `import-*.ts` | Import (condition, language, etched, tradelist counts, `nameMatch` for flavor and front face names), search (`usd`, `eur`, flavor names) and catalog logic; the bulk import stores prices and flavor names |
+| `apps/server/src/decks.ts` | Deck routes: list, create (id from the caller), rename and deck collection, cards with links and missing counts, link copies (`linkCopies`, switches printing), candidates |
+| `apps/server/src/links.ts` | Deck link helpers: `linkedCount`, `trimLinks`, `addLink`, `moveLinks`, `capDeckCardLinks`, `deckLinks`, `collectionLinks`, `touchDeckCollections` |
+| `apps/web/src/formats.ts` | Export formats (`EXPORT_FORMATS`, `exportText`) |
+| `apps/web/src/components/FileWindows.tsx`, `ContextMenu.tsx` | Import and Export windows; right-click and long-press row menus |
+| `apps/web/src/views/HomeView.tsx`, `CardPage.tsx` | Phone Home screen; card page (versions, rulings, card actions button) |
 | `apps/web/src/main.tsx` | Boot (`WebRoot`, or `AppRoot` with the app sign-in screen), keyboard shortcuts, desktop or phone shell, scanner, `useAppFeatures` (Back button, sync events, offers from notifications, update check) |
 | `apps/web/src/android/` | `platform.ts` (native plugin interface, settings, server address rules, Back button), `net.ts` (requests with the device token), `offline.ts` (copy, queue, local changes, sync), `catalog.ts` (card list, offline search and scan matching), `idb.ts`, `AppScreens.tsx` (sign-in screen, sync chip, Devices, Changes not applied, update check) |
 | `apps/server/src/mobile.ts` | Devices table and routes, `deviceUser`, CORS for https://localhost, `/api/sync`, `/api/sync/state`, `Revision`, `/api/catalog/compact` |
@@ -109,11 +131,11 @@ Devon said "build all of it now" for the seven proposals without a question roun
 | `apps/web/src/views/TradeView.tsx` | Trade list and trade calculator |
 | `apps/web/src/views/Views.tsx` | Card search (prices, tags, + Wishlist) and the deck view (Cards, Ownership, Statistics tabs) |
 | `apps/web/src/actions.tsx` | The `ACTIONS` map: every command with label, short label, icon, key; shortcut list; workspace list |
-| `apps/web/src/ribbon.ts` | `DEFAULT_RIBBON` (Trade tab added) and `MENUS` (Trade menu added) as data |
+| `apps/web/src/ribbon.ts` | `DEFAULT_RIBBON` (tabs Home, Collection, Decks, Trade, View, Help; groups with `context`), `RIBBON_MENUS` dropdowns, account and app menus |
 | `apps/web/src/dock.ts` | Panel registry, layout model, presets, move and remove operations |
 | `apps/web/src/prefs.ts` | Preference defaults (currency, collectionSort, collectionLayout), merge (ribbon reset on new version), save to server, theme |
 | `apps/web/src/icons.tsx` | `RI` inline SVG icon table (trade, stats, binder, edit, wish, copy, owned, usd, eur added) |
-| `apps/web/src/components/` | MenuBar, Ribbon, RibbonCustomize, Dock, StatusBar (PRICES toggle), Dialog, Shell (desktop and phone, Scan tab), About, CardScanner (camera with focus and torch, scanning loop and lock-on, last card strip, scanned list, edit and Add to dialogs) |
+| `apps/web/src/components/` | Ribbon (with TitleBar and DropDown), RibbonCustomize, Dock, StatusBar (PRICES toggle), Dialog, Shell (desktop and phone, Scan tab), About, CardScanner (camera with focus and torch, scanning loop and lock-on, last card strip, scanned list, edit and Add to dialogs) |
 | `apps/web/src/panels/Panels.tsx` | Filters, Collections (values, Wishlist badge), Decks, Card (prices, etched, wanted), Deck list, Import review panels |
 | `apps/web/src/about/` | About guide pages `01-overview.md` to `22-release-notes.md` (09 Prices and statistics and 10 Wishlists and trading added in 0.3.0, 16 Android app in 0.5.0) |
 | `apps/web/src/static.test.ts` | Static checks: guide order and links, release note version, every label in the guide, versions equal, no em dashes |
@@ -148,11 +170,10 @@ None known.
 - Main set needs Scryfall's printed size for each set; it arrives with the first card database update after 0.2.0. Prices and flavor names arrive with the first card database update after 0.3.0.
 - Undo history is per page load and reverses by sending the reverse change; a concurrent edit to the same card by someone else is overwritten by an undo.
 - The trade calculator is lost on page reload.
-- Deck ownership does not reserve copies between decks.
 - Imports up to 5 MB and 5,000 rows; backups up to 25 MB.
 - Card images load from Scryfall's servers.
 - The server serves the built files registered at startup; restart it after rebuilding the interface (Docker does this on every deploy).
 
 ## Where work stopped
 
-0.1.0 to 0.4.0 are merged to main. 0.5.0 (the Android app) is on branch `android-0.5.0`, pushed, in pull request #8 (not merged). The deployed server stays on 0.4.0 until it is merged and redeployed, and the app cannot connect to a 0.4.0 server (it refuses the app's cross-origin requests, so the app shows "No Mana Vault server answered at that address."). All checks pass (`PW_CHANNEL=chrome npm run test:all`: typecheck, server tests, web tests including the static checks, browser tests including 4 Android app tests), and a debug APK (`mana-vault-0.5.0-debug.apk`, signed with a debug key) was built in the workspace and sent to Devon for testing; the signed release APK will not install over it without uninstalling it first. Next: create the release key and the four repository secrets, merge, tag v0.5.0, install the APK on a phone and check scanning, notifications and offline use with real cards; then tune `sortLines` and the read areas from what fails.
+0.1.0 to 0.5.0 are merged to main. 0.6.0 (storage links, formats, scanner, ribbon, card page) is built on branch `features-0.6.0` and merged to main, so the GHCR image is published and Dockhand picks it up on its update schedule. All checks pass (`PW_CHANNEL=chrome npm run test:all`). The 0.6.0 debug APK comes from the `Android app` run on main and was sent to Devon; it is the first one signed with the shared debug key, so the 0.5.0 debug app must be uninstalled once before installing it. After deploying, run Update card database once to get rulings, power and toughness. Next: try the 0.6.0 app on a phone with real cards (scanner settings, printing picker, linked deck cards offline), then create the release key and the four repository secrets and tag a release.

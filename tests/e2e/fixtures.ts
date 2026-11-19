@@ -12,7 +12,7 @@ export async function signUp(page: Page, prefix = "user"): Promise<string> {
   await page.fill("#pw", "correct horse");
   await page.fill("#pw2", "correct horse");
   await page.locator("#go").click();
-  await page.waitForSelector("#menubar, #ptabs");
+  await page.waitForSelector("#titlebar, #ptabs");
   return name;
 }
 
@@ -50,7 +50,21 @@ export async function search(page: Page, text: string) {
   await expect(page.locator("#view-cards .phpos")).not.toHaveText("Searching");
 }
 
-export async function menu(page: Page, menuName: string, item: string) {
-  await page.locator("#menubar .menu", { hasText: menuName }).first().click();
-  await page.locator("#dropdown .dd", { hasText: item }).first().click();
+/** Runs a ribbon command by its label: the tab is named first, then the button, or the list button that holds it. */
+export async function menu(page: Page, tabName: string, item: string) {
+  await page.locator(".rtab", { hasText: tabName }).first().click();
+  const button = page.locator(`.rpanel [data-label="${item}"]`);
+  if (await button.count()) {
+    await button.first().click();
+    return;
+  }
+  const list = page.locator(".rpanel [data-labels]").filter({ has: page.locator(":scope") });
+  for (let index = 0; index < await list.count(); index++) {
+    const labels = (await list.nth(index).getAttribute("data-labels")) ?? "";
+    if (!labels.split("\n").includes(item)) continue;
+    await list.nth(index).dispatchEvent("mousedown");
+    await page.locator("#dropdown .dd", { hasText: item }).first().click();
+    return;
+  }
+  throw new Error(`No ribbon command "${item}" on the ${tabName} tab`);
 }

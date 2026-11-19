@@ -83,7 +83,9 @@ function useKeyboard(store: Store, actions: Record<string, Action>) {
         case "ArrowDown": event.preventDefault(); store.moveSelection(1); break;
         case "ArrowUp": event.preventDefault(); store.moveSelection(-1); break;
         case "Escape":
-          if (store.view === "about") store.closeAbout();
+          if (store.contextMenu) store.setContextMenu(null);
+          else if (store.cardPage) store.setCardPage(null);
+          else if (store.view === "about") store.closeAbout();
           else {
             store.select(null);
             store.setChecked(new Set());
@@ -108,7 +110,7 @@ function App({ user, prefs }: { user: User; prefs: Prefs }) {
     <StoreContext.Provider value={store}>
       {narrow ? <PhoneShell actions={actions} /> : <DesktopShell actions={actions} />}
       <DialogHost />
-      {store.scannerOpen && !narrow && <CardScanner onClose={() => store.setScannerOpen(false)} />}
+      {store.scannerOpen && !narrow && !store.cardPage && <CardScanner onClose={() => store.setScannerOpen(false)} />}
     </StoreContext.Provider>
   );
 }
@@ -129,9 +131,11 @@ function useAppFeatures(store: Store, actions: Record<string, Action>) {
       },
       leaveView: () => {
         const current = live.current;
-        if (current.scannerOpen) current.setScannerOpen(false);
+        if (current.contextMenu) current.setContextMenu(null);
+        else if (current.cardPage) current.setCardPage(null);
+        else if (current.scannerOpen) current.setScannerOpen(false);
         else if (current.view === "about") current.closeAbout();
-        else if (current.view !== "cards") current.setView("cards");
+        else if (current.view !== "home") current.setView("home");
         else return false;
         return true;
       },

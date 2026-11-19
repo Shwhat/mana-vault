@@ -132,7 +132,7 @@ export function watchBackButton(handlers: { closeDialog: () => boolean; leaveVie
   let handle: PluginListenerHandle | null = null;
   void native().addListener("backButton", () => {
     if (handlers.closeDialog()) return;
-    if (document.querySelector(".sheetwrap") || document.getElementById("dropdown")) {
+    if (document.querySelector(".sheetwrap, .scanpicker, .scansettings") || document.getElementById("dropdown") || document.getElementById("ctxmenu")) {
       window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
       return;
     }

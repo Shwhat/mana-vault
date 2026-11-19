@@ -4,12 +4,16 @@ import fastifyStatic from "@fastify/static";
 import { registerScanRoutes } from "./scan.js";
 import { fileURLToPath } from "node:url";
 import { assignUnowned, initializeDatabase, openDatabase, type CardRow } from "./database.js";
-import { importCollectionCsv } from "./collection-import.js";
+import { IMPORT_FORMATS, type ImportFormat, importCollectionCsv } from "./collection-import.js";
+
+const readImportFormat = (value: unknown): ImportFormat | undefined =>
+  (typeof value === "string" && value in IMPORT_FORMATS ? value as ImportFormat : undefined);
 import { importDecklist } from "./deck-import.js";
 import { createBackup, inspectBackup, restoreBackup } from "./backup.js";
 import { parseCardQuery } from "./card-search.js";
 import { type CatalogUpdateStatus } from "./catalog-updater.js";
 import { registerInsightRoutes } from "./insights.js";
+import { registerDeckRoutes } from "./decks.js";
 import { deviceUser, handleCrossOrigin, registerMobileRoutes, Revision } from "./mobile.js";
 import { access, createCollection, forgetItem, itemSharing, registerLibraryRoutes } from "./library.js";
 import {
@@ -145,6 +149,7 @@ export async function buildApp(
   });
 
   registerLibraryRoutes(app, database);
+  registerDeckRoutes(app, database);
   registerInsightRoutes(app, database);
   registerScanRoutes(app, database);
 
@@ -418,11 +423,12 @@ export async function buildApp(
     const userId = request.user!.id;
     const collections = database.prepare(
       `SELECT col.id, COALESCE(m.display_name, col.name) AS name, col.kind,
-              COALESCE(SUM(CASE WHEN i.card_id = ? AND i.foil = 0 THEN i.quantity END), 0) AS regular,
-              COALESCE(SUM(CASE WHEN i.card_id = ? AND i.foil = 1 THEN i.quantity END), 0) AS foil,
-              COALESCE(SUM(CASE WHEN i.card_id = ? AND i.foil = 2 THEN i.quantity END), 0) AS etched,
+              COALESCE(SUM(CASE WHEN i.card_id = ? AND i.foil = 0 AND i.proxy = 0 THEN i.quantity END), 0) AS regular,
+              COALESCE(SUM(CASE WHEN i.card_id = ? AND i.foil = 1 AND i.proxy = 0 THEN i.quantity END), 0) AS foil,
+              COALESCE(SUM(CASE WHEN i.card_id = ? AND i.foil = 2 AND i.proxy = 0 THEN i.quantity END), 0) AS etched,
+              COALESCE(SUM(CASE WHEN i.proxy = 1 THEN i.quantity END), 0) AS proxies,
               COALESCE(SUM(i.trade), 0) AS trade,
-              COALESCE(SUM(i.quantity), 0) AS all_printings
+              COALESCE(SUM(CASE WHEN i.proxy = 0 THEN i.quantity END), 0) AS all_printings
        FROM collections col
        LEFT JOIN members m ON m.kind = 'collection' AND m.item_id = col.id AND m.user_id = ?
        JOIN collection_cards i ON i.collection_id = col.id
@@ -431,232 +437,52 @@ export async function buildApp(
        GROUP BY col.id ORDER BY col.created_at, col.rowid`,
     ).all(card.id, card.id, card.id, userId, card.oracle_id, userId).map((row) => ({
       id: String(row.id), name: String(row.name), wishlist: row.kind === "wishlist", regular: Number(row.regular), foil: Number(row.foil),
-      etched: Number(row.etched), trade: Number(row.trade), allPrintings: Number(row.all_printings),
+      etched: Number(row.etched), proxies: Number(row.proxies), trade: Number(row.trade), allPrintings: Number(row.all_printings),
     }));
     // copies in wishlists are wanted, not owned
     const owned = collections.filter((item) => !item.wishlist);
-    const sum = (key: "regular" | "foil" | "etched" | "allPrintings") => owned.reduce((total, item) => total + item[key], 0);
+    const sum = (key: "regular" | "foil" | "etched" | "proxies" | "allPrintings") => owned.reduce((total, item) => total + item[key], 0);
     return {
       ...card,
-      owned: { regular: sum("regular"), foil: sum("foil"), etched: sum("etched"), allPrintings: sum("allPrintings"), collections: owned },
+      owned: { regular: sum("regular"), foil: sum("foil"), etched: sum("etched"), proxies: sum("proxies"), allPrintings: sum("allPrintings"), collections: owned },
       wanted: collections.filter((item) => item.wishlist),
       pricesUpdatedAt: String(database.prepare("SELECT value FROM catalog_metadata WHERE key = 'updated_at'").get()?.value ?? "") || null,
     };
   });
 
-  app.post<{ Params: { collectionId: string }; Body: string }>("/api/collections/:collectionId/import/preview", async (request, reply) => {
+  app.get<{ Params: { cardId: string } }>("/api/cards/:cardId/rulings", async (request, reply) => {
+    const card = database.prepare("SELECT oracle_id FROM cards WHERE id = ?").get(request.params.cardId);
+    if (!card) return reply.code(404).send({ error: "Card printing not found" });
+    return database.prepare("SELECT published_at, comment FROM rulings WHERE oracle_id = ? ORDER BY published_at, rowid")
+      .all(String(card.oracle_id)).map((row) => ({ date: String(row.published_at), text: String(row.comment) }));
+  });
+
+  app.post<{ Params: { collectionId: string }; Querystring: { format?: string }; Body: string }>("/api/collections/:collectionId/import/preview", async (request, reply) => {
     if (typeof request.body !== "string" || !request.body.trim()) {
-      return reply.code(400).send({ error: "Upload a non-empty CSV file" });
+      return reply.code(400).send({ error: "Upload a non-empty file" });
     }
     try {
-      return importCollectionCsv(database, request.body, false, request.params.collectionId);
+      return importCollectionCsv(database, request.body, false, request.params.collectionId, readImportFormat(request.query.format));
     } catch (error) {
       return reply.code(400).send({ error: error instanceof Error ? error.message : "Could not preview collection CSV" });
     }
   });
 
-  app.post<{ Params: { collectionId: string }; Body: string }>("/api/collections/:collectionId/import", async (request, reply) => {
+  app.post<{ Params: { collectionId: string }; Querystring: { format?: string }; Body: string }>("/api/collections/:collectionId/import", async (request, reply) => {
     if (typeof request.body !== "string" || !request.body.trim()) {
-      return reply.code(400).send({ error: "Upload a non-empty CSV file" });
+      return reply.code(400).send({ error: "Upload a non-empty file" });
     }
     try {
-      return importCollectionCsv(database, request.body, true, request.params.collectionId);
+      return importCollectionCsv(database, request.body, true, request.params.collectionId, readImportFormat(request.query.format));
     } catch (error) {
       return reply.code(400).send({ error: error instanceof Error ? error.message : "Could not import CSV" });
     }
   });
 
-  app.get("/api/decks", async (request) => {
-    const userId = request.user!.id;
-    return database.prepare(
-      `SELECT d.id, d.name, d.format, d.mode, d.created_at, d.updated_at,
-              COALESCE((SELECT SUM(quantity) FROM deck_cards WHERE deck_id = d.id), 0) AS card_count
-       FROM decks d
-       WHERE d.owner_id = ? OR EXISTS (SELECT 1 FROM members m WHERE m.kind = 'deck' AND m.item_id = d.id AND m.user_id = ?)
-       ORDER BY d.updated_at DESC, d.name`,
-    ).all(userId, userId).map((deck) => {
-      const sharing = itemSharing(database, "deck", String(deck.id), userId);
-      return { ...deck, name: sharing.displayName ?? deck.name, realName: deck.name, ...sharing };
-    });
-  });
-
-  app.patch<{ Params: { deckId: string }; Body: { name?: unknown } }>("/api/decks/:deckId", async (request, reply) => {
-    const name = typeof request.body?.name === "string" ? request.body.name.trim() : "";
-    if (!name || name.length > 100) return reply.code(400).send({ error: "Deck name must be between 1 and 100 characters" });
-    database.prepare("UPDATE decks SET name = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(name, request.params.deckId);
-    return { status: "renamed", name };
-  });
-
-  app.delete<{ Params: { deckId: string } }>("/api/decks/:deckId", async (request, reply) => {
-    const id = request.params.deckId;
-    if (access(database, "deck", id, request.user!.id)?.role !== "owner") {
-      return reply.code(403).send({ error: "Only the owner can delete a deck. Use Leave shared deck instead." });
-    }
-    database.exec("BEGIN");
-    try {
-      forgetItem(database, "deck", id);
-      database.prepare("DELETE FROM decks WHERE id = ?").run(id);
-      database.exec("COMMIT");
-    } catch (error) {
-      database.exec("ROLLBACK");
-      throw error;
-    }
-    return { status: "deleted" };
-  });
-
-  app.post<{ Body: { name?: string; format?: string; mode?: string } }>(
-    "/api/decks",
-    async (request, reply) => {
-      const { name, format = "casual", mode = "normal" } = request.body ?? {};
-      if (typeof name !== "string" || !name.trim() || name.trim().length > 100) {
-        return reply.code(400).send({ error: "Deck name must be between 1 and 100 characters" });
-      }
-      if (!["normal", "theme"].includes(mode)) {
-        return reply.code(400).send({ error: "Deck mode must be normal or theme" });
-      }
-      if (typeof format !== "string" || !["casual", "commander", "standard", "pioneer", "modern", "legacy", "pauper", "vintage"].includes(format)) {
-        return reply.code(400).send({ error: "Choose a supported deck format" });
-      }
-      const id = randomUUID();
-      database.prepare("INSERT INTO decks (id, name, format, mode, owner_id) VALUES (?, ?, ?, ?, ?)").run(id, name.trim(), format, mode, request.user!.id);
-      return reply.code(201).send(database.prepare(
-        `SELECT id, name, format, mode, created_at, updated_at FROM decks WHERE id = ?`,
-      ).get(id));
-    },
-  );
-
-  app.get<{ Params: { deckId: string } }>("/api/decks/:deckId", async (request, reply) => {
-    const deck = database.prepare(
-      `SELECT id, name, format, mode, created_at, updated_at FROM decks WHERE id = ?`,
-    ).get(request.params.deckId);
-    if (!deck) return reply.code(404).send({ error: "Deck not found" });
-    const cards = database.prepare(
-      `SELECT dc.id AS entry_id, c.id AS card_id, dc.oracle_id, dc.printing_id, dc.quantity, dc.zone, c.name, c.mana_cost,
-              c.type_line, c.set_code, c.set_name, c.collector_number, c.image_url
-       FROM deck_cards dc JOIN cards c ON c.id = COALESCE(
-         dc.printing_id,
-         (SELECT p.id FROM cards p WHERE p.oracle_id = dc.oracle_id ORDER BY p.released_at DESC LIMIT 1)
-       )
-       WHERE dc.deck_id = ? ORDER BY dc.zone, c.name`,
-    ).all(request.params.deckId);
-    const sharing = itemSharing(database, "deck", request.params.deckId, request.user!.id);
-    return { ...deck, ...sharing, name: sharing.displayName ?? deck.name, realName: deck.name, cards };
-  });
-
-  app.post<{ Params: { deckId: string }; Body: { cardId?: string; quantity?: number; zone?: string } }>(
-    "/api/decks/:deckId/cards",
-    async (request, reply) => {
-      const { cardId, quantity = 1, zone = "main" } = request.body ?? {};
-      if (!cardId || !Number.isInteger(quantity) || quantity < 1 || quantity > 100 || !["main", "sideboard", "commander"].includes(zone)) {
-        return reply.code(400).send({ error: "Provide a printing, quantity from 1 to 100, and a valid deck zone" });
-      }
-      const deck = database.prepare("SELECT id, mode FROM decks WHERE id = ?").get(request.params.deckId);
-      if (!deck) return reply.code(404).send({ error: "Deck not found" });
-      const card = database.prepare("SELECT id, oracle_id FROM cards WHERE id = ?").get(cardId);
-      if (!card) return reply.code(404).send({ error: "Card printing not found" });
-      if (typeof card.oracle_id !== "string") throw new Error("Card printing has no valid oracle ID");
-      const selectedPrinting = deck.mode === "theme" ? cardId : null;
-      const insert = selectedPrinting
-        ? database.prepare(
-          `INSERT INTO deck_cards (deck_id, oracle_id, printing_id, quantity, zone)
-           VALUES (?, ?, ?, ?, ?)
-           ON CONFLICT(deck_id, oracle_id, printing_id, zone) WHERE printing_id IS NOT NULL
-           DO UPDATE SET quantity = quantity + excluded.quantity`,
-        )
-        : database.prepare(
-          `INSERT INTO deck_cards (deck_id, oracle_id, printing_id, quantity, zone)
-           VALUES (?, ?, ?, ?, ?)
-           ON CONFLICT(deck_id, oracle_id, zone) WHERE printing_id IS NULL
-           DO UPDATE SET quantity = quantity + excluded.quantity`,
-        );
-      insert.run(request.params.deckId, card.oracle_id, selectedPrinting, quantity, zone);
-      database.prepare("UPDATE decks SET updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(request.params.deckId);
-      return reply.code(201).send({ status: "added" });
-    },
-  );
-
-  app.patch<{ Params: { deckId: string; oracleId: string }; Querystring: { zone?: string; entryId?: string }; Body: { quantity?: number; zone?: string } }>(
-    "/api/decks/:deckId/cards/:oracleId",
-    async (request, reply) => {
-      const currentZone = request.query.zone ?? "main";
-      const nextZone = request.body?.zone ?? currentZone;
-      const { quantity } = request.body ?? {};
-      if (
-        typeof quantity !== "number" ||
-        !Number.isInteger(quantity) ||
-        quantity < 0 ||
-        quantity > 100 ||
-        !["main", "sideboard", "commander"].includes(currentZone) ||
-        !["main", "sideboard", "commander"].includes(nextZone)
-      ) {
-        return reply.code(400).send({ error: "Provide a quantity from 0 to 100 and valid deck zones" });
-      }
-      const existing = request.query.entryId
-        ? database.prepare(
-          "SELECT id, oracle_id, printing_id FROM deck_cards WHERE deck_id = ? AND id = ?",
-        ).get(request.params.deckId, Number(request.query.entryId))
-        : database.prepare(
-          "SELECT id, oracle_id, printing_id FROM deck_cards WHERE deck_id = ? AND oracle_id = ? AND zone = ? LIMIT 1",
-        ).get(request.params.deckId, request.params.oracleId, currentZone);
-      if (!existing) return reply.code(404).send({ error: "Deck card not found" });
-      if (typeof existing.id !== "number" || typeof existing.oracle_id !== "string" ||
-        (existing.printing_id !== null && typeof existing.printing_id !== "string")) {
-        throw new Error("Deck card has invalid stored values");
-      }
-      if (quantity === 0) {
-        database.prepare("DELETE FROM deck_cards WHERE id = ?").run(existing.id);
-      } else if (currentZone === nextZone) {
-        database.prepare("UPDATE deck_cards SET quantity = ? WHERE id = ?").run(quantity, existing.id);
-      } else {
-        database.exec("BEGIN");
-        try {
-          const target = database.prepare(
-            `SELECT id FROM deck_cards
-             WHERE deck_id = ? AND oracle_id = ? AND zone = ? AND printing_id IS ?`,
-          ).get(request.params.deckId, existing.oracle_id, nextZone, existing.printing_id);
-          if (target && typeof target.id === "number") {
-            database.prepare("UPDATE deck_cards SET quantity = quantity + ? WHERE id = ?").run(quantity, target.id);
-            database.prepare("DELETE FROM deck_cards WHERE id = ?").run(existing.id);
-          } else {
-            database.prepare("UPDATE deck_cards SET quantity = ?, zone = ? WHERE id = ?")
-              .run(quantity, nextZone, existing.id);
-          }
-          database.exec("COMMIT");
-        } catch (error) {
-          database.exec("ROLLBACK");
-          throw error;
-        }
-      }
-      database.prepare("UPDATE decks SET updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(request.params.deckId);
-      return { status: quantity === 0 ? "removed" : "updated" };
-    },
-  );
-
-  app.delete<{ Params: { deckId: string; oracleId: string }; Querystring: { zone?: string; entryId?: string } }>(
-    "/api/decks/:deckId/cards/:oracleId",
-    async (request, reply) => {
-      const zone = request.query.zone ?? "main";
-      if (!["main", "sideboard", "commander"].includes(zone)) {
-        return reply.code(400).send({ error: "Invalid deck zone" });
-      }
-      const entry = request.query.entryId
-        ? database.prepare("SELECT id FROM deck_cards WHERE deck_id = ? AND id = ?")
-          .get(request.params.deckId, Number(request.query.entryId))
-        : database.prepare("SELECT id FROM deck_cards WHERE deck_id = ? AND oracle_id = ? AND zone = ? LIMIT 1")
-          .get(request.params.deckId, request.params.oracleId, zone);
-      const result = entry && typeof entry.id === "number"
-        ? database.prepare("DELETE FROM deck_cards WHERE id = ?").run(entry.id)
-        : { changes: 0 };
-      if (!result.changes) return reply.code(404).send({ error: "Deck card not found" });
-      database.prepare("UPDATE decks SET updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(request.params.deckId);
-      return { status: "removed" };
-    },
-  );
-
   return app;
 }
 
-function toCardRow(row: Record<string, unknown>): CardRow & { flavor_name: string | null; prices: Record<string, number | null> } {
+function toCardRow(row: Record<string, unknown>): CardRow & { flavor_name: string | null; power: string | null; toughness: string | null; prices: Record<string, number | null> } {
   const required = (key: string): string => {
     const value = row[key];
     if (typeof value !== "string") throw new Error(`Invalid card database value for ${key}`);
@@ -686,6 +512,8 @@ function toCardRow(row: Record<string, unknown>): CardRow & { flavor_name: strin
     released_at: optional("released_at"),
     artist: optional("artist"),
     flavor_name: optional("flavor_name"),
+    power: typeof row.power === "string" ? row.power : null,
+    toughness: typeof row.toughness === "string" ? row.toughness : null,
     prices: {
       usd: price(row.price_usd), usd_foil: price(row.price_usd_foil), usd_etched: price(row.price_usd_etched),
       eur: price(row.price_eur), eur_foil: price(row.price_eur_foil),
@@ -694,4 +522,4 @@ function toCardRow(row: Record<string, unknown>): CardRow & { flavor_name: strin
 }
 
 const price = (value: unknown) => (typeof value === "number" ? value : null);
-const CARD_PRICE_COLUMNS = "flavor_name, price_usd, price_usd_foil, price_usd_etched, price_eur, price_eur_foil";
+const CARD_PRICE_COLUMNS = "flavor_name, power, toughness, price_usd, price_usd_foil, price_usd_etched, price_eur, price_eur_foil";

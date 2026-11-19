@@ -1,11 +1,12 @@
 # Set completion
 
-A collection linked to one or more sets shows how much of each set it holds and which cards are still missing. Only cards in that collection count.
+A collection linked to one or more sets, with a completion rule other than None, shows how much of each set it holds and which cards are still missing. Only cards in that collection count, and proxies never count.
 
 ## Completion rules
 
 | Rule | Each set needs | Example |
 |---|---|---|
+| None (the default for new collections) | Nothing: the collection tracks no completion, for bulk cards. The Completion and Missing tabs are hidden | A box of bulk commons |
 | Main set | One copy of every numbered card printed in the set, from 1 up to the set's printed size | A set printed with 281 cards needs cards 1 to 281; showcase and extended-art versions numbered above 281 are not needed |
 | Every printing | One copy of every printing in the set, including variants, promos and versions with letters in the number | The same set might need 400 printings |
 | Each card name once | One copy of each different card in the set, in any of its versions from that set | A card with a regular and a borderless version in the set needs either one. A copy of the same card printed in a different set does not count |
@@ -46,11 +47,11 @@ The Missing tab lists every card still needed, with its image, mana cost, type, 
 - Narrow the list by set, rarity or color (Colorless lists cards with no color). The count shows how many of the missing cards are listed.
 - **+ Collection** on a row adds one copy of that printing to the open collection, as foil when a foil is needed and regular when a regular is needed. The list and the completion update at once.
 - Click a row to see the card in the Card panel.
-- **Add all to wishlist** (or **Add missing cards to wishlist** in the Collection menu and ribbon tab) adds one copy of every missing card to your wishlist, foil where a foil is needed, in one step that can be undone. It is not offered when the open collection is itself a wishlist. Etched copies count as foil for set completion.
+- **Add all to wishlist** (or **Add missing cards to wishlist** on the Collection ribbon tab) adds one copy of every missing card to your wishlist, foil where a foil is needed, in one step that can be undone. It is not offered when the open collection is itself a wishlist. Etched copies count as foil for set completion.
 
 ## Exporting the missing list
 
-**Export text** and **Export CSV** in the Missing tab, or **Export missing list (text)** and **Export missing list (CSV)** in the File menu and Collection ribbon tab, download every missing card of the open collection (filters are not applied):
+**Export...** in the Missing tab (**Export missing cards...**) opens the export window with Missing cards chosen; it downloads every missing card of the open collection (filters are not applied) in the chosen format, for example:
 
 | Format | File | Contents |
 |---|---|---|

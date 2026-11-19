@@ -125,8 +125,8 @@ describe("collections", () => {
       { cardId: "t1", foil: false, quantity: 2 }, { cardId: "t3", foil: true, quantity: 5 }, { cardId: "t4", foil: false, quantity: 1 },
     ] })).json().moved;
     expect(moved).toEqual([
-      { cardId: "t1", foil: 0, condition: "NM", language: "en", quantity: 2 },
-      { cardId: "t3", foil: 1, condition: "NM", language: "en", quantity: 1 },
+      { cardId: "t1", foil: 0, condition: "NM", language: "en", proxy: false, quantity: 2 },
+      { cardId: "t3", foil: 1, condition: "NM", language: "en", proxy: false, quantity: 1 },
     ]);
     const left = (await call("ann", "GET", `/api/collections/${a}/cards`)).json();
     expect(left.map((entry: { id: string; quantity: number }) => [entry.id, entry.quantity])).toEqual([["t1", 1], ["t2", 2]]);
@@ -146,8 +146,8 @@ describe("collections", () => {
     const owned = (await call("ann", "GET", "/api/cards/t1")).json().owned;
     expect(owned).toMatchObject({ regular: 2, foil: 0, allPrintings: 3 });
     expect(owned.collections).toEqual([
-      { id: a, name: "A", wishlist: false, regular: 2, foil: 0, etched: 0, trade: 0, allPrintings: 2 },
-      { id: b, name: "B", wishlist: false, regular: 0, foil: 0, etched: 0, trade: 0, allPrintings: 1 },
+      { id: a, name: "A", wishlist: false, regular: 2, foil: 0, etched: 0, proxies: 0, trade: 0, allPrintings: 2 },
+      { id: b, name: "B", wishlist: false, regular: 0, foil: 0, etched: 0, proxies: 0, trade: 0, allPrintings: 1 },
     ]);
   });
 });
@@ -195,8 +195,12 @@ describe("set completion", () => {
     await signUp("ann");
     const sets = (await call("ann", "GET", "/api/sets?q=test")).json();
     expect(sets).toMatchObject([{ code: "tst", name: "Test Set", printed_size: 3, printings: 5 }]);
-    await call("ann", "POST", "/api/collections", { name: "Set", sets: ["tst"] });
-    expect((await call("ann", "GET", "/api/collections")).json()[0].progress).toEqual({ owned: 0, total: 3 });
+    await call("ann", "POST", "/api/collections", { name: "Set", sets: ["tst"], completion: "main" });
+    await call("ann", "POST", "/api/collections", { name: "Bulk", sets: ["tst"] });
+    const list = (await call("ann", "GET", "/api/collections")).json() as Array<{ name: string; completion: string; progress: unknown }>;
+    expect(list.find((item) => item.name === "Set")!.progress).toEqual({ owned: 0, total: 3 });
+    // a new collection tracks no completion unless a rule is chosen
+    expect(list.find((item) => item.name === "Bulk")).toMatchObject({ completion: "none", progress: null });
   });
 });
 
@@ -320,7 +324,7 @@ describe("backups per account", () => {
     await call("ann", "POST", `/api/collections/${col}/cards`, { cardId: "t1", quantity: 2, foil: true });
     await call("bob", "POST", "/api/collections", { name: "Bob's" });
     const backup = (await call("ann", "GET", "/api/backup")).body;
-    expect(JSON.parse(backup)).toMatchObject({ version: 3, collections: [{ name: "Binder", sets: ["tst"], completion: "names", finish: "both" }] });
+    expect(JSON.parse(backup)).toMatchObject({ version: 4, collections: [{ name: "Binder", sets: ["tst"], completion: "names", finish: "both" }] });
     await call("ann", "DELETE", `/api/collections/${col}`);
     const raw = (url: string, user: string) => app.inject({
       method: "POST", url, payload: backup,

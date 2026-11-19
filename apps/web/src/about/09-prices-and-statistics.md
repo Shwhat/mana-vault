@@ -10,7 +10,7 @@ Prices are part of the card database. Each update stores Scryfall's prices for e
 
 **Prices** chooses the currency for every price and value on screen: US dollars or euros. The choice is kept for your account.
 
-- Change it with **Prices in US dollars** or **Prices in euros** (View menu, Database ribbon tab, group Prices: USD and EUR), with PRICES in the status bar, or with **Show in euros** or **Show in US dollars** on a Statistics tab.
+- Change it with **Prices in US dollars** or **Prices in euros** (the Currency list on the View ribbon tab), with PRICES in the status bar, or with **Show in euros** or **Show in US dollars** on a Statistics tab.
 - Values are never converted between currencies. A printing with a dollar price but no euro price has no value in euros.
 
 ## The price of a copy
@@ -30,8 +30,8 @@ Search results, which are not yet copies, show the regular price, or the foil pr
 | Row in a collection | Price of one copy times the count | 3 regular Lightning Bolt at $2.50 = $7.50 |
 | Collection | Sum of every row. Copies without a price add nothing | $7.50 + $900.00 for a Shivan Dragon = $907.50 |
 | Wishlist | The same sum, shown as the wanted value | |
-| Normal deck | Each card at its cheapest printing's price (regular, or foil when only foil exists), times the count | 4 Lightning Bolt, cheapest printing $2.50 = $10.00 |
-| Theme deck | Each card at its chosen printing's price, times the count | |
+| Proxy | No value. Proxies are left out of collection values, statistics and the trade list | |
+| Deck | Each card at its printing's price, times the count | 4 Lightning Bolt (M10) at $2.50 = $10.00 |
 | Cards to buy for a deck | Missing copies times the deck price above; see [Decks](/about/decks) | |
 
 Collection values appear in the Collections panel and the bar above the collection's rows. Deck values appear in the deck view header.
@@ -74,4 +74,3 @@ Each chart is a list of bars in one color. The figure at the end of each bar is 
 
 In a collection, clicking a bar (or pressing Enter on it) opens the Cards tab with only the matching rows, shown as a filter tag; see [Collections](/about/collections). Deck charts are not clickable.
 
-A Normal deck's statistics use the newest printing of each card for rarity and set, and the cheapest printing for value.

@@ -189,27 +189,53 @@ describe("wishlists", () => {
 });
 
 describe("deck ownership", () => {
-  it("counts any printing for normal decks and only the exact printing for theme decks, without counting a copy twice", async () => {
+  it("counts the copies linked to each deck card, each copy filling one deck card at a time", async () => {
     const { signUp, call } = await server();
     const main = await signUp("ann");
     const wish = (await call("ann", "POST", "/api/collections", { name: "Wants", kind: "wishlist" })).json().id;
     await call("ann", "PUT", `/api/collections/${main}/cards`, { items: [{ cardId: "o1", foil: 0, quantity: 3 }] });
     await call("ann", "PUT", `/api/collections/${wish}/cards`, { items: [{ cardId: "t2", foil: 0, quantity: 4 }] });
-    const normal = (await call("ann", "POST", "/api/decks", { name: "Normal", format: "casual", mode: "normal" })).json().id;
-    await call("ann", "POST", `/api/decks/${normal}/cards`, { cardId: "t1", quantity: 2, zone: "main" });
-    await call("ann", "POST", `/api/decks/${normal}/cards`, { cardId: "t1", quantity: 2, zone: "sideboard" });
-    await call("ann", "POST", `/api/decks/${normal}/cards`, { cardId: "t2", quantity: 1, zone: "main" });
-    const report = (await call("ann", "GET", `/api/decks/${normal}/ownership`)).json();
+    const deck = (await call("ann", "POST", "/api/decks", { name: "Deck", format: "casual" })).json().id;
+    const link = (quantity: number) => [{ collectionId: main, cardId: "o1", foil: 0, quantity }];
+    expect((await call("ann", "POST", `/api/decks/${deck}/cards`, { cardId: "t1", quantity: 2, zone: "main", links: link(2) })).json()).toMatchObject({ linked: 2 });
+    // only one copy is still free for the sideboard
+    expect((await call("ann", "POST", `/api/decks/${deck}/cards`, { cardId: "t1", quantity: 2, zone: "sideboard", links: link(2) })).json()).toMatchObject({ linked: 1 });
+    await call("ann", "POST", `/api/decks/${deck}/cards`, { cardId: "t2", quantity: 1, zone: "main" });
+    // wishlist cards are not owned
+    expect((await call("ann", "POST", `/api/decks/${deck}/cards`, { cardId: "t2", quantity: 1, zone: "main", links: [{ collectionId: wish, cardId: "t2", foil: 0 }] })).statusCode).toBe(400);
+    const report = (await call("ann", "GET", `/api/decks/${deck}/ownership`)).json();
     expect(report).toMatchObject({ needed: 5, owned: 3, missing: 2 });
-    const byZone = Object.fromEntries(report.entries.map((entry: { name: string; zone: string; owned: number }) => [`${entry.name}:${entry.zone}`, entry.owned]));
-    expect(byZone).toEqual({ "Bolt:main": 2, "Bolt:sideboard": 1, "Bear:main": 0 });
-    // the cheapest Bolt is 0.50 and Bear is 0.25
-    expect(report.missingValue).toBe(0.75);
-    expect(report.entries.find((entry: { name: string }) => entry.name === "Bolt").where).toEqual([{ id: main, name: "Main collection", quantity: 3 }]);
+    // a linked copy of another printing moves the deck card to that printing
+    const detail = (await call("ann", "GET", `/api/decks/${deck}`)).json();
+    const rows = detail.cards.map((card: { card_id: string; zone: string; quantity: number; missing: number }) => `${card.card_id}:${card.zone}:${card.quantity}:${card.missing}`).sort();
+    expect(rows).toEqual(["o1:main:2:0", "o1:sideboard:1:0", "t1:sideboard:1:1", "t2:main:1:1"]);
+    expect(detail.cards.find((card: { zone: string; card_id: string }) => card.card_id === "o1" && card.zone === "main").links[0]).toMatchObject({ collectionName: "Main collection", quantity: 2 });
+    // the collection shows which decks hold its copies
+    expect((await call("ann", "GET", `/api/collections/${main}/cards`)).json()[0].decks).toEqual([{ id: deck, name: "Deck", quantity: 3 }]);
+    // removing copies from the collection makes deck cards missing; moving keeps the links
+    const other = (await call("ann", "POST", "/api/collections", { name: "Box" })).json().id;
+    await call("ann", "POST", `/api/collections/${main}/move`, { to: other, items: [{ cardId: "o1", foil: 0, quantity: 3 }] });
+    expect((await call("ann", "GET", `/api/decks/${deck}/ownership`)).json()).toMatchObject({ owned: 3 });
+    expect((await call("ann", "GET", `/api/collections/${other}/cards`)).json()[0].decks).toEqual([{ id: deck, name: "Deck", quantity: 3 }]);
+    await call("ann", "PUT", `/api/collections/${other}/cards`, { items: [{ cardId: "o1", foil: 0, quantity: 1 }] });
+    expect((await call("ann", "GET", `/api/decks/${deck}/ownership`)).json()).toMatchObject({ owned: 1, missing: 4 });
+  });
 
-    const theme = (await call("ann", "POST", "/api/decks", { name: "Theme", format: "casual", mode: "theme" })).json().id;
-    await call("ann", "POST", `/api/decks/${theme}/cards`, { cardId: "t1", quantity: 1, zone: "main" });
-    expect((await call("ann", "GET", `/api/decks/${theme}/ownership`)).json()).toMatchObject({ owned: 0, missing: 1, missingValue: 2 });
+  it("lists free copies to link, and moves links when a copy's details change", async () => {
+    const { signUp, call } = await server();
+    const main = await signUp("ann");
+    await call("ann", "PUT", `/api/collections/${main}/cards`, { items: [{ cardId: "t1", foil: 0, quantity: 2 }, { cardId: "o1", foil: 1, quantity: 1 }] });
+    const deck = (await call("ann", "POST", "/api/decks", { name: "Deck" })).json().id;
+    const added = (await call("ann", "POST", `/api/decks/${deck}/cards`, { cardId: "t1", quantity: 1, links: [{ collectionId: main, cardId: "t1", foil: 0 }] })).json();
+    const candidates = (await call("ann", "GET", `/api/decks/${deck}/candidates?cardId=t1`)).json();
+    expect(candidates.map((item: { cardId: string; free: number }) => `${item.cardId}:${item.free}`)).toEqual(["t1:1", "o1:1"]);
+    // the edit of a copy (finish change) is sent as one count set to 0 and another raised: the link follows
+    await call("ann", "PUT", `/api/collections/${main}/cards`, { items: [{ cardId: "t1", foil: 0, quantity: 0 }, { cardId: "t1", foil: 1, quantity: 2 }] });
+    const card = (await call("ann", "GET", `/api/decks/${deck}`)).json().cards[0];
+    expect(card.links).toMatchObject([{ cardId: "t1", foil: 1, quantity: 1 }]);
+    // replacing the links
+    await call("ann", "PUT", `/api/decks/${deck}/entries/${added.entryId}/links`, { links: [] });
+    expect((await call("ann", "GET", `/api/decks/${deck}`)).json().cards[0].missing).toBe(1);
   });
 });
 
@@ -244,9 +270,9 @@ describe("statistics", () => {
     expect(stats.curve.find((bucket: { key: string }) => bucket.key === "7+").count).toBe(1);
     expect(stats.finish.map((bucket: { label: string }) => bucket.label)).toEqual(["Regular", "Foil"]);
     expect((await call("ann", "GET", `/api/collections/${main}/stats?currency=eur`)).json()).toMatchObject({ currency: "eur", value: 35.8 });
-    const deck = (await call("ann", "POST", "/api/decks", { name: "D", format: "casual", mode: "normal" })).json().id;
+    const deck = (await call("ann", "POST", "/api/decks", { name: "D", format: "casual" })).json().id;
     await call("ann", "POST", `/api/decks/${deck}/cards`, { cardId: "t1", quantity: 4, zone: "main" });
-    expect((await call("ann", "GET", `/api/decks/${deck}/stats`)).json()).toMatchObject({ cards: 4, value: 2 });
+    expect((await call("ann", "GET", `/api/decks/${deck}/stats`)).json()).toMatchObject({ cards: 4, value: 8 });
   });
 });
 
@@ -273,7 +299,7 @@ describe("backups", () => {
     await call("ann", "PUT", `/api/collections/${main}/cards`, { items: [{ cardId: "t1", foil: 2, condition: "HP", language: "de", quantity: 2, trade: 1 }] });
     const backup = (await call("ann", "GET", "/api/backup")).body;
     const parsed = JSON.parse(backup);
-    expect(parsed.version).toBe(3);
+    expect(parsed.version).toBe(4);
     expect(parsed.collectionCards[0]).toMatchObject({ foil: 2, condition: "HP", language: "de", trade: 1 });
     const headers = "application/vnd.mana-vault.backup+json";
     expect((await call("ann", "POST", "/api/backup/restore", backup, headers)).statusCode).toBe(200);

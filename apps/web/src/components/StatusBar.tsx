@@ -3,7 +3,7 @@ import type { Action } from "../actions";
 import { customDialog } from "./Dialog";
 import { useApp, zoneLabel } from "../store";
 
-const VIEW_NAMES = { cards: "Card search", collection: "Collection", deck: "Deck", trade: "Trade", about: "About" } as const;
+const VIEW_NAMES = { home: "Home", cards: "Card search", collection: "Collection", deck: "Deck", trade: "Trade", about: "About" } as const;
 
 export function StatusBar({ actions }: { actions: Record<string, Action> }) {
   const store = useApp();

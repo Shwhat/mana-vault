@@ -69,11 +69,12 @@ export function handleCrossOrigin(request: FastifyRequest, reply: FastifyReply):
 }
 
 type Change = { id: string; method: string; url: string; body?: unknown; base?: unknown };
-type ItemBase = { cardId: string; foil: number; condition?: string; language?: string; quantity: number };
+type ItemBase = { cardId: string; foil: number; condition?: string; language?: string; proxy?: boolean; quantity: number };
 
 const isRecord = (value: unknown): value is Record<string, unknown> => !!value && typeof value === "object" && !Array.isArray(value);
 const sameKey = (a: ItemBase, b: ItemBase) =>
-  a.cardId === b.cardId && Number(a.foil) === Number(b.foil) && (a.condition ?? "NM") === (b.condition ?? "NM") && (a.language ?? "en") === (b.language ?? "en");
+  a.cardId === b.cardId && Number(a.foil) === Number(b.foil) && (a.condition ?? "NM") === (b.condition ?? "NM") && (a.language ?? "en") === (b.language ?? "en") &&
+  !!a.proxy === !!b.proxy;
 
 /**
  * Offline count edits are sent as the count the phone saw (base) and the count it wants. The server applies the
@@ -85,12 +86,12 @@ function rebase(database: DatabaseSync, change: Change): unknown {
     const id = decodeURIComponent(collection[1]!);
     const base = change.base as ItemBase[];
     const current = database.prepare(
-      "SELECT quantity FROM collection_cards WHERE collection_id = ? AND card_id = ? AND foil = ? AND condition = ? AND language = ?",
+      "SELECT quantity FROM collection_cards WHERE collection_id = ? AND card_id = ? AND foil = ? AND condition = ? AND language = ? AND proxy = ?",
     );
     const items = (change.body.items as ItemBase[]).map((item) => {
       const seen = base.find((entry) => sameKey(entry, item));
       if (!seen || typeof item.quantity !== "number") return item;
-      const now = Number(current.get(id, item.cardId, Number(item.foil), item.condition ?? "NM", item.language ?? "en")?.quantity ?? 0);
+      const now = Number(current.get(id, item.cardId, Number(item.foil), item.condition ?? "NM", item.language ?? "en", item.proxy ? 1 : 0)?.quantity ?? 0);
       return { ...item, quantity: Math.max(0, Math.min(10_000, now + item.quantity - seen.quantity)) };
     });
     return { ...change.body, items };
@@ -154,7 +155,8 @@ export function registerMobileRoutes(app: FastifyInstance, database: DatabaseSyn
        WHERE s.to_user = ? AND s.status = 'pending' ORDER BY s.created_at DESC LIMIT 5`,
     ).all(me).map((row) => ({ id: String(row.id), kind: String(row.kind), itemName: String(row.item_name), mode: String(row.mode), createdAt: String(row.created_at), user: String(row.user_name) }));
     const catalog = database.prepare("SELECT value FROM catalog_metadata WHERE key = 'updated_at'").get()?.value ?? null;
-    return { revision: revision.value, inbox: Number(inbox?.count ?? 0), newestOffer: inbox?.newest ?? null, offers, catalog };
+    const rulings = database.prepare("SELECT value FROM catalog_metadata WHERE key = 'rulings_at'").get()?.value ?? null;
+    return { revision: revision.value, inbox: Number(inbox?.count ?? 0), newestOffer: inbox?.newest ?? null, offers, catalog, rulings };
   });
 
   app.post<{ Body: { changes?: unknown } }>("/api/sync", { bodyLimit: 5 * 1024 * 1024 }, async (request, reply) => {
@@ -215,11 +217,11 @@ export function registerMobileRoutes(app: FastifyInstance, database: DatabaseSyn
     if (compact?.stamp !== stamp) {
       const rows = database.prepare(
         `SELECT id, oracle_id, name, mana_cost, mana_value, type_line, colors, set_code, set_name, collector_number, rarity,
-                image_url, released_at, finishes, flavor_name, promo, variation
+                image_url, released_at, finishes, flavor_name, promo, variation, oracle_text, power, toughness
          FROM cards ORDER BY name, released_at DESC`,
       ).all();
       const fields = ["id", "oracle_id", "name", "mana_cost", "mana_value", "type_line", "colors", "set_code", "set_name", "collector_number",
-        "rarity", "image_url", "released_at", "finishes", "flavor_name", "promo", "variation"];
+        "rarity", "image_url", "released_at", "finishes", "flavor_name", "promo", "variation", "oracle_text", "power", "toughness"];
       const body = { version: stamp, fields, rows: rows.map((row) => fields.map((field) => row[field] ?? null)) };
       compact = { stamp, body: gzipSync(JSON.stringify(body)) };
     }
@@ -228,5 +230,24 @@ export function registerMobileRoutes(app: FastifyInstance, database: DatabaseSyn
     reply.header("etag", `"${stamp}"`);
     reply.header("cache-control", "no-cache");
     return reply.send(compact.body);
+  });
+
+  // every ruling, grouped by card, for the card page on the phone without a connection
+  let rulingsCache: CompactCache = null;
+  app.get("/api/rulings/compact", async (request, reply) => {
+    const stamp = String(database.prepare("SELECT value FROM catalog_metadata WHERE key = 'rulings_at'").get()?.value ?? "none");
+    if (request.headers["if-none-match"] === `"${stamp}"`) return reply.code(304).send();
+    if (rulingsCache?.stamp !== stamp) {
+      const grouped: Record<string, Array<[string, string]>> = {};
+      for (const row of database.prepare("SELECT oracle_id, published_at, comment FROM rulings ORDER BY oracle_id, published_at, rowid").all()) {
+        (grouped[String(row.oracle_id)] ??= []).push([String(row.published_at), String(row.comment)]);
+      }
+      rulingsCache = { stamp, body: gzipSync(JSON.stringify({ version: stamp, rulings: grouped })) };
+    }
+    reply.header("content-type", "application/json; charset=utf-8");
+    reply.header("content-encoding", "gzip");
+    reply.header("etag", `"${stamp}"`);
+    reply.header("cache-control", "no-cache");
+    return reply.send(rulingsCache.body);
   });
 }

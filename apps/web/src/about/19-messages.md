@@ -6,15 +6,16 @@ Messages appear at the right end of the status bar (on the phone, in a banner ab
 
 | Message | Shown after |
 |---|---|
-| Card name added to collection name (foil adds "(foil)") | Add to collection |
-| Card name added to Deck name (with the zone when not the main deck) | Add to deck |
+| Card name added to collection name (foil adds "(foil)", a proxy "(proxy)") | Add to collection, Add as proxy |
+| Card name added to Deck name (with the zone when not the main deck, and ", from collection name" when a copy was linked) | Add to deck |
+| Card name linked to collection names, or Card name is now missing | Link copies |
+| N rows exported | Export |
 | Card name removed from collection name | Removing a collection entry |
 | Removed N entries (M cards) from collection name | Remove selected |
 | Moved N cards to collection name | Moving cards |
 | New cards go to collection name | Changing the target collection |
 | Collection name created, or saved, or deleted | New collection, Collection settings, Delete collection |
 | You left name | Leaving a shared collection or deck |
-| Missing list exported (N cards) | Exporting a missing list |
 | Deck renamed to name, or Deck name deleted | Rename deck, Delete deck |
 | Sent to name. It is added when they accept it. | Sending a collection or deck |
 | Name accepted, or Name declined | Accepting or declining an offer |
@@ -27,7 +28,6 @@ Messages appear at the right end of the status bar (on the phone, in a banner ab
 | Cards are added as foil, or Cards are added as regular copies | Switching Add as foil |
 | New deck cards go to the main deck (or the sideboard, the commander) | Changing the target zone |
 | Imported N cards from M rows (into collection name for collections) | A collection or decklist import |
-| Collection name exported | Export collection |
 | Deck name exported as text, or as CSV | Export deck |
 | Backup downloaded | Download backup |
 | Backup restored | Restore backup |
@@ -54,7 +54,7 @@ Messages appear at the right end of the status bar (on the phone, in a banner ab
 | Message | Cause | What to do |
 |---|---|---|
 | Select a card first | Add was used with no card selected | Click a card in a list |
-| Open or create a deck first (Deck menu, Open deck or New deck) | Add to deck or Import decklist with no deck open | Open or create a deck |
+| Open or create a deck first | Add to deck or Import decklist with no deck open | Open or create a deck |
 | Open a deck first | Export deck with no deck open | Open a deck |
 | There are no decks yet. Use New deck to create one. | Open deck with no decks | Create a deck |
 | Enter a deck name | New deck with an empty name | Type a name |
@@ -63,7 +63,7 @@ Messages appear at the right end of the status bar (on the phone, in a banner ab
 | Name is a built-in workspace. Choose another name. | Saving under Search, Collection or Deck building | Use another name |
 | Type a name in the Name box first | Add or Rename in Customize ribbon with an empty Name box | Type the name, then choose Add or Rename |
 | Collection name is empty, so there is nothing to export | Export collection with no entries | Add cards first |
-| Create a collection first (Collection menu, New collection) | Adding, importing or exporting with no collection | Create a collection |
+| Create a collection first | Adding, importing or exporting with no collection | Create a collection |
 | Enter a collection name | New collection or Collection settings with an empty name | Type a name |
 | Pick one or more rows first | Remove selected or Move selected with no rows picked | Pick rows |
 | Create another collection to move cards into | Move with only one collection | Create a second collection |

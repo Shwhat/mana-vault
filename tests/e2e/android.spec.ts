@@ -58,7 +58,7 @@ async function synced(page: Page) {
     };
     open.onerror = () => resolve(false);
   })), { timeout: 15_000 }).toBe(true);
-  await expect(chip(page)).toHaveCount(0);
+  await expect(chip(page)).toHaveText(/^Synced/);
 }
 
 async function signUpOnPhone(page: Page, baseURL: string, prefix: string): Promise<string> {
@@ -79,20 +79,25 @@ async function signUpOnPhone(page: Page, baseURL: string, prefix: string): Promi
 }
 
 async function addFromSearch(page: Page, query: string, name: string) {
-  await page.locator(".ptab", { hasText: "Cards" }).click();
+  await page.locator(".ptab", { hasText: "Search" }).click();
   await page.getByRole("textbox", { name: "Search cards" }).fill(query);
   await page.locator("#view-cards .row", { hasText: name }).first().click();
-  await expect(page.locator(".sheet .ident")).toHaveText(name);
-  await page.locator(".sheet").getByRole("button", { name: "Add to collection" }).click();
+  await expect(page.locator(".cardpage h2")).toHaveText(name);
+  await page.getByRole("button", { name: "Card actions" }).click();
+  await page.locator(".fabmenu .pmrow", { hasText: "Add to collection" }).click();
   await expect(page.locator(".ptoast")).toHaveText(`${name} added to Main collection`);
-  await page.locator(".sheethead .btn").click();
+  await page.getByRole("button", { name: "Back" }).click();
 }
 
-async function serverCards(page: Page, baseURL: string): Promise<string[]> {
+const openMenu = (page: Page) => page.getByRole("button", { name: "Menu" }).click();
+
+async function serverCards(page: Page, baseURL: string, collection = "Main collection"): Promise<string[]> {
   const token = await page.evaluate(() => (JSON.parse(localStorage.getItem("test.native") ?? "{}") as { token: string }).token);
   const headers = { authorization: `Bearer ${token}` };
-  const collections = await (await page.request.get(`${baseURL}/api/collections`, { headers })).json() as Array<{ id: string }>;
-  const cards = await (await page.request.get(`${baseURL}/api/collections/${collections[0]!.id}/cards`, { headers })).json() as Array<{ name: string; quantity: number }>;
+  const collections = await (await page.request.get(`${baseURL}/api/collections`, { headers })).json() as Array<{ id: string; name: string }>;
+  const id = collections.find((item) => item.name === collection)?.id;
+  if (!id) return [];
+  const cards = await (await page.request.get(`${baseURL}/api/collections/${id}/cards`, { headers })).json() as Array<{ name: string; quantity: number }>;
   return cards.map((card) => `${card.quantity} ${card.name}`);
 }
 
@@ -102,7 +107,7 @@ test.describe("Android app", () => {
   test("signs in with a server address, works offline and sends the changes when back online", async ({ page, context, baseURL }) => {
     await fakePhone(page);
     await signUpOnPhone(page, baseURL!, "droid");
-    await expect(page.locator("#menubar")).toHaveCount(0);
+    await expect(page.locator("#titlebar")).toHaveCount(0);
     await addFromSearch(page, "Counterspell", "Counterspell");
 
     await context.setOffline(true);
@@ -114,14 +119,14 @@ test.describe("Android app", () => {
     await expect(page.locator("#view-collection .row", { hasText: "Shivan Dragon" }).first()).toBeVisible();
     await expect(page.locator("#view-collection .row", { hasText: "Counterspell" }).first()).toBeVisible();
     // things that need the server say so
-    await page.locator(".ptab", { hasText: "More" }).click();
+    await openMenu(page);
     await page.locator(".pmrow", { hasText: "Devices..." }).click();
     await expect(page.locator("#dlg")).toContainText("cannot be reached");
     await page.locator("#dlg .dlgbtns .btn").last().click();
 
     // the app syncs by itself when the connection returns
     await context.setOffline(false);
-    await expect(chip(page)).toHaveCount(0);
+    await expect(chip(page)).toHaveText(/^Synced/);
     expect((await serverCards(page, baseURL!)).sort()).toEqual(["1 Counterspell", "1 Shivan Dragon"]);
   });
 
@@ -129,31 +134,31 @@ test.describe("Android app", () => {
     await fakePhone(page);
     await signUpOnPhone(page, baseURL!, "back");
 
-    await page.locator(".ptab", { hasText: "More" }).click();
+    await openMenu(page);
     await expect(page.locator(".sheet")).toBeVisible();
     await fire(page, "backButton");
     await expect(page.locator(".sheet")).toHaveCount(0);
     await page.locator(".ptab", { hasText: "Decks" }).click();
     await fire(page, "backButton");
-    await expect(page.locator(".ptab.on")).toHaveText("Cards");
+    await expect(page.locator(".ptab.on")).toHaveText("Home");
     await fire(page, "backButton");
     expect(await calls(page)).toContainEqual(["minimize"]);
 
-    await page.locator(".ptab", { hasText: "More" }).click();
+    await openMenu(page);
     await page.locator(".pmrow", { hasText: "Devices..." }).click();
     await expect(page.locator(".devlist")).toContainText("Test Phone");
     await expect(page.locator(".devlist")).toContainText("This phone");
     await fire(page, "backButton");
     await expect(page.locator("#dlg[open]")).toHaveCount(0);
 
-    await page.locator(".ptab", { hasText: "More" }).click();
+    await openMenu(page);
     await page.locator(".pmrow", { hasText: "Notifications..." }).click();
     await page.getByLabel("Notify me about new offers in the Inbox").check();
     await page.locator("#dlg .dlgbtns .primary").click();
     await expect(page.locator(".ptoast")).toHaveText("Notifications on");
     expect(await calls(page)).toContainEqual(["notifications", { enabled: true, wifiOnly: false }]);
 
-    await page.locator(".ptab", { hasText: "More" }).click();
+    await openMenu(page);
     await page.locator(".pmrow", { hasText: "Sign out" }).click();
     await page.locator("#dlg .dlgbtns .primary").click();
     await expect(page.locator("#server")).toBeVisible();
@@ -175,7 +180,7 @@ test.describe("Android app", () => {
     await context.setOffline(false);
     await expect(page.locator("#dlg")).toContainText("Changes not applied");
     await expect(page.locator("#dlg")).toContainText("Add 1 Serra Angel to Main collection");
-    await expect(chip(page)).toHaveCount(0);
+    await expect(chip(page)).toHaveText(/^Synced/);
   });
 
   test("the scanner matches cards on the phone while offline", async ({ page, context, baseURL }) => {
@@ -195,12 +200,17 @@ test.describe("Android app", () => {
     await expect(page.locator(".scanlastname")).toContainText("Lightning Bolt");
     await page.getByRole("button", { name: "Scanned list", exact: true }).click();
     await expect(page.locator(".scansheet")).toContainText("M10 #146");
+    // a new collection can be made offline from Add to
     await page.getByRole("button", { name: "Add to..." }).click();
-    await page.locator(".dlgbtns .primary").click();
-    await expect(page.locator(".ptoast")).toHaveText("1 card added to Main collection");
-    await expect(chip(page).locator(".cbadge")).toHaveText("1");
+    await page.locator("#add-target").selectOption("collection:new-collection");
+    await page.locator("#add-name").fill("Offline box");
+    await page.locator("dialog[open]").getByRole("button", { name: "Add", exact: true }).click();
+    await expect(page.locator(".ptoast")).toHaveText("1 card added to Offline box");
+    await expect(chip(page).locator(".cbadge")).toHaveText("2");
+    // Sync now: tapping the chip
     await context.setOffline(false);
-    await expect(chip(page)).toHaveCount(0);
-    expect(await serverCards(page, baseURL!)).toEqual(["1 Lightning Bolt"]);
+    await chip(page).click();
+    await expect(chip(page)).toHaveText(/^Synced/);
+    expect(await serverCards(page, baseURL!, "Offline box")).toEqual(["1 Lightning Bolt"]);
   });
 });

@@ -11,20 +11,29 @@ const cardFields = [
 
 type BackupCard = Record<(typeof cardFields)[number], string | number | null>;
 type BackupCollection = {
-  id: string; name: string; description: string; completion: "main" | "all" | "names";
+  id: string; name: string; description: string; completion: "none" | "main" | "all" | "names";
   finish: "any" | "regular" | "foil" | "both"; kind: "collection" | "wishlist"; sets: string[]; created_at: string; updated_at: string;
 };
-type BackupCopy = { collection_id: string; card_id: string; quantity: number; foil: number; condition: string; language: string; trade: number };
+type BackupCopy = {
+  collection_id: string; card_id: string; quantity: number; foil: number; condition: string; language: string; trade: number;
+  proxy: number; purchase_price: number | null; price_currency: string | null; added_at: string | null; misprint: number; altered: number; signed: number;
+};
+type BackupLink = {
+  deck_id: string; printing_id: string; zone: string; collection_id: string; card_id: string; foil: number; condition: string; language: string;
+  proxy: number; quantity: number;
+};
 
 export interface ManaVaultBackup {
   format: "mana-vault-backup";
-  version: 3;
+  version: 4;
   createdAt: string;
   cards: BackupCard[];
   collections: BackupCollection[];
   collectionCards: BackupCopy[];
-  decks: Array<{ id: string; name: string; format: string; mode: "normal" | "theme"; created_at: string; updated_at: string }>;
+  decks: Array<{ id: string; name: string; format: string; mode: "normal" | "theme"; collection_id?: string | null; created_at: string; updated_at: string }>;
   deckCards: Array<{ deck_id: string; oracle_id: string; printing_id: string | null; quantity: number; zone: string }>;
+  /** Version 4: the collection copies that fill each deck card. */
+  deckLinks: BackupLink[];
 }
 
 export interface BackupSummary {
@@ -52,21 +61,26 @@ export function createBackup(database: DatabaseSync, userId: number): ManaVaultB
   ).all(userId, userId) as BackupCard[];
   return {
     format: "mana-vault-backup",
-    version: 3,
+    version: 4,
     createdAt: new Date().toISOString(),
     cards,
     collections,
     collectionCards: database.prepare(
-      `SELECT collection_id, card_id, quantity, foil, condition, language, trade FROM collection_cards
-       WHERE collection_id IN (SELECT id FROM collections WHERE owner_id = ?) ORDER BY collection_id, card_id, foil, condition, language`,
+      `SELECT collection_id, card_id, quantity, foil, condition, language, trade, proxy, purchase_price, price_currency, added_at, misprint, altered, signed
+       FROM collection_cards WHERE collection_id IN (SELECT id FROM collections WHERE owner_id = ?) ORDER BY collection_id, card_id, foil, condition, language, proxy`,
     ).all(userId) as ManaVaultBackup["collectionCards"],
     decks: database.prepare(
-      "SELECT id, name, format, mode, created_at, updated_at FROM decks WHERE owner_id = ? ORDER BY id",
+      "SELECT id, name, format, mode, collection_id, created_at, updated_at FROM decks WHERE owner_id = ? ORDER BY id",
     ).all(userId) as ManaVaultBackup["decks"],
     deckCards: database.prepare(
       `SELECT deck_id, oracle_id, printing_id, quantity, zone FROM deck_cards
        WHERE deck_id IN (SELECT id FROM decks WHERE owner_id = ?) ORDER BY deck_id, zone, oracle_id`,
     ).all(userId) as ManaVaultBackup["deckCards"],
+    deckLinks: database.prepare(
+      `SELECT dc.deck_id, dc.printing_id, dc.zone, l.collection_id, l.card_id, l.foil, l.condition, l.language, l.proxy, l.quantity
+       FROM deck_links l JOIN deck_cards dc ON dc.id = l.deck_card_id JOIN decks d ON d.id = dc.deck_id JOIN collections col ON col.id = l.collection_id
+       WHERE d.owner_id = ? AND col.owner_id = ? AND dc.printing_id IS NOT NULL ORDER BY l.id`,
+    ).all(userId, userId) as BackupLink[],
   };
 }
 
@@ -108,28 +122,45 @@ export function restoreBackup(database: DatabaseSync, source: string, userId: nu
       for (const code of collection.sets) if (knownSets.has(code)) insertSet.run(id, code);
     }
     const insertCollectionCard = database.prepare(
-      `INSERT INTO collection_cards (collection_id, card_id, quantity, foil, condition, language, trade) VALUES (?, ?, ?, ?, ?, ?, ?)
-       ON CONFLICT(collection_id, card_id, foil, condition, language) DO UPDATE SET quantity = MIN(10000, quantity + excluded.quantity),
+      `INSERT INTO collection_cards (collection_id, card_id, quantity, foil, condition, language, trade, proxy, purchase_price, price_currency, added_at, misprint, altered, signed)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(collection_id, card_id, foil, condition, language, proxy) DO UPDATE SET quantity = MIN(10000, quantity + excluded.quantity),
          trade = MIN(MIN(10000, quantity + excluded.quantity), trade + excluded.trade)`,
     );
     for (const item of backup.collectionCards) {
       insertCollectionCard.run(collectionIds.get(item.collection_id)!, item.card_id, Math.min(10_000, item.quantity), item.foil, item.condition, item.language,
-        Math.min(10_000, item.trade));
+        Math.min(10_000, item.trade), item.proxy, item.purchase_price, item.price_currency, item.added_at, item.misprint, item.altered, item.signed);
     }
     const deckIds = new Map<string, string>();
     const insertDeck = database.prepare(
-      "INSERT INTO decks (id, owner_id, name, format, mode, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      "INSERT INTO decks (id, owner_id, name, format, mode, collection_id, created_at, updated_at) VALUES (?, ?, ?, ?, 'theme', ?, ?, ?)",
     );
     for (const deck of backup.decks) {
       const id = randomUUID();
       deckIds.set(deck.id, id);
-      insertDeck.run(id, userId, deck.name, deck.format, deck.mode, deck.created_at, deck.updated_at);
+      insertDeck.run(id, userId, deck.name, deck.format, deck.collection_id ? collectionIds.get(deck.collection_id) ?? null : null, deck.created_at, deck.updated_at);
     }
+    // a deck card without a printing (Normal decks before 0.6.0) takes the newest printing of the card
+    const newest = database.prepare("SELECT id FROM cards WHERE oracle_id = ? ORDER BY released_at IS NULL, released_at DESC, promo, variation LIMIT 1");
     const insertDeckCard = database.prepare(
-      "INSERT INTO deck_cards (deck_id, oracle_id, printing_id, quantity, zone) VALUES (?, ?, ?, ?, ?)",
+      `INSERT INTO deck_cards (deck_id, oracle_id, printing_id, quantity, zone) VALUES (?, ?, ?, ?, ?)
+       ON CONFLICT(deck_id, oracle_id, printing_id, zone) WHERE printing_id IS NOT NULL DO UPDATE SET quantity = quantity + excluded.quantity`,
     );
     for (const card of backup.deckCards) {
-      insertDeckCard.run(deckIds.get(card.deck_id)!, card.oracle_id, card.printing_id, card.quantity, card.zone);
+      const printing = card.printing_id ?? (newest.get(card.oracle_id)?.id as string | undefined) ?? null;
+      if (printing) insertDeckCard.run(deckIds.get(card.deck_id)!, card.oracle_id, printing, card.quantity, card.zone);
+      else database.prepare("INSERT INTO deck_cards (deck_id, oracle_id, printing_id, quantity, zone) VALUES (?, ?, NULL, ?, ?)").run(deckIds.get(card.deck_id)!, card.oracle_id, card.quantity, card.zone);
+    }
+    const deckCardOf = database.prepare("SELECT id FROM deck_cards WHERE deck_id = ? AND printing_id = ? AND zone = ?");
+    const insertLink = database.prepare(
+      `INSERT INTO deck_links (deck_card_id, collection_id, card_id, foil, condition, language, proxy, quantity) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(deck_card_id, collection_id, card_id, foil, condition, language, proxy) DO UPDATE SET quantity = quantity + excluded.quantity`,
+    );
+    for (const link of backup.deckLinks) {
+      const deckId = deckIds.get(link.deck_id);
+      const collectionId = collectionIds.get(link.collection_id);
+      const card = deckId ? deckCardOf.get(deckId, link.printing_id, link.zone) : undefined;
+      if (card && collectionId) insertLink.run(Number(card.id), collectionId, link.card_id, link.foil, link.condition, link.language, link.proxy, link.quantity);
     }
     database.exec("COMMIT");
   } catch (error) {
@@ -160,7 +191,7 @@ function summarizeBackup(backup: ManaVaultBackup): BackupSummary {
 }
 
 function validateBackup(value: unknown): ManaVaultBackup {
-  if (!isRecord(value) || value.format !== "mana-vault-backup" || ![1, 2, 3].includes(Number(value.version))) {
+  if (!isRecord(value) || value.format !== "mana-vault-backup" || ![1, 2, 3, 4].includes(Number(value.version))) {
     throw new Error("Unsupported backup file format or version");
   }
   if (typeof value.createdAt !== "string" || !Number.isFinite(Date.parse(value.createdAt))) {
@@ -208,10 +239,10 @@ function validateBackup(value: unknown): ManaVaultBackup {
     return result;
   });
   const collections: BackupCollection[] = legacy && rawCollectionCards.length
-    ? [{ id: "legacy", name: "Main collection", description: "", completion: "main", finish: "any", kind: "collection", sets: [], created_at: value.createdAt, updated_at: value.createdAt }]
+    ? [{ id: "legacy", name: "Main collection", description: "", completion: "none", finish: "any", kind: "collection", sets: [], created_at: value.createdAt, updated_at: value.createdAt }]
     : rawCollections.map((entry: unknown, index: number) => {
       if (!isRecord(entry) || typeof entry.id !== "string" || !entry.id || typeof entry.name !== "string" || !entry.name.trim() ||
-        typeof entry.description !== "string" || !["main", "all", "names"].includes(String(entry.completion)) ||
+        typeof entry.description !== "string" || !["none", "main", "all", "names"].includes(String(entry.completion)) ||
         !["any", "regular", "foil", "both"].includes(String(entry.finish)) || !Array.isArray(entry.sets) ||
         !entry.sets.every((code) => typeof code === "string" && /^[a-z0-9]{2,8}$/.test(code)) ||
         typeof entry.created_at !== "string" || typeof entry.updated_at !== "string" ||
@@ -231,9 +262,13 @@ function validateBackup(value: unknown): ManaVaultBackup {
       !condition || !language || typeof trade !== "number" || !Number.isInteger(trade) || trade < 0 || trade > entry.quantity) {
       throw new Error(`Backup collection entry ${index + 1} is invalid`);
     }
+    // backups before version 4 have no proxies or copy details
+    const text = (field: string) => (typeof entry[field] === "string" ? entry[field] as string : null);
+    const flag = (field: string) => (entry[field] === 1 || entry[field] === true ? 1 : 0);
     return {
       collection_id: legacy ? "legacy" : String(entry.collection_id), card_id: entry.card_id, quantity: entry.quantity, foil: entry.foil,
-      condition, language, trade,
+      condition, language, trade, proxy: flag("proxy"), purchase_price: typeof entry.purchase_price === "number" ? entry.purchase_price : null,
+      price_currency: text("price_currency"), added_at: text("added_at"), misprint: flag("misprint"), altered: flag("altered"), signed: flag("signed"),
     };
   });
   const decks = value.decks.map((entry, index) => {
@@ -257,6 +292,14 @@ function validateBackup(value: unknown): ManaVaultBackup {
   const cardsById = new Map(cards.map((card) => [card.id, card]));
   const oracleIds = new Set(cards.map((card) => card.oracle_id));
   const deckModes = new Map(decks.map((deck) => [deck.id, deck.mode]));
+  const deckLinks = (Array.isArray(value.deckLinks) ? value.deckLinks : []).map((entry: unknown, index: number) => {
+    if (!isRecord(entry) || typeof entry.deck_id !== "string" || typeof entry.printing_id !== "string" || typeof entry.zone !== "string" ||
+      typeof entry.collection_id !== "string" || typeof entry.card_id !== "string" || ![0, 1, 2].includes(Number(entry.foil)) ||
+      typeof entry.condition !== "string" || typeof entry.language !== "string" || !validPositiveInteger(entry.quantity)) {
+      throw new Error(`Backup deck link ${index + 1} is invalid`);
+    }
+    return { ...entry, foil: Number(entry.foil), proxy: entry.proxy === 1 ? 1 : 0 } as BackupLink;
+  });
   if (cardsById.size !== cards.length) throw new Error("Backup contains duplicate card records");
   if (new Set(decks.map((deck) => deck.id)).size !== decks.length) throw new Error("Backup contains duplicate decks");
   const collectionIds = new Set(collections.map((item) => item.id));
@@ -276,13 +319,14 @@ function validateBackup(value: unknown): ManaVaultBackup {
   }
   return {
     format: "mana-vault-backup",
-    version: 3,
+    version: 4,
     createdAt: value.createdAt,
     cards,
     collections,
     collectionCards,
     decks,
     deckCards,
+    deckLinks,
   };
 }
 

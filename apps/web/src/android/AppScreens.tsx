@@ -1,4 +1,5 @@
 // ---------- screens and windows that only the Android app has ----------
+import { Icon } from "../icons";
 import { useEffect, useState, type FormEvent } from "react";
 import { APP_VERSION } from "../api";
 import { customDialog } from "../components/Dialog";
@@ -108,7 +109,6 @@ export function AppSignIn({ onDone }: { onDone: () => void }) {
             <>
               <label htmlFor="pw2">Repeat password</label>
               <input id="pw2" type="password" value={repeat} onChange={(event) => setRepeat(event.target.value)} autoComplete="new-password" required />
-              <p className="note">At least 8 characters.</p>
             </>
           )}
           <button type="submit" className="btn primary go" disabled={busy}>{mode === "up" ? "Create account" : "Sign in"}</button>
@@ -135,14 +135,24 @@ export function useSyncStatus(): SyncStatus {
   return status;
 }
 
-/** Online, Offline (with the number of waiting changes) or Syncing, shown in the app's top bar. */
+/** Always shown in the app's top bar: Synced with the time of the last sync, Waiting, Offline or Syncing. Tapping it syncs now. */
 export function SyncChip() {
   const status = useSyncStatus();
-  if (status.state === "online" && !status.pending) return null;
-  const label = status.state === "syncing" ? "Syncing" : status.state === "offline" ? "Offline" : "Waiting";
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const timer = window.setInterval(() => setTick((value) => value + 1), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
+  const ago = (at: number | null) => {
+    if (!at) return "";
+    const minutes = Math.floor((Date.now() - at) / 60_000);
+    return minutes < 1 ? "now" : minutes < 60 ? `${minutes}m` : `${Math.floor(minutes / 60)}h`;
+  };
+  const label = status.state === "syncing" ? "Syncing" : status.state === "offline" ? "Offline" : status.pending ? "Waiting" : `Synced ${ago(status.lastSync)}`.trim();
   return (
-    <button type="button" className={`pbtn syncchip ${status.state}`} onClick={() => { void syncNow(); }}>
-      {label}{status.pending > 0 && <span className="cbadge">{status.pending}</span>}
+    <button type="button" className={`pbtn syncchip ${status.state}${status.error ? " warn" : ""}`} title={status.error ?? "Sync now"} aria-label={`${label}. Sync now`}
+      onClick={() => { void syncNow(true); }}>
+      <Icon name="sync" />{label}{status.pending > 0 && <span className="cbadge">{status.pending}</span>}
     </button>
   );
 }
@@ -150,7 +160,6 @@ export function SyncChip() {
 export function showSyncProblems(problems: SyncProblem[]) {
   customDialog("Changes not applied", () => (
     <div>
-      <p className="note">The server did not take these changes made on this phone. The phone now shows the server's version.</p>
       <ul className="synclist">
         {problems.map((problem, index) => <li key={index}><b>{problem.label}</b><span>{problem.error}</span></li>)}
       </ul>
@@ -187,7 +196,7 @@ export function DeviceList() {
   };
   if (error) return <p className="note err">{error}</p>;
   if (!devices) return <p className="note">Loading</p>;
-  if (!devices.length) return <p className="note">No phones are signed in to this account.</p>;
+  if (!devices.length) return <p className="note">No phones signed in</p>;
   return (
     <table className="devlist">
       <thead><tr><th>Device</th><th>Last seen</th><th /></tr></thead>

@@ -2,7 +2,8 @@
 import type { FastifyInstance } from "fastify";
 import type { DatabaseSync } from "node:sqlite";
 import { type Currency, priceSql, readCurrency } from "./copies.js";
-import { ENTRY_COLUMNS } from "./library.js";
+import { ENTRY_COLUMNS, toEntry } from "./library.js";
+import { deckLinks } from "./links.js";
 
 export type Bucket = { key: string; label: string; count: number; value: number };
 type StatRow = {
@@ -135,52 +136,36 @@ function deckRows(database: DatabaseSync, deckId: string, currency: Currency) {
 }
 
 /**
- * Which deck cards the account owns. Copies in any of its collections (its own and shared with it, not wishlists) count.
- * Normal decks take any printing of a card, Theme decks only the exact printing. Copies are given out in the order
- * commander, main deck, sideboard, so one copy never counts twice.
+ * Which deck cards the account owns: the copies linked to each deck card. A copy fills one deck at a time, and proxies
+ * fill a slot like any copy. Cards with no linked copy are missing.
  */
 export function deckOwnership(database: DatabaseSync, deckId: string, userId: number, currency: Currency) {
-  const mode = String(database.prepare("SELECT mode FROM decks WHERE id = ?").get(deckId)?.mode ?? "normal");
   const rows = deckRows(database, deckId, currency);
-  const copies = database.prepare(
-    `SELECT i.card_id, c.oracle_id, col.id AS collection_id, COALESCE(m.display_name, col.name) AS name, SUM(i.quantity) AS quantity
-     FROM collection_cards i JOIN cards c ON c.id = i.card_id JOIN collections col ON col.id = i.collection_id
-     LEFT JOIN members m ON m.kind = 'collection' AND m.item_id = col.id AND m.user_id = ?
-     WHERE (col.owner_id = ? OR m.user_id IS NOT NULL) AND col.kind = 'collection'
-       AND c.oracle_id IN (SELECT oracle_id FROM deck_cards WHERE deck_id = ?)
-     GROUP BY i.card_id, col.id ORDER BY col.created_at, col.rowid`,
-  ).all(userId, userId, deckId);
-  const pool = new Map<string, number>();
-  const places = new Map<string, Map<string, { id: string; name: string; quantity: number }>>();
-  for (const copy of copies) {
-    const key = mode === "theme" ? String(copy.card_id) : String(copy.oracle_id);
-    pool.set(key, (pool.get(key) ?? 0) + Number(copy.quantity));
-    const where = places.get(key) ?? new Map();
-    const place = where.get(String(copy.collection_id)) ?? { id: String(copy.collection_id), name: String(copy.name), quantity: 0 };
-    place.quantity += Number(copy.quantity);
-    where.set(place.id, place);
-    places.set(key, where);
-  }
+  const links = deckLinks(database, deckId, userId);
   let missingValue = 0;
   let unpriced = 0;
   const entries = rows.map((row) => {
-    const key = mode === "theme" ? row.printing_id ?? row.card_id : row.oracle_id;
-    const left = pool.get(key) ?? 0;
-    const owned = Math.min(left, row.quantity);
-    pool.set(key, left - owned);
+    const list = links.get(row.entry_id) ?? [];
+    const owned = Math.min(row.quantity, list.reduce((sum, link) => sum + link.quantity, 0));
     const missing = row.quantity - owned;
     if (missing) {
       if (row.price === null) unpriced += missing;
       else missingValue += row.price * missing;
     }
+    const places = new Map<string, { id: string; name: string; quantity: number }>();
+    for (const link of list) {
+      const place = places.get(link.collectionId) ?? { id: link.collectionId, name: link.collectionName, quantity: 0 };
+      place.quantity += link.quantity;
+      places.set(link.collectionId, place);
+    }
     return {
       entryId: row.entry_id, cardId: row.card_id, name: row.name, zone: row.zone, needed: row.quantity, owned, missing, price: row.price,
-      where: [...(places.get(key)?.values() ?? [])],
+      proxies: list.filter((link) => link.proxy).reduce((sum, link) => sum + link.quantity, 0), where: [...places.values()],
     };
   });
   const needed = entries.reduce((sum, entry) => sum + entry.needed, 0);
   const owned = entries.reduce((sum, entry) => sum + entry.owned, 0);
-  return { mode, currency, needed, owned, missing: needed - owned, missingValue: round(missingValue), unpriced, entries };
+  return { mode: "theme", currency, needed, owned, missing: needed - owned, missingValue: round(missingValue), unpriced, entries };
 }
 
 export function registerInsightRoutes(app: FastifyInstance, database: DatabaseSync) {
@@ -190,7 +175,7 @@ export function registerInsightRoutes(app: FastifyInstance, database: DatabaseSy
     const currency = readCurrency(request.query.currency);
     const rows = database.prepare(
       `SELECT c.name, i.quantity, i.foil, c.rarity, c.colors, c.type_line, c.mana_value, c.set_code, c.set_name, ${priceSql(currency)} AS price
-       FROM collection_cards i JOIN cards c ON c.id = i.card_id WHERE i.collection_id = ?`,
+       FROM collection_cards i JOIN cards c ON c.id = i.card_id WHERE i.collection_id = ? AND i.proxy = 0`,
     ).all(request.params.collectionId).map((row) => ({
       name: String(row.name), quantity: Number(row.quantity), foil: Number(row.foil), rarity: String(row.rarity), colors: String(row.colors),
       type_line: String(row.type_line), mana_value: typeof row.mana_value === "number" ? row.mana_value : null, set_code: String(row.set_code),
@@ -212,7 +197,7 @@ export function registerInsightRoutes(app: FastifyInstance, database: DatabaseSy
   app.get("/api/trade", async (request) => database.prepare(
     `SELECT ${ENTRY_COLUMNS}, col.id AS collection_id, col.name AS collection_name
      FROM collection_cards i JOIN cards c ON c.id = i.card_id JOIN collections col ON col.id = i.collection_id
-     WHERE col.owner_id = ? AND col.kind = 'collection' AND i.trade > 0
+     WHERE col.owner_id = ? AND col.kind = 'collection' AND i.trade > 0 AND i.proxy = 0
      ORDER BY c.name, c.set_code, c.collector_number, col.created_at`,
-  ).all(request.user!.id));
+  ).all(request.user!.id).map(toEntry));
 }
