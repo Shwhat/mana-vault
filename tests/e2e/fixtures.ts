@@ -2,8 +2,11 @@ import { test as base, expect, type Page } from "@playwright/test";
 
 let counter = 0;
 
-/** Creates a new account through the sign-in page and waits for the app. */
-export async function signUp(page: Page, prefix = "user"): Promise<string> {
+/**
+ * Creates a new account through the sign-in page and waits for the app. New accounts show collections as a grid;
+ * most tests work with rows, so the list layout is chosen unless `grid` is set.
+ */
+export async function signUp(page: Page, prefix = "user", grid = false): Promise<string> {
   counter += 1;
   const name = `${prefix}${Date.now().toString(36)}${counter}`;
   await page.goto("/login");
@@ -13,7 +16,22 @@ export async function signUp(page: Page, prefix = "user"): Promise<string> {
   await page.fill("#pw2", "correct horse");
   await page.locator("#go").click();
   await page.waitForSelector("#titlebar, #ptabs");
+  if (!grid) {
+    // the app saves its preferences once it has loaded the collections; the change is made after that
+    await expect.poll(async () => (await (await page.request.get("/api/prefs")).json()).openCollection ?? null).not.toBeNull();
+    const prefs = await (await page.request.get("/api/prefs")).json();
+    await page.request.put("/api/prefs", { headers: { "x-mana-vault": "1" }, data: { ...prefs, collectionLayout: "list", collectionLayoutPhone: "list" } });
+    await page.reload();
+    await page.waitForSelector("#titlebar, #ptabs");
+  }
   return name;
+}
+
+/** Opens a collection or deck with the switcher: its button, then the name in the list. */
+export async function switchTo(page: Page, kind: "collection" | "deck", name: string) {
+  await page.locator(`#view-${kind} .switcher`).first().click();
+  await page.locator(".swpop input").fill(name);
+  await page.locator(".swrow", { hasText: name }).first().click();
 }
 
 /** Any page error or console error fails the test. */
@@ -67,4 +85,10 @@ export async function menu(page: Page, tabName: string, item: string) {
     return;
   }
   throw new Error(`No ribbon command "${item}" on the ${tabName} tab`);
+}
+
+/** Applies a workspace from the list at the end of the ribbon tabs. */
+export async function useWorkspace(page: Page, name: string) {
+  await page.locator(".wsbox .wsbtn").dispatchEvent("mousedown");
+  await page.locator("#dropdown .dd", { hasText: name }).first().click();
 }

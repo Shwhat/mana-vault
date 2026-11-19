@@ -21,12 +21,12 @@ The data folder can also hold default-cards.json, the last downloaded card catal
 |---|---|
 | Collections | Every collection you own, with its name, description, completion rule, finish rule, whether it is a wishlist, linked sets and dates |
 | Copies | Every row in those collections with its finish, condition, language, proxy, count, number for trade, purchase price and currency, date added, and misprint, altered and signed marks |
-| Decks | Every deck you own, with its name, format, the collection remembered for it, and dates |
-| Deck cards | Every card in those decks, with zone, count and printing |
+| Decks | Every deck you own, with its name, format, the collection remembered for it, its description and cover card, and dates |
+| Deck cards | Every card in those decks, with zone, count, printing and tags |
 | Deck links | Which copies in your own collections fill each deck card |
 | Cards | The card records they use, so a backup can be restored on a server with an empty card database |
 
-A backup does not contain collections or decks shared with you by others, accounts, preferences, prices, the trade calculator or the full card database. Prices return with the next card database update.
+A backup does not contain collections or decks shared with you by others, accounts, preferences, prices, deck history, the trade calculator or the full card database. Prices return with the next card database update.
 
 ## Restoring a backup
 

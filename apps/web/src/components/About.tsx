@@ -24,6 +24,8 @@ function inline(text: string): string {
   html = html.replace(/`([^`]+)`/g, "<code>$1</code>");
   html = html.replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>");
   html = html.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_match, label: string, href: string) => {
+    // only web addresses and the program's own pages become links
+    if (!/^(https?:\/\/|\/)/i.test(href)) return label;
     const external = /^https?:/.test(href);
     return `<a href="${href}"${external ? ' target="_blank" rel="noreferrer"' : ""}>${label}</a>`;
   });

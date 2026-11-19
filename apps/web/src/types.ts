@@ -76,6 +76,7 @@ export type Collection = Sharing & {
   progress: { owned: number; total: number } | null;
   /** When anything in the collection last changed. */
   updatedAt?: string;
+  createdAt?: string;
 };
 
 export type SetProgress = { code: string; name: string; owned: number; total: number; printedSize: number | null; known: boolean };
@@ -114,7 +115,7 @@ export const SEND_MODES: Array<["copy" | "share" | "transfer", string]> = [
 ];
 
 export type DeckMode = "normal" | "theme";
-export type Zone = "main" | "sideboard" | "commander";
+export type Zone = "main" | "sideboard" | "commander" | "maybeboard";
 
 export type Deck = Partial<Sharing> & {
   id: string;
@@ -125,12 +126,33 @@ export type Deck = Partial<Sharing> & {
   card_count?: number;
   /** The collection that receives copies added straight to this deck, remembered per deck. */
   collection_id?: string | null;
+  created_at?: string;
+  updated_at?: string;
+  /** The deck's description (Markdown). */
+  description?: string;
+  cover_card_id?: string | null;
+  /** The commander names, joined with " + ". */
+  commander?: string | null;
+  /** The cover card's picture, or else the first commander's. */
+  image_url?: string | null;
 };
 
 /** A collection copy that fills a deck card. */
 export type DeckLink = CopyKey & { collectionId: string; collectionName: string; quantity: number };
 
-export type DeckCard = Pick<Card, "name" | "mana_cost" | "type_line" | "set_code" | "set_name" | "collector_number" | "image_url"> & {
+export type DeckCard = Pick<Card, "name" | "mana_cost" | "type_line" | "set_code" | "set_name" | "collector_number" | "image_url"> & Partial<PriceFields> & {
+  mana_value?: number | null;
+  rarity?: string;
+  colors?: string;
+  color_identity?: string;
+  oracle_text?: string | null;
+  legalities?: Record<string, string>;
+  /** W, U, B, R, G and C: the mana the card can make. */
+  produced_mana?: string;
+  tokens?: Array<{ id: string; name: string }>;
+  power?: string | null;
+  toughness?: string | null;
+  tags?: string[];
   entry_id: number;
   card_id: string;
   oracle_id: string;
@@ -183,7 +205,15 @@ export type User = { id: number; name: string };
 
 export type View = "home" | "cards" | "collection" | "deck" | "trade" | "about";
 export type CollectionTab = "cards" | "completion" | "missing" | "stats";
-export type DeckTab = "cards" | "ownership" | "stats";
+export type DeckTab = "cards" | "ownership" | "stats" | "playtest" | "description" | "history";
+export type DeckView = "list" | "text" | "stacks" | "grid";
+export type DeckGroup = "type" | "mana" | "color" | "rarity" | "tag" | "none";
+export type DeckSort = "name" | "mana" | "price";
+export type CollectionLayout = "list" | "binder" | "grid";
+export type GridSize = "s" | "m" | "l";
+export type SwitchSort = "recent" | "name" | "created" | "cards" | "value" | "format" | "commander";
+export type DeckToken = { id: string; name: string; image_url: string | null; type_line: string; from: string[] };
+export type DeckChange = { id: number; at: string; user: string; change: string };
 
 export type Bucket = { key: string; label: string; count: number; value: number };
 export type Stats = {
@@ -276,8 +306,17 @@ export const ZONES: Array<{ id: Zone; label: string }> = [
   { id: "main", label: "Main deck" },
   { id: "sideboard", label: "Sideboard" },
   { id: "commander", label: "Commander" },
+  { id: "maybeboard", label: "Maybeboard" },
 ];
 
-export const FORMATS = ["commander", "standard", "pioneer", "modern", "legacy", "pauper", "vintage", "casual"] as const;
+export const FORMATS = [
+  "commander", "standard", "pioneer", "modern", "legacy", "pauper", "vintage", "brawl", "standardbrawl", "historic", "explorer", "timeless",
+  "alchemy", "oathbreaker", "paupercommander", "duel", "premodern", "oldschool", "penny", "predh", "casual",
+] as const;
+const FORMAT_NAMES: Record<string, string> = {
+  standardbrawl: "Standard Brawl", paupercommander: "Pauper Commander", duel: "Duel Commander", oldschool: "Old School", penny: "Penny Dreadful",
+  predh: "PreDH",
+};
+export const formatName = (format: string) => FORMAT_NAMES[format] ?? capitalize(format);
 
 export const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);

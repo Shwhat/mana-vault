@@ -1,5 +1,5 @@
 // ---------- statistics: stat tiles and bar charts for a collection or a deck ----------
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Icon } from "../icons";
 import { useApp } from "../store";
 import { type Bucket, COLOR_NAMES, type Currency, type Facets, money, type Stats } from "../types";
@@ -77,7 +77,7 @@ function Curve({ buckets, measure, currency, onPick }: { buckets: Bucket[]; meas
   );
 }
 
-export function StatsPanel({ stats, kind, onFacet }: { stats: Stats | null; kind: "collection" | "deck"; onFacet?: (facet: Facets) => void }) {
+export function StatsPanel({ stats, kind, onFacet, extra }: { stats: Stats | null; kind: "collection" | "deck"; onFacet?: (facet: Facets) => void; extra?: ReactNode }) {
   const store = useApp();
   const [measure, setMeasure] = useState<Measure>("count");
   if (!stats) return <div className="emptynote">Working out the statistics</div>;
@@ -99,7 +99,7 @@ export function StatsPanel({ stats, kind, onFacet }: { stats: Stats | null; kind
           <div className="stsub">{stats.highest?.name ?? "No priced cards"}</div></div>
       </div>
       <div className="rulesline">
-        <span>{kind === "deck" ? "Normal decks are priced at the cheapest printing of each card, Theme decks at the chosen printing." : "Each copy is priced in its own finish."}
+        <span>{kind === "deck" ? "Each card is priced at its printing. Maybeboard cards are left out." : "Each copy is priced in its own finish."}
           {onFacet ? " Click a bar to list those cards." : ""}</span>
         <div className="seg" role="group" aria-label="Measure">
           <button type="button" className={measure === "count" ? "on" : ""} aria-pressed={measure === "count"} onClick={() => setMeasure("count")}>Cards</button>
@@ -110,6 +110,7 @@ export function StatsPanel({ stats, kind, onFacet }: { stats: Stats | null; kind
         </button>
       </div>
       <div className="chartgrid">
+        {extra}
         <Curve buckets={stats.curve} measure={measure} currency={currency} onPick={pick((bucket) => ({ curve: bucket.key }))} />
         <BarList title="Color" buckets={stats.color} measure={measure} currency={currency} labelOf={(bucket) => COLOR_NAMES[bucket.key] ?? bucket.label}
           onPick={pick((bucket) => ({ color: bucket.key }))} />

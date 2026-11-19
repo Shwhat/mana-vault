@@ -75,6 +75,12 @@ async function signUpOnPhone(page: Page, baseURL: string, prefix: string): Promi
   await page.locator(".appcard .go").click();
   await expect(page.locator("#ptabs")).toBeVisible();
   await synced(page);
+  // these tests work with collection rows; new accounts start with the grid
+  await page.locator(".ptab", { hasText: "Collection" }).click();
+  await page.getByRole("button", { name: /Options/ }).click();
+  await page.locator(".optpop").getByRole("button", { name: "List" }).click();
+  await page.locator(".optpop").getByRole("button", { name: "Done" }).click();
+  await page.locator(".ptab", { hasText: "Home" }).click();
   return name;
 }
 

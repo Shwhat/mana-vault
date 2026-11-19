@@ -1,5 +1,5 @@
 // ---------- collection view: cards, set completion and missing cards ----------
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Action } from "../actions";
 import { rowMenu } from "../components/ContextMenu";
 import { collectionDialog, copyDialog, moveDialog } from "../components/LibraryDialogs";
@@ -7,9 +7,11 @@ import { Icon } from "../icons";
 import { entryKey } from "../library-state";
 import { type Store, useApp } from "../store";
 import {
-  capitalize, COLOR_NAMES, COMPLETION_RULES, conditionName, copyLabel, copyPrice, FINISH_RULES, FINISHES, type Collection, type CollectionEntry, type CollectionSort,
+  capitalize, COLOR_NAMES, COMPLETION_RULES, conditionName, copyLabel, copyPrice, FINISH_RULES, FINISHES, type Collection, type CollectionEntry,
+  type CollectionLayout, type CollectionSort, type GridSize,
   type CollectionTab, type Facets, languageName, money,
 } from "../types";
+import { Switcher } from "../components/Switcher";
 import { StatsPanel } from "./StatsView";
 import { Quantity, Thumb } from "./Views";
 
@@ -85,7 +87,7 @@ export function Meter({ owned, total, label }: { owned: number; total: number; l
   );
 }
 
-function CollectionHeader({ current }: { current: Collection }) {
+function CollectionHeader({ current, actions }: { current: Collection; actions: Record<string, Action> }) {
   const store = useApp();
   // a collection without a completion rule tracks no completion
   const tabs: Array<[CollectionTab, string]> = current.completion === "none"
@@ -93,11 +95,13 @@ function CollectionHeader({ current }: { current: Collection }) {
     : [["cards", "Cards"], ["completion", "Completion"], ["missing", "Missing"], ["stats", "Statistics"]];
   const currency = store.prefs.currency;
   const isTarget = store.prefs.targetCollection === current.id;
+  const rows = store.collection?.length ?? current.entryCount;
+  const shownRows = store.visibleCollection.length;
+  const filtered = store.collectionTab === "cards" && store.collection !== null && shownRows < rows;
+  const unpriced = current.value[currency === "usd" ? "unpricedUsd" : "unpricedEur"];
   return (
     <div id="pagetabs" className="colhead">
-      <select className="colpick" aria-label="Open collection" value={current.id} onChange={(event) => store.openCollection(event.target.value)}>
-        {(store.collections ?? []).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-      </select>
+      <Switcher kind="collection" actions={actions} />
       <div className="seg" role="tablist" aria-label="Collection view">
         {tabs.map(([id, label]) => (
           <button key={id} type="button" role="tab" aria-selected={store.collectionTab === id} className={store.collectionTab === id ? "on" : ""} onClick={() => store.setCollectionTab(id)}>
@@ -105,9 +109,6 @@ function CollectionHeader({ current }: { current: Collection }) {
           </button>
         ))}
       </div>
-      {isTarget
-        ? <span className="badge main" title="Add to collection puts cards here">Adds here</span>
-        : <button type="button" className="lnk" onClick={() => store.setTargetCollection(current.id)}>Add cards here</button>}
       {current.kind === "wishlist" && <span className="badge wish" title="Cards here are wanted, not owned">Wishlist</span>}
       {current.role === "member" && <span className="badge">Shared by {current.owner.name}</span>}
       {current.role === "owner" && current.sharedWith.length > 0 && <span className="badge">Shared with {current.sharedWith.map((person) => person.name).join(", ")}</span>}
@@ -117,85 +118,210 @@ function CollectionHeader({ current }: { current: Collection }) {
           <input value={store.collectionFilter} onChange={(event) => store.setCollectionFilter(event.target.value)} placeholder="Filter by card or set name" aria-label="Filter collection" />
         </label>
       )}
-      {store.collectionTab === "cards" && (
-        <button type="button" className={store.selectMode ? "btn small on" : "btn small"} aria-pressed={store.selectMode}
-          onClick={() => { store.setSelectMode(!store.selectMode); if (store.selectMode) store.setChecked(new Set()); }}>Select</button>
-      )}
-      <span className="phpos" title={current.value[currency === "usd" ? "unpricedUsd" : "unpricedEur"] ? `${current.value[currency === "usd" ? "unpricedUsd" : "unpricedEur"]} cards have no price` : undefined}>
-        {current.cardCount} cards
+      {store.collectionTab === "cards" && <OptionsButton />}
+      <button type="button" className="btn small addbtn" title={isTarget ? `Search for cards to add to ${current.name}` : `Add new cards to ${current.name}, then search for them`}
+        onClick={() => { if (!isTarget) store.setTargetCollection(current.id); actions.find?.run(); }}>+ Add</button>
+      <span className="phpos" title={unpriced ? `${unpriced} cards have no price` : undefined}>
+        {current.cardCount.toLocaleString()} cards ({rows.toLocaleString()} unique), {current.kind === "wishlist" ? "wanted " : ""}{money(current.value[currency], currency)}
+        {filtered ? `, showing ${shownRows.toLocaleString()} of ${rows.toLocaleString()}` : ""}
       </span>
     </div>
   );
 }
 
-function CardsBar() {
+/** Sort, layout, card size, For trade only, In decks or not and Select, behind one button with a count of active filters. */
+function OptionsButton() {
   const store = useApp();
-  const current = store.collections?.find((item) => item.id === store.prefs.openCollection);
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+  const button = useRef<HTMLButtonElement>(null);
+  const active = (store.facets.trade ? 1 : 0) + (store.facets.inDeck ? 1 : 0);
+  const layout = store.layout;
+  useEffect(() => {
+    if (!open) return;
+    const close = (event: Event) => {
+      if (event.target instanceof Node && (box.current?.contains(event.target) || button.current?.contains(event.target))) return;
+      setOpen(false);
+    };
+    const key = (event: KeyboardEvent) => { if (event.key === "Escape") setOpen(false); };
+    window.addEventListener("mousedown", close);
+    window.addEventListener("touchstart", close);
+    window.addEventListener("keydown", key);
+    return () => {
+      window.removeEventListener("mousedown", close);
+      window.removeEventListener("touchstart", close);
+      window.removeEventListener("keydown", key);
+    };
+  }, [open]);
+  const rect = button.current?.getBoundingClientRect();
+  const style = store.phone || !rect ? undefined : { left: Math.max(4, Math.min(rect.left, window.innerWidth - 300)), top: rect.bottom + 2 };
+  const layouts: Array<[CollectionLayout, string]> = [["grid", "Grid"], ["binder", "Binder"], ["list", "List"]];
+  const sizes: Array<[GridSize, string]> = [["s", "Small"], ["m", "Medium"], ["l", "Large"]];
+  return (
+    <>
+      <button ref={button} type="button" className={active ? "btn small on" : "btn small"} aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen(!open)}>
+        Options{active ? <span className="cbadge">{active}</span> : null} ▾</button>
+      {open && (
+        <div ref={box} className={store.phone ? "optpop phone" : "optpop"} style={style} role="dialog" aria-label="Collection options">
+          <div className="prow"><label htmlFor="opt-sort">Sort</label>
+            <select id="opt-sort" value={store.prefs.collectionSort} onChange={(event) => store.setPrefs({ collectionSort: event.target.value as CollectionSort })}>
+              {SORTS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            </select></div>
+          <div className="prow"><label>Layout</label>
+            <div className="seg" role="group" aria-label="Collection layout">
+              {layouts.map(([value, label]) => (
+                <button key={value} type="button" className={layout === value ? "on" : ""} aria-pressed={layout === value} onClick={() => store.setCollectionLayout(value)}>{label}</button>
+              ))}
+            </div></div>
+          {layout === "grid" && (
+            <div className="prow"><label>Card size</label>
+              <div className="seg" role="group" aria-label="Card size">
+                {sizes.map(([value, label]) => (
+                  <button key={value} type="button" className={store.prefs.gridSize === value ? "on" : ""} aria-pressed={store.prefs.gridSize === value}
+                    onClick={() => store.setPrefs({ gridSize: value })}>{label}</button>
+                ))}
+              </div></div>
+          )}
+          <div className="prow"><label htmlFor="opt-deck">Decks</label>
+            <select id="opt-deck" aria-label="Filter by deck" value={store.facets.inDeck ?? ""} onChange={(event) => store.setFacet({ inDeck: (event.target.value || undefined) as Facets["inDeck"] })}>
+              <option value="">In decks or not</option>
+              <option value="yes">In a deck</option>
+              <option value="no">Not in a deck</option>
+            </select></div>
+          <label className="optcheck"><input type="checkbox" checked={!!store.facets.trade} onChange={() => store.setFacet({ trade: !store.facets.trade })} /> For trade only</label>
+          <label className="optcheck"><input type="checkbox" checked={store.selectMode}
+            onChange={() => { store.setSelectMode(!store.selectMode); if (store.selectMode) store.setChecked(new Set()); }} /> Select several cards</label>
+          <div className="btnrow end"><button type="button" className="btn small" onClick={() => setOpen(false)}>Done</button></div>
+        </div>
+      )}
+    </>
+  );
+}
+
+/** The active filter tags, as chips that remove themselves. */
+function ChipBar() {
+  const store = useApp();
   const chips = facetLabels(store);
-  const layout = store.prefs.collectionLayout;
+  if (!chips.length) return null;
   return (
     <div className="filterbar">
-      <select aria-label="Sort collection" value={store.prefs.collectionSort} onChange={(event) => store.setPrefs({ collectionSort: event.target.value as CollectionSort })}>
-        {SORTS.map(([value, label]) => <option key={value} value={value}>Sort: {label}</option>)}
-      </select>
-      <div className="seg" role="group" aria-label="Collection layout">
-        <button type="button" className={layout === "list" ? "on" : ""} aria-pressed={layout === "list"} onClick={() => store.setPrefs({ collectionLayout: "list" })}>List</button>
-        <button type="button" className={layout === "binder" ? "on" : ""} aria-pressed={layout === "binder"} onClick={() => store.setPrefs({ collectionLayout: "binder" })}>Binder</button>
-      </div>
-      <button type="button" className={store.facets.trade ? "btn small on" : "btn small"} aria-pressed={!!store.facets.trade}
-        onClick={() => store.setFacet({ trade: !store.facets.trade })}>For trade only</button>
-      <select aria-label="Filter by deck" value={store.facets.inDeck ?? ""} onChange={(event) => store.setFacet({ inDeck: (event.target.value || undefined) as Facets["inDeck"] })}>
-        <option value="">In decks or not</option>
-        <option value="yes">In a deck</option>
-        <option value="no">Not in a deck</option>
-      </select>
       {chips.map(([key, text]) => (
         <span className="chip" key={key}>{text}<button type="button" aria-label={`Remove filter ${text}`} onClick={() => store.setFacet({ [key]: undefined })}>×</button></span>
       ))}
       {chips.length > 1 && <button type="button" className="lnk" onClick={() => store.setFacet(ALL_FACETS)}>Clear tags</button>}
-      <span className="phpos">{store.visibleCollection.length} of {store.collection?.length ?? 0} rows, {current?.kind === "wishlist" ? "wanted value" : "value"} {money(current?.value[store.prefs.currency] ?? 0, store.prefs.currency)}</span>
+    </div>
+  );
+}
+
+/** The size of an element, kept current as it changes. */
+function useSize<T extends HTMLElement>() {
+  const ref = useRef<T>(null);
+  const [size, setSize] = useState({ width: 0, height: 0 });
+  useEffect(() => {
+    const element = ref.current;
+    if (!element) return;
+    const observer = new ResizeObserver(() => setSize({ width: element.clientWidth, height: element.clientHeight }));
+    observer.observe(element);
+    setSize({ width: element.clientWidth, height: element.clientHeight });
+    return () => observer.disconnect();
+  }, []);
+  return [ref, size] as const;
+}
+
+/** One card picture with its count, finish, trade and price marks. Used by the binder and the grid. */
+function Pocket({ entry }: { entry: CollectionEntry }) {
+  const store = useApp();
+  const key = entryKey(entry);
+  const active = store.checked.has(key);
+  const label = copyLabel(entry);
+  const currency = store.prefs.currency;
+  return (
+    <div data-key={key} role="option" aria-selected={active} className={active ? "pocket active" : "pocket"}
+      title={`${entry.name}, ${entry.set_name} ${entry.collector_number}${label ? `, ${label}` : ""}`}
+      onClick={(event) => store.pickRow(entry, { ctrl: event.ctrlKey || event.metaKey, shift: event.shiftKey })}
+      onDoubleClick={() => copyDialog(store, entry)} {...entryMenu(store, entry)}>
+      {entry.image_url ? <img src={entry.image_url} alt={entry.name} loading="lazy" draggable={false} /> : <span className="pocketname">{entry.name}</span>}
+      {entry.foil > 0 && <span className="badge foil pocketfoil">{entry.foil === 2 ? "ETCHED" : "FOIL"}</span>}
+      {entry.proxy && <span className="badge proxy pocketproxy">PROXY</span>}
+      <span className="pocketqty">{entry.quantity}</span>
+      {entry.trade > 0 && <span className="badge trade pockettrade">TRADE {entry.trade}</span>}
+      <span className="pocketprice">{entry.proxy ? "Proxy" : money(copyPrice(entry, currency), currency)}</span>
     </div>
   );
 }
 
 const PAGE_SIZE = 9;
 
-/** Pages of nine card images, like a binder sheet. Page Up and Page Down turn the pages. */
+/** Pages of nine card pictures, like a binder sheet, as large as the space allows. Page Up and Page Down turn the pages. */
 function Binder() {
   const store = useApp();
   const entries = store.visibleCollection;
   const pages = Math.max(1, Math.ceil(entries.length / PAGE_SIZE));
   const page = Math.min(store.binderPage, pages - 1);
   const shown = entries.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
-  const currency = store.prefs.currency;
+  const [area, size] = useSize<HTMLDivElement>();
+  const [typed, setTyped] = useState("");
+  const gap = store.phone ? 6 : 10;
+  // three pockets across and down, as big as fits; the sheet adds its padding and border
+  const pocket = Math.max(60, Math.floor(Math.min((size.width - 2 * gap - 4 * gap) / 3, ((size.height - 2 * gap - 4 * gap) / 3) * (63 / 88))));
+  const go = (next: number) => store.setBinderPage(Math.max(0, Math.min(pages - 1, next)));
   return (
     <div className="binderwrap">
-      <div className="binder" role="listbox" aria-label={`Binder page ${page + 1} of ${pages}`}>
-        {shown.map((entry) => {
-          const key = entryKey(entry);
-          const active = store.checked.has(key);
-          const label = copyLabel(entry);
-          return (
-            <div key={key} data-key={key} role="option" aria-selected={active} className={active ? "pocket active" : "pocket"}
-              title={`${entry.name}, ${entry.set_name} ${entry.collector_number}${label ? `, ${label}` : ""}`}
-              onClick={(event) => store.pickRow(entry, { ctrl: event.ctrlKey || event.metaKey, shift: event.shiftKey })}
-              onDoubleClick={() => copyDialog(store, entry)} {...entryMenu(store, entry)}>
-              {entry.image_url ? <img src={entry.image_url} alt={entry.name} loading="lazy" /> : <span className="pocketname">{entry.name}</span>}
-              {entry.foil > 0 && <span className="badge foil pocketfoil">{entry.foil === 2 ? "ETCHED" : "FOIL"}</span>}
-              {entry.proxy && <span className="badge proxy pocketproxy">PROXY</span>}
-              <span className="pocketqty">{entry.quantity}</span>
-              {entry.trade > 0 && <span className="badge trade pockettrade">TRADE {entry.trade}</span>}
-              <span className="pocketprice">{entry.proxy ? "Proxy" : money(copyPrice(entry, currency), currency)}</span>
-            </div>
-          );
-        })}
-        {Array.from({ length: PAGE_SIZE - shown.length }, (_, index) => <div key={`empty-${index}`} className="pocket emptypocket" aria-hidden="true" />)}
+      <div className="binderarea" ref={area}>
+        <div className="binder" role="listbox" aria-label={`Binder page ${page + 1} of ${pages}`}
+          style={{ gridTemplateColumns: `repeat(3, ${pocket}px)`, gap, padding: gap }}>
+          {shown.map((entry) => <Pocket key={entryKey(entry)} entry={entry} />)}
+          {Array.from({ length: PAGE_SIZE - shown.length }, (_, index) => <div key={`empty-${index}`} className="pocket emptypocket" aria-hidden="true" />)}
+        </div>
       </div>
       <div className="binderpager">
-        <button type="button" className="btn small" disabled={page === 0} onClick={() => store.setBinderPage(page - 1)}>Previous page</button>
-        <span>Page {page + 1} of {pages}</span>
-        <button type="button" className="btn small" disabled={page >= pages - 1} onClick={() => store.setBinderPage(page + 1)}>Next page</button>
+        <button type="button" className="btn small" disabled={page === 0} onClick={() => go(0)}>First</button>
+        <button type="button" className="btn small" disabled={page === 0} onClick={() => go(page - 1)}>Previous page</button>
+        <span>Page <input className="pagebox" inputMode="numeric" aria-label="Page number" value={typed || String(page + 1)}
+          onFocus={(event) => { setTyped(String(page + 1)); event.target.select(); }}
+          onChange={(event) => setTyped(event.target.value.replace(/\D/g, ""))}
+          onBlur={() => setTyped("")}
+          onKeyDown={(event) => { if (event.key === "Enter") { go(Number(typed || page + 1) - 1); (event.target as HTMLInputElement).blur(); } }} /> of {pages}</span>
+        <button type="button" className="btn small" disabled={page >= pages - 1} onClick={() => go(page + 1)}>Next page</button>
+        <button type="button" className="btn small" disabled={page >= pages - 1} onClick={() => go(pages - 1)}>Last</button>
       </div>
+    </div>
+  );
+}
+
+const GRID_STEP = 60;
+const GRID_WIDTHS: Record<GridSize, number> = { s: 120, m: 170, l: 240 };
+const PHONE_COLUMNS: Record<GridSize, number> = { s: 4, m: 3, l: 2 };
+
+/** Card pictures that fill the width; more load while scrolling. */
+function Grid() {
+  const store = useApp();
+  const entries = store.visibleCollection;
+  const [count, setCount] = useState(GRID_STEP);
+  const end = useRef<HTMLDivElement>(null);
+  const list = useRef<HTMLDivElement>(null);
+  // a new filter, sort or collection starts again at the top
+  useEffect(() => {
+    setCount(GRID_STEP);
+    list.current?.scrollTo({ top: 0 });
+  }, [store.prefs.openCollection, store.collectionFilter, store.facets, store.prefs.collectionSort]);
+  useEffect(() => {
+    const element = end.current;
+    if (!element) return;
+    const observer = new IntersectionObserver((seen) => {
+      if (seen.some((item) => item.isIntersecting)) setCount((current) => Math.min(entries.length, current + GRID_STEP));
+    }, { root: list.current, rootMargin: "600px" });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [entries.length, count]);
+  const size = store.prefs.gridSize;
+  const columns = store.phone ? `repeat(${PHONE_COLUMNS[size]}, minmax(0, 1fr))` : `repeat(auto-fill, minmax(${GRID_WIDTHS[size]}px, 1fr))`;
+  return (
+    <div className="gridwrap" ref={list}>
+      <div className={`cardgrid size-${size}`} role="listbox" aria-label="Collection" aria-multiselectable="true" style={{ gridTemplateColumns: columns }}>
+        {entries.slice(0, count).map((entry) => <Pocket key={entryKey(entry)} entry={entry} />)}
+      </div>
+      {count < entries.length && <div ref={end} className="gridmore">Loading more cards</div>}
     </div>
   );
 }
@@ -205,10 +331,10 @@ function CardsTab({ actions }: { actions: Record<string, Action> }) {
   const { visibleCollection, collection, checked, selectMode } = store;
   const pickedCards = (collection ?? []).filter((entry) => checked.has(entryKey(entry))).reduce((sum, entry) => sum + entry.quantity, 0);
   const currency = store.prefs.currency;
-  const binder = store.prefs.collectionLayout === "binder" && (collection?.length ?? 0) > 0;
+  const pictures = store.layout !== "list" && (collection?.length ?? 0) > 0 && visibleCollection.length > 0;
   return (
     <>
-      {collection !== null && collection.length > 0 && <CardsBar />}
+      {collection !== null && collection.length > 0 && <ChipBar />}
       {(checked.size > 1 || selectMode) && (
         <div className="pickbar" role="toolbar" aria-label="Picked rows">
           <span><b>{checked.size}</b> picked ({pickedCards} {pickedCards === 1 ? "card" : "cards"})</span>
@@ -220,8 +346,9 @@ function CardsTab({ actions }: { actions: Record<string, Action> }) {
           <button type="button" className="btn small" onClick={() => { store.setChecked(new Set()); store.setSelectMode(false); }}>Done</button>
         </div>
       )}
-      {binder && <Binder />}
-      {!binder && <div className="list" role="listbox" aria-label="Collection" aria-multiselectable="true">
+      {pictures && store.layout === "binder" && <Binder />}
+      {pictures && store.layout === "grid" && <Grid />}
+      {!pictures && <div className="list" role="listbox" aria-label="Collection" aria-multiselectable="true">
         {collection === null && <div className="emptynote">Loading the collection</div>}
         {collection !== null && collection.length === 0 && (
           <div className="empty">
@@ -392,7 +519,7 @@ export function CollectionView({ actions }: { actions: Record<string, Action> })
   }
   return (
     <div className="view" id="view-collection">
-      <CollectionHeader current={current} />
+      <CollectionHeader current={current} actions={actions} />
       {(store.collectionTab === "cards" || (current.completion === "none" && store.collectionTab !== "stats")) && <CardsTab actions={actions} />}
       {store.collectionTab === "completion" && current.completion !== "none" && <CompletionTab current={current} />}
       {store.collectionTab === "missing" && current.completion !== "none" && <MissingTab current={current} actions={actions} />}

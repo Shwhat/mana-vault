@@ -16,21 +16,21 @@ The ribbon is the only menu. It has tabs of grouped buttons. A button shows an i
 
 - **Lists**: related commands share one button with a ▾ after its label. Clicking it opens a list of the commands; a check mark shows the one that is on. Esc or a click elsewhere closes the list.
 - **Hidden commands**: a command that cannot be used right now is not shown. A group with no command to show is not shown.
-- **Context groups**: some groups appear only while that part of the program is in use. Their group name is blue. The Decks tab adds Build, Missing and Share while a deck is open; the Collection tab adds Selection, Layout and Wishlist while the collection view is shown. Opening a deck selects the Decks tab.
+- **Context groups**: some groups appear only while that part of the program is in use. Their group name is blue. The Decks tab adds Build, Check, Missing and Share while a deck is open; the Collection tab adds Selection, Layout and Wishlist while the collection view is shown. Opening a deck selects the Decks tab.
 - **Import...** and **Export...** open the import and export windows; see [Import and export](/about/import-and-export).
 
 | Tab | Groups and buttons |
 |---|---|
 | Home | Search: Find, Scan card, Clear filters. Add: Add to collection, Target, Wishlist, Add as foil. Views: Home, Search, Collection, Deck, Trade. Files: Import, Export, Backup ▾ (Download backup, Restore backup...). Edit: Undo, Redo |
-| Collection | Collection: New collection, Settings, Delete (Leave when shared with you). Selection: Select all, Move, Remove, Details, For trade (Mark for trade or Unmark for trade). Layout: Binder. Wishlist: Missing to wishlist. Share: Send, Sharing |
-| Decks | Deck: New deck, Open deck, Rename, Delete (Leave when shared with you). Build: Add to deck, Target zone ▾ (Main deck, Sideboard, Commander), Link copies. Missing: Missing to wishlist. Share: Send, Sharing |
-| Trade | Trade: You give, You get. Summary: Copy summary, Clear trade |
+| Collection | Collection: New collection, Settings, Delete (Leave when shared with you). Selection: Select all, Move, Remove, Details, For trade (Mark for trade or Unmark for trade). Layout: Grid (Grid layout), Binder (Binder layout), List (List layout). Wishlist: Missing to wishlist. Share: Send, Sharing |
+| Decks | Deck: New deck, Open deck, Rename, Delete (Leave when shared with you). Build: Add to deck, Target zone ▾ (Main deck, Sideboard, Commander, Maybeboard), Link copies, Tags (Tags...), Edit as text (Edit as text...). Check: Format (Deck format...), Playtest, History (Deck history). Missing: Missing to wishlist. Share: Send, Sharing |
+| Trade | Open: Trade (Trade view, shown at all times). Trade: You give, You get. Summary: Copy summary, Clear trade |
 | View | Look: Theme ▾ (Light theme, Dark theme, System theme), Currency ▾ (Prices in US dollars, Prices in euros). Panels: Panels ▾ (Filters panel, Collections panel, Decks panel, Card panel, Deck list panel, Import review panel), Workspace ▾ (Save workspace..., Manage workspaces..., Reset panels). Ribbon: Button size ▾ (Large buttons, Compact buttons, Icons only), Customize. Card database: Update database |
 | Help | Help: Shortcuts, About |
 
-Undo and Redo show the change they will reverse or repeat, for example "Undo Add Sol Ring". The **Workspace** list at the right end of the tab row switches workspaces.
+Undo and Redo show the change they will reverse or repeat, for example "Undo Add Sol Ring". The **Workspace** button at the right end of the tab row shows the current workspace; it opens a list of every workspace (a check mark shows the one in use) followed by Save workspace..., Manage workspaces... and Reset panels.
 
-The views of a collection (Cards, Completion, Missing, Statistics) and of a deck (Cards, Ownership, Statistics) are the tabs in the header of that view.
+The views of a collection (Cards, Completion, Missing, Statistics) and of a deck (Cards, Ownership, Statistics, Playtest, Description, History) are the tabs in the header of that view.
 
 ### Button size
 
@@ -75,8 +75,10 @@ Right-clicking a card row opens a menu of what can be done with that card. On a 
 | Row | Menu |
 |---|---|
 | Search result | Card page, Add to collection, Add as proxy, Add to wishlist, Add to the open deck, Add to trade (you get) |
-| Collection row or binder pocket | Card page, Copy details..., Move..., Mark for trade or Unmark for trade, Add to trade (you give), Add to the open deck, Remove |
-| Deck card | Card page, Link copies..., Add missing to wishlist (when cards are missing), Remove from deck |
+| Collection row, grid card or binder pocket | Card page, Copy details..., Move..., Mark for trade or Unmark for trade, Add to trade (you give), Add to the open deck, Remove |
+| Deck card, in any view | Card page, Link copies..., Tags..., Move to each other zone, Use as cover card, Add missing to wishlist (when cards are missing), Remove from deck |
+
+Commands that can be used are shown in the normal text color.
 
 ## Work area
 
@@ -86,11 +88,11 @@ The work area in the middle shows one of five views, chosen with the Views group
 |---|---|
 | Home | Totals for your collections (cards owned, value, collections, decks), Scan cards, Search and Import buttons, offers waiting in your Inbox, and your recent scans |
 | Card search | Search results with prices |
-| Collection | The open collection, in four tabs: Cards (rows as a list or binder pages), Completion, Missing and Statistics; see [Collections](/about/collections), [Set completion](/about/set-completion) and [Prices and statistics](/about/prices-and-statistics) |
-| Deck | The open deck, in three tabs: Cards (grouped by zone, with the collection each card comes from, count controls, a zone list, a link button and a remove button), Ownership and Statistics; see [Decks](/about/decks) |
+| Collection | The open collection, in four tabs: Cards (a grid of card pictures, binder pages or a list), Completion, Missing and Statistics; see [Collections](/about/collections), [Set completion](/about/set-completion) and [Prices and statistics](/about/prices-and-statistics) |
+| Deck | The open deck, in six tabs: Cards (Quick add, the format check, and the cards by zone and group as a list, text, stacks or grid), Ownership, Statistics, Playtest, Description and History; see [Decks](/about/decks) |
 | Trade | The trade list and the trade calculator; see [Wishlists and trading](/about/wishlists-and-trading) |
 
-Click a row to select it; its details appear in the Card panel. Up and Down select the previous or next row. The About guide and the card page also open in the work area and close with **Close**, **Back** or Esc.
+Click a row to select it; its details appear in the Card panel. Up and Down select the previous or next row. The About guide and the card page also open in the work area and close with **Close**, **Back** or Esc. The About guide also closes when you open a collection, deck, card or view, or select a card in a panel.
 
 ## Card page
 
@@ -109,9 +111,9 @@ The card page shows one card in full. It opens from **Card page** in a right-cli
 |---|---|
 | Filters | Type, set code, color, rarity, legal format and mana value range filters for card search, and **Clear filters** |
 | Collections | Your collections with card counts, values, completion bars and percentages, Wishlist and Shared badges, **Add here** to choose the target collection, and **New...** |
-| Decks | Every deck with its card count and a Shared badge for shared decks, a box to find a deck, and **New...**. Click a deck to open it; double-click to also show it in the work area |
+| Decks | Every deck with its card count and a Shared badge for shared decks, a box to find a deck by name or commander, and **New...**. Click a deck to open it in the work area |
 | Card | The selected card: image, name, type, **Add to collection**, **Add to deck**, **Add to wishlist**, **You get**, mana cost, mana value, rules text, set, number, rarity, artist, release date, flavor name, regular, foil and etched prices, copies owned of this printing (regular, foil and etched), of all printings and in each of your collections with the number for trade, and copies wanted in each wishlist |
-| Deck list | The open deck in compact form by zone, with plus and minus buttons, and the Main, Sideboard and Commander target zone switch |
+| Deck list | The open deck in compact form by zone, with plus and minus buttons, and the Main, Sideboard, Commander and Maybeboard target zone switch |
 | Import review | The rows skipped by the latest import or import preview, with row number, card name and reason, and **Clear** |
 
 ### Moving and arranging panels
@@ -124,6 +126,8 @@ Panels sit in three dock areas (left, right and bottom) or float above the work 
 - Drag it to the left, right or bottom edge of the window to dock it there.
 - Drop it on the work area to make it a floating window. Move a floating window by its grip strip and resize it from any edge or corner.
 - A blue rectangle shows where the panel will land.
+- Dragging a floating window by its grip works the same way: over another panel or floating window, at a panel's edge or at a window edge, the blue rectangle shows where it will land, and letting go docks all of its panels there (as tabs, split beside the panel, or in the dock area). In open space the window just moves, and its edges snap to the edges of other floating windows that are within a few pixels.
+- When a panel's tabs do not fit its width, they wrap onto more rows.
 - Drag the line between panels to resize them, and the inner edge of a dock area to change its width or height.
 - The **x** on a tab closes the panel. The Panels list on the View tab opens and closes panels.
 
@@ -159,13 +163,13 @@ A workspace is a saved panel layout and view. Three are built in:
 
 Below 900 pixels wide, and always in the Android app, the title bar, ribbon, panels and status bar are replaced by:
 
-- A top bar with the deck name, "Card", "Scan" or "Mana Vault", in the Android app the sync button (see [Android app](/about/android-app)), an **Inbox** button with a count when offers are waiting, a **Decks** button while in the deck view, and the **Menu** button at the top right.
+- A top bar with the deck name, "Card", "Scan" or "Mana Vault", in the Android app the sync button (see [Android app](/about/android-app)), an **Inbox** button with a count when offers are waiting, and the **Menu** button at the top right.
 - The current view, filling the screen. Phones open on Home. The card search adds a **Filters** button under the search box.
-- A bottom tab bar: **Home**, **Search**, **Collection**, **Decks** and **Scan**. Search is card search. Decks shows the open deck, or the deck list when no deck is open. Scan opens the camera scanner in place of the view (see [Scanning cards](/about/scanning-cards)).
+- A bottom tab bar: **Home**, **Search**, **Collection**, **Decks** and **Scan**. Search is card search. Decks shows the open deck, with the deck switcher at the top. Scan opens the camera scanner in place of the view (see [Scanning cards](/about/scanning-cards)).
 - Tapping a card opens its card page (except while picking rows).
 - **Menu** opens a sheet with one section per ribbon tab (Home, Collection, Decks, Trade, View, Help). Tapping a section opens it; lists such as Backup or Theme open inside it. The last section, **Account**, is open and holds Inbox, Change password, Devices and Sign out; the Android app adds Sync now, Notifications and Check for updates. Commands that do not apply are not shown.
-- Sheets that slide up from the bottom: **Filters**, **Decks**, **Menu** and the scanned list in the scanner. Close a sheet with **Close**, by tapping outside it, or with Esc.
-- In a collection, **Select** turns on checkboxes; tap rows to pick them and use the bar above the list to move or remove them.
+- Sheets that slide up from the bottom: **Filters**, **Menu** and the scanned list in the scanner. Close a sheet with **Close**, by tapping outside it, or with Esc.
+- In a collection, **Select several cards** in **Options** turns on checkboxes; tap rows to pick them and use the bar above the list to move or remove them.
 - Messages appear as a short banner above the tab bar.
 
-Panels (including the Collections panel), workspaces and ribbon customizing are desktop only; on the phone, switch collections with the list at the top of the collection view. Choices made on one layout are kept for the other.
+Panels (including the Collections panel), workspaces and ribbon customizing are desktop only; on the phone, switch collections and decks with the switcher at the top of the view, which opens as a full sheet. Choices made on one layout are kept for the other, except the collection layout (Grid, Binder or List), which each layout remembers on its own.

@@ -6,7 +6,7 @@ Mana Vault is a self-hosted Magic: The Gathering collection and deck manager for
 |---|---|
 | **Card search** | The full local card database: every printing, searchable by name, type, rules text, color, set, rarity, legality and mana value |
 | **Collections** | The printings you own, kept in as many collections as you like (binders, boxes, sets you are completing), with finish, condition, language, prices and set completion. Wishlists hold the cards you want |
-| **Decks** | Your decks, each with a format and cards in the main deck, sideboard or commander zone, linked to the collection copies that fill them |
+| **Decks** | Your decks, built with Quick add, text editing, tags, views and format checks, with cards in the commander zone, main deck, sideboard or maybeboard, linked to the collection copies that fill them |
 | **Trade** | The copies you are willing to trade, and a calculator that compares what you give with what you get |
 | **Card database** | The local copy of the card catalog, with prices, that search, imports and decks match against |
 

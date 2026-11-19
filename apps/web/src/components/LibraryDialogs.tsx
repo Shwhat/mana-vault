@@ -7,7 +7,7 @@ import type { Store } from "../store";
 import { useApp } from "../store";
 import {
   type Candidate, capitalize, type Collection, type CollectionEntry, COMPLETION_RULES, CONDITIONS, copyLabel, type DeckCard, FINISH_RULES, FINISHES, type FinishCode,
-  FORMATS, LANGUAGES, type Offer, SEND_MODES, type SetInfo,
+  FORMATS, formatName, LANGUAGES, type Offer, SEND_MODES, type SetInfo,
 } from "../types";
 import { customDialog, dialog } from "./Dialog";
 
@@ -140,7 +140,7 @@ export function copyDialog(store: Store, entry: CollectionEntry) {
 export function newDeckDialog(store: Store) {
   dialog("New deck", [
     ["name", "Deck name", ""],
-    ["format", "Format", "commander", "select", FORMATS.map((format) => [format, capitalize(format)])],
+    ["format", "Format", "commander", "select", FORMATS.map((format) => [format, formatName(format)])],
   ], async (values) => {
     const name = String(values.name);
     if (!name || name.length > 100) {

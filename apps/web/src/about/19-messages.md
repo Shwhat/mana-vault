@@ -7,7 +7,13 @@ Messages appear at the right end of the status bar (on the phone, in a banner ab
 | Message | Shown after |
 |---|---|
 | Card name added to collection name (foil adds "(foil)", a proxy "(proxy)") | Add to collection, Add as proxy |
-| Card name added to Deck name (with the zone when not the main deck, and ", from collection name" when a copy was linked) | Add to deck |
+| Card name added to Deck name (with the count when more than one, the zone when not the main deck, and ", from collection name" when a copy was linked) | Add to deck, Quick add |
+| Card name tagged tags, or Tags removed from Card name | Tags... |
+| Deck name updated: N added, N changed, N removed | Edit as text |
+| Format set to format | Deck format... |
+| Description saved | Saving the deck description |
+| Card name is the cover card, Cover card changed, or Cover card removed | Choosing the cover card |
+| Grid layout, Binder layout | Switching the collection layout with B |
 | Card name linked to collection names, or Card name is now missing | Link copies |
 | N rows exported | Export |
 | Card name removed from collection name | Removing a collection entry |
@@ -26,7 +32,7 @@ Messages appear at the right end of the status bar (on the phone, in a banner ab
 | Deck name created | New deck |
 | Deck name opened | Opening a deck |
 | Cards are added as foil, or Cards are added as regular copies | Switching Add as foil |
-| New deck cards go to the main deck (or the sideboard, the commander) | Changing the target zone |
+| New deck cards go to the main deck (or the sideboard, the commander, the maybeboard) | Changing the target zone |
 | Imported N cards from M rows (into collection name for collections) | A collection or decklist import |
 | Deck name exported as text, or as CSV | Export deck |
 | Backup downloaded | Download backup |
@@ -59,6 +65,12 @@ Messages appear at the right end of the status bar (on the phone, in a banner ab
 | There are no decks yet. Use New deck to create one. | Open deck with no decks | Create a deck |
 | Enter a deck name | New deck with an empty name | Type a name |
 | Deck names can be up to 100 characters | The name is too long | Shorten it |
+| Type a card name, such as 2 Sol Ring | Quick add with no name, or a count outside 1 to 100 | Type a count and a name |
+| No card named name in the card database | Quick add with a name or printing the card database does not have | Check the spelling, or leave out the set |
+| Select a card in the deck first | Tags or Link copies with no deck card selected | Click a deck card |
+| Use up to 12 tags of up to 40 characters each | Tags... with too many or too long tags | Shorten the list |
+| The description can be up to 20,000 characters | Saving a longer deck description | Shorten it |
+| Choose a supported deck format | A format Mana Vault does not know | Choose one from the list |
 | Enter a workspace name | Save workspace with an empty name | Type a name |
 | Name is a built-in workspace. Choose another name. | Saving under Search, Collection or Deck building | Use another name |
 | Type a name in the Name box first | Add or Rename in Customize ribbon with an empty Name box | Type the name, then choose Add or Rename |

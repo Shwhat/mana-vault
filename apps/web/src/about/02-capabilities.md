@@ -22,7 +22,8 @@ This page lists what Mana Vault does in the current version, followed by what is
 - Show each row's value, and each collection's total value, in US dollars or euros.
 - Sort rows by name, price, quantity, or set and number.
 - Narrow the list with filter tags by clicking a set code or rarity on a row, or a bar in Statistics.
-- Show a collection as binder pages of nine cards.
+- Show a collection as a grid of card pictures that loads more while scrolling (Small, Medium or Large), as binder pages of nine cards with a page box, or as a list. Each device type remembers its own layout.
+- Open collections from a switcher with search, five sort orders and the keyboard.
 - Show statistics: mana curve, colors, types, rarity, finish, top sets by value, average and median prices.
 - Change counts with plus and minus buttons, and remove entries.
 - Pick many rows with Ctrl+click, Shift+click, Ctrl+A or Select mode, then remove or move them in one step.
@@ -52,15 +53,23 @@ This page lists what Mana Vault does in the current version, followed by what is
 
 ### Decks
 
-- Create decks with a name and a format; every deck keeps the printing of each card.
+- Create decks with a name and one of 21 formats; every deck keeps the printing of each card.
+- Open decks from a switcher with search, six sort orders, cover card, commander, format and card count.
+- Add cards by typing them (Quick add, such as 2 Sol Ring), from card search or from the scanner.
+- Edit the whole deck as text, checked before it is applied, as one step that can be undone.
+- Show the cards as a list, text, stacks of pictures or a grid, grouped by type, mana value, color, rarity or your own tags, and sorted by name, mana value or price.
+- Check a deck against its format: deck and sideboard size, copies of each card, banned and not legal cards, and the commander's color identity.
+- Keep a maybeboard of cards being considered, list the tokens the deck makes, and point at a card name for a large picture.
+- Playtest: shuffle, draw opening hands, mulligan, draw and play cards.
+- Write a description with headings, lists and links, choose a cover card, and see the history of every change.
 - Link each deck card to the copy in a collection that fills it: one deck per copy, chosen when a card is free in more than one collection, changeable later, following the copy when it moves, and missing when it is removed.
 - Rename and delete decks.
-- Add cards to the main deck, sideboard or commander zone, change counts, move cards between zones and remove cards.
+- Add cards to the commander zone, main deck, sideboard or maybeboard, change counts, move cards between zones and remove cards.
 - Import decklists as text (Moxfield, Arena and MTGO style) or CSV, with a preview.
 - Export decks as text or CSV.
 - Check which deck cards have a linked copy, where they are, and what the missing cards cost.
 - Export the missing cards of a deck as text, or add them to the wishlist.
-- Show deck statistics and the deck's value.
+- Show deck statistics, colored mana symbols beside the cards that make each color, and the deck's value.
 
 ### Sending and sharing
 
@@ -105,7 +114,7 @@ This page lists what Mana Vault does in the current version, followed by what is
 
 ### Interface
 
-- Desktop layout with a title bar, the ribbon as the only menu (lists for related commands, context groups, hidden commands that do not apply, three button sizes), dockable panels, saved workspaces, status bar and light, dark or system theme.
+- Desktop layout with a title bar, the ribbon as the only menu (lists for related commands, context groups, hidden commands that do not apply, three button sizes), dockable panels whose floating windows dock onto other panels and snap to each other, saved workspaces, status bar and light, dark or system theme.
 - Right-click menus on cards and rows; a long press opens them on a phone.
 - Card page with art, rules text, power and toughness, every version with market prices, rulings, and where you own the card.
 - Home view with totals, recent scans and the Inbox.

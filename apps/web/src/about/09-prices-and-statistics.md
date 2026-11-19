@@ -31,7 +31,7 @@ Search results, which are not yet copies, show the regular price, or the foil pr
 | Collection | Sum of every row. Copies without a price add nothing | $7.50 + $900.00 for a Shivan Dragon = $907.50 |
 | Wishlist | The same sum, shown as the wanted value | |
 | Proxy | No value. Proxies are left out of collection values, statistics and the trade list | |
-| Deck | Each card at its printing's price, times the count | 4 Lightning Bolt (M10) at $2.50 = $10.00 |
+| Deck | Each card at its printing's price, times the count, maybeboard cards left out | 4 Lightning Bolt (M10) at $2.50 = $10.00 |
 | Cards to buy for a deck | Missing copies times the deck price above; see [Decks](/about/decks) | |
 
 Collection values appear in the Collections panel and the bar above the collection's rows. Deck values appear in the deck view header.
@@ -72,5 +72,5 @@ Each chart is a list of bars in one color. The figure at the end of each bar is 
 | Finish | Regular, Foil and Etched (collections only) |
 | Top sets | The twelve sets with the highest value, with their set code |
 
-In a collection, clicking a bar (or pressing Enter on it) opens the Cards tab with only the matching rows, shown as a filter tag; see [Collections](/about/collections). Deck charts are not clickable.
+In a collection, clicking a bar (or pressing Enter on it) opens the Cards tab with only the matching rows, shown as a filter tag; see [Collections](/about/collections). Deck charts are not clickable. Deck statistics leave out the maybeboard, and start with Mana symbols and sources; see [Decks](/about/decks).
 

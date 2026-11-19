@@ -31,6 +31,8 @@ export function Dock({ renderPanel, children }: { renderPanel: (panel: PanelId) 
   const main = useRef<HTMLDivElement>(null);
   const [hint, setHint] = useState<Hint>(null);
   const [ghost, setGhost] = useState<{ x: number; y: number; title: string } | null>(null);
+  // the floating window being moved lets the pointer see what is under it
+  const [moving, setMoving] = useState<string | null>(null);
 
   const markCustom = (next: Layout) => setLayout(next);
 
@@ -171,17 +173,30 @@ export function Dock({ renderPanel, children }: { renderPanel: (panel: PanelId) 
     );
   }
 
+  /**
+   * Dragging a floating window by its grip moves it. Over another panel, a window edge or a docked area it shows where
+   * the window will land, and letting go docks all its panels there (joined as tabs, split beside, or docked at the
+   * edge). In open space its edges snap to the edges of other floating windows.
+   */
   function floatMove(event: ReactPointerEvent, floatId: string, mode: string) {
     if ((event.target as HTMLElement).closest(".tab") && mode === "move") return;
     const base = layout.floating.find((item) => item.id === floatId);
     if (!base) return;
-    startPointerDrag(event, (dx, dy) => {
+    let found: ReturnType<typeof targetAt> = null;
+    if (mode === "move") setMoving(floatId);
+    startPointerDrag(event, (dx, dy, e) => {
       const next = clone(layout);
       const item = next.floating.find((f) => f.id === floatId);
       if (!item) return;
       if (mode === "move") {
-        item.x = Math.max(0, Math.min(window.innerWidth - 80, base.x + dx));
-        item.y = Math.max(0, Math.min(window.innerHeight - 40, base.y + dy));
+        found = targetAt(e.clientX, e.clientY, base.group.active);
+        if (found?.target.kind === "float") found = null;
+        setHint(found?.hint ?? null);
+        let x = Math.max(0, Math.min(window.innerWidth - 80, base.x + dx));
+        let y = Math.max(0, Math.min(window.innerHeight - 40, base.y + dy));
+        if (!found) [x, y] = snapEdges(next.floating.filter((other) => other.id !== floatId), x, y, item.w, item.h);
+        item.x = x;
+        item.y = y;
       } else {
         if (mode.includes("e")) item.w = Math.max(180, base.w + dx);
         if (mode.includes("s")) item.h = Math.max(120, base.h + dy);
@@ -189,6 +204,10 @@ export function Dock({ renderPanel, children }: { renderPanel: (panel: PanelId) 
         if (mode.includes("n")) { item.h = Math.max(120, base.h - dy); item.y = base.y + base.h - item.h; }
       }
       setLayout(next);
+    }, () => {
+      setMoving(null);
+      setHint(null);
+      if (mode === "move" && found) markCustom(dockGroup(layout, base.group.panels, base.group.active, found.target));
     });
   }
 
@@ -202,7 +221,7 @@ export function Dock({ renderPanel, children }: { renderPanel: (panel: PanelId) 
       {renderArea("right")}
       <div id="dockfloat">
         {layout.floating.map((item) => (
-          <div className="dfloat" key={item.id} style={{ left: item.x, top: item.y, width: item.w, height: item.h }}>
+          <div className={moving === item.id ? "dfloat moving" : "dfloat"} key={item.id} style={{ left: item.x, top: item.y, width: item.w, height: item.h }}>
             <div className="dgrip" onPointerDown={(event) => floatMove(event, item.id, "move")} title="Drag to move" />
             {renderGroup(item.group)}
             {["n", "s", "e", "w", "ne", "nw", "se", "sw"].map((mode) => (
@@ -219,4 +238,42 @@ export function Dock({ renderPanel, children }: { renderPanel: (panel: PanelId) 
 
 function FragmentWithSplit({ show, split, children }: { show: boolean; split: ReactNode; children: ReactNode }) {
   return <>{show && split}{children}</>;
+}
+
+const SNAP = 10;
+/** Moves a floating window's position so an edge that comes within a few pixels of another window's edge lines up with it. */
+export function snapEdges(others: Array<{ x: number; y: number; w: number; h: number }>, x: number, y: number, w: number, h: number): [number, number] {
+  let bestX: number | null = null;
+  let bestY: number | null = null;
+  for (const other of others) {
+    const overlapY = y < other.y + other.h + SNAP && y + h > other.y - SNAP;
+    const overlapX = x < other.x + other.w + SNAP && x + w > other.x - SNAP;
+    if (overlapY) {
+      for (const candidate of [other.x + other.w, other.x - w, other.x, other.x + other.w - w]) {
+        if (Math.abs(candidate - x) <= SNAP && (bestX === null || Math.abs(candidate - x) < Math.abs(bestX - x))) bestX = candidate;
+      }
+    }
+    if (overlapX) {
+      for (const candidate of [other.y + other.h, other.y - h, other.y, other.y + other.h - h]) {
+        if (Math.abs(candidate - y) <= SNAP && (bestY === null || Math.abs(candidate - y) < Math.abs(bestY - y))) bestY = candidate;
+      }
+    }
+  }
+  return [bestX ?? x, bestY ?? y];
+}
+
+/** Docks every panel of a group at a drop target: the first goes to the target, the rest join it as tabs. */
+export function dockGroup(layout: Layout, panels: PanelId[], active: PanelId, target: DropTarget): Layout {
+  const [first, ...rest] = panels;
+  if (!first) return layout;
+  let next = movePanel(layout, first, target);
+  const home = () => [...(["left", "right", "bottom"] as AreaId[]).flatMap((id) => next[id].columns.flatMap((c) => c.groups)), ...next.floating.map((f) => f.group)]
+    .find((item) => item.panels.includes(first));
+  for (const panel of rest) {
+    const group = home();
+    if (group) next = movePanel(next, panel, { kind: "tab", groupId: group.id });
+  }
+  const group = home();
+  if (group && group.panels.includes(active)) group.active = active;
+  return next;
 }

@@ -174,6 +174,7 @@ function initializeLibrary(database: DatabaseSync): void {
   `);
   upgradeCopies(database);
   upgradeLinks(database);
+  upgradeDeckBuilder(database);
   const legacy = database.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'collection_items'").get();
   if (legacy) {
     database.exec("BEGIN");
@@ -363,6 +364,52 @@ function upgradeLinks(database: DatabaseSync): void {
   }
 }
 
+/**
+ * The deck builder (0.7.0): a Maybeboard zone, tags on deck cards, a deck description and cover card, the deck's change
+ * history, and the mana a card makes and the tokens it creates.
+ */
+function upgradeDeckBuilder(database: DatabaseSync): void {
+  if (!tableSql(database, "deck_cards").includes("'maybeboard'")) {
+    rebuild(database, `
+      CREATE TABLE deck_cards_v7 (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        deck_id TEXT NOT NULL REFERENCES decks(id) ON DELETE CASCADE,
+        oracle_id TEXT NOT NULL,
+        printing_id TEXT REFERENCES cards(id),
+        quantity INTEGER NOT NULL CHECK(quantity > 0),
+        zone TEXT NOT NULL CHECK(zone IN ('main', 'sideboard', 'commander', 'maybeboard')),
+        tags TEXT NOT NULL DEFAULT ''
+      );
+      INSERT INTO deck_cards_v7 (id, deck_id, oracle_id, printing_id, quantity, zone)
+        SELECT id, deck_id, oracle_id, printing_id, quantity, zone FROM deck_cards;
+      DROP TABLE deck_cards;
+      ALTER TABLE deck_cards_v7 RENAME TO deck_cards;
+      CREATE UNIQUE INDEX IF NOT EXISTS deck_cards_normal_unique ON deck_cards(deck_id, oracle_id, zone) WHERE printing_id IS NULL;
+      CREATE UNIQUE INDEX IF NOT EXISTS deck_cards_theme_unique ON deck_cards(deck_id, oracle_id, printing_id, zone) WHERE printing_id IS NOT NULL;
+    `);
+  }
+  const deckColumns = new Set(
+    (database.prepare("PRAGMA table_info(decks)").all() as Array<{ name: string }>).map((column) => column.name),
+  );
+  if (!deckColumns.has("description")) database.exec("ALTER TABLE decks ADD COLUMN description TEXT NOT NULL DEFAULT ''");
+  if (!deckColumns.has("cover_card_id")) database.exec("ALTER TABLE decks ADD COLUMN cover_card_id TEXT");
+  const cardColumns = new Set(
+    (database.prepare("PRAGMA table_info(cards)").all() as Array<{ name: string }>).map((column) => column.name),
+  );
+  if (!cardColumns.has("produced_mana")) database.exec("ALTER TABLE cards ADD COLUMN produced_mana TEXT NOT NULL DEFAULT ''");
+  if (!cardColumns.has("tokens")) database.exec("ALTER TABLE cards ADD COLUMN tokens TEXT NOT NULL DEFAULT ''");
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS deck_history (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      deck_id TEXT NOT NULL REFERENCES decks(id) ON DELETE CASCADE,
+      at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%f', 'now')),
+      user_name TEXT NOT NULL DEFAULT '',
+      change TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS deck_history_deck_idx ON deck_history(deck_id, id);
+  `);
+}
+
 /** Collections and decks without an owner (from before accounts owned data) go to the oldest account. */
 export function assignUnowned(database: DatabaseSync): void {
   const oldest = database.prepare("SELECT id FROM users ORDER BY id LIMIT 1").get();
@@ -374,6 +421,11 @@ export function assignUnowned(database: DatabaseSync): void {
 /** Card details that 0.2.0 added; kept separate so older callers of cardInsertStatement keep working. */
 export function cardExtrasStatement(database: DatabaseSync) {
   return database.prepare("UPDATE cards SET finishes = ?, promo = ?, variation = ? WHERE id = ?");
+}
+
+/** The colors of mana a card makes and the tokens it creates (0.7.0), stored on each card database update. */
+export function cardBuilderStatement(database: DatabaseSync) {
+  return database.prepare("UPDATE cards SET produced_mana = ?, tokens = ? WHERE id = ?");
 }
 
 /** Prices and the flavor name (0.3.0), stored on each card database update. */

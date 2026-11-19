@@ -23,6 +23,8 @@
 | Currency | US dollars or euros, the unit for every price and value on screen |
 | Filter tag | A narrowing of the collection list chosen by clicking a set code, rarity or Statistics bar |
 | Binder layout | The collection shown as pages of nine card images |
+| Grid layout | The collection shown as card pictures that fill the width, loading more while scrolling |
+| Switcher | The button with the open collection's or deck's name that opens a searchable list of the others |
 | Flavor name | Another name printed on some versions of a card, matched by search and imports |
 | Ownership | Which deck cards you own across your collections |
 | Target collection | The collection that Add to collection puts cards into |
@@ -46,12 +48,19 @@
 | Card page | The full view of one card: art, text, versions with prices, rulings and where you own it |
 | Quick mode | A scanner setting that takes the first matching printing instead of asking |
 | Set filter | The scanner sets outside which a card gives a "Not in set" warning |
-| Zone | Where a card sits in a deck: main deck, sideboard or commander |
+| Zone | Where a card sits in a deck: commander, main deck, sideboard or maybeboard |
+| Maybeboard | The zone for cards being considered; not counted in the deck's size, value, ownership or legality |
+| Tag | A word you give deck cards, such as Ramp, to group them |
+| Quick add | The box in the deck view that adds a card by typing a count and name |
+| Cover card | The card whose picture stands for a deck in the switcher |
+| Legality | Whether a deck follows its format's rules |
+| Token | A card that a deck's cards create during a game, listed under Tokens |
+| Playtest | Drawing sample hands from a deck without changing it |
 | Target zone | The zone that Add to deck puts cards into |
 | Scanned list | Cards recognized by the scanner or added by name, waiting on this device to be added to a collection or deck |
 | Information line | The small text at the bottom left of a card printed since 2019, with the collector number, rarity letter, set code and language |
 | Open deck | The deck that Add to deck, the Deck list panel and the deck view work with |
-| Format | A deck's label (Commander, Standard and so on). Mana Vault does not check format rules |
+| Format | The game type a deck is built for (Commander, Standard and so on), which the deck is checked against. Casual decks are not checked |
 | Mana value | The total mana in a card's cost, used by the mv filter |
 | Color identity | Every color in a card's cost and rules text, used by the id filter |
 | Selected card | The row last clicked or moved to with Up and Down; its details show in the Card panel |

@@ -3,7 +3,7 @@ import { useState } from "react";
 import type { Action } from "../actions";
 import { Icon } from "../icons";
 import { useApp, zoneLabel } from "../store";
-import { capitalize, FORMATS, money, type OwnedIn } from "../types";
+import { capitalize, FORMATS, formatName, money, type OwnedIn } from "../types";
 import { Meter } from "../views/CollectionView";
 import { NoDeck, Quantity, zoneGroups } from "../views/Views";
 
@@ -26,7 +26,7 @@ export function FiltersPanel({ actions }: { actions: Record<string, Action> }) {
         <div className="prow"><label htmlFor="flt-set">Set code</label>{text("set", "lea")}</div>
         <div className="prow"><label htmlFor="flt-color">Color</label>{select("color", [["", "Any color"], ["W", "White"], ["U", "Blue"], ["B", "Black"], ["R", "Red"], ["G", "Green"]])}</div>
         <div className="prow"><label htmlFor="flt-rarity">Rarity</label>{select("rarity", [["", "Any rarity"], ["common", "Common"], ["uncommon", "Uncommon"], ["rare", "Rare"], ["mythic", "Mythic"]])}</div>
-        <div className="prow"><label htmlFor="flt-format">Legal in</label>{select("format", [["", "Any format"], ...FORMATS.filter((f) => f !== "casual").map((f): [string, string] => [f, capitalize(f)])])}</div>
+        <div className="prow"><label htmlFor="flt-format">Legal in</label>{select("format", [["", "Any format"], ...FORMATS.filter((f) => f !== "casual").map((f): [string, string] => [f, formatName(f)])])}</div>
       </div>
       <div className="pgrp">
         <h4>Mana value</h4>
@@ -79,7 +79,8 @@ export function CollectionsPanel({ actions }: { actions: Record<string, Action> 
 export function DecksPanel({ actions }: { actions: Record<string, Action> }) {
   const store = useApp();
   const [term, setTerm] = useState("");
-  const shown = store.decks.filter((deck) => deck.name.toLowerCase().includes(term.trim().toLowerCase()));
+  const words = term.trim().toLowerCase();
+  const shown = store.decks.filter((deck) => `${deck.name} ${deck.commander ?? ""}`.toLowerCase().includes(words));
   return (
     <div className="pbody flush">
       <div className="navbar">
@@ -88,8 +89,8 @@ export function DecksPanel({ actions }: { actions: Record<string, Action> }) {
       </div>
       {store.decks.length === 0 && <p className="note pad">No decks yet</p>}
       {shown.map((deck) => (
-        <div key={deck.id} className={store.deck?.id === deck.id ? "navitem active" : "navitem"} role="button" onClick={() => void store.openDeck(deck.id)}
-          onDoubleClick={() => store.setView("deck")}>
+        <div key={deck.id} className={store.deck?.id === deck.id ? "navitem active" : "navitem"} role="button" title={[deck.commander, formatName(deck.format)].filter(Boolean).join(", ")}
+          onClick={() => void store.openDeck(deck.id).then(() => store.setView("deck"))}>
           <span className="nl">{deck.name}</span>
           {(deck.role === "member" || (deck.sharedWith?.length ?? 0) > 0) && <span className="badge">Shared</span>}
           <span className="cnt">{deck.card_count ?? 0}</span>
@@ -164,14 +165,14 @@ export function DeckListPanel({ actions }: { actions: Record<string, Action> }) 
   const store = useApp();
   const { deck } = store;
   if (!deck) return <div className="pbody"><NoDeck actions={actions} compact /></div>;
-  const total = deck.cards.reduce((sum, card) => sum + card.quantity, 0);
+  const total = deck.cards.filter((card) => card.zone === "main" || card.zone === "commander").reduce((sum, card) => sum + card.quantity, 0);
   return (
     <div className="pbody flush">
       <div className="dlhead">
         <div className="ident">{deck.name}</div>
-        <div className="sub">{capitalize(deck.format)}, {total} cards</div>
+        <div className="sub">{formatName(deck.format)}, {total} cards</div>
         <div className="seg" role="group" aria-label="Target zone">
-          {(["zone.main", "zone.sideboard", "zone.commander"] as const).map((id) => (
+          {(["zone.main", "zone.sideboard", "zone.commander", "zone.maybeboard"] as const).map((id) => (
             <button key={id} type="button" className={actions[id]?.on ? "on" : ""} onClick={actions[id]?.run}>{actions[id]?.short}</button>
           ))}
         </div>

@@ -10,7 +10,8 @@ import { CardPage } from "../views/CardPage";
 import { CollectionView } from "../views/CollectionView";
 import { HomeView } from "../views/HomeView";
 import { TradeView } from "../views/TradeView";
-import { CardsView, DeckView } from "../views/Views";
+import { CardsView } from "../views/Views";
+import { DeckView } from "../views/DeckView";
 import { About } from "./About";
 import CardScanner from "./CardScanner";
 import { ContextMenuHost } from "./ContextMenu";
@@ -117,7 +118,7 @@ function PhoneMenu({ actions, close }: { actions: Record<string, Action>; close:
 
 export function PhoneShell({ actions }: { actions: Record<string, Action> }) {
   const store = useApp();
-  const [sheet, setSheet] = useState<"filters" | "menu" | "decks" | null>(null);
+  const [sheet, setSheet] = useState<"filters" | "menu" | null>(null);
   const lastKey = useRef<string | null>(null);
 
   // tapping a card opens its card page
@@ -153,13 +154,12 @@ export function PhoneShell({ actions }: { actions: Record<string, Action> }) {
         <span className="ptitle">{title}</span>
         {isApp() && <SyncChip />}
         {store.offers.inbox.length > 0 && <button type="button" className="pbtn" onClick={actions.inbox?.run}>Inbox <span className="cbadge">{store.offers.inbox.length}</span></button>}
-        {store.view === "deck" && !store.scannerOpen && !store.cardPage && <button type="button" className="pbtn" onClick={() => setSheet("decks")}>Decks</button>}
         <button type="button" className={sheet === "menu" ? "pbtn on" : "pbtn"} aria-label="Menu" onClick={() => setSheet(sheet === "menu" ? null : "menu")}><Icon name="menu" /></button>
       </div>
       <div id="pmain" className={store.scannerOpen && !store.cardPage ? "scanning" : undefined}>
         {store.scannerOpen && !store.cardPage
           ? <CardScanner phone onClose={() => store.setScannerOpen(false)} />
-          : store.view === "deck" && !store.deck && !store.cardPage ? <DecksPanel actions={actions} /> : <CenterView actions={actions} onFilters={() => setSheet("filters")} />}
+          : <CenterView actions={actions} onFilters={() => setSheet("filters")} />}
       </div>
       {store.flashMsg && <div className={store.flashMsg.kind === "err" ? "ptoast err" : "ptoast"} role="status" key={store.flashMsg.id}>{store.flashMsg.text}</div>}
       <nav id="ptabs" aria-label="Main">
@@ -172,7 +172,6 @@ export function PhoneShell({ actions }: { actions: Record<string, Action> }) {
         </button>
       </nav>
       {sheet === "filters" && <Sheet title="Filters" onClose={close}><FiltersPanel actions={actions} /></Sheet>}
-      {sheet === "decks" && <Sheet title="Decks" onClose={close}><DecksPanel actions={actions} /></Sheet>}
       {sheet === "menu" && <Sheet title="Menu" onClose={close}><PhoneMenu actions={actions} close={close} /></Sheet>}
       <ContextMenuHost />
     </div>

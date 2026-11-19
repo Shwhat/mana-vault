@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import { menu, signUp, status, test, expect } from "./fixtures";
+import { menu, signUp, status, test, expect, switchTo } from "./fixtures";
 
 type Read = { lines: string[]; info: string } | null;
 
@@ -139,7 +139,7 @@ test("the scanned list stays after a reload and goes into a deck through a colle
   // the deck card shows the collection its copy is in, and the collection shows the deck
   await expect(page.locator("#view-deck .row", { hasText: "Lightning Bolt" }).locator(".badge.col")).toHaveText("Burn");
   await page.keyboard.press("2");
-  await page.locator("#view-collection .colpick").selectOption({ label: "Burn" });
+  await switchTo(page, "collection", "Burn");
   await expect(page.locator("#view-collection .row", { hasText: "Lightning Bolt" }).locator(".badge.deck")).toHaveText("Burn");
 
   // the next time, the deck's collection is filled in; Clear asks first

@@ -10,10 +10,12 @@ import { applyTheme, type Prefs, savePrefs } from "./prefs";
 import {
   type BackupSummary, type Candidate, type Card, type CardDetail, type CatalogStatus, type Collection, type CollectionEntry, type CollectionTab,
   type CompletionReport, type CopyKey, type Deck, type DeckCard, type DeckTab, type Facets, type FinishCode, type Ownership, type PriceFields, type Stats,
-  type DeckDetail, EMPTY_FILTERS, type Filters, type ImportReport, type TradeEntry, type User, type View, type Zone, capitalize,
+  type CollectionLayout, type DeckDetail, EMPTY_FILTERS, type Filters, type ImportReport, type TradeEntry, type User, type View, type Zone, capitalize,
   cardTypes, colorKey, copyKey, copyPrice, curveKey, money, priceOf, pricesOf,
 } from "./types";
 import { candidateLabel } from "./components/LibraryDialogs";
+import { parseQuickAdd } from "./deck-rules";
+import { usePhone } from "./narrow";
 
 export type Selection = { view: "cards" | "collection" | "deck"; key: string; printingId: string } | null;
 export type Flash = { text: string; kind: "ok" | "err"; id: number } | null;
@@ -34,6 +36,7 @@ const message = (reason: unknown, fallback: string) => (reason instanceof Error 
 
 export function useStoreState(user: User, initialPrefs: Prefs) {
   const [prefs, setPrefsState] = useState(initialPrefs);
+  const phone = usePhone();
   const [view, setViewState] = useState<View>(() => {
     if (window.location.pathname.startsWith("/about")) return "about";
     // phones open on Home
@@ -92,7 +95,7 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
     setPrefsState((current) => {
       const delta = typeof change === "function" ? change(current) : change;
       const next = { ...current, ...delta };
-      savePrefs(next, "lastDeckId" in delta || "openCollection" in delta || "targetCollection" in delta);
+      savePrefs(next, "lastDeckId" in delta || "openCollection" in delta || "targetCollection" in delta || "recent" in delta);
       return next;
     });
   }, []);
@@ -133,6 +136,20 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
     setViewState(lastView);
     window.history.pushState(null, "", "/");
   }, [lastView]);
+
+  /** Going anywhere else closes the About guide, so it never hides what was opened. */
+  const leaveAbout = useCallback(() => {
+    setViewState((current) => {
+      if (current !== "about") return current;
+      if (window.location.pathname.startsWith("/about")) window.history.pushState(null, "", "/");
+      return lastView;
+    });
+  }, [lastView]);
+
+  /** Remembers when a collection or deck was opened, for the switcher's Recently opened order. */
+  const markRecent = useCallback((id: string) => {
+    setPrefs((current) => ({ recent: Object.fromEntries([[id, Date.now()], ...Object.entries(current.recent).filter(([key]) => key !== id)].slice(0, 300)) }));
+  }, [setPrefs]);
 
   useEffect(() => {
     const onPop = () => {
@@ -243,12 +260,16 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
       const detail = await loadDeck(id);
       setDeck(detail);
       setPrefs({ lastDeckId: id });
-      if (!quiet) flash(`${detail.name} opened`);
+      if (!quiet) {
+        markRecent(id);
+        leaveAbout();
+        flash(`${detail.name} opened`);
+      }
     } catch (reason) {
       if (!quiet) fail(reason, "Could not open the deck.");
       else setPrefs({ lastDeckId: null });
     }
-  }, [loadDeck, setPrefs, flash, fail]);
+  }, [loadDeck, setPrefs, flash, fail, markRecent, leaveAbout]);
 
   const reloadDeck = useCallback(async () => {
     const current = live.current.deck;
@@ -274,10 +295,11 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
   }, []);
 
   const select = useCallback((next: Selection) => {
+    if (next) leaveAbout();
     setSelection(next);
     if (next) void reloadCardDetail(next.printingId);
     else setCardDetail(null);
-  }, [reloadCardDetail]);
+  }, [reloadCardDetail, leaveAbout]);
 
   useEffect(() => {
     void reloadDecks();
@@ -561,8 +583,13 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
     const linkText = (card?: DeckCard) => JSON.stringify((card?.links ?? []).map((link) => [link.collectionId, link.cardId, link.foil, link.condition, link.language, !!link.proxy, link.quantity]));
     for (const card of to.cards) {
       const entry = settled.cards.find((other) => same(card, other));
-      if (!entry || linkText(entry) === linkText(card)) continue;
-      await request(`/api/decks/${encodeURIComponent(to.id)}/entries/${entry.entry_id}/links`, { method: "PUT", body: JSON.stringify({ links: card.links ?? [] }) });
+      if (!entry) continue;
+      if (linkText(entry) !== linkText(card)) {
+        await request(`/api/decks/${encodeURIComponent(to.id)}/entries/${entry.entry_id}/links`, { method: "PUT", body: JSON.stringify({ links: card.links ?? [] }) });
+      }
+      if (JSON.stringify(entry.tags ?? []) !== JSON.stringify(card.tags ?? [])) {
+        await request(`/api/decks/${encodeURIComponent(to.id)}/entries/${entry.entry_id}/tags`, { method: "PUT", body: JSON.stringify({ tags: card.tags ?? [] }) });
+      }
     }
   }, [loadDeck, writeDeck]);
 
@@ -581,13 +608,14 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
    * Adds a printing to the open deck. A free copy in one collection is linked at once; when copies are in more than
    * one collection the person picks one; with none the card is missing.
    */
-  const addToDeck = useCallback(async (cardId: string, name: string, chosen?: Candidate | null) => {
+  const addToDeck = useCallback(async (cardId: string, name: string, chosen?: Candidate | null, options?: { quantity?: number; zone?: Zone }) => {
     const current = live.current.deck;
     if (!current) {
       flash("Open or create a deck first", "err");
       return;
     }
-    const zone = prefs.zone;
+    const zone = options?.zone ?? prefs.zone;
+    const quantity = Math.max(1, Math.min(100, options?.quantity ?? 1));
     let link: Candidate | null = chosen ?? null;
     if (chosen === undefined) {
       try {
@@ -596,7 +624,7 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
         if (places.size > 1) {
           dialog(`Add ${name} to ${current.name}`, [
             ["copy", "Use the copy in", "0", "select", [...candidates.map((item, index): [string, string] => [String(index), candidateLabel(item)]), ["", "None (missing)"]]],
-          ], async (values) => { await addToDeck(cardId, name, values.copy === "" ? null : candidates[Number(values.copy)] ?? null); }, "Add");
+          ], async (values) => { await addToDeck(cardId, name, values.copy === "" ? null : candidates[Number(values.copy)] ?? null, options); }, "Add");
           return;
         }
         link = candidates[0] ?? null;
@@ -604,14 +632,17 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
         link = null;
       }
     }
+    // maybeboard cards are only being considered, so no copy is linked to them
+    if (zone === "maybeboard") link = null;
     try {
       const before = await loadDeck(current.id);
-      const links = link ? [{ ...link, quantity: 1 }] : undefined;
-      await request(`/api/decks/${encodeURIComponent(current.id)}/cards`, { method: "POST", body: JSON.stringify({ cardId, quantity: 1, zone, links }) });
+      const links = link ? [{ ...link, quantity: Math.min(quantity, link.free) }] : undefined;
+      await request(`/api/decks/${encodeURIComponent(current.id)}/cards`, { method: "POST", body: JSON.stringify({ cardId, quantity, zone, links }) });
       const after = await loadDeck(current.id);
       const zoneLabel = zone === "main" ? "" : ` (${zone})`;
-      pushUndo({ label: `Add ${name} to ${current.name}`, undo: () => restoreDeck(after, before), redo: () => restoreDeck(before, after) });
-      flash(`${name} added to ${current.name}${zoneLabel}${link ? `, from ${link.collectionName}` : ""}`);
+      const count = quantity > 1 ? `${quantity} ` : "";
+      pushUndo({ label: `Add ${count}${name} to ${current.name}`, undo: () => restoreDeck(after, before), redo: () => restoreDeck(before, after) });
+      flash(`${count}${name} added to ${current.name}${zoneLabel}${link ? `, from ${link.collectionName}` : ""}`);
       await refreshAfterChange();
     } catch (reason) {
       fail(reason, "Could not add the card to the deck.");
@@ -675,13 +706,87 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
     }
   }, [writeDeck, pushUndo, flash, fail, refreshAfterChange]);
 
+  /** Saves a deck card's tags. */
+  const setDeckTags = useCallback(async (card: DeckCard, tags: string[]) => {
+    const current = live.current.deck;
+    if (!current) return;
+    const base = `/api/decks/${encodeURIComponent(current.id)}/entries/${card.entry_id}/tags`;
+    const from = card.tags ?? [];
+    try {
+      await request(base, { method: "PUT", body: JSON.stringify({ tags }) });
+      pushUndo({
+        label: `Tags of ${card.name}`,
+        undo: async () => { await request(base, { method: "PUT", body: JSON.stringify({ tags: from }) }); },
+        redo: async () => { await request(base, { method: "PUT", body: JSON.stringify({ tags }) }); },
+      });
+      flash(tags.length ? `${card.name} tagged ${tags.join(", ")}` : `Tags removed from ${card.name}`);
+      await reloadDeck();
+    } catch (reason) {
+      fail(reason, "Could not save the tags.");
+    }
+  }, [pushUndo, flash, fail, reloadDeck]);
+
+  /** Changes the open deck's format, description or cover card. */
+  const updateDeckInfo = useCallback(async (change: { format?: string; description?: string; coverCardId?: string | null }, done: string) => {
+    const current = live.current.deck;
+    if (!current) return false;
+    try {
+      await request(`/api/decks/${encodeURIComponent(current.id)}`, { method: "PATCH", body: JSON.stringify(change) });
+      flash(done);
+      await Promise.all([reloadDeck(), reloadDecks()]);
+      return true;
+    } catch (reason) {
+      fail(reason, "Could not save the deck.");
+      return false;
+    }
+  }, [flash, fail, reloadDeck, reloadDecks]);
+
+  /** Quick add: "2 Sol Ring" adds two Sol Ring to the chosen zone of the open deck. */
+  const quickAdd = useCallback(async (text: string, zone: Zone): Promise<boolean> => {
+    const line = parseQuickAdd(text);
+    if (!line) {
+      flash("Type a card name, such as 2 Sol Ring", "err");
+      return false;
+    }
+    try {
+      const params = new URLSearchParams({ name: line.name, set: line.set, number: line.number });
+      const found = await request<{ id: string; name: string }>(`/api/cards/resolve?${params}`);
+      await addToDeck(found.id, found.name, undefined, { quantity: line.quantity, zone });
+      return true;
+    } catch (reason) {
+      fail(reason, "Could not find the card.");
+      return false;
+    }
+  }, [addToDeck, flash, fail]);
+
+  /** Makes the open deck match a deck list typed as text, as one undo step. */
+  const replaceDeckText = useCallback(async (text: string) => {
+    const current = live.current.deck;
+    if (!current) return;
+    try {
+      const before = await loadDeck(current.id);
+      const report = await request<{ added: number; removed: number; changed: number }>(`/api/decks/${encodeURIComponent(current.id)}/replace`, {
+        method: "POST", body: JSON.stringify({ text }),
+      });
+      const after = await loadDeck(current.id);
+      pushUndo({ label: `Edit ${current.name} as text`, undo: () => restoreDeck(after, before), redo: () => restoreDeck(before, after) });
+      flash(`${current.name} updated: ${report.added} added, ${report.changed} changed, ${report.removed} removed`);
+      await refreshAfterChange();
+    } catch (reason) {
+      fail(reason, "Could not apply the deck list.");
+    }
+  }, [loadDeck, pushUndo, restoreDeck, flash, fail, refreshAfterChange]);
+
   const createDeck = useCallback(async (name: string, format: string, open = true): Promise<Deck> => {
     const created = await request<Deck>("/api/decks", { method: "POST", body: JSON.stringify({ name, format, id: crypto.randomUUID() }) });
-    if (open) await openDeck(created.id, true);
+    if (open) {
+      await openDeck(created.id, true);
+      markRecent(created.id);
+    }
     await reloadDecks();
     flash(`${created.name} created`);
     return created;
-  }, [openDeck, reloadDecks, flash]);
+  }, [openDeck, reloadDecks, flash, markRecent]);
 
   // ---------- imports, exports and backups ----------
   const showReview = useCallback((title: string, report: ImportReport, done: boolean) => {
@@ -891,6 +996,22 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
     }
   }, [listItems, selection, select, library]);
 
+  const showCardPage = useCallback((id: string | null) => {
+    if (id) leaveAbout();
+    setCardPage(id);
+  }, [leaveAbout]);
+  const openCollection = useCallback((id: string) => {
+    library.openCollection(id);
+    markRecent(id);
+    leaveAbout();
+  }, [library, markRecent, leaveAbout]);
+
+  /** The collection layout on this device: phones and the desktop each remember their own. */
+  const layout: CollectionLayout = phone ? prefs.collectionLayoutPhone : prefs.collectionLayout;
+  const setCollectionLayout = useCallback((next: CollectionLayout) => {
+    setPrefs(phone ? { collectionLayoutPhone: next } : { collectionLayout: next });
+  }, [phone, setPrefs]);
+
   /** The selected row's printing and name, known at once without waiting for the card details to load. */
   const selectedCard = useMemo((): { id: string; name: string } | null => {
     if (!selection) return null;
@@ -911,7 +1032,8 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
     trade, addTradeLine, setTradeQuantity, tradeTotal, clearTrade, copyTradeSummary, giveEntry, getCard,
     collections, reloadCollections, collectionName, collectionTab, setCollectionTab, completion, reloadCompletion,
     checked, setChecked, pickRow, selectMode, setSelectMode, ...library,
-    decks, deck, openDeck, reloadDecks, createDeck,
+    decks, deck, openDeck, reloadDecks, createDeck, setDeckTags, updateDeckInfo, quickAdd, replaceDeckText, markRecent, leaveAbout,
+    phone, layout, setCollectionLayout,
     selection, select, cardDetail, selectedCard, moveSelection,
     catalog, catalogRequestPending, updateCatalog,
     review, setReview,
@@ -920,12 +1042,12 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
     addToCollection, setCollectionQuantity, addToDeck, setDeckQuantity, moveDeckCard,
     showReview, downloadBackup, restoreBackup, loadCandidates, setDeckLinks, restoreDeck, loadDeck, restoreWishes,
     applyWorkspace, saveWorkspace, deleteWorkspace,
-    scannerOpen, setScannerOpen, ...scan, cardPage, setCardPage, contextMenu, setContextMenu,
+    scannerOpen, setScannerOpen, ...scan, cardPage, setCardPage: showCardPage, contextMenu, setContextMenu, openCollection,
     refreshAfterChange,
   };
 }
 
-const ZONE_ORDER: Record<Zone, number> = { commander: 0, main: 1, sideboard: 2 };
+const ZONE_ORDER: Record<Zone, number> = { commander: 0, main: 1, sideboard: 2, maybeboard: 3 };
 export function sortDeck(cards: DeckCard[]): DeckCard[] {
   return [...cards].sort((a, b) => ZONE_ORDER[a.zone] - ZONE_ORDER[b.zone] || a.name.localeCompare(b.name));
 }

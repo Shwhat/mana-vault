@@ -94,17 +94,17 @@ test("deck building with zones, moves and undo", async ({ page }) => {
   await expect(status(page)).toHaveText("Lightning Bolt added to Burn test (sideboard)");
 
   await page.keyboard.press("3");
-  await expect(page.locator(".zonehead")).toHaveText(["Main deck 2", "Sideboard 1"]);
+  await expect(page.locator("#view-deck .boardhead")).toHaveText(["Main deck 2", "Sideboard 1"]);
   const side = page.locator("#view-deck .row").nth(1);
   await side.locator(".zonesel").selectOption("main");
-  await expect(page.locator(".zonehead")).toHaveText(["Main deck 3"]);
+  await expect(page.locator("#view-deck .boardhead")).toHaveText(["Main deck 3"]);
   await expect(page.locator("#view-deck .row")).toHaveCount(2);
   await page.keyboard.press("Control+z");
-  await expect(page.locator(".zonehead")).toHaveText(["Main deck 2", "Sideboard 1"]);
+  await expect(page.locator("#view-deck .boardhead")).toHaveText(["Main deck 2", "Sideboard 1"]);
   await page.locator("#view-deck .row").first().getByRole("button", { name: /Remove Lightning Bolt from deck/ }).click();
-  await expect(page.locator(".zonehead")).toHaveText(["Sideboard 1"]);
+  await expect(page.locator("#view-deck .boardhead")).toHaveText(["Sideboard 1"]);
   await page.keyboard.press("Control+z");
-  await expect(page.locator(".zonehead")).toHaveText(["Main deck 2", "Sideboard 1"]);
+  await expect(page.locator("#view-deck .boardhead")).toHaveText(["Main deck 2", "Sideboard 1"]);
 
   await menu(page, "Home", "Export...");
   await page.locator("#ex-what").selectOption("deck");
@@ -156,7 +156,7 @@ test("decklist import into a deck", async ({ page }) => {
   await expect(status(page)).toHaveText("Imported 8 cards from 4 rows into Imported");
   await expect(page.locator("dialog[open]")).toHaveCount(0);
   await page.keyboard.press("3");
-  await expect(page.locator(".zonehead")).toHaveText(["Commander 1", "Main deck 5", "Sideboard 2"]);
+  await expect(page.locator("#view-deck .boardhead")).toHaveText(["Commander 1", "Main deck 5", "Sideboard 2"]);
 });
 
 test("theme and preferences are saved per account", async ({ page }) => {
@@ -189,7 +189,20 @@ test("panels close, reopen, float and workspaces apply", async ({ page }) => {
   await page.mouse.up();
   await expect(page.locator('.dfloat .tab[data-panel="filters"]')).toBeVisible();
 
-  await page.locator(".wsbox select").selectOption("Collection");
+  // a floating window dragged by its grip onto a docked panel joins it as a tab
+  const grip = await page.locator(".dfloat .dgrip").boundingBox();
+  const cardTabs = await page.locator('.dtabs:has(.tab[data-panel="card"])').boundingBox();
+  if (!grip || !cardTabs) throw new Error("floating window not found");
+  await page.mouse.move(grip.x + 20, grip.y + grip.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(cardTabs.x + cardTabs.width / 2, cardTabs.y + cardTabs.height / 2, { steps: 8 });
+  await expect(page.locator("#dockhint")).toBeVisible();
+  await page.mouse.up();
+  await expect(page.locator(".dfloat")).toHaveCount(0);
+  await expect(page.locator('.dgroup:has(.tab[data-panel="card"]) .tab[data-panel="filters"]')).toBeVisible();
+
+  await page.locator(".wsbox .wsbtn").dispatchEvent("mousedown");
+  await page.locator("#dropdown .dd", { hasText: "Collection" }).click();
   await expect(status(page)).toHaveText("Collection workspace");
   await expect(page.locator("#view-collection")).toBeVisible();
   await expect(page.locator(".dfloat")).toHaveCount(0);
@@ -281,18 +294,20 @@ test.describe("phone layout", () => {
     await page.locator(".ptab", { hasText: "Collection" }).click();
     await expect(page.locator("#view-collection .row", { hasText: "Counterspell" }).first()).toBeVisible();
     await page.locator(".ptab", { hasText: "Decks" }).click();
-    await expect(page.locator("#pmain")).toContainText("New...");
+    await expect(page.locator("#pmain")).toContainText("New deck...");
     await page.getByRole("button", { name: "Menu" }).click();
     await expect(page.locator(".pmrow", { hasText: "Sign out" })).toBeVisible();
     await expect(page.locator(".pmsection > summary")).toContainText(["Home", "Collection", "Decks"]);
-    await page.locator(".pmsection > summary", { hasText: "Home" }).click();
+    await page.locator(".pmsection > summary", { hasText: "Home" }).first().click();
     await expect(page.locator(".pmsub > summary", { hasText: "Backup" })).toBeVisible();
     await expect(page.locator(".pmrow", { hasText: "Customize ribbon" })).toHaveCount(0);
     const box = await page.locator(".pmrow").first().boundingBox();
     expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
     await page.locator(".sheethead .btn").click();
     await page.locator(".ptab", { hasText: "Collection" }).click();
-    await page.getByRole("button", { name: "Select" }).click();
+    await page.getByRole("button", { name: /Options/ }).click();
+    await page.getByLabel("Select several cards").check();
+    await page.locator(".optpop").getByRole("button", { name: "Done" }).click();
     await page.locator("#view-collection .row", { hasText: "Counterspell" }).first().locator(".rowtitle").click();
     await expect(page.locator(".pickbar")).toContainText("1 picked");
     await expect(page.locator(".sheet")).toHaveCount(0);
