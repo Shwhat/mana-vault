@@ -1,6 +1,6 @@
 # Accounts and access
 
-Every visit to Mana Vault needs a signed-in account. This page covers sign-in, accounts, passwords and sessions.
+Every visit to Mana Vault needs a signed-in account. This page covers sign-in, accounts, passwords, sessions and devices. Signing in the Android app is described in [Android app](/about/android-app).
 
 ## Sign-in page
 
@@ -36,7 +36,11 @@ When Mana Vault is updated from a version before 0.2.0, the collection and decks
 
 1. Open the account menu (your user name at the right of the menu bar) and choose **Change password...**.
 2. Enter the current password and the new one twice, then choose **Change password**.
-3. Every other browser signed in to the account is signed out. This browser stays signed in.
+3. Every other browser and every phone signed in to the account is signed out. This browser (or phone) stays signed in.
+
+## Devices
+
+Each phone signed in with the Android app has its own device sign-in. **Devices...** (account menu, or Menu on the phone) lists them with the time each last reached the server; **This phone** marks the phone in use. **Remove** signs a phone out. Phones do not appear in the list for browser sessions.
 
 ## Protection against guessing
 
@@ -58,3 +62,4 @@ When Mana Vault is updated from a version before 0.2.0, the collection and decks
 | The new passwords do not match | The two new password fields differ | Type them again |
 | Password changed. Other devices are signed out. | The password was changed | None |
 | You are signed out. Sign in again to continue. | The session ended or expired | Sign in again |
+| That device is not signed in. | Remove was used on a phone that was already removed | None |

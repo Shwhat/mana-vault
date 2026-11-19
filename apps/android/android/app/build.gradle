@@ -1,0 +1,78 @@
+apply plugin: 'com.android.application'
+
+import groovy.json.JsonSlurper
+
+// The app has the same version as Mana Vault (package.json at the repository root).
+def manaVaultVersion = new JsonSlurper().parse(file('../../../../package.json')).version
+def versionParts = manaVaultVersion.tokenize('.').collect { it as int }
+def manaVaultVersionCode = versionParts[0] * 10000 + versionParts[1] * 100 + versionParts[2]
+
+// Release signing comes from environment variables (GitHub Actions secrets); without them the release build is unsigned.
+def keystorePath = System.getenv('MANAVAULT_KEYSTORE')
+
+android {
+    namespace = "com.shwhat.manavault"
+    compileSdk = rootProject.ext.compileSdkVersion
+    defaultConfig {
+        applicationId "com.shwhat.manavault"
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        versionCode manaVaultVersionCode
+        versionName manaVaultVersion
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        aaptOptions {
+             // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
+             // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
+            ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
+        }
+    }
+    signingConfigs {
+        release {
+            if (keystorePath) {
+                storeFile file(keystorePath)
+                storePassword System.getenv('MANAVAULT_KEYSTORE_PASSWORD')
+                keyAlias System.getenv('MANAVAULT_KEY_ALIAS')
+                keyPassword System.getenv('MANAVAULT_KEY_PASSWORD')
+            }
+        }
+    }
+    buildFeatures {
+        buildConfig = true
+    }
+    buildTypes {
+        release {
+            if (keystorePath) signingConfig signingConfigs.release
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+}
+
+repositories {
+    flatDir{
+        dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs'
+    }
+}
+
+dependencies {
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
+    implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
+    implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
+    implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
+    implementation project(':capacitor-android')
+    implementation "com.google.mlkit:text-recognition:$mlkitTextVersion"
+    implementation "androidx.work:work-runtime:$workVersion"
+    implementation "androidx.security:security-crypto:$securityCryptoVersion"
+    implementation project(':capacitor-cordova-android-plugins')
+}
+
+apply from: 'capacitor.build.gradle'
+
+try {
+    def servicesJSON = file('google-services.json')
+    if (servicesJSON.text) {
+        apply plugin: 'com.google.gms.google-services'
+    }
+} catch(Exception e) {
+    logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
+}

@@ -61,7 +61,7 @@ export function MenuBar({ actions }: { actions: Record<string, Action> }) {
     setOpen({ name, x, y: rect.bottom, items });
   };
 
-  const account: MenuItem[] = ["inbox", "-", "password", "-", "signout"];
+  const account: MenuItem[] = ["inbox", "-", "password", "devices", "-", "signout"];
 
   return (
     <div id="menubar" ref={bar}>

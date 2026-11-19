@@ -1,9 +1,13 @@
-import { StrictMode, useEffect, useState } from "react";
+import { StrictMode, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { type Action, useActions } from "./actions";
 import { request, SignedOutError } from "./api";
+import { AppSignIn, checkForUpdate, showSyncProblems } from "./android/AppScreens";
+import { onSignedOut } from "./android/net";
+import { PROBLEM_EVENT, startSync, SYNCED_EVENT, type SyncProblem } from "./android/offline";
+import { clearSettings, isApp, loadSettings, native, signedIn, watchBackButton } from "./android/platform";
 import CardScanner from "./components/CardScanner";
-import { DialogHost, isDialogOpen } from "./components/Dialog";
+import { closeDialog, DialogHost, isDialogOpen } from "./components/Dialog";
 import { DesktopShell, PhoneShell } from "./components/Shell";
 import { applyTheme, loadPrefs, type Prefs, watchSystemTheme } from "./prefs";
 import { type Store, StoreContext, useStoreState } from "./store";
@@ -95,9 +99,11 @@ function useKeyboard(store: Store, actions: Record<string, Action>) {
 function App({ user, prefs }: { user: User; prefs: Prefs }) {
   const store = useStoreState(user, prefs);
   const actions = useActions(store);
-  const narrow = useNarrow();
+  // the Android app always uses the phone layout
+  const narrow = useNarrow() || isApp();
   useKeyboard(store, actions);
   useEffect(() => watchSystemTheme(() => store.prefs.theme), [store.prefs.theme]);
+  useAppFeatures(store, actions);
   return (
     <StoreContext.Provider value={store}>
       {narrow ? <PhoneShell actions={actions} /> : <DesktopShell actions={actions} />}
@@ -107,7 +113,70 @@ function App({ user, prefs }: { user: User; prefs: Prefs }) {
   );
 }
 
+/** What the Android app adds: the Back button, sync results, offers opened from a notification and the update check. */
+function useAppFeatures(store: Store, actions: Record<string, Action>) {
+  const live = useRef(store);
+  live.current = store;
+  const liveActions = useRef(actions);
+  liveActions.current = actions;
+  useEffect(() => {
+    if (!isApp()) return;
+    const stopBack = watchBackButton({
+      closeDialog: () => {
+        if (!isDialogOpen()) return false;
+        closeDialog();
+        return true;
+      },
+      leaveView: () => {
+        const current = live.current;
+        if (current.scannerOpen) current.setScannerOpen(false);
+        else if (current.view === "about") current.closeAbout();
+        else if (current.view !== "cards") current.setView("cards");
+        else return false;
+        return true;
+      },
+    });
+    const synced = () => { void live.current.refreshAfterChange(); void live.current.reloadOffers(); };
+    const problems = (event: Event) => showSyncProblems((event as CustomEvent<SyncProblem[]>).detail);
+    window.addEventListener(SYNCED_EVENT, synced);
+    window.addEventListener(PROBLEM_EVENT, problems);
+    void native().takeLaunchOffer().then(({ offer }) => { if (offer) void live.current.reloadOffers().then(() => liveActions.current.inbox?.run()); }).catch(() => undefined);
+    let offerHandle: { remove: () => Promise<void> } | null = null;
+    void native().addListener("offer", () => { void live.current.reloadOffers().then(() => liveActions.current.inbox?.run()); })
+      .then((handle) => { offerHandle = handle; }).catch(() => undefined);
+    void checkForUpdate();
+    return () => {
+      stopBack();
+      void offerHandle?.remove();
+      window.removeEventListener(SYNCED_EVENT, synced);
+      window.removeEventListener(PROBLEM_EVENT, problems);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+}
+
+/** The Android app: the sign-in screen until this phone is signed in, then the app with sync. */
+function AppRoot() {
+  const [ready, setReady] = useState<"loading" | "signin" | "app">("loading");
+  useEffect(() => {
+    void loadSettings().then(() => setReady(signedIn() ? "app" : "signin"));
+    return onSignedOut(() => {
+      void clearSettings().then(() => setReady("signin"));
+    });
+  }, []);
+  useEffect(() => {
+    if (ready === "app") startSync();
+  }, [ready]);
+  if (ready === "loading") return <div className="bootmsg">Loading Mana Vault</div>;
+  if (ready === "signin") return <AppSignIn onDone={() => window.location.reload()} />;
+  return <WebRoot />;
+}
+
 function Root() {
+  return isApp() ? <AppRoot /> : <WebRoot />;
+}
+
+function WebRoot() {
   const [boot, setBoot] = useState<{ user: User; prefs: Prefs } | null>(null);
   const [error, setError] = useState("");
   useEffect(() => {
@@ -131,7 +200,7 @@ createRoot(document.getElementById("root")!).render(
   </StrictMode>,
 );
 
-if ("serviceWorker" in navigator && import.meta.env.PROD) {
+if ("serviceWorker" in navigator && import.meta.env.PROD && !isApp()) {
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("/sw.js").catch((error: unknown) => {
       console.error("Service worker registration failed", error);

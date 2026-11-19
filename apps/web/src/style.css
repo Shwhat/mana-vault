@@ -565,3 +565,30 @@ dialog::backdrop{background:rgba(20,28,40,.35)}
 .phone .orow{grid-template-columns:1fr 80px}
 .phone .orow > span:nth-child(3){grid-column:1 / -1}
 .phone .price{min-width:60px}
+
+/* ---------- Android app: sign-in screen, sync state, devices ---------- */
+.appsign{height:100%;overflow:auto;display:flex;align-items:center;justify-content:center;padding:calc(16px + env(safe-area-inset-top)) 16px calc(16px + env(safe-area-inset-bottom));background:var(--bg)}
+.appcard{width:100%;max-width:380px;background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:24px 22px 18px;display:flex;flex-direction:column}
+.appbrand{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.appbrand .brand{display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:6px;background:#1f5fbf;color:#fff;font:700 18px Georgia,serif}
+.appbrand h1{font-size:19px;font-weight:600;margin:0}
+.appcard label{font-size:11.5px;color:var(--muted);margin:12px 0 4px}
+.appcard input{height:44px;font-size:16px;padding:0 10px;border:1px solid var(--line);border-radius:3px;background:var(--panel2)}
+.appcard input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 2px #cfe0fa}
+.appcard .go{height:44px;margin-top:18px;font-size:14px;font-weight:600}
+.appcard .lnk{align-self:center;margin-top:12px;min-height:40px}
+.appcard .apptabs{margin-top:12px}
+.appcard .apptabs button{height:40px;font-size:13px}
+.appmsg{min-height:20px;margin-top:10px;color:var(--err);font-size:12.5px}
+.note.warn{color:var(--warn)}
+.syncchip{font-size:12px;font-weight:600}
+.syncchip.offline{color:#f0b35a}
+.syncchip.syncing{color:#b9c3d1}
+.synclist{margin:10px 0 0;padding:0;list-style:none}
+.synclist li{display:flex;flex-direction:column;gap:2px;padding:6px 0;border-top:1px solid var(--line2)}
+.synclist span{color:var(--muted);font-size:11.5px}
+.devlist{width:100%;border-collapse:collapse}
+.devlist th{text-align:left;font-size:11.5px;color:var(--muted);font-weight:600;padding:4px 6px;border-bottom:1px solid var(--line)}
+.devlist td{padding:6px;border-bottom:1px solid var(--line2);vertical-align:middle}
+.devlist td:last-child{text-align:right}
+.devlist .pill{margin-left:8px;padding:0 6px;border-radius:8px;background:var(--accent-soft);color:var(--on-text);font-size:10.5px}

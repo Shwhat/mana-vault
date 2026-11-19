@@ -1,10 +1,14 @@
 // ---------- host: everything that talks to the server ----------
-export const APP_VERSION = __APP_VERSION__;
+import { appFetch, SignedOutError } from "./android/net";
+import { appRequest } from "./android/offline";
+import { isApp, saveBlob } from "./android/platform";
 
-export class SignedOutError extends Error {}
+export { SignedOutError };
+export const APP_VERSION = __APP_VERSION__;
 
 /** Sends a request with the safety header the server requires on every change. A 401 returns to the sign-in page. */
 export async function request<T>(url: string, init: RequestInit = {}): Promise<T> {
+  if (isApp()) return appRequest<T>(url, init);
   const method = (init.method ?? "GET").toUpperCase();
   const response = await fetch(url, {
     ...init,
@@ -28,7 +32,22 @@ export async function request<T>(url: string, init: RequestInit = {}): Promise<T
 
 export const jsonBody = (value: unknown) => JSON.stringify(value);
 
+/** A plain request for a file from the server (such as a backup), signed in the same way as every other request. */
+export async function fetchFile(url: string): Promise<Response> {
+  if (isApp()) return appFetch(url, {}, 120_000);
+  const response = await fetch(url, { credentials: "same-origin" });
+  if (response.status === 401) {
+    window.location.href = "/login";
+    throw new SignedOutError("You are signed out.");
+  }
+  return response;
+}
+
 export function downloadBlob(filename: string, blob: Blob) {
+  if (isApp()) {
+    void saveBlob(filename, blob).catch((reason: unknown) => console.error("Saving the file failed", reason));
+    return;
+  }
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;

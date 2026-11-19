@@ -1,6 +1,6 @@
 # Overview
 
-Mana Vault is a self-hosted Magic: The Gathering collection and deck manager for one household or a small group, run on your own server and used from a desktop browser or a phone. Each person signs in to their own account with their own collections and decks.
+Mana Vault is a self-hosted Magic: The Gathering collection and deck manager for one household or a small group, run on your own server and used from a desktop browser, a phone browser or the Android app. Each person signs in to their own account with their own collections and decks.
 
 | Area | What it holds |
 |---|---|
@@ -38,7 +38,8 @@ Card search is where cards are found. From a search result a card is added to th
 | [Import and export](/about/import-and-export) | Every file format in and out, with column tables |
 | [Scanning cards](/about/scanning-cards) | Scanning cards with the camera into a scanned list, and adding them to a collection or deck |
 | [Card database](/about/card-database) | Where card data comes from and how it is updated |
-| [Accounts and access](/about/accounts) | Sign-in, accounts, passwords and sessions |
+| [Accounts and access](/about/accounts) | Sign-in, accounts, passwords, sessions and devices |
+| [Android app](/about/android-app) | Installing the app, signing in a phone, offline use and sync, scanning, notifications and updates |
 | [Storage and backups](/about/storage-and-backups) | What is stored, how to back up and restore |
 | [Settings and shortcuts](/about/settings-and-shortcuts) | Preferences, themes, undo and every keyboard shortcut |
 | [Messages](/about/messages) | Every message Mana Vault shows, its cause and what to do |

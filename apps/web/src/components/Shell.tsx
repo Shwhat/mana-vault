@@ -15,6 +15,8 @@ import { Dock } from "./Dock";
 import { MenuBar } from "./MenuBar";
 import { Ribbon } from "./Ribbon";
 import { StatusBar } from "./StatusBar";
+import { SyncChip } from "../android/AppScreens";
+import { isApp } from "../android/platform";
 
 function CenterView({ actions, onFilters }: { actions: Record<string, Action>; onFilters?: () => void }) {
   const store = useApp();
@@ -101,6 +103,7 @@ export function PhoneShell({ actions }: { actions: Record<string, Action> }) {
       <div id="pbar">
         <span className="brand" aria-hidden="true">M</span>
         <span className="ptitle">{store.scannerOpen ? "Scan" : store.view === "deck" && store.deck ? store.deck.name : "Mana Vault"}</span>
+        {isApp() && <SyncChip />}
         {store.offers.inbox.length > 0 && <button type="button" className="pbtn" onClick={actions.inbox?.run}>Inbox <span className="cbadge">{store.offers.inbox.length}</span></button>}
         {store.view === "deck" && !store.scannerOpen && <button type="button" className="pbtn" onClick={() => setSheet("decks")}>Decks</button>}
         <button type="button" className="pbtn" aria-label="Menu" onClick={() => setSheet("more")}><Icon name="menu" /></button>
@@ -142,7 +145,7 @@ export function PhoneShell({ actions }: { actions: Record<string, Action> }) {
               </div>
             ))}
             <div className="navgroup">Account: {store.user.name}</div>
-            {(["inbox", "password", "signout"] as const).map((item) => (
+            {(isApp() ? ["inbox", "app.sync", "app.notifications", "app.update", "password", "devices", "signout"] : ["inbox", "password", "devices", "signout"]).map((item) => (
               <button key={item} type="button" className="pmrow" onClick={() => { close(); actions[item]?.run(); }}>
                 <Icon name={actions[item]!.icon} /><span>{actions[item]!.label}</span>
               </button>

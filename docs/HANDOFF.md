@@ -1,10 +1,10 @@
 # Mana Vault handoff
 
-Last updated: 2026-11-18, version 0.4.0.
+Last updated: 2026-11-18, version 0.5.0.
 
 ## Project
 
-Mana Vault is Devon's self-hosted Magic: The Gathering collection and deck manager (repository Shwhat/mana-vault). It runs as one Docker container (Node.js 22, Fastify, SQLite) and serves a React interface for desktop browsers and phones. Version 0.1.0 rebuilt the interface in the OpenSchem design style (program-design-guide skill, "look and shell" adoption), added sign-in, per-account preferences, undo, the About guide and Dockhand-ready deployment. Version 0.2.0 added multiple collections per account, set completion, bulk editing, per-account ownership of collections and decks, sending (copy, share, transfer) with an Inbox, and deck rename and delete. Version 0.3.0 added prices and values, statistics, deck ownership, wishlists, the trade list and trade calculator, copy details (finish, condition, language, trade count), filter tags, the binder layout and flavor name matching. The 0.3.0 features came from a comparison with AeroEagle/mtg-collection-viewer. Version 0.4.0 rebuilt the camera scanner as a continuous, ManaBox-style live scanner with a scanned list.
+Mana Vault is Devon's self-hosted Magic: The Gathering collection and deck manager (repository Shwhat/mana-vault). It runs as one Docker container (Node.js 22, Fastify, SQLite) and serves a React interface for desktop browsers and phones. Version 0.1.0 rebuilt the interface in the OpenSchem design style (program-design-guide skill, "look and shell" adoption), added sign-in, per-account preferences, undo, the About guide and Dockhand-ready deployment. Version 0.2.0 added multiple collections per account, set completion, bulk editing, per-account ownership of collections and decks, sending (copy, share, transfer) with an Inbox, and deck rename and delete. Version 0.3.0 added prices and values, statistics, deck ownership, wishlists, the trade list and trade calculator, copy details (finish, condition, language, trade count), filter tags, the binder layout and flavor name matching. The 0.3.0 features came from a comparison with AeroEagle/mtg-collection-viewer. Version 0.4.0 rebuilt the camera scanner as a continuous, ManaBox-style live scanner with a scanned list. Version 0.5.0 added the Android app (Capacitor around the same interface) with device sign-in, offline use and sync, phone text recognition and Inbox notifications.
 
 ## Rules
 
@@ -13,12 +13,23 @@ Mana Vault is Devon's self-hosted Magic: The Gathering collection and deck manag
 - Do not commit or push until asked. Do not remind Devon about uncommitted work.
 - Never use em dashes anywhere (code, comments, docs, interface text). A static test enforces this.
 - Answer questions simply and directly, without extra unrequested actions.
-- Keep a task list while building, update the README feature list and keep the keyboard shortcut list current (README, About guide page 17 Settings and shortcuts, `SHORTCUTS` in `actions.tsx`, key handling in `main.tsx`).
+- Keep a task list while building, update the README feature list and keep the keyboard shortcut list current (README, About guide page 18 Settings and shortcuts, `SHORTCUTS` in `actions.tsx`, key handling in `main.tsx`).
 - Update this handoff (here and in the claude.ai manavault project, identical) with every build.
-- Raise the version in every place with each delivered build: `package.json`, `apps/server/package.json`, `apps/web/package.json` and `package-lock.json` (run `npm install --package-lock-only`). Patch for fixes, minor for features, major only when Devon says so. A static test checks they match.
+- Raise the version in every place with each delivered build: `package.json`, `apps/server/package.json`, `apps/web/package.json`, `apps/android/package.json` and `package-lock.json` (run `npm install --package-lock-only`). Patch for fixes, minor for features, major only when Devon says so. A static test checks they match.
 - Every pull request that changes what the app does, or the rules it follows, also updates the About guide: the affected pages, Capabilities, and a new entry in the release notes. It also raises the version. The version is shown in the guide.
 - Every change gets tests; `npm run test:all` must pass before delivery. Where Playwright cannot download its browser, run it with an installed Chrome: `PW_CHANNEL=chrome npm run test:all`.
 - Deployment follows the docker-server-setup skill: Dockhand only, no Watchtower, absolute data path, UID 65532, no cloudflared or reverse proxy in the stack.
+
+## Decisions (0.5.0 Android app)
+
+- Specification: `docs/ANDROID-SPEC.md` in the claude.ai project. Devon chose: Capacitor wrapper around the existing interface, full phone parity plus scanning, offline and notifications, server address entered in the app, read and edit offline with server-wins sync, background check every 15 minutes (no Firebase), on-device text recognition (ML Kit), code in `apps/android`, sideloaded APK from GitHub releases. Devon said "build it" without answering the four open points; the proposed defaults were taken: plain http only for home network addresses (with a warning), Android 8.0 minimum (API 26), app name "Mana Vault" with the existing icon, update check against GitHub releases (the repository is public).
+- The app always uses the phone shell (`useNarrow() || isApp()`). The bundled interface is served by Capacitor from https://localhost; the server allows that origin (CORS in `mobile.ts`) and accepts `Authorization: Bearer <device token>`. Device tokens are hashed like sessions, have no expiry, are listed in Devices... and removed by Remove, Sign out or a password change on another device.
+- Offline: `apps/web/src/android/offline.ts` wraps `request()` in the app. GET answers are kept in IndexedDB (cache store, keyed by URL); offline they come from there, card search, card details and printings from the compact card list (`catalog.ts`). Changes that can wait (collection card add, set, add many, move, rename collection when rules and sets are unchanged, deck card add, change, remove, deck rename, prefs) are applied to the copy and queued; others say "You are offline. This needs a connection to the server." Online changes are also applied to the copy so it stays right if the connection drops.
+- Sync (`POST /api/sync`): queued changes are replayed in order through `app.inject` with the caller's headers; each change id is applied once (table `sync_changes`, kept 30 days). Collection PUT and deck PATCH carry the count the phone saw (`base`) and are applied as a difference. 4xx results are listed in Changes not applied; 5xx keeps the queue. After sending, `GET /api/sync/state` (revision that changes with every successful change, new offers, catalog date) decides whether to download the copy again and the card list (`GET /api/catalog/compact`, gzip JSON with an ETag).
+- Undo while offline queues the reverse change (the spec said it would remove the queued change; queuing the reverse has the same result).
+- Scanning in the app: `readOnPhone` in `recognize.ts` sends one JPEG of the card area to ML Kit and sorts lines by position (`sortLines`). Matching rules moved to `apps/server/src/scan-core.ts`, shared by the server and the phone.
+- Native code is Java (the Capacitor template language), not Kotlin as the spec said. Settings in EncryptedSharedPreferences. Notifications: WorkManager periodic work (15 minutes, unmetered when Check only on Wi-Fi), reads `/api/sync/state`, notifies for offers newer than the last one shown; tapping opens the Inbox.
+- Left out of 0.5.0 (spec items): share-to-app imports and deep links; a managed image cache with a size setting (images use the WebView cache); background sync of queued changes from the worker (changes are sent when the app runs); offline statistics not opened before.
 
 ## Decisions (0.4.0 scanner specification)
 
@@ -82,7 +93,11 @@ Devon said "build all of it now" for the seven proposals without a question roun
 | `apps/server/src/database.ts` | Schema and migrations: cards (finishes, promo, variation; prices and flavor_name in 0.3.0), sets, collections (kind), collection_cards (0.3.0 key with condition, language, trade; `upgradeCopies` rebuilds the 0.2.0 table), members, shares, decks.owner_id; `cardPricesStatement` |
 | `apps/server/src/backup.ts` | Backup version 3 per account (collections with kind, copies with finish, condition, language, trade, decks, deck cards, card records); versions 1 and 2 restore with defaults |
 | `apps/server/src/collection-import.ts`, `deck-import.ts`, `card-search.ts`, `catalog-updater.ts`, `import-*.ts` | Import (condition, language, etched, tradelist counts, `nameMatch` for flavor and front face names), search (`usd`, `eur`, flavor names) and catalog logic; the bulk import stores prices and flavor names |
-| `apps/web/src/main.tsx` | Boot, keyboard shortcuts, desktop or phone shell, scanner |
+| `apps/web/src/main.tsx` | Boot (`WebRoot`, or `AppRoot` with the app sign-in screen), keyboard shortcuts, desktop or phone shell, scanner, `useAppFeatures` (Back button, sync events, offers from notifications, update check) |
+| `apps/web/src/android/` | `platform.ts` (native plugin interface, settings, server address rules, Back button), `net.ts` (requests with the device token), `offline.ts` (copy, queue, local changes, sync), `catalog.ts` (card list, offline search and scan matching), `idb.ts`, `AppScreens.tsx` (sign-in screen, sync chip, Devices, Changes not applied, update check) |
+| `apps/server/src/mobile.ts` | Devices table and routes, `deviceUser`, CORS for https://localhost, `/api/sync`, `/api/sync/state`, `Revision`, `/api/catalog/compact` |
+| `apps/server/src/scan-core.ts` | Scan matching rules shared with the app: `normalize`, `buildNameIndex`, `bestName`, `readInfoLine` |
+| `apps/android/` | Capacitor project: `capacitor.config.json`, `android/` (Gradle, `ManaVaultPlugin.java`, `Settings.java`, `InboxWorker.java`, `MainActivity.java`, icons). Version from the root package.json. `.github/workflows/android.yml` builds it |
 | `apps/web/src/store.tsx` | App state (`useStoreState`): undo stack, collections, facets and sort (`visibleCollection`), binder page, statistics, ownership, trade list, trade calculator (`TradeLine`), imports and exports (Moxfield CSV with condition, language, finish, tradelist) |
 | `apps/web/src/scan-state.tsx` | Scanned list (`useScanState`, kept in localStorage), finishes (`finishCode`), `matchText`, Add to as one undo step, `scanTargets` |
 | `apps/web/src/recognize.ts` | Tesseract worker from `/ocr`, the card outline geometry (`guideBox`, `guideInVideo`), crop and contrast (`prepare`), read modes (`readCard`); `window.__manaVaultScanText` replaces recognition in tests |
@@ -100,11 +115,11 @@ Devon said "build all of it now" for the seven proposals without a question roun
 | `apps/web/src/icons.tsx` | `RI` inline SVG icon table (trade, stats, binder, edit, wish, copy, owned, usd, eur added) |
 | `apps/web/src/components/` | MenuBar, Ribbon, RibbonCustomize, Dock, StatusBar (PRICES toggle), Dialog, Shell (desktop and phone, Scan tab), About, CardScanner (camera with focus and torch, scanning loop and lock-on, last card strip, scanned list, edit and Add to dialogs) |
 | `apps/web/src/panels/Panels.tsx` | Filters, Collections (values, Wishlist badge), Decks, Card (prices, etched, wanted), Deck list, Import review panels |
-| `apps/web/src/about/` | About guide pages `01-overview.md` to `21-release-notes.md` (09 Prices and statistics and 10 Wishlists and trading added in 0.3.0) |
+| `apps/web/src/about/` | About guide pages `01-overview.md` to `22-release-notes.md` (09 Prices and statistics and 10 Wishlists and trading added in 0.3.0, 16 Android app in 0.5.0) |
 | `apps/web/src/static.test.ts` | Static checks: guide order and links, release note version, every label in the guide, versions equal, no em dashes |
 | `apps/web/public/login.html` | Self-contained sign-in page |
 | `apps/web/vite.config.ts` | Vite config, including the plugin that serves and bundles the OCR files under `/ocr` |
-| `tests/e2e/` | Playwright suites (`app.spec.ts`, `collections.spec.ts`, `insights.spec.ts`, `scanner.spec.ts`; the browser runs with a fake camera), fixtures, sample-data server (`serve.mjs`, with sample prices and a flavor name) |
+| `tests/e2e/` | Playwright suites (`app.spec.ts`, `collections.spec.ts`, `insights.spec.ts`, `scanner.spec.ts`, `android.spec.ts` with a stand-in for the native plugin and the built files served as Capacitor does; the browser runs with a fake camera), fixtures, sample-data server (`serve.mjs`, with sample prices and a flavor name) |
 | `docker-compose.yml`, `.env.example`, `Dockerfile` | Dockhand-ready deployment (unchanged in 0.3.0) |
 
 ## Open bugs
@@ -113,6 +128,7 @@ None known.
 
 ## Open ideas
 
+- Android app: sharing CSV or text files into the app, deep links, instant notifications, more than one server or account, background sync of waiting changes; leaving the browser OCR files (about 11 MB) and the x86 libraries out of the APK (55 MB now).
 - Price history and price change alerts (prices are a snapshot of the last catalog update).
 - Saving the trade calculator, or applying a finished trade to collections in one step.
 - A built-in demo document (program-design-guide section 6) was not part of the 0.1.0 specification.
@@ -123,6 +139,9 @@ None known.
 ## Known limits
 
 - Search returns at most 40 results.
+- The Android app has not yet been run on a real phone: the APK was built in the workspace and the app was tested in Chromium with a stand-in for the native plugin. ML Kit reading, the camera permission, notifications, the share sheet and the Back button need checking on a phone.
+- The app's release signing needs the four `ANDROID_*` repository secrets (README, Android app); without them the tag build fails with a clear message.
+- Offline in the app: card search matches names only (no search syntax), prices only for cards opened before, statistics only when opened before.
 - The scanner reads English text. Real OCR was checked with synthetic card pictures through Chromium's fake camera (normal, dark title bar, small, large and off-center cards, name-only cards, a sequence of cards); it has not yet been tried on a phone with real cards, foils or sleeves.
 - The live camera needs HTTPS or localhost. The OCR files add about 11 MB to the image (about 7 MB is loaded by a browser).
 - Sending works only between accounts on the same server. Offers have no expiry.
@@ -136,4 +155,4 @@ None known.
 
 ## Where work stopped
 
-0.1.0 to 0.4.0 are merged to main (0.4.0, the live scanner, in pull request #6, rebased onto main after 0.3.0 was merged). GitHub Actions publishes the image; Dockhand picks it up on its update schedule or a manual pull and redeploy. All checks pass (`npm run test:all`: typecheck, 91 server tests, 11 web tests including the static checks, 25 browser tests). Next: try the scanner on a phone over HTTPS with real cards and tune the read areas or thresholds from what fails. The draft Android specification (`docs/ANDROID-SPEC.md` in the project) targets 0.3.0, which is now taken; its version needs moving to 0.5.0 or later.
+0.1.0 to 0.4.0 are merged to main. 0.5.0 (the Android app) is on branch `android-0.5.0`, pushed, in pull request #8 (not merged). The deployed server stays on 0.4.0 until it is merged and redeployed, and the app cannot connect to a 0.4.0 server (it refuses the app's cross-origin requests, so the app shows "No Mana Vault server answered at that address."). All checks pass (`PW_CHANNEL=chrome npm run test:all`: typecheck, server tests, web tests including the static checks, browser tests including 4 Android app tests), and a debug APK (`mana-vault-0.5.0-debug.apk`, signed with a debug key) was built in the workspace and sent to Devon for testing; the signed release APK will not install over it without uninstalling it first. Next: create the release key and the four repository secrets, merge, tag v0.5.0, install the APK on a phone and check scanning, notifications and offline use with real cards; then tune `sortLines` and the read areas from what fails.
