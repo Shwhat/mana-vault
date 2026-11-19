@@ -124,6 +124,7 @@ test("collections and decks can be sent to another account", async ({ page, brow
   await page.locator("#f-mode").selectOption("copy");
   await page.locator(".dlgbtns .primary").click();
   await expect(status(page)).toHaveText(`Sent to ${other.name}. It is added when they accept it.`);
+  await expect(page.locator("dialog[open]")).toHaveCount(0);
 
   await page.keyboard.press("Control+n");
   await expect(page.locator("#f-name")).toBeFocused();
