@@ -24,6 +24,12 @@ export type Prefs = {
   collectionSort: CollectionSort;
   /** List shows rows, Binder shows pages of nine card images. */
   collectionLayout: "list" | "binder";
+  /** Scanner: vibrate when a card is recognized. */
+  scanVibrate: boolean;
+  /** Scanner: finish given to newly scanned cards. */
+  scanFoil: boolean;
+  /** Scanner: which camera to use. */
+  scanCamera: "environment" | "user";
   appVersion: string;
 };
 
@@ -32,7 +38,8 @@ export function defaultPrefs(): Prefs {
   return {
     theme: "light", foil: false, zone: "main", ribbon: null, ribbonTab: "home", layout: preset.layout,
     workspace: DEFAULT_WORKSPACE, workspaces: {}, lastDeckId: null, targetCollection: null, openCollection: null,
-    currency: "usd", collectionSort: "name", collectionLayout: "list", appVersion: APP_VERSION,
+    currency: "usd", collectionSort: "name", collectionLayout: "list",
+    scanVibrate: true, scanFoil: false, scanCamera: "environment", appVersion: APP_VERSION,
   };
 }
 
@@ -62,6 +69,9 @@ export function mergePrefs(saved: unknown): Prefs {
     currency: value.currency === "eur" ? "eur" : "usd",
     collectionSort: ["price-desc", "price-asc", "quantity", "set"].includes(String(value.collectionSort)) ? value.collectionSort as CollectionSort : "name",
     collectionLayout: value.collectionLayout === "binder" ? "binder" : "list",
+    scanVibrate: value.scanVibrate !== false,
+    scanFoil: value.scanFoil === true,
+    scanCamera: value.scanCamera === "user" ? "user" : "environment",
     appVersion: APP_VERSION,
   };
 }

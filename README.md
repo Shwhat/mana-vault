@@ -27,7 +27,7 @@ The full user guide is built into the app: Help menu, **About Mana Vault**. The 
 - Exports: collection as Moxfield CSV with condition, language, finish and tradelist counts, decks as text or CSV, missing set and deck cards as text.
 - JSON backup and restore of the signed-in account's own collections and decks and the card records they use.
 - Card database updates from Scryfall on demand or on a schedule, including the set list (printed sizes) and each printing's finishes.
-- Camera card scanner with in-browser text recognition.
+- Live camera card scanner: scans continuously, finds the exact printing from the set code and collector number (or the card name, with tolerance for reading mistakes), collects cards in a scanned list with edit, +1 and finish controls, and adds the list to a collection or deck as one undo step. Text recognition runs in the browser with files served by Mana Vault, so it works offline. Phone Scan tab; desktop scanner window.
 - Sign-in with accounts, password changes, 30-day sessions and protection against password guessing. New accounts can be turned off.
 - Desktop interface in the OpenSchem style: menu bar, customizable ribbon with a contextual Deck tab, dockable and floating panels (Filters, Collections, Decks, Card, Deck list, Import review), saved workspaces, status bar and light, dark or system theme.
 - Phone layout with bottom tabs, full-screen sheets and 44 pixel touch targets.

@@ -1,10 +1,10 @@
 # Mana Vault handoff
 
-Last updated: 2026-11-18, version 0.3.0.
+Last updated: 2026-11-18, version 0.4.0.
 
 ## Project
 
-Mana Vault is Devon's self-hosted Magic: The Gathering collection and deck manager (repository Shwhat/mana-vault). It runs as one Docker container (Node.js 22, Fastify, SQLite) and serves a React interface for desktop browsers and phones. Version 0.1.0 rebuilt the interface in the OpenSchem design style (program-design-guide skill, "look and shell" adoption), added sign-in, per-account preferences, undo, the About guide and Dockhand-ready deployment. Version 0.2.0 added multiple collections per account, set completion, bulk editing, per-account ownership of collections and decks, sending (copy, share, transfer) with an Inbox, and deck rename and delete. Version 0.3.0 added prices and values, statistics, deck ownership, wishlists, the trade list and trade calculator, copy details (finish, condition, language, trade count), filter tags, the binder layout and flavor name matching. The 0.3.0 features came from a comparison with AeroEagle/mtg-collection-viewer.
+Mana Vault is Devon's self-hosted Magic: The Gathering collection and deck manager (repository Shwhat/mana-vault). It runs as one Docker container (Node.js 22, Fastify, SQLite) and serves a React interface for desktop browsers and phones. Version 0.1.0 rebuilt the interface in the OpenSchem design style (program-design-guide skill, "look and shell" adoption), added sign-in, per-account preferences, undo, the About guide and Dockhand-ready deployment. Version 0.2.0 added multiple collections per account, set completion, bulk editing, per-account ownership of collections and decks, sending (copy, share, transfer) with an Inbox, and deck rename and delete. Version 0.3.0 added prices and values, statistics, deck ownership, wishlists, the trade list and trade calculator, copy details (finish, condition, language, trade count), filter tags, the binder layout and flavor name matching. The 0.3.0 features came from a comparison with AeroEagle/mtg-collection-viewer. Version 0.4.0 rebuilt the camera scanner as a continuous, ManaBox-style live scanner with a scanned list.
 
 ## Rules
 
@@ -19,6 +19,19 @@ Mana Vault is Devon's self-hosted Magic: The Gathering collection and deck manag
 - Every pull request that changes what the app does, or the rules it follows, also updates the About guide: the affected pages, Capabilities, and a new entry in the release notes. It also raises the version. The version is shown in the guide.
 - Every change gets tests; `npm run test:all` must pass before delivery. Where Playwright cannot download its browser, run it with an installed Chrome: `PW_CHANNEL=chrome npm run test:all`.
 - Deployment follows the docker-server-setup skill: Dockhand only, no Watchtower, absolute data path, UID 65532, no cloudflared or reverse proxy in the stack.
+
+## Decisions (0.4.0 scanner specification)
+
+- Modeled on ManaBox (screenshots from Devon): live camera, continuous scanning with no capture button, a last-card strip and a scanned list. Built on branch `scanner-0.4.0`, started before 0.3.0 was merged and then rebased onto it.
+- Recognition reads the name line and the bottom-left information line (collector number and set code) with Tesseract.js in the browser. Set code plus collector number gives the exact printing when it agrees with the name; otherwise the name is fuzzy-matched on the server (`POST /api/scan/match`), including front faces and flavor names (a flavor name picks the printing that carries it).
+- Name-only matches always take the newest printing (regular before promos and variants), or the printing in a set read from the information line. No set lock.
+- A name match needs two equal reads in a row; a set and number match needs one. A card in view is counted once; two empty reads mean it left.
+- Read modes cycle after a miss and stay while reads find a card: the card's own lines, then overlapping narrow strips around the top and bottom (wide), then strips for a card about 62% of the outline (small). Crops that are mostly dark are inverted (dark title bars). One large crop was tried and fails (empty table hides the text).
+- Scanned list kept in localStorage per account (`mana-vault.scan.<userId>`), rows merged by printing and finish. Edit (quantity, finish, printing), remove, Clear (asks), Add a card by name (same fuzzy match), Add to (any collection, wishlist or deck; one undo step; collections through `POST /cards/add` as NM English, foil rows of etched-only printings as etched; decks use the target zone).
+- Last card strip: Normal or Foil, printing (opens the edit window), +1. Torch, tap to focus and continuous autofocus where the camera supports them. Scanner settings in prefs: `scanVibrate`, `scanFoil`, `scanCamera`.
+- Phone: Scan tab in the bottom bar (Cards, Collection, Decks, Scan, More); the scanner replaces the view. Desktop: large window, camera left and list right.
+- OCR files (worker, two core builds, English best_int model) are bundled under `/ocr` by a Vite plugin; no CDN. Choosing a photo was dropped.
+- Condition, language and prices are not set or shown by the scanner (agreed before 0.3.0 added copy details).
 
 ## Decisions (0.3.0)
 
@@ -62,6 +75,7 @@ Devon said "build all of it now" for the seven proposals without a question roun
 | `apps/server/src/library.ts` | Access checks, collections CRUD (kind), `collectionValue`, `ENTRY_COLUMNS`, copy keys in POST/PUT (`trade`)/move, bulk add `POST /cards/add` (returns before and after for undo), set completion and missing, members, shares |
 | `apps/server/src/insights.ts` | `summarize` (stat tiles and buckets), `deckOwnership`, routes `/api/collections/:id/stats`, `/api/decks/:id/stats`, `/api/decks/:id/ownership`, `/api/trade` |
 | `apps/server/src/copies.ts` | Copy key parsing (`readCopyKey`, `readCondition`, `readLanguage`, `readFinish`), conditions and languages, `priceSql` per currency |
+| `apps/server/src/scan.ts` | Scan matching: `NameMatcher` (in-memory trigram index of names, front faces and flavor names, rebuilt when the catalog changes), `readInfoLine`, `matchScan`; routes `POST /api/scan/match` and `GET /api/cards/:cardId/printings` |
 | `apps/server/src/sets.ts` | Scryfall set list storage (`saveSets`) and set search (`listSets`) |
 | `apps/server/src/auth.ts` | Users, sessions (token hashes), prefs table, PBKDF2, rate limiter, cookie helpers |
 | `apps/server/src/index.ts` | Startup, environment variables, `-healthcheck` flag |
@@ -70,6 +84,8 @@ Devon said "build all of it now" for the seven proposals without a question roun
 | `apps/server/src/collection-import.ts`, `deck-import.ts`, `card-search.ts`, `catalog-updater.ts`, `import-*.ts` | Import (condition, language, etched, tradelist counts, `nameMatch` for flavor and front face names), search (`usd`, `eur`, flavor names) and catalog logic; the bulk import stores prices and flavor names |
 | `apps/web/src/main.tsx` | Boot, keyboard shortcuts, desktop or phone shell, scanner |
 | `apps/web/src/store.tsx` | App state (`useStoreState`): undo stack, collections, facets and sort (`visibleCollection`), binder page, statistics, ownership, trade list, trade calculator (`TradeLine`), imports and exports (Moxfield CSV with condition, language, finish, tradelist) |
+| `apps/web/src/scan-state.tsx` | Scanned list (`useScanState`, kept in localStorage), finishes (`finishCode`), `matchText`, Add to as one undo step, `scanTargets` |
+| `apps/web/src/recognize.ts` | Tesseract worker from `/ocr`, the card outline geometry (`guideBox`, `guideInVideo`), crop and contrast (`prepare`), read modes (`readCard`); `window.__manaVaultScanText` replaces recognition in tests |
 | `apps/web/src/library-state.tsx` | Collections CRUD, row picking, bulk remove and move, `editCopy`, `markTrade`, wishlist helpers, deck missing export, offers |
 | `apps/web/src/types.ts` | Shared types; `priceOf`, `money`, `copyKey`, `copyLabel`, facet helpers (`cardTypes`, `colorKey`, `curveKey`, same rules as the server) |
 | `apps/web/src/components/LibraryDialogs.tsx` | Collection settings (Wishlist checkbox) with the set picker, Copy details (`copyDialog`), Move, Send, Inbox, Accept, Sharing and Rename deck dialogs |
@@ -82,12 +98,13 @@ Devon said "build all of it now" for the seven proposals without a question roun
 | `apps/web/src/dock.ts` | Panel registry, layout model, presets, move and remove operations |
 | `apps/web/src/prefs.ts` | Preference defaults (currency, collectionSort, collectionLayout), merge (ribbon reset on new version), save to server, theme |
 | `apps/web/src/icons.tsx` | `RI` inline SVG icon table (trade, stats, binder, edit, wish, copy, owned, usd, eur added) |
-| `apps/web/src/components/` | MenuBar, Ribbon, RibbonCustomize, Dock, StatusBar (PRICES toggle), Dialog, Shell (desktop and phone), About, CardScanner |
+| `apps/web/src/components/` | MenuBar, Ribbon, RibbonCustomize, Dock, StatusBar (PRICES toggle), Dialog, Shell (desktop and phone, Scan tab), About, CardScanner (camera with focus and torch, scanning loop and lock-on, last card strip, scanned list, edit and Add to dialogs) |
 | `apps/web/src/panels/Panels.tsx` | Filters, Collections (values, Wishlist badge), Decks, Card (prices, etched, wanted), Deck list, Import review panels |
 | `apps/web/src/about/` | About guide pages `01-overview.md` to `21-release-notes.md` (09 Prices and statistics and 10 Wishlists and trading added in 0.3.0) |
 | `apps/web/src/static.test.ts` | Static checks: guide order and links, release note version, every label in the guide, versions equal, no em dashes |
 | `apps/web/public/login.html` | Self-contained sign-in page |
-| `tests/e2e/` | Playwright suites (`app.spec.ts`, `collections.spec.ts`, `insights.spec.ts`), fixtures, sample-data server (`serve.mjs`, with sample prices and a flavor name) |
+| `apps/web/vite.config.ts` | Vite config, including the plugin that serves and bundles the OCR files under `/ocr` |
+| `tests/e2e/` | Playwright suites (`app.spec.ts`, `collections.spec.ts`, `insights.spec.ts`, `scanner.spec.ts`; the browser runs with a fake camera), fixtures, sample-data server (`serve.mjs`, with sample prices and a flavor name) |
 | `docker-compose.yml`, `.env.example`, `Dockerfile` | Dockhand-ready deployment (unchanged in 0.3.0) |
 
 ## Open bugs
@@ -106,6 +123,8 @@ None known.
 ## Known limits
 
 - Search returns at most 40 results.
+- The scanner reads English text. Real OCR was checked with synthetic card pictures through Chromium's fake camera (normal, dark title bar, small, large and off-center cards, name-only cards, a sequence of cards); it has not yet been tried on a phone with real cards, foils or sleeves.
+- The live camera needs HTTPS or localhost. The OCR files add about 11 MB to the image (about 7 MB is loaded by a browser).
 - Sending works only between accounts on the same server. Offers have no expiry.
 - Main set needs Scryfall's printed size for each set; it arrives with the first card database update after 0.2.0. Prices and flavor names arrive with the first card database update after 0.3.0.
 - Undo history is per page load and reverses by sending the reverse change; a concurrent edit to the same card by someone else is overwritten by an undo.
@@ -117,4 +136,4 @@ None known.
 
 ## Where work stopped
 
-0.1.0 is merged to main and published. 0.2.0 is on branch `collections-0.2.0` (pushed, not merged). 0.3.0 is on branch `features-0.3.0` (pushed, not merged), started from `collections-0.2.0`, so merging it also brings in 0.2.0. All checks pass (`PW_CHANNEL=chrome npm run test:all`: typecheck, 81 server tests, 7 static checks, 22 browser tests). An upgrade of a real 0.2.0 database was checked by hand. After merging, run Update card database once to load prices and flavor names.
+0.1.0 to 0.3.0 are merged to main. 0.4.0 (live scanner) is on branch `scanner-0.4.0`, rebased onto main after 0.3.0 was merged (pushed, not merged). All checks pass (`npm run test:all`: typecheck, 91 server tests, 11 web tests including the static checks, 25 browser tests). Next: try the scanner on a phone over HTTPS with real cards and tune the read areas or thresholds from what fails. The draft Android specification (`docs/ANDROID-SPEC.md` in the project) targets 0.3.0, which is now taken; its version needs moving to 0.5.0 or later.

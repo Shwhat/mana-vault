@@ -10,7 +10,7 @@ Mana Vault is a self-hosted Magic: The Gathering collection and deck manager for
 | **Trade** | The copies you are willing to trade, and a calculator that compares what you give with what you get |
 | **Card database** | The local copy of the card catalog, with prices, that search, imports and decks match against |
 
-Card search is where cards are found. From a search result a card is added to the target collection, to the open deck, or both. Imports and the camera scanner feed the same search and matching rules. Collections and decks can be sent to other accounts as copies, shares or transfers.
+Card search is where cards are found. From a search result a card is added to the target collection, to the open deck, or both. Imports use the same matching rules as search, and the camera scanner collects cards in a scanned list that is added to a collection or deck in one step. Collections and decks can be sent to other accounts as copies, shares or transfers.
 
 ## Principles
 
@@ -36,7 +36,7 @@ Card search is where cards are found. From a search result a card is added to th
 | [Wishlists and trading](/about/wishlists-and-trading) | Wishlists, the trade list, the trade view and the trade calculator |
 | [Sending and sharing](/about/sending-and-sharing) | Sending collections and decks as copies, shares or transfers, and the Inbox |
 | [Import and export](/about/import-and-export) | Every file format in and out, with column tables |
-| [Scanning cards](/about/scanning-cards) | Reading a card name with the camera |
+| [Scanning cards](/about/scanning-cards) | Scanning cards with the camera into a scanned list, and adding them to a collection or deck |
 | [Card database](/about/card-database) | Where card data comes from and how it is updated |
 | [Accounts and access](/about/accounts) | Sign-in, accounts, passwords and sessions |
 | [Storage and backups](/about/storage-and-backups) | What is stored, how to back up and restore |

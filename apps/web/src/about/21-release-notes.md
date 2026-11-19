@@ -2,6 +2,21 @@
 
 The installed version is shown at the top of this guide.
 
+## 0.4.0 (2026-11-18): Live card scanner
+
+- Scanner rebuilt: it scans continuously, with no capture button. Each card held in the outline is recognized and added to a scanned list, with a short vibration on phones; a card that stays in view is counted once.
+- Exact printings from the set code and collector number on cards printed since 2019; otherwise the card name with tolerance for reading mistakes and the newest printing.
+- Reads only the card's name and information lines, enlarged and with the contrast raised, instead of the whole camera picture. Light text on dark title bars is read, and cards held larger, smaller or off center are found.
+- Continuous autofocus, tap to focus and a torch button.
+- Last card strip with Normal or Foil, another printing and +1.
+- Scanned list with edit (quantity, finish, printing), remove, Clear and Add a card by name. It is kept on the device until it is added or cleared.
+- Add to... puts the whole scanned list into any collection or deck as one undo step.
+- Scanner settings: vibrate when a card is added, new scans are foil, and back or front camera.
+- Phone: a Scan tab in the bottom tab bar. Desktop: a large scanner window with the camera and the scanned list side by side.
+- Text recognition files are served by Mana Vault, so scanning works without an internet connection.
+- Choosing a photo is no longer offered; Add a card by name replaces it for cards the camera cannot read.
+- Fixed: the scanner read the whole camera picture and took its first line of text, so it rarely found the card name, and an exact name match was needed to find a card.
+
 ## 0.3.0 (2026-11-18): Prices, statistics, deck ownership, wishlists and trading
 
 - Prices: every card database update stores each printing's US dollar (regular, foil, etched) and euro (regular, foil) prices. Prices show in search results, the Card panel, collection rows, the binder, the trade view and the Collections panel, in US dollars or euros (PRICES in the status bar).

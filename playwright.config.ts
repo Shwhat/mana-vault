@@ -17,6 +17,8 @@ export default defineConfig({
     viewport: { width: 1440, height: 860 },
     acceptDownloads: true,
     screenshot: "only-on-failure",
+    // a fake camera (a moving test picture) for the scanner tests; the tests replace text recognition
+    launchOptions: { args: ["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream"] },
   },
   webServer: {
     command: "node tests/e2e/serve.mjs",

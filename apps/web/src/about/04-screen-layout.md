@@ -122,9 +122,9 @@ A workspace is a saved panel layout and view. Three are built in:
 Below 900 pixels wide, the menu bar, ribbon, panels and status bar are replaced by:
 
 - A top bar with the deck name or "Mana Vault", an **Inbox** button with a count when offers are waiting, a **Decks** button while in the deck view, and a menu button.
-- The current view, filling the screen. The card search adds **Filters** and **Scan** buttons under the search box.
-- A bottom tab bar: **Cards**, **Collection**, **Decks** and **More**. The trade view opens from **Menu** (Trade view). Decks shows the open deck, or the deck list when no deck is open.
-- Sheets that slide up from the bottom: **Filters**, **Card** (opens when a card is tapped, except while picking rows), **Decks**, and **Menu** (every menu command that applies on a phone, plus Inbox, Change password and Sign out).
+- The current view, filling the screen. The card search adds a **Filters** button under the search box.
+- A bottom tab bar: **Cards**, **Collection**, **Decks**, **Scan** and **More**. The trade view opens from **Menu** (Trade view). Decks shows the open deck, or the deck list when no deck is open. Scan opens the camera scanner in place of the view (see [Scanning cards](/about/scanning-cards)); the top bar then shows "Scan".
+- Sheets that slide up from the bottom: **Filters**, **Card** (opens when a card is tapped, except while picking rows), **Decks**, the scanned list in the scanner, and **Menu** (every menu command that applies on a phone, plus Inbox, Change password and Sign out).
 - In a collection, **Select** turns on checkboxes; tap rows to pick them and use the bar above the list to move or remove them. Close a sheet with **Close**, by tapping outside it, or with Esc.
 - Messages appear as a short banner above the tab bar.
 

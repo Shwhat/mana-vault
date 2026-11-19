@@ -10,6 +10,7 @@ import { CollectionView } from "../views/CollectionView";
 import { TradeView } from "../views/TradeView";
 import { CardsView, DeckView } from "../views/Views";
 import { About } from "./About";
+import CardScanner from "./CardScanner";
 import { Dock } from "./Dock";
 import { MenuBar } from "./MenuBar";
 import { Ribbon } from "./Ribbon";
@@ -80,29 +81,43 @@ export function PhoneShell({ actions }: { actions: Record<string, Action> }) {
   }, [store.selection]);
 
   const tab = (id: "cards" | "collection" | "deck", label: string, icon: string) => (
-    <button type="button" className={store.view === id && !sheet ? "ptab on" : "ptab"} onClick={() => { setSheet(null); store.setView(id); }}>
+    <button type="button" className={store.view === id && !sheet && !store.scannerOpen ? "ptab on" : "ptab"}
+      onClick={() => { setSheet(null); store.setScannerOpen(false); store.setView(id); }}>
       <Icon name={icon} /><span>{label}</span>
     </button>
   );
   const close = () => setSheet(null);
 
+  // opening another view from the menu leaves the scanner
+  const shownView = useRef(store.view);
+  useEffect(() => {
+    if (shownView.current !== store.view) store.setScannerOpen(false);
+    shownView.current = store.view;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [store.view]);
+
   return (
     <div id="app" className="phone">
       <div id="pbar">
         <span className="brand" aria-hidden="true">M</span>
-        <span className="ptitle">{store.view === "deck" && store.deck ? store.deck.name : "Mana Vault"}</span>
+        <span className="ptitle">{store.scannerOpen ? "Scan" : store.view === "deck" && store.deck ? store.deck.name : "Mana Vault"}</span>
         {store.offers.inbox.length > 0 && <button type="button" className="pbtn" onClick={actions.inbox?.run}>Inbox <span className="cbadge">{store.offers.inbox.length}</span></button>}
-        {store.view === "deck" && <button type="button" className="pbtn" onClick={() => setSheet("decks")}>Decks</button>}
+        {store.view === "deck" && !store.scannerOpen && <button type="button" className="pbtn" onClick={() => setSheet("decks")}>Decks</button>}
         <button type="button" className="pbtn" aria-label="Menu" onClick={() => setSheet("more")}><Icon name="menu" /></button>
       </div>
-      <div id="pmain">
-        {store.view === "deck" && !store.deck ? <DecksPanel actions={actions} /> : <CenterView actions={actions} onFilters={() => setSheet("filters")} />}
+      <div id="pmain" className={store.scannerOpen ? "scanning" : undefined}>
+        {store.scannerOpen
+          ? <CardScanner phone onClose={() => store.setScannerOpen(false)} />
+          : store.view === "deck" && !store.deck ? <DecksPanel actions={actions} /> : <CenterView actions={actions} onFilters={() => setSheet("filters")} />}
       </div>
       {store.flashMsg && <div className={store.flashMsg.kind === "err" ? "ptoast err" : "ptoast"} role="status" key={store.flashMsg.id}>{store.flashMsg.text}</div>}
       <nav id="ptabs" aria-label="Main">
         {tab("cards", "Cards", "cards")}
         {tab("collection", "Collection", "collection")}
         {tab("deck", "Decks", "deck")}
+        <button type="button" className={store.scannerOpen && !sheet ? "ptab on" : "ptab"} onClick={() => { setSheet(null); store.setScannerOpen(true); }}>
+          <Icon name="scan" /><span>Scan</span>
+        </button>
         <button type="button" className={sheet === "more" ? "ptab on" : "ptab"} onClick={() => setSheet("more")}><Icon name="menu" /><span>More</span></button>
       </nav>
       {sheet === "filters" && <Sheet title="Filters" onClose={close}><FiltersPanel actions={actions} /></Sheet>}

@@ -73,7 +73,15 @@ This page lists what Mana Vault does in the current version, followed by what is
 
 ### Scanning
 
-- Read a card name from the phone or computer camera, or from a photo, and search for it.
+- Scan cards continuously with the phone or computer camera: each card held in the outline is recognized and added to a scanned list, with a short vibration on phones.
+- Recognize the exact printing from the set code and collector number on cards printed since 2019; otherwise match the card name, allowing for reading mistakes, and pick the newest printing.
+- Read light text on dark title bars, and cards held larger, smaller or off center.
+- Continuous autofocus, tap to focus and the torch where the camera supports them.
+- Last card strip with Normal or Foil, another printing and +1.
+- Edit, remove or clear scanned rows, and add cards by name.
+- Add the whole scanned list to any collection or deck as one undo step.
+- The scanned list is kept on the device until it is added or cleared.
+- Text recognition runs on the device with files served by Mana Vault, so no internet connection is needed.
 
 ### Backups
 
