@@ -12,22 +12,22 @@ This page covers the first visit, loading the card database and adding the first
 
 A new server starts with an empty card database. Search, imports and decks all need it.
 
-1. Open the **Database** ribbon tab (or the **Cards** menu).
+1. Open the **View** ribbon tab.
 2. Choose **Update card database**. The status bar shows "Updating card database" while it runs. The first update downloads the full catalog and can take several minutes.
 3. When it finishes, the status bar shows the number of printings and a confirmation message.
 
 ## Add cards you own
 
-Cards go into the target collection, shown as ADD TO in the status bar. To keep cards in more than one place, use **New collection...** in the Collection menu; see [Collections](/about/collections).
+Cards go into the target collection, shown as ADD TO in the status bar. To keep cards in more than one place, use **New collection...** on the Collection ribbon tab; see [Collections](/about/collections).
 
 1. Type part of a card name in the search box (press **/** to jump there).
 2. Click a result to select it. Its details appear in the Card panel.
 3. Press **Enter**, choose **+ Collection** on the row, or double-click the row. Each press adds one copy.
-4. To add foil copies, turn on **Add as foil** (ribbon, Cards menu, the FOIL toggle in the status bar, or **F**) before adding.
+4. To add foil copies, turn on **Add as foil** (Home ribbon tab, the FOIL toggle in the status bar, or **F**) before adding.
 
 ## Build the first deck
 
-1. Press **Ctrl+N** (or **Deck**, **New deck...**). Enter a name, pick a format and a mode, and choose **Create deck**.
+1. Press **Ctrl+N** (or **Deck**, **New deck...**). Enter a name, pick a format, and choose **Create deck**.
 2. The new deck opens in the Deck list panel and the **Deck** ribbon tab appears.
 3. Select a card in the search results and press **Shift+Enter** (or **+ Deck**) to add it to the target zone.
 4. Press **3** to see the whole deck in the work area.
@@ -36,10 +36,10 @@ Cards go into the target collection, shown as ADD TO in the status bar. To keep 
 
 | To find | Look in |
 |---|---|
-| Search, collection and deck views | Ribbon Home tab, View menu, or keys 1, 2 and 3 |
-| Your collections and set completion | Collections panel, Collection menu and Collection ribbon tab |
+| Home, search, collection and deck views | Views group of the Home ribbon tab, or keys 1, 2 and 3 |
+| Your collections and set completion | Collections panel and Collection ribbon tab |
 | Offers sent to you | Inbox, in the account menu |
-| Imports, exports and backups | File menu, Collection and Decks ribbon tabs |
-| Theme, panels and workspaces | View menu and View ribbon tab |
-| Your account | The account menu at the right end of the menu bar |
+| Imports, exports and backups | Files group of the Home ribbon tab |
+| Theme, panels and workspaces | View ribbon tab |
+| Your account | The account menu at the right end of the title bar |
 | This guide | Help menu, **About Mana Vault** |

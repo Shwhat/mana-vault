@@ -14,7 +14,7 @@ test("sign-in protects the app and accounts work", async ({ page }) => {
   await expect(page.locator("#msg")).toHaveText("Wrong user name or password.");
   await page.fill("#pw", "correct horse");
   await page.locator("#go").click();
-  await expect(page.locator("#menubar")).toBeVisible();
+  await expect(page.locator("#titlebar")).toBeVisible();
 });
 
 test("search, filters and adding to the collection with undo", async ({ page }) => {
@@ -76,10 +76,11 @@ test("deck building with zones, moves and undo", async ({ page }) => {
   await page.keyboard.press("Enter");
   await expect(status(page)).toHaveText("Enter a deck name");
   await page.keyboard.type("Burn test");
-  await page.locator("#f-mode").selectOption("theme");
   await page.keyboard.press("Enter");
   await expect(page.locator("#docname")).toHaveText("Deck: Burn test");
-  await expect(page.locator(".rtab.ctx.active")).toHaveText("Deck");
+  // an open deck adds its groups to the Decks tab
+  await expect(page.locator(".rtab.active")).toHaveText("Decks");
+  await expect(page.locator(".rgroup.ctx", { hasText: "Build" })).toBeVisible();
 
   await search(page, "Lightning Bolt");
   await row(page, "Lightning Bolt").click();
@@ -105,23 +106,28 @@ test("deck building with zones, moves and undo", async ({ page }) => {
   await page.keyboard.press("Control+z");
   await expect(page.locator(".zonehead")).toHaveText(["Main deck 2", "Sideboard 1"]);
 
+  await menu(page, "Home", "Export...");
+  await page.locator("#ex-what").selectOption("deck");
+  await page.locator("#ex-format").selectOption("text");
   const download = page.waitForEvent("download");
-  await menu(page, "File", "Export deck (text)");
+  await page.locator("dialog[open]").getByRole("button", { name: "Export", exact: true }).click();
   const file = await download;
   expect(file.suggestedFilename()).toBe("burn-test.txt");
 });
 
-test("collection CSV import shows a preview and the review panel", async ({ page }) => {
+test("collection CSV import shows the detected format, a preview and the review panel", async ({ page }) => {
   await signUp(page);
+  await menu(page, "Home", "Import...");
   const chooser = page.waitForEvent("filechooser");
-  await menu(page, "File", "Import collection CSV...");
+  await page.getByRole("button", { name: "Choose file..." }).click();
   await (await chooser).setFiles({
     name: "cards.csv",
     mimeType: "text/csv",
     buffer: Buffer.from("Count,Name,Edition,Foil\n2,Sol Ring,lea,\n1,Not A Real Card,,\n3,Counterspell,,foil\n"),
   });
-  await expect(page.locator("dialog[open]")).toContainText("2 matched rows (5 cards) will be added. 1 rows will be skipped.");
-  await page.getByRole("button", { name: "Import matched rows" }).click();
+  await expect(page.locator("dialog[open]")).toContainText("2 rows (5 cards) match. 1 rows are skipped.");
+  await expect(page.locator("#io-format option").first()).toHaveText("Detected: Moxfield CSV");
+  await page.locator("dialog[open]").getByRole("button", { name: "Import", exact: true }).click();
   await expect(status(page)).toHaveText("Imported 5 cards from 2 rows into Main collection");
   await expect(page.locator("dialog[open]")).toHaveCount(0);
   await expect(page.locator(".revhead")).toContainText("Imported: 2 matched rows (5 cards), 1 skipped");
@@ -130,22 +136,24 @@ test("collection CSV import shows a preview and the review panel", async ({ page
   await expect(page.locator(".dgbody .msg", { hasText: "Not A Real Card" })).toContainText("No card with this name exists in the local catalog");
 });
 
-test("decklist import into a normal deck", async ({ page }) => {
+test("decklist import into a deck", async ({ page }) => {
   await signUp(page);
   await page.keyboard.press("Control+n");
   await expect(page.locator("#f-name")).toBeFocused();
   await page.keyboard.type("Imported");
   await page.keyboard.press("Enter");
   await expect(page.locator("#docname")).toHaveText("Deck: Imported");
+  await menu(page, "Home", "Import...");
+  await page.locator("dialog[open]").getByRole("button", { name: "Deck", exact: true }).click();
   const chooser = page.waitForEvent("filechooser");
-  await menu(page, "File", "Import decklist...");
+  await page.getByRole("button", { name: "Choose file..." }).click();
   await (await chooser).setFiles({
     name: "deck.txt", mimeType: "text/plain",
     buffer: Buffer.from("Commander\n1 Atraxa, Praetors' Voice\n\nDeck\n1 Sol Ring\n4 Llanowar Elves\nSideboard\n2 Swords to Plowshares\n"),
   });
-  await expect(page.locator("dialog[open]")).toContainText("4 matched rows (8 cards)");
-  await page.getByRole("button", { name: "Import matched rows" }).click();
-  await expect(status(page)).toHaveText("Imported 8 cards from 4 rows");
+  await expect(page.locator("dialog[open]")).toContainText("4 rows (8 cards) match");
+  await page.locator("dialog[open]").getByRole("button", { name: "Import", exact: true }).click();
+  await expect(status(page)).toHaveText("Imported 8 cards from 4 rows into Imported");
   await expect(page.locator("dialog[open]")).toHaveCount(0);
   await page.keyboard.press("3");
   await expect(page.locator(".zonehead")).toHaveText(["Commander 1", "Main deck 5", "Sideboard 2"]);
@@ -195,11 +203,16 @@ test("ribbon can be customized and reset", async ({ page }) => {
   await page.locator(".cz-row", { hasText: "Scan card..." }).first().click();
   await page.locator(".cz > div").nth(2).getByRole("button", { name: "Remove" }).click();
   await page.locator(".dlgbtns .primary").click();
+  await page.locator(".rtab", { hasText: "Home" }).click();
   await expect(page.locator('.rpanel [data-action="scan"]')).toHaveCount(0);
   await menu(page, "View", "Customize ribbon...");
   await page.getByRole("button", { name: "Reset ribbon" }).click();
   await page.locator(".dlgbtns .primary").click();
+  await page.locator(".rtab", { hasText: "Home" }).click();
   await expect(page.locator('.rpanel [data-action="scan"]')).toBeVisible();
+  // the button size is chosen in the View tab
+  await menu(page, "View", "Icons only");
+  await expect(page.locator("#toolbar")).toHaveClass(/rsize-icons/);
 });
 
 test("About guide opens, navigates and closes", async ({ page }) => {
@@ -225,11 +238,11 @@ test("About guide opens, navigates and closes", async ({ page }) => {
 test("backup downloads and restores after a confirmation", async ({ page }) => {
   await signUp(page);
   const download = page.waitForEvent("download");
-  await menu(page, "File", "Download backup");
+  await menu(page, "Home", "Download backup");
   const file = await download;
   const path = await file.path();
   const chooser = page.waitForEvent("filechooser");
-  await menu(page, "File", "Restore backup...");
+  await menu(page, "Home", "Restore backup...");
   await (await chooser).setFiles(path);
   await expect(page.locator("dialog[open] .dlghead")).toHaveText("Restore backup");
   await expect(page.locator("dialog[open]")).toContainText("A restore cannot be undone.");
@@ -248,21 +261,32 @@ test("keyboard shortcut list and dialogs close with Escape", async ({ page }) =>
 test.describe("phone layout", () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
 
-  test("tabs, card sheet and menu", async ({ page }) => {
+  test("tabs, card page and the nested menu", async ({ page }) => {
     await signUp(page, "phone");
-    await expect(page.locator("#ptabs")).toBeVisible();
-    await expect(page.locator("#menubar")).toHaveCount(0);
+    await expect(page.locator("#ptabs .ptab")).toHaveText(["Home", "Search", "Collection", "Decks", "Scan"]);
+    await expect(page.locator("#view-home")).toBeVisible();
+    await expect(page.locator("#titlebar")).toHaveCount(0);
+    await page.locator(".ptab", { hasText: "Search" }).click();
     await page.locator("#view-cards .row", { hasText: "Counterspell" }).click();
-    await expect(page.locator(".sheet .ident")).toHaveText("Counterspell");
-    await page.locator(".sheet").getByRole("button", { name: "Add to collection" }).click();
+    await expect(page.locator(".cardpage h2")).toHaveText("Counterspell");
+    await page.getByRole("button", { name: "Card actions" }).click();
+    await page.locator(".fabmenu .pmrow", { hasText: "Add to collection" }).click();
     await expect(page.locator(".ptoast")).toHaveText("Counterspell added to Main collection");
-    await page.locator(".sheethead .btn").click();
+    await page.getByRole("button", { name: "Back" }).click();
+    await expect(page.locator(".cardpage")).toHaveCount(0);
+    // a long press opens the row menu
+    await page.locator("#view-cards .row", { hasText: "Counterspell" }).dispatchEvent("contextmenu");
+    await expect(page.locator("#ctxmenu")).toContainText("Add to wishlist");
+    await page.keyboard.press("Escape");
     await page.locator(".ptab", { hasText: "Collection" }).click();
     await expect(page.locator("#view-collection .row", { hasText: "Counterspell" }).first()).toBeVisible();
     await page.locator(".ptab", { hasText: "Decks" }).click();
     await expect(page.locator("#pmain")).toContainText("New...");
-    await page.locator(".ptab", { hasText: "More" }).click();
+    await page.getByRole("button", { name: "Menu" }).click();
     await expect(page.locator(".pmrow", { hasText: "Sign out" })).toBeVisible();
+    await expect(page.locator(".pmsection > summary")).toContainText(["Home", "Collection", "Decks"]);
+    await page.locator(".pmsection > summary", { hasText: "Home" }).click();
+    await expect(page.locator(".pmsub > summary", { hasText: "Backup" })).toBeVisible();
     await expect(page.locator(".pmrow", { hasText: "Customize ribbon" })).toHaveCount(0);
     const box = await page.locator(".pmrow").first().boundingBox();
     expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
@@ -273,7 +297,7 @@ test.describe("phone layout", () => {
     await expect(page.locator(".pickbar")).toContainText("1 picked");
     await expect(page.locator(".sheet")).toHaveCount(0);
     await page.locator(".pickbar").getByRole("button", { name: "Remove..." }).click();
-    await page.getByRole("button", { name: "Remove", exact: true }).click();
+    await page.locator("dialog[open]").getByRole("button", { name: "Remove", exact: true }).click();
     await expect(page.locator(".ptoast")).toContainText("Removed Counterspell");
   });
 });

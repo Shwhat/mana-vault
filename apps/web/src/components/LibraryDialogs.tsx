@@ -6,7 +6,8 @@ import { entryKey } from "../library-state";
 import type { Store } from "../store";
 import { useApp } from "../store";
 import {
-  type Collection, type CollectionEntry, COMPLETION_RULES, CONDITIONS, FINISH_RULES, FINISHES, type FinishCode, LANGUAGES, type Offer, SEND_MODES, type SetInfo,
+  type Candidate, capitalize, type Collection, type CollectionEntry, COMPLETION_RULES, CONDITIONS, copyLabel, type DeckCard, FINISH_RULES, FINISHES, type FinishCode,
+  FORMATS, LANGUAGES, type Offer, SEND_MODES, type SetInfo,
 } from "../types";
 import { customDialog, dialog } from "./Dialog";
 
@@ -31,7 +32,7 @@ function SetPicker({ holder, initial }: { holder: { sets: string[] }; initial: A
           onKeyDown={(event) => { if (event.key === "Enter") event.preventDefault(); }} />
       </div>
       <div className="chips" aria-label="Chosen sets">
-        {chosen.length === 0 && <span className="note">No sets linked. The collection tracks cards without set completion.</span>}
+        {chosen.length === 0 && <span className="note">No sets linked</span>}
         {chosen.map((set) => (
           <span className="chip" key={set.code}>{set.name} <b>{set.code.toUpperCase()}</b>
             <button type="button" aria-label={`Remove ${set.name}`} onClick={() => toggle(set)}>×</button></span>
@@ -49,7 +50,7 @@ function SetPicker({ holder, initial }: { holder: { sets: string[] }; initial: A
             </label>
           );
         })}
-        {results.length === 0 && <div className="note pad">No sets match. Sets appear once the card database is loaded.</div>}
+        {results.length === 0 && <div className="note pad">No sets match</div>}
       </div>
     </div>
   );
@@ -61,7 +62,7 @@ export function collectionDialog(store: Store, existing?: Collection) {
   dialog(existing ? "Collection settings" : "New collection", [
     ["name", "Name", existing?.realName ?? ""],
     ["description", "Description", existing?.description ?? ""],
-    ["completion", "Completion rule", existing?.completion ?? "main", "select", COMPLETION_RULES],
+    ["completion", "Completion rule", existing?.completion ?? "none", "select", COMPLETION_RULES],
     ["finish", "Finish rule", existing?.finish ?? "any", "select", FINISH_RULES],
     ["wishlist", "Wishlist", existing?.kind === "wishlist", "check"],
   ], async (values) => {
@@ -85,40 +86,105 @@ export function collectionDialog(store: Store, existing?: Collection) {
       return false;
     }
   }, existing ? "Save" : "Create collection", (
-    <>
-      <SetPicker holder={holder} initial={existing?.sets ?? []} />
-      <p className="note">
-        Completion rules: Main set counts the numbered cards printed in the set. Every printing also counts variants and promos.
-        Each card name once needs one copy of each card, printed in a linked set. Finish rules decide whether regular, foil or both copies count.
-      </p>
-      <p className="note">A wishlist holds cards you want. Its cards do not count as owned in the Card panel or the deck ownership check, and they are not on your trade list.</p>
-      {existing?.role === "member" && <p className="note">This collection is shared with you by {existing.owner.name}. Your changes apply for both of you.</p>}
-    </>
+    <SetPicker holder={holder} initial={existing?.sets ?? []} />
   ), 620);
 }
 
-/** Finish, condition, language and the number for trade of one collection row. */
+/** Finish, condition, language, proxy, the number for trade and the copy details of one collection row. */
 export function copyDialog(store: Store, entry: CollectionEntry) {
   dialog(`Copy details: ${entry.name}`, [
     ["foil", "Finish", String(entry.foil), "select", FINISHES.map(([code, label]) => [String(code), label])],
     ["condition", "Condition", entry.condition, "select", CONDITIONS],
     ["language", "Language", entry.language, "select", LANGUAGES],
+    ["proxy", "Proxy", !!entry.proxy, "check"],
     ["trade", "For trade", String(entry.trade), "number"],
+    ["price", "Purchase price", entry.purchase_price === null || entry.purchase_price === undefined ? "" : String(entry.purchase_price), "number"],
+    ["currency", "Purchase currency", entry.price_currency ?? "USD"],
+    ["added", "Date added", entry.added_at ? entry.added_at.slice(0, 10) : ""],
+    ["misprint", "Misprint", !!entry.misprint, "check"],
+    ["altered", "Altered", !!entry.altered, "check"],
+    ["signed", "Signed", !!entry.signed, "check"],
   ], async (values) => {
     const trade = Number(values.trade);
     if (!Number.isInteger(trade) || trade < 0 || trade > entry.quantity) {
       store.flash(`Enter a number for trade from 0 to ${entry.quantity}`, "err");
       return false;
     }
+    const price = values.price === "" ? null : Number(values.price);
+    if (price !== null && (!Number.isFinite(price) || price < 0)) {
+      store.flash("Enter a purchase price of 0 or more", "err");
+      return false;
+    }
+    const currency = String(values.currency).toUpperCase();
+    if (price !== null && !/^[A-Z]{3}$/.test(currency)) {
+      store.flash("Enter a three letter currency such as USD", "err");
+      return false;
+    }
+    const added = String(values.added);
+    if (added && !Number.isFinite(Date.parse(added))) {
+      store.flash("Enter the date added as a date, such as 2026-08-10", "err");
+      return false;
+    }
     await store.editCopy(entry, {
-      foil: Number(values.foil) as FinishCode, condition: values.condition as CollectionEntry["condition"], language: String(values.language), trade,
+      foil: Number(values.foil) as FinishCode, condition: values.condition as CollectionEntry["condition"], language: String(values.language),
+      proxy: values.proxy === true, trade: values.proxy === true ? 0 : trade,
+      extras: {
+        purchase_price: price, price_currency: price === null ? null : currency, added_at: added ? new Date(added).toISOString() : entry.added_at ?? null,
+        misprint: values.misprint === true, altered: values.altered === true, signed: values.signed === true,
+      },
     });
-  }, "Save", (
-    <p className="note">
-      {entry.quantity} {entry.quantity === 1 ? "copy" : "copies"} of {entry.set_name} {entry.collector_number}. All copies in this row change together.
-      If another row already has the new finish, condition and language, the two rows are merged. For trade is how many of these copies are on your trade list.
-    </p>
-  ), 460);
+  }, "Save", undefined, 460);
+}
+
+/** New deck: name and format. Every deck keeps the printing of each card. */
+export function newDeckDialog(store: Store) {
+  dialog("New deck", [
+    ["name", "Deck name", ""],
+    ["format", "Format", "commander", "select", FORMATS.map((format) => [format, capitalize(format)])],
+  ], async (values) => {
+    const name = String(values.name);
+    if (!name || name.length > 100) {
+      store.flash(name ? "Deck names can be up to 100 characters" : "Enter a deck name", "err");
+      return false;
+    }
+    try {
+      await store.createDeck(name, String(values.format));
+    } catch (reason) {
+      store.fail(reason, "Could not create the deck.");
+      return false;
+    }
+  }, "Create deck");
+}
+
+/** One free copy, as a line in a list. */
+export function candidateLabel(item: Candidate): string {
+  const label = copyLabel(item);
+  return `${item.collectionName}: ${item.set_code.toUpperCase()} ${item.collector_number}${label ? `, ${label}` : ""}${item.proxy ? ", proxy" : ""} (${item.free} free)`;
+}
+
+/** Chooses which copies fill a deck card. The deck card takes the printing of the copy chosen. */
+export async function linkDialog(store: Store, card: DeckCard) {
+  let candidates: Candidate[];
+  try {
+    candidates = await store.loadCandidates(card.card_id, card.entry_id);
+  } catch (reason) {
+    return store.fail(reason, "Could not load your copies of this card.");
+  }
+  const current = card.links ?? [];
+  if (!candidates.length && !current.length) return store.flash(`No free copy of ${card.name} is in your collections`, "err");
+  const options: Array<[string, string]> = [["", "None (missing)"], ...candidates.map((item, index): [string, string] => [String(index), candidateLabel(item)])];
+  dialog(`Link ${card.name}`, [
+    ["copy", "Copy", candidates.length ? "0" : "", "select", options],
+    ["quantity", "How many", String(card.quantity), "number"],
+  ], async (values) => {
+    const chosen = values.copy === "" ? null : candidates[Number(values.copy)] ?? null;
+    const quantity = Number(values.quantity);
+    if (chosen && (!Number.isInteger(quantity) || quantity < 1 || quantity > card.quantity)) {
+      store.flash(`Enter a number from 1 to ${card.quantity}`, "err");
+      return false;
+    }
+    await store.setDeckLinks(card, chosen ? [{ ...chosen, quantity: Math.min(quantity, chosen.free) }] : []);
+  }, "Link", undefined, 520);
 }
 
 export function moveDialog(store: Store, entries: CollectionEntry[]) {
@@ -126,7 +192,6 @@ export function moveDialog(store: Store, entries: CollectionEntry[]) {
   if (!entries.length) return store.flash("Pick one or more rows first", "err");
   if (!others.length) return store.flash("Create another collection to move cards into", "err");
   const single = entries.length === 1 ? entries[0]! : null;
-  const cards = entries.reduce((sum, entry) => sum + entry.quantity, 0);
   dialog(single ? `Move ${single.name}` : `Move ${entries.length} entries`, [
     ["to", "Move to", others[0]!.id, "select", others.map((item) => [item.id, item.name])],
     ...(single && single.quantity > 1 ? [["count", "Copies to move", String(single.quantity), "number"] as [string, string, string, "number"]] : []),
@@ -141,7 +206,7 @@ export function moveDialog(store: Store, entries: CollectionEntry[]) {
       counts.set(entryKey(single), count);
     }
     await store.moveEntries(entries, String(values.to), counts);
-  }, "Move", <p className="note">{single ? `${single.quantity} ${single.quantity === 1 ? "copy" : "copies"} in this collection.` : `All ${cards} cards in the ${entries.length} picked entries move.`} A move can be undone.</p>, 440);
+  }, "Move", undefined, 440);
 }
 
 export async function sendDialog(store: Store, kind: "collection" | "deck", item: { id: string; name: string; role?: string }) {
@@ -163,12 +228,7 @@ export async function sendDialog(store: Store, kind: "collection" | "deck", item
       store.fail(reason, "Could not send it.");
       return false;
     }
-  }, "Send", (
-    <p className="note">
-      The other person accepts or declines it in their Inbox. Copy leaves yours unchanged. Share lets you both edit the same {kind}.
-      Transfer moves it to them when they accept. {item.role === "member" ? `This ${kind} is shared with you, so you can only send a copy.` : ""}
-    </p>
-  ), 480);
+  }, "Send", undefined, 480);
 }
 
 function acceptDialog(store: Store, offer: Offer) {
@@ -189,7 +249,7 @@ function acceptDialog(store: Store, offer: Offer) {
       store.fail(reason, "Could not accept it.");
       return false;
     }
-  }, "Accept", <p className="note">{intro}{merge ? " Merging adds its cards to one of your collections; the name is then not used." : ""}</p>, 460);
+  }, "Accept", <p className="dlgq">{intro}</p>, 460);
 }
 
 function InboxList() {
@@ -199,7 +259,7 @@ function InboxList() {
   return (
     <div className="inbox">
       <h4>Waiting for you</h4>
-      {inbox.length === 0 && <p className="note">Nothing is waiting for you.</p>}
+      {inbox.length === 0 && <p className="note">Nothing is waiting</p>}
       {inbox.map((offer) => (
         <div className="wsrow" key={offer.id}>
           <span><b>{offer.itemName}</b> <span className="badge">{offer.kind === "collection" ? "Collection" : "Deck"}</span> <span className="badge main">{mode(offer)}</span>
@@ -211,7 +271,7 @@ function InboxList() {
         </div>
       ))}
       <h4>Sent by you, not yet answered</h4>
-      {sent.length === 0 && <p className="note">You have no offers waiting.</p>}
+      {sent.length === 0 && <p className="note">No offers waiting</p>}
       {sent.map((offer) => (
         <div className="wsrow" key={offer.id}>
           <span><b>{offer.itemName}</b> <span className="badge main">{mode(offer)}</span><span className="sub"> to {offer.user}</span></span>
@@ -231,11 +291,11 @@ function SharingList({ kind }: { kind: "collection" | "deck" }) {
   const store = useApp();
   const item = kind === "collection" ? store.collections?.find((entry) => entry.id === store.prefs.openCollection) : store.deck;
   const busy = useRef(false);
-  if (!item) return <p className="note">Nothing is open.</p>;
+  if (!item) return <p className="note">Nothing is open</p>;
   if (item.role === "member") return <p className="dlgq">{item.name} is shared with you by {item.owner?.name}. Only the owner can change who it is shared with.</p>;
   return (
     <div>
-      {!item.sharedWith?.length && <p className="note">{item.name} is not shared with anyone. Use Send to share it.</p>}
+      {!item.sharedWith?.length && <p className="note">Not shared</p>}
       {item.sharedWith?.map((person) => (
         <div className="wsrow" key={person.id}><span>{person.name}</span>
           <button type="button" className="btn small" onClick={() => {
@@ -267,5 +327,5 @@ export function renameDeckDialog(store: Store) {
       store.fail(reason, "Could not rename the deck.");
       return false;
     }
-  }, "Rename", deck.role === "member" ? <p className="note">This deck is shared with you; the new name applies for both of you.</p> : undefined);
+  }, "Rename");
 }

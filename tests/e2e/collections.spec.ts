@@ -6,7 +6,9 @@ const rows = (page: Page) => page.locator("#view-collection .row");
 async function newCollection(page: Page, name: string, sets: string[] = []) {
   await menu(page, "Collection", "New collection...");
   await expect(page.locator("#f-name")).toBeFocused();
+  await expect(page.locator("#f-completion")).toHaveValue("none");
   await page.keyboard.type(name);
+  if (sets.length) await page.locator("#f-completion").selectOption("main");
   for (const set of sets) {
     await page.fill("#set-search", set);
     await page.locator(".setrow", { hasText: set }).first().locator("input").check();
@@ -45,7 +47,8 @@ test("collections link sets, show completion and missing cards", async ({ page }
   await expect(status(page)).toHaveText("New cards go to Alpha binder");
 
   await addFromSearch(page, ["Sol Ring", "Dark Ritual"]);
-  await menu(page, "Collection", "Set completion");
+  await page.keyboard.press("2");
+  await page.locator(".colhead .seg button", { hasText: "Completion" }).click();
   await expect(page.locator(".stvalue")).toHaveText("25%");
   await expect(page.locator(".mrow", { hasText: "Limited Edition Alpha" })).toContainText("2 / 8");
 
@@ -57,8 +60,11 @@ test("collections link sets, show completion and missing cards", async ({ page }
   await expect(status(page)).toHaveText("Shivan Dragon added to Alpha binder");
   await expect(page.locator(".filterbar")).toContainText("0 of 5 missing");
 
+  await page.getByRole("button", { name: "Export..." }).click();
+  await expect(page.locator("#ex-what")).toHaveValue("missing");
+  await page.locator("#ex-format").selectOption("text");
   const download = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Export text" }).click();
+  await page.locator("dialog[open]").getByRole("button", { name: "Export", exact: true }).click();
   const file = await download;
   expect(file.suggestedFilename()).toBe("alpha-binder-missing.txt");
 
@@ -88,7 +94,7 @@ test("rows can be picked in bulk, removed, restored and moved", async ({ page })
   await expect(page.locator(".pickbar")).toContainText("3 picked (3 cards)");
   await page.keyboard.press("Delete");
   await expect(page.locator("dialog[open]")).toContainText("Remove 3 entries (3 cards) from Main collection?");
-  await page.getByRole("button", { name: "Remove", exact: true }).click();
+  await page.locator("dialog[open]").getByRole("button", { name: "Remove", exact: true }).click();
   await expect(status(page)).toHaveText("Removed 3 entries (3 cards) from Main collection");
   await expect(rows(page)).toHaveCount(1);
   await page.keyboard.press("Control+z");
@@ -127,12 +133,12 @@ test("collections and decks can be sent to another account", async ({ page, brow
   await expect(page.locator("dialog[open]")).toHaveCount(0);
 
   // the menu, not Ctrl+N: Chromium can keep Ctrl+N for itself (new window) instead of passing it to the page
-  await menu(page, "Deck", "New deck...");
+  await menu(page, "Decks", "New deck...");
   await expect(page.locator("#f-name")).toBeFocused();
   await page.keyboard.type("Shared deck");
   await page.keyboard.press("Enter");
   await expect(page.locator("#docname")).toHaveText("Deck: Shared deck");
-  await menu(page, "Deck", "Send deck...");
+  await menu(page, "Decks", "Send deck...");
   await page.locator("#f-to").selectOption({ label: other.name });
   await page.locator("#f-mode").selectOption("share");
   await page.locator(".dlgbtns .primary").click();
@@ -158,17 +164,17 @@ test("collections and decks can be sent to another account", async ({ page, brow
   await expect(other.page.locator("#view-deck, #docname").first()).toBeVisible();
   await expect(other.page.locator("#docname")).toHaveText("Deck: Shared deck");
 
-  await menu(page, "Deck", "Rename deck...");
+  await menu(page, "Decks", "Rename deck...");
   await page.locator("#f-name").fill("Renamed deck");
   await page.locator(".dlgbtns .primary").click();
   await expect(status(page)).toHaveText("Deck renamed to Renamed deck");
-  await menu(page, "Deck", "Delete deck...");
+  await menu(page, "Decks", "Delete deck...");
   await expect(page.locator("dialog[open]")).toContainText(`It is shared with ${other.name}, who will lose it too.`);
   await page.getByRole("button", { name: "Delete deck" }).click();
   await expect(status(page)).toHaveText("Renamed deck deleted");
   await other.page.reload();
   await other.page.locator('.dtabs .tab[data-panel="decks"]').click();
   await expect(other.page.locator(".navitem", { hasText: "deck" })).toHaveCount(0);
-  await expect(other.page.locator("#docname")).toHaveText("No deck open");
+  await expect(other.page.locator("#docname")).toHaveText("");
   await other.context.close();
 });

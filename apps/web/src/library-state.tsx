@@ -4,15 +4,23 @@ import { csvCell, downloadText, request, slugify } from "./api";
 import { confirmDialog } from "./components/Dialog";
 import type { Prefs } from "./prefs";
 import {
-  type Collection, type CollectionEntry, type CollectionKind, type CompletionReport, type CompletionRule, type CopyKey, copyKey, copyLabel,
-  type Currency, type DeckDetail, type FinishCode, type FinishRule, type Offer, type Ownership, type Person,
+  type Collection, type CollectionEntry, type CollectionKind, type CompletionReport, type CompletionRule, type CopyExtras, type CopyKey, copyKey, copyLabel,
+  type Currency, type DeckDetail, type FinishCode, type FinishRule, type Offer, type Ownership, type Person, sameCopy,
 } from "./types";
 
-export type Counts = Array<CopyKey & { quantity: number; trade?: number }>;
+export type Counts = Array<CopyKey & { quantity: number; trade?: number; purchasePrice?: number | null; priceCurrency?: string | null; addedAt?: string | null;
+  misprint?: boolean; altered?: boolean; signed?: boolean }>;
+/** Wishlist rows the server lowered because the same cards were added to a collection. */
+export type WishChange = { collectionId: string; collectionName: string; before: Counts[number]; after: Counts[number] };
 type UndoEntry = { label: string; undo: () => Promise<void>; redo: () => Promise<void> };
 
 export type CollectionInput = { name: string; description: string; completion: CompletionRule; finish: FinishRule; kind: CollectionKind; sets: string[] };
-export type CopyChange = { foil: FinishCode; condition: CopyKey["condition"]; language: string; trade: number };
+export type CopyChange = { foil: FinishCode; condition: CopyKey["condition"]; language: string; proxy: boolean; trade: number; extras?: CopyExtras };
+
+const extrasFor = (extras: Partial<CopyExtras> | undefined) => (extras ? {
+  purchasePrice: extras.purchase_price ?? null, priceCurrency: extras.price_currency ?? null, addedAt: extras.added_at ?? null,
+  misprint: !!extras.misprint, altered: !!extras.altered, signed: !!extras.signed,
+} : {});
 
 export type LibraryDeps = {
   userId: number;
@@ -38,9 +46,9 @@ export type LibraryDeps = {
   visibleCollection: CollectionEntry[];
 };
 
-export const entryKey = (entry: Pick<CollectionEntry, "id" | "foil" | "condition" | "language">) =>
-  `${entry.id}:${entry.foil}:${entry.condition}:${entry.language}`;
-const sameKey = (a: CopyKey, b: CopyKey) => a.cardId === b.cardId && a.foil === b.foil && a.condition === b.condition && a.language === b.language;
+export const entryKey = (entry: Pick<CollectionEntry, "id" | "foil" | "condition" | "language" | "proxy">) =>
+  `${entry.id}:${entry.foil}:${entry.condition}:${entry.language}${entry.proxy ? ":p" : ""}`;
+const sameKey = sameCopy;
 
 export function useLibraryState(deps: LibraryDeps) {
   const { live, flash, fail, setPrefs, pushUndo, clearUndo, setCounts, refreshAfterChange, reloadCollections, reloadDecks, collectionName } = deps;
@@ -51,7 +59,7 @@ export function useLibraryState(deps: LibraryDeps) {
 
   // ---------- collections ----------
   const createCollection = useCallback(async (input: CollectionInput) => {
-    const created = await request<Collection>("/api/collections", { method: "POST", body: JSON.stringify(input) });
+    const created = await request<Collection>("/api/collections", { method: "POST", body: JSON.stringify({ id: crypto.randomUUID(), ...input }) });
     const list = await reloadCollections();
     const change: Partial<Prefs> = { openCollection: created.id };
     if (!live.current.prefs.targetCollection || list.length === 1) change.targetCollection = created.id;
@@ -75,7 +83,7 @@ export function useLibraryState(deps: LibraryDeps) {
 
   const cycleTargetCollection = useCallback(() => {
     const list = live.current.collections ?? [];
-    if (!list.length) return flash("Create a collection first (Collection menu, New collection)", "err");
+    if (!list.length) return flash("Create a collection first", "err");
     const index = list.findIndex((item) => item.id === live.current.prefs.targetCollection);
     setTargetCollection(list[(index + 1) % list.length]!.id);
   }, [live, flash, setTargetCollection]);
@@ -196,18 +204,21 @@ export function useLibraryState(deps: LibraryDeps) {
     const target = live.current.prefs.openCollection;
     if (!target) return;
     const from = copyKey(entry);
-    const to: CopyKey = { cardId: entry.id, foil: change.foil, condition: change.condition, language: change.language };
+    const to: CopyKey = { cardId: entry.id, foil: change.foil, condition: change.condition, language: change.language, proxy: change.proxy };
+    const oldExtras = extrasFor(entry);
+    const newExtras = extrasFor(change.extras ?? entry);
+    const extrasChanged = JSON.stringify(oldExtras) !== JSON.stringify(newExtras);
     let before: Counts;
     let after: Counts;
     if (sameKey(from, to)) {
-      if (change.trade === entry.trade) return;
-      before = [{ ...from, quantity: entry.quantity, trade: entry.trade }];
-      after = [{ ...from, quantity: entry.quantity, trade: change.trade }];
+      if (change.trade === entry.trade && !extrasChanged) return;
+      before = [{ ...from, quantity: entry.quantity, trade: entry.trade, ...oldExtras }];
+      after = [{ ...from, quantity: entry.quantity, trade: change.trade, ...newExtras }];
     } else {
       const existing = (live.current.collection ?? []).find((item) => sameKey(copyKey(item), to));
       const quantity = Math.min(10_000, entry.quantity + (existing?.quantity ?? 0));
-      before = [{ ...from, quantity: entry.quantity, trade: entry.trade }, { ...to, quantity: existing?.quantity ?? 0, trade: existing?.trade ?? 0 }];
-      after = [{ ...from, quantity: 0 }, { ...to, quantity, trade: Math.min(quantity, change.trade + (existing?.trade ?? 0)) }];
+      before = [{ ...from, quantity: entry.quantity, trade: entry.trade, ...oldExtras }, { ...to, quantity: existing?.quantity ?? 0, trade: existing?.trade ?? 0 }];
+      after = [{ ...from, quantity: 0 }, { ...to, quantity, trade: Math.min(quantity, change.trade + (existing?.trade ?? 0)), ...(existing ? {} : newExtras) }];
     }
     try {
       await setCounts(target, after);
@@ -223,7 +234,7 @@ export function useLibraryState(deps: LibraryDeps) {
   /** Marks every copy of the given rows for trade, or clears their marks. */
   const markTrade = useCallback(async (entries: CollectionEntry[], on: boolean) => {
     const target = live.current.prefs.openCollection;
-    const changed = entries.filter((entry) => (on ? entry.trade < entry.quantity : entry.trade > 0));
+    const changed = entries.filter((entry) => !entry.proxy && (on ? entry.trade < entry.quantity : entry.trade > 0));
     if (!target || !changed.length) return flash(on ? "Those copies are already for trade" : "None of those copies are for trade", "err");
     const before: Counts = changed.map((entry) => ({ ...copyKey(entry), quantity: entry.quantity, trade: entry.trade }));
     const after: Counts = changed.map((entry) => ({ ...copyKey(entry), quantity: entry.quantity, trade: on ? entry.quantity : 0 }));
@@ -245,7 +256,7 @@ export function useLibraryState(deps: LibraryDeps) {
       ?? (live.current.collections ?? []).find((item) => item.kind === "wishlist");
     if (found) return found;
     const created = await request<Collection>("/api/collections", {
-      method: "POST", body: JSON.stringify({ name: "Wishlist", description: "", completion: "main", finish: "any", kind: "wishlist", sets: [] }),
+      method: "POST", body: JSON.stringify({ name: "Wishlist", description: "", completion: "none", finish: "any", kind: "wishlist", sets: [] }),
     });
     await reloadCollections();
     return created;
@@ -269,11 +280,11 @@ export function useLibraryState(deps: LibraryDeps) {
 
   const addMissingToWishlist = useCallback(async () => {
     const id = live.current.prefs.openCollection;
-    if (!id) return flash("Create a collection first (Collection menu, New collection)", "err");
+    if (!id) return flash("Create a collection first", "err");
     try {
       const report = await request<CompletionReport>(`/api/collections/${encodeURIComponent(id)}/completion`);
       if (!report.missing.length) return flash(`Nothing is missing from ${collectionName(id)}`, "err");
-      const items: Counts = report.missing.map((card) => ({ cardId: card.id, foil: card.needs === "foil" ? 1 : 0, condition: "NM", language: "en", quantity: 1 }));
+      const items: Counts = report.missing.map((card) => ({ cardId: card.id, foil: card.needs === "foil" ? 1 : 0, condition: "NM", language: "en", proxy: false, quantity: 1 }));
       await addToWishlist(items, `${report.missing.length} missing cards`);
     } catch (reason) {
       fail(reason, "Could not load the missing list.");
@@ -295,7 +306,7 @@ export function useLibraryState(deps: LibraryDeps) {
       if (!report) return;
       const missing = report.entries.filter((entry) => entry.missing > 0);
       if (!missing.length) return flash(`You own every card in ${live.current.deck?.name}`, "err");
-      const items: Counts = missing.map((entry) => ({ cardId: entry.cardId, foil: 0, condition: "NM", language: "en", quantity: entry.missing }));
+      const items: Counts = missing.map((entry) => ({ cardId: entry.cardId, foil: 0, condition: "NM", language: "en", proxy: false, quantity: entry.missing }));
       await addToWishlist(items, `missing cards of ${live.current.deck?.name}`);
     } catch (reason) {
       fail(reason, "Could not check which deck cards you own.");
@@ -324,7 +335,7 @@ export function useLibraryState(deps: LibraryDeps) {
   // ---------- missing list exports ----------
   const exportMissing = useCallback(async (format: "text" | "csv") => {
     const id = live.current.prefs.openCollection;
-    if (!id) return flash("Create a collection first (Collection menu, New collection)", "err");
+    if (!id) return flash("Create a collection first", "err");
     let report: CompletionReport;
     try {
       report = await request<CompletionReport>(`/api/collections/${encodeURIComponent(id)}/completion`);

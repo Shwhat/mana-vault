@@ -17,19 +17,30 @@ A wishlist is a collection with **Wishlist** ticked in its settings. It works li
 
 | From | Command |
 |---|---|
-| A selected card | **Add to wishlist** (W, Cards menu, Home ribbon tab, Card panel), or **+ Wishlist** on a search result. Adds one copy, foil when Add as foil is on |
-| The Missing tab of a collection linked to sets | **Add missing cards to wishlist** (Collection menu, Collection ribbon tab), or **Add all to wishlist** above the list. Adds one copy of every missing card, foil where foil is missing |
-| A deck | **Add missing deck cards to wishlist** (Deck menu, Decks ribbon tab), or **Add missing to wishlist** on the Ownership tab. Adds the missing number of copies of each card |
+| A selected card | **Add to wishlist** (W, Home ribbon tab, Card panel, card page), or **+ Wishlist** on a search result. Adds one copy, foil when Add as foil is on |
+| The Missing tab of a collection linked to sets | **Add missing cards to wishlist** (Collection ribbon tab), or **Add all to wishlist** above the list. Adds one copy of every missing card, foil where foil is missing |
+| A deck | **Add missing deck cards to wishlist** (Decks ribbon tab), **Add missing to wishlist** on the Ownership tab, or **+ Wishlist** on a missing deck card. Adds the missing number of copies of each card |
 
 These commands use your first wishlist. When you have none, a wishlist named **Wishlist** is created. Copies already on the wishlist are added to. Each command undoes as one step, for example "Undo Add missing cards of Blue deck to Wishlist".
 
+### Wants go down as cards arrive
+
+The count of a wishlist row is the number of copies wanted. Adding copies of a card to a collection (Add to collection, the scanner's Add to, and Add as proxy excepted) lowers the wishlist rows of the same card, in any printing, by one per copy added:
+
+- The row added to a wishlist first is lowered first, across all your wishlists.
+- A row lowered to zero is removed.
+- Proxies lower nothing, and imports and moves lower nothing.
+- Undo of the add puts the wants back.
+
+Example: Wants holds 2 Lightning Bolt (added first) and More wants holds 1. Adding 3 Lightning Bolt to Main collection empties both.
+
 ## The trade list
 
-Any copy in a collection you own can be marked for trade. The number for trade is kept per row and is never more than the row's count.
+Any copy in a collection you own can be marked for trade, except proxies. The number for trade is kept per row and is never more than the row's count.
 
 | To | Do |
 |---|---|
-| Mark every copy of the picked rows | **Mark for trade** (Trade menu, Collection menu, Collection and Trade ribbon tabs), or **For trade** in the picked bar |
+| Mark every copy of the picked rows | **Mark for trade** (Collection ribbon tab, For trade button), **For trade** in the picked bar, or the right-click menu |
 | Clear the marks of the picked rows | **Unmark for trade**, or **Not for trade** in the picked bar |
 | Mark some copies of one row | **Copy details...** (E), field For trade |
 | Show only rows with copies for trade | **For trade only** above the collection's rows |
@@ -40,7 +51,7 @@ The **trade list** on the left of the trade view lists every row marked for trad
 
 ## The trade view
 
-Press **4**, or choose **Trade view** (Trade menu, View menu, Home and Trade ribbon tabs), to open the trade view: the trade list on the left and the trade calculator on the right. On the phone it opens from **Menu**.
+Press **4**, or choose **Trade view** (Views group of the Home ribbon tab), to open the trade view: the trade list on the left and the trade calculator on the right. On the phone it opens from the Home section of **Menu**.
 
 ## The trade calculator
 

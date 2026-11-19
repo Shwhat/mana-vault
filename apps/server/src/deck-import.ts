@@ -84,7 +84,7 @@ function parseText(text: string): DeckImportRow[] {
 export function importDecklist(
   database: DatabaseSync,
   deckId: string,
-  mode: "normal" | "theme",
+  _mode: "normal" | "theme",
   content: string,
   commit = true,
 ): DeckImportResult {
@@ -115,10 +115,6 @@ export function importDecklist(
       unmatched.push({ row: sourceRow, name: row.name, reason: "Quantity must be a whole number from 1 to 100" });
       return;
     }
-    if (mode === "theme" && (!row.set || !row.collectorNumber)) {
-      unmatched.push({ row: sourceRow, name: row.name, reason: "Theme decks need both a set and collector number" });
-      return;
-    }
     const printing = findPrinting.get(
       ...nameMatch(row.name), row.set, row.set, row.set, row.collectorNumber, row.collectorNumber, row.name,
     ) as { id: string; oracle_id: string } | undefined;
@@ -134,15 +130,15 @@ export function importDecklist(
       unmatched.push({ row: sourceRow, name: row.name, reason: "Zone must be Main, Sideboard, or Commander" });
       return;
     }
-    const key = `${printing.oracle_id}\u0000${row.zone}\u0000${mode === "theme" ? printing.id : ""}`;
+    // every deck keeps a printing: the one named, or the newest printing of the card
+    const key = `${printing.oracle_id}\u0000${row.zone}\u0000${printing.id}`;
     const addition = additions.get(key) ?? {
       oracleId: printing.oracle_id,
-      printingId: mode === "theme" ? printing.id : null,
+      printingId: printing.id as string | null,
       quantity: 0,
       zone: row.zone,
     };
     addition.quantity += row.quantity;
-    if (mode === "theme") addition.printingId = printing.id;
     additions.set(key, addition);
     matchedRows += 1;
     importedQuantity += row.quantity;

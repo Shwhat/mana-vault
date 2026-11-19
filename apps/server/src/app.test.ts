@@ -230,7 +230,7 @@ describe("API", () => {
       method: "POST",
       url: `/api/collections/${col}/import`,
       headers: { "content-type": "text/csv" },
-      payload: '"Card","Count"\r\n"Lightning Bolt","2"',
+      payload: '"Title","Count"\r\n"Lightning Bolt","2"',
     });
     expect(result.statusCode).toBe(400);
     expect(result.json().error).toContain("Name");
@@ -350,7 +350,7 @@ describe("API", () => {
     database.close();
   });
 
-  it("creates decks with different printing behavior", async () => {
+  it("keeps the printing of every deck card, also when a client asks for a Normal deck", async () => {
     const { app, database } = await setup();
     const normal = await app.inject({
       method: "POST",
@@ -376,7 +376,8 @@ describe("API", () => {
     });
     const normalDeck = await app.inject({ method: "GET", url: `/api/decks/${normal.json().id}` });
     const themeDeck = await app.inject({ method: "GET", url: `/api/decks/${theme.json().id}` });
-    expect(normalDeck.json().cards[0].printing_id).toBeNull();
+    expect(normalDeck.json().cards[0].printing_id).toBe("printing-1");
+    expect(normalDeck.json().mode).toBe("theme");
     expect(themeDeck.json().cards[0].printing_id).toBe("printing-1");
     const decks = await app.inject({ method: "GET", url: "/api/decks" });
     expect(decks.json()).toHaveLength(2);

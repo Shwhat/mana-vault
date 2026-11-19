@@ -6,7 +6,7 @@ The scanner watches the camera continuously, recognizes each card held in front 
 
 | Where | How |
 |---|---|
-| Desktop | **Scan card...** in the Cards menu, or **Scan card** in the Search group of the Home ribbon tab. The scanner opens in a large window: the camera on the left, the scanned list on the right. Close it with **Close**, Esc, or by clicking outside it. |
+| Desktop | **Scan card** in the Search group of the Home ribbon tab, or **Scan cards** on Home. The scanner opens in a large window: the camera on the left, the scanned list on the right. Close it with **Close**, Esc, or by clicking outside it. |
 | Phone | The **Scan** tab in the bottom tab bar. The camera fills the screen; the scanned list opens as a sheet. Choosing another tab leaves the scanner. |
 
 The browser asks for camera access the first time. The camera turns off when the scanner closes.
@@ -14,7 +14,7 @@ The browser asks for camera access the first time. The camera turns off when the
 ## Scanning
 
 1. Hold a card inside the outline, flat and in good light, so that it fills most of the outline.
-2. The scanner reads the card about twice a second. When it recognizes a card it adds one copy to the top of the scanned list, the phone vibrates briefly, and the message shows **Added** and the card name.
+2. The scanner reads the card about twice a second. When it recognizes a card it adds one copy to the top of the scanned list with the finish, condition and language on the strip, plays a short tone and vibrates (when those settings are on), and the message shows **Added** and the card name.
 3. Move to the next card. A card that stays in view is counted once. To count another copy of the same card, take it out of view and bring it back, or choose **+1**.
 
 Tapping or clicking the camera picture focuses on that point where the camera allows it; otherwise the camera keeps focusing automatically.
@@ -25,36 +25,51 @@ Text recognition runs on the device. Pictures are never sent to the server; only
 
 1. The scanner reads the name line at the top of the card and the information line at the bottom left, which on cards printed since 2019 holds the collector number and set code (for example "0164 C" and "TRK EN").
 2. The set code and collector number identify the exact printing when they agree with the name.
-3. Otherwise the name is compared with every card name in the card database, allowing for small reading mistakes ("Lightning Bo1t" matches Lightning Bolt). Front face names of double-faced cards and flavor names (such as the Godzilla series titles) match too; a flavor name picks the printing that carries it.
-4. With a name only, the scanner picks the printing in the set read from the information line when there is one, otherwise the newest printing (regular printings before promos and variants).
-5. A card read by name needs two matching reads in a row before it is added; a card identified by set code and collector number is added after one.
-6. When a read finds nothing, the next reads look in wider areas around the top and bottom of the outline, then for a smaller card in the middle, so a card held larger, smaller or off center is still found.
+3. Otherwise the name is compared with every card name in the card database, allowing for small reading mistakes ("Lightning Bo1t" matches Lightning Bolt). Front face names of double-faced cards and flavor names (such as the Godzilla series titles) match too.
+4. A card read by name needs two matching reads in a row; a card identified by set code and collector number needs one.
+5. When a read finds nothing, the next reads look in wider areas around the top and bottom of the outline, then for a smaller card in the middle, so a card held larger, smaller or off center is still found.
 
 Light text on dark title bars (borderless and showcase frames) is read as well. Foil glare, sleeves with reflections and very small or blurred cards can prevent a match; **Add a card by name** covers those.
 
+## Choosing the printing
+
+| The card was read by | What happens |
+|---|---|
+| Set code and collector number | That printing is added. With a set filter, a printing from another set is not added: the message shows "Not in set: card name (SET)" in red |
+| Name only | The printings that fit are the card's printings in the filter sets (all sets without a filter), without promos when Ignore promos is on. None: "Not in set: card name". One: it is added. More than one: with **Quick mode** on, the newest is added; with Quick mode off, the printing picker opens |
+
+The **printing picker** opens over the lower half of the camera. It shows a **Filter sets** box and a row of card pictures that scrolls sideways, each with its set name, set code and collector number. Tapping a picture adds that printing. **Skip** closes the picker without adding the card. Scanning pauses while the picker is open.
+
 ## Camera controls
+
+At the top right of the camera:
 
 | Control | What it does |
 |---|---|
 | **Scanned list** (phone, with the number of cards scanned) | Opens the scanned list sheet |
 | **Torch** | Turns the camera light on or off. Dimmed when the camera has no light (most computer cameras) |
-| **Scanner settings** | Opens the scanner settings |
+| **Scanner settings** | Opens the scanner settings. A number on it shows the active filters (each set, and Ignore promos) |
+| Set chips with a lock (for example **LEA**) | One for each set in the set filter. Tapping one opens the scanner settings |
+| PROXY | Shown while Mark as proxy is on |
 
-## Last card strip
+With **Display total value** on, the value of the scanned list (proxies have none) shows at the bottom left of the camera.
 
-Under the camera, the most recently scanned card shows its picture, name, set name, set code and collector number. Below it:
+## The strip
 
-| Button | What it does |
+Under the camera, the most recently scanned card shows its picture, quantity, name, set name, set code, collector number, Foil and Proxy when they apply, and with **Display copies in collection** on, how many copies of the card your collections already hold. Tapping it opens the card's page; the pencil opens the edit window.
+
+Below it, the strip sets the next cards:
+
+| Item | What it does |
 |---|---|
-| **Normal** or **Foil** | Switches the card between the normal and foil finish. Dimmed when the printing exists in one finish only |
-| Set code and number (for example **TRK #164**) | Opens the edit window to choose another printing |
-| **+1** | Adds another copy of the card |
-
-On the phone, tapping the card opens the scanned list.
+| **Normal** or **Foil** | The finish of the next cards (the same as Prefer foil if possible). A printing that exists in one finish only gets that finish |
+| Condition (NM, LP and so on) | The condition of the next cards |
+| Language (EN, JA and so on) | The language of the next cards |
+| **+1** | Adds another copy of the last card |
 
 ## Scanned list
 
-The header shows how many cards are scanned (copies, not rows). Each row shows the quantity and name, the set name, set code, collector number, the finish (**Normal** or **Foil**) and when it was scanned (for example "A moment ago" or "5 minutes ago"). The newest card is at the top. Scanning the same printing in the same finish again raises that row's quantity and moves it to the top.
+The header shows how many cards are scanned (copies, not rows). Each row shows the quantity and name, the set name, set code, collector number, the finish (**Normal** or **Foil**), the condition and language when not NM and EN, PROXY, and when it was scanned (for example "A moment ago" or "5 minutes ago"). The newest card is at the top. Scanning the same printing with the same details again raises that row's quantity and moves it to the top. Tapping a row opens the card's page.
 
 | Control | What it does |
 |---|---|
@@ -73,34 +88,54 @@ The list is kept on this device and browser for the signed-in account, so it sur
 | Quantity | Number | 1 to 999 |
 | Finish | Normal or Foil | The printing must exist in that finish |
 | Printing | List | Every printing of the card, newest first, as set name, set code, collector number and year |
+| Condition | Mint to Damaged | |
+| Language | Any card language | |
+| Proxy | Yes or no | |
 
-When an edit makes two rows the same printing and finish, they are combined.
+When an edit makes two rows the same, they are combined.
 
 ### Add to
 
-**Add to...** asks for the destination: any collection, wishlist or deck the account owns or shares. The target collection is chosen at first.
+**Add to...** opens a window:
 
-- In a collection or wishlist, each row adds its quantity as near mint, English copies in its finish (foil rows of printings that only come etched are added as etched), up to 10,000 copies. Change condition or language afterwards with Copy details.
-- In a deck, each row adds its quantity to the zone that Add to deck uses (Main deck, Sideboard or Commander). A normal deck counts cards by name; a theme deck keeps each printing.
+| Item | Choices |
+|---|---|
+| Add N to | Collections: every collection and wishlist the account owns or shares, and **New collection...**. Decks: every deck, and **New deck...** |
+| Name | For a new collection or deck |
+| Copies go into (decks) | **New collection: deck name**, or any of your collections. Filled in with the collection used for that deck last time |
+
+- In a collection or wishlist, each row adds its quantity with its finish, condition, language and proxy (foil rows of printings that only come etched are added as etched), up to 10,000 copies.
+- In a deck, the copies go into the chosen collection first, and each row is added to the deck's target zone, linked to those copies; see [Decks](/about/decks). The collection chosen is remembered for the deck.
+- Copies added to a collection lower the wants of wishlists that hold the card.
 - The whole list is one undo step, named for example "Add 5 scanned cards to Main collection".
 - The added rows leave the scanned list.
+- New collections and decks can be made, and cards added, without a connection in the Android app.
 
 ## Scanner settings
 
-| Setting | Choices | Default | Applies to |
-|---|---|---|---|
-| Vibrate when a card is added | On or off | On | Your account |
-| New scans are foil | On or off | Off | Your account |
-| Camera | Back camera or Front camera | Back camera | Your account |
+The settings sheet opens over the camera. **Done** closes it. Settings are saved for your account at once.
 
-A new scan gets the foil setting, unless the printing only exists in the other finish.
+| Setting | Choices | Default |
+|---|---|---|
+| Quick mode (takes the first matching printing) | On or off | Off |
+| Play sounds | On or off | On |
+| Vibrate | On or off | On |
+| Mark as proxy | On or off | Off |
+| Camera | Back camera or Front camera | Back camera |
+| Filters: Set | Any number of sets. Type part of a set name or code, then tap the set. Each set shows as a chip; **×** removes it | None |
+| Ignore promos | On or off | Off |
+| Prefer foil if possible | On or off | Off |
+| On screen: Display total value | On or off | Off |
+| On screen: Display copies in collection | On or off | Off |
+
+The set filter stays on until it is changed.
 
 ## Requirements and limits
 
 - The camera needs a secure connection (HTTPS) or a local address such as localhost. Without it, cards can still be added by name.
 - The first scan on a device loads the text recognition files (about 7 MB) from the Mana Vault server; the browser keeps them for later scans. No internet connection is needed.
-- Recognition reads English card text. Prices, condition and language are not set by the scanner. Cards in other languages are found by their set code and collector number when the information line can be read.
-- The scanner pauses while a window or the scanned list sheet is open, and while the page is hidden.
+- Recognition reads English card text. Cards in other languages are found by their set code and collector number when the information line can be read.
+- The scanner pauses while a window, the picker, the settings, the card page or the scanned list sheet is open, and while the page is hidden.
 
 ## Messages
 
@@ -111,6 +146,7 @@ A new scan gets the foil setting, unless the printing only exists in the other f
 | Point the camera at a card and fill the outline | Ready; no card is recognized at the moment |
 | Reading card name | A card name was read once; hold the card steady for a second read |
 | Added card name | The card was added to the scanned list |
+| Not in set: card name (SET) | The card is from a set outside the set filter; it was not added |
 | Text recognition could not start: reason | The text recognition files could not load. Reload the page; if it continues, check that the server is up to date |
 | Scanning stopped for a moment: reason | A read or the match on the server failed; scanning tries again by itself |
 | Camera access is unavailable. Open Mana Vault over HTTPS (or localhost), or add cards by name. | The page is not on a secure connection, or the browser has no camera support |
@@ -120,11 +156,11 @@ A new scan gets the foil setting, unless the printing only exists in the other f
 | card name added to the scanned list | Add a card by name found a card |
 | No card name is close to "text" | Add a card by name found nothing close enough; check the spelling |
 | Could not look up that name. | The server could not be reached |
+| No set matches | The picker's Filter sets box matches no printing |
 | Enter a quantity from 1 to 999 | The edit window has a quantity out of range |
 | set and number is not printed in foil (or a normal finish) | The chosen printing does not exist in the chosen finish |
 | Could not load the printings of this card. | The edit window opened with the current printing only |
 | N cards added to destination | Add to finished |
+| Enter a name for the new collection (or deck) | New collection... or New deck... without a name |
 | Could not add the scanned cards. | Add to failed; the scanned list is unchanged |
-| Create a collection first (Collection menu, New collection) | There is no collection or deck to add to |
 | Scanned list cleared | Clear finished |
-| Scanner settings saved | The scanner settings were changed |

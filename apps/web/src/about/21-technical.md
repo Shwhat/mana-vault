@@ -7,7 +7,7 @@
 | Interface | React and TypeScript, built with Vite into static files |
 | Server | Node.js 22 with Fastify, serving the interface and a JSON API |
 | Database | SQLite (built into Node.js), one file in the data folder |
-| Card data | Scryfall Default Cards bulk data, read as a stream |
+| Card data | Scryfall Default Cards bulk data and the rulings file, read as streams |
 | Card text recognition | Tesseract.js with the English model, running in the browser; its files are served by Mana Vault from /ocr. In the Android app, Google ML Kit text recognition on the phone |
 | Scan matching | The server compares the text read from a card with every card name (edit distance over a three-letter index) and with set codes and collector numbers |
 | Sign-in | PBKDF2-SHA256 password hashes (600,000 rounds), HTTP-only session cookie, request safety header on every change |
@@ -59,7 +59,8 @@ The container checks itself every 30 seconds by running the server with `-health
 - Card images need internet access to Scryfall's image servers.
 - Prices are as old as the last card database update, and are not kept over time.
 - The trade calculator is kept in the browser until the page is reloaded.
-- Ownership counts copies once per deck; two decks may count the same copies.
+- A copy fills one deck card at a time; decks from other accounts never use your copies.
+- Power, toughness, two-faced rules text and rulings arrive with the first card database update after installing 0.6.0.
 - The scanner's live camera needs HTTPS or a local address (in the browser).
 - The Android app reads English card text, checks for offers about every 15 minutes rather than at once, and signs in to one server and account at a time.
 

@@ -24,7 +24,7 @@ function BarList({ title, buckets, measure, currency, ordered, onPick, labelOf }
   return (
     <section className="chartcard" aria-label={title}>
       <h4>{title}</h4>
-      {shown.length === 0 && <p className="note">Nothing to show.</p>}
+      {shown.length === 0 && <p className="note">Nothing to show</p>}
       <div className="bars" role="table" aria-label={title}>
         {shown.map((bucket) => {
           const width = max > 0 ? Math.max(amount(bucket) > 0 ? 1.5 : 0, (amount(bucket) / max) * 100) : 0;
@@ -119,7 +119,6 @@ export function StatsPanel({ stats, kind, onFacet }: { stats: Stats | null; kind
         <BarList title={`Top sets by ${measure === "count" ? "cards" : "value"}`} buckets={stats.sets} measure={measure} currency={currency}
           labelOf={(bucket) => `${bucket.label} (${bucket.key.toUpperCase()})`} onPick={pick((bucket) => ({ set: bucket.key }))} />
       </div>
-      <p className="note pad">Type counts a card once for each of its types, so an artifact creature appears under Artifact and Creature. Sets lists the twelve sets with the highest value.</p>
     </div>
   );
 }

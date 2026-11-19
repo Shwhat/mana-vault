@@ -1,7 +1,9 @@
 name: Android app
 
-# Pull requests that touch the interface or the app get a debug build as a check.
-# A version tag (vX.Y.Z) builds the signed release APK and attaches it to the GitHub release.
+# Pull requests and pushes to main build a debug APK (signed with the shared
+# debug key in apps/android/android/app) and keep it with the run as
+# mana-vault-X.Y.Z-debug. A version tag (vX.Y.Z) builds the signed release APK
+# and attaches it to the GitHub release.
 on:
   pull_request:
     paths:
@@ -10,6 +12,7 @@ on:
       - "apps/server/src/scan-core.ts"
       - ".github/workflows/android.yml"
   push:
+    branches: [main]
     tags: ["v*"]
   workflow_dispatch:
 
@@ -47,12 +50,24 @@ jobs:
         working-directory: apps/android
 
       - name: Build the debug app
-        if: github.event_name == 'pull_request'
-        run: ./gradlew --no-daemon assembleDebug
+        if: "!startsWith(github.ref, 'refs/tags/v')"
         working-directory: apps/android/android
+        run: |
+          ./gradlew --no-daemon assembleDebug
+          version=$(node -p "require('../../../package.json').version")
+          mkdir -p "$RUNNER_TEMP/debug"
+          cp app/build/outputs/apk/debug/app-debug.apk "$RUNNER_TEMP/debug/mana-vault-$version-debug.apk"
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+
+      - name: Keep the debug APK with this run
+        if: "!startsWith(github.ref, 'refs/tags/v')"
+        uses: actions/upload-artifact@v4
+        with:
+          name: mana-vault-${{ env.VERSION }}-debug
+          path: ${{ runner.temp }}/debug/*.apk
 
       - name: Build and sign the release app
-        if: github.event_name != 'pull_request'
+        if: startsWith(github.ref, 'refs/tags/v')
         env:
           KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           MANAVAULT_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
@@ -74,7 +89,7 @@ jobs:
           rm -f "$RUNNER_TEMP/release.jks"
 
       - name: Keep the APK with this run
-        if: github.event_name != 'pull_request'
+        if: startsWith(github.ref, 'refs/tags/v')
         uses: actions/upload-artifact@v4
         with:
           name: mana-vault-apk

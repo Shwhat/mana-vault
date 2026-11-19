@@ -14,6 +14,7 @@ export async function importBulkFile(
   const insertCard = cardInsertStatement(database);
   const insertExtras = cardExtrasStatement(database);
   const insertPrices = cardPricesStatement(database);
+  const insertStats = database.prepare("UPDATE cards SET power = ?, toughness = ? WHERE id = ?");
   let imported = 0;
   const importValue = (value: unknown) => {
     const card = parsePrinting(value);
@@ -40,6 +41,7 @@ export async function importBulkFile(
     insertExtras.run(card.finishes.join(","), card.promo ? 1 : 0, card.variation ? 1 : 0, card.id);
     const prices = card.prices;
     insertPrices.run(prices.usd, prices.usd_foil, prices.usd_etched, prices.eur, prices.eur_foil, card.flavorName, card.id);
+    insertStats.run(card.power, card.toughness, card.id);
     imported += 1;
     if (imported % 25_000 === 0) onProgress?.(imported);
   };
@@ -128,6 +130,8 @@ interface Printing {
   variation: boolean;
   prices: Record<"usd" | "usd_foil" | "usd_etched" | "eur" | "eur_foil", number | null>;
   flavorName: string | null;
+  power: string | null;
+  toughness: string | null;
 }
 
 /** Scryfall sends prices as decimal strings or null; anything else is treated as no price. */
@@ -173,7 +177,9 @@ function parsePrinting(value: unknown): Printing {
     manaCost: optionalString(record, "mana_cost"),
     manaValue: typeof manaValue === "number" ? manaValue : null,
     typeLine: topLevelTypeLine ?? faceTypeLines.join(" // "),
-    oracleText: optionalString(record, "oracle_text"),
+    // two-faced cards keep their text on each face
+    oracleText: optionalString(record, "oracle_text")
+      ?? (cardFaces.map((face) => optionalString(face, "oracle_text")).filter((text): text is string => !!text).join("\n//\n") || null),
     colors: parsedColors,
     colorIdentity,
     legalities: parsedLegalities,
@@ -190,6 +196,8 @@ function parsePrinting(value: unknown): Printing {
     prices: parsePrices(record.prices),
     flavorName: typeof record.flavor_name === "string" && record.flavor_name ? record.flavor_name
       : typeof cardFaceRecord?.flavor_name === "string" && cardFaceRecord.flavor_name ? cardFaceRecord.flavor_name : null,
+    power: optionalString(record, "power") ?? (cardFaceRecord ? optionalString(cardFaceRecord, "power") : null),
+    toughness: optionalString(record, "toughness") ?? (cardFaceRecord ? optionalString(cardFaceRecord, "toughness") : null),
   };
 }
 

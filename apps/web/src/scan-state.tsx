@@ -1,20 +1,24 @@
 // ---------- scan state: the scanned list, kept on this device until it is added or cleared ----------
 import { useCallback, useEffect, useState, type MutableRefObject } from "react";
 import { request } from "./api";
-import type { Counts } from "./library-state";
+import type { Counts, WishChange } from "./library-state";
 import type { Prefs } from "./prefs";
-import type { Collection, Deck, DeckDetail, Zone } from "./types";
+import type { Collection, Deck, DeckDetail, PriceFields } from "./types";
 
 export type ScanCard = {
   id: string; oracle_id: string; name: string; set_code: string; set_name: string; collector_number: string;
-  rarity: string; image_url: string | null; finishes: string; released_at: string | null;
-};
+  rarity: string; image_url: string | null; finishes: string; released_at: string | null; promo?: number; variation?: number;
+} & Partial<PriceFields>;
 export type ScanMatch = { card: ScanCard | null; score: number; by: "printing" | "name" | null; read: string };
-export type ScanItem = { key: string; card: ScanCard; foil: boolean; quantity: number; at: number };
+/** One row of the scanned list: a printing in one finish, condition and language, real or a proxy. */
+export type ScanItem = {
+  key: string; card: ScanCard; foil: boolean; quantity: number; at: number; condition?: string; language?: string; proxy?: boolean;
+};
 export type ScanTarget = { kind: "collection" | "deck"; id: string; name: string; label: string };
+/** Where scanned cards go: a collection, or a deck together with the collection that receives the copies. */
+export type ScanDestination = { kind: "collection"; id: string; name: string } | { kind: "deck"; id: string; name: string; collectionId: string; collectionName: string };
 
 type UndoEntry = { label: string; undo: () => Promise<void>; redo: () => Promise<void> };
-type DeckKey = { deckId: string; oracle_id: string; printing_id: string | null; card_id: string; zone: Zone };
 
 export type ScanDeps = {
   userId: number;
@@ -23,8 +27,9 @@ export type ScanDeps = {
   fail: (reason: unknown, fallback: string) => void;
   pushUndo: (entry: UndoEntry) => void;
   setCounts: (collectionId: string, items: Counts) => Promise<void>;
-  writeDeck: (key: DeckKey, to: number) => Promise<void>;
   loadDeck: (id: string) => Promise<DeckDetail>;
+  restoreDeck: (from: DeckDetail, to: DeckDetail) => Promise<void>;
+  restoreWishes: (changes: WishChange[], side: "before" | "after") => Promise<void>;
   refreshAfterChange: () => Promise<void>;
 };
 
@@ -55,19 +60,21 @@ export function finishCode(item: Pick<ScanItem, "card" | "foil">): 0 | 1 | 2 {
   return list.includes("etched") && !list.includes("foil") ? 2 : 1;
 }
 
-/** The finish a new scan gets: the scanner setting, unless the printing only comes in the other finish. */
+/** The finish a new scan gets: foil when foil is preferred and the printing has it, otherwise the finish the printing has. */
 export function finishFor(card: ScanCard, wantFoil: boolean): boolean {
   return hasFinish(card, wantFoil) ? wantFoil : !wantFoil;
 }
 
 export const scanCount = (items: ScanItem[]) => items.reduce((sum, item) => sum + item.quantity, 0);
+const sameRow = (a: Pick<ScanItem, "card" | "foil" | "condition" | "language" | "proxy">, b: typeof a) =>
+  a.card.id === b.card.id && a.foil === b.foil && (a.condition ?? "NM") === (b.condition ?? "NM") && (a.language ?? "en") === (b.language ?? "en") && !!a.proxy === !!b.proxy;
 
 export async function matchText(lines: string[], info: string): Promise<ScanMatch> {
   return request<ScanMatch>("/api/scan/match", { method: "POST", body: JSON.stringify({ lines, info }) });
 }
 
 export function useScanState(deps: ScanDeps) {
-  const { userId, live, flash, fail, pushUndo, setCounts, writeDeck, loadDeck, refreshAfterChange } = deps;
+  const { userId, live, flash, fail, pushUndo, setCounts, loadDeck, restoreDeck, restoreWishes, refreshAfterChange } = deps;
   const [scanItems, setScanItems] = useState<ScanItem[]>(() => readStored(userId));
 
   useEffect(() => {
@@ -78,26 +85,27 @@ export function useScanState(deps: ScanDeps) {
     }
   }, [userId, scanItems]);
 
-  /** Adds one copy of a printing to the top of the list. The same printing and finish raise the existing row. */
-  const addScanned = useCallback((card: ScanCard, foil: boolean, quantity = 1) => {
+  /** Adds copies of a printing to the top of the list. The same printing and copy details raise the existing row. */
+  const addScanned = useCallback((card: ScanCard, foil: boolean, quantity = 1, details: Pick<ScanItem, "condition" | "language" | "proxy"> = {}) => {
     setScanItems((items) => {
-      const existing = items.find((item) => item.card.id === card.id && item.foil === foil);
+      const row = { card, foil, ...details };
+      const existing = items.find((item) => sameRow(item, row));
       const rest = items.filter((item) => item !== existing);
-      const row: ScanItem = existing
+      const next: ScanItem = existing
         ? { ...existing, quantity: Math.min(999, existing.quantity + quantity), at: Date.now() }
-        : { key: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`, card, foil, quantity, at: Date.now() };
-      return [row, ...rest];
+        : { key: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`, ...row, quantity, at: Date.now() };
+      return [next, ...rest];
     });
   }, []);
 
-  /** Changes a row. Rows that end up with the same printing and finish are combined. */
-  const updateScanItem = useCallback((key: string, change: Partial<Pick<ScanItem, "card" | "foil" | "quantity">>) => {
+  /** Changes a row. Rows that end up alike are combined. */
+  const updateScanItem = useCallback((key: string, change: Partial<Pick<ScanItem, "card" | "foil" | "quantity" | "condition" | "language" | "proxy">>) => {
     setScanItems((items) => {
       const index = items.findIndex((item) => item.key === key);
       if (index < 0) return items;
       const row = { ...items[index]!, ...change };
       row.quantity = Math.max(1, Math.min(999, Math.round(row.quantity)));
-      const twin = items.find((item) => item.key !== key && item.card.id === row.card.id && item.foil === row.foil);
+      const twin = items.find((item) => item.key !== key && sameRow(item, row));
       const next = items.map((item, at) => (at === index ? row : item));
       if (!twin) return next;
       return next.filter((item) => item.key !== twin.key).map((item) => (item.key === key ? { ...item, quantity: Math.min(999, item.quantity + twin.quantity) } : item));
@@ -107,48 +115,50 @@ export function useScanState(deps: ScanDeps) {
   const removeScanItem = useCallback((key: string) => setScanItems((items) => items.filter((item) => item.key !== key)), []);
   const clearScanItems = useCallback(() => setScanItems([]), []);
 
-  /** Adds every scanned card to a collection or deck as one undo step, then empties the list. */
-  const addScannedTo = useCallback(async (target: ScanTarget, items: ScanItem[]) => {
+  /**
+   * Adds every scanned card as one undo step, then empties the list. For a deck the copies go into the chosen collection
+   * first and are linked to the deck cards they fill.
+   */
+  const addScannedTo = useCallback(async (target: ScanDestination, items: ScanItem[]) => {
     if (!items.length) return false;
     const copies = scanCount(items);
     const label = `Add ${copies} scanned card${copies === 1 ? "" : "s"} to ${target.name}`;
+    const collectionId = target.kind === "collection" ? target.id : target.collectionId;
     try {
+      const added = items.map((item) => ({
+        cardId: item.card.id, foil: finishCode(item), condition: item.condition ?? "NM", language: item.language ?? "en", proxy: !!item.proxy, quantity: item.quantity,
+      }));
+      const result = await request<{ before: Counts; after: Counts; wishlist?: WishChange[] }>(`/api/collections/${encodeURIComponent(collectionId)}/cards/add`, {
+        method: "POST", body: JSON.stringify({ items: added }),
+      });
+      const wishes = result.wishlist ?? [];
       if (target.kind === "collection") {
-        // scanned copies are near mint and English; the bulk add reports the counts before and after for undo
-        const added = items.map((item) => ({ cardId: item.card.id, foil: finishCode(item), condition: "NM", language: "en", quantity: item.quantity }));
-        const result = await request<{ before: Counts; after: Counts }>(`/api/collections/${encodeURIComponent(target.id)}/cards/add`, {
-          method: "POST", body: JSON.stringify({ items: added }),
+        pushUndo({
+          label,
+          undo: async () => { await setCounts(collectionId, result.before); await restoreWishes(wishes, "before"); },
+          redo: async () => { await setCounts(collectionId, result.after); await restoreWishes(wishes, "after"); },
         });
-        pushUndo({ label, undo: () => setCounts(target.id, result.before), redo: () => setCounts(target.id, result.after) });
       } else {
         const before = await loadDeck(target.id);
         const zone = live.current.prefs.zone;
-        const keyFor = (item: ScanItem): DeckKey => ({
-          deckId: target.id, oracle_id: item.card.oracle_id, printing_id: before.mode === "theme" ? item.card.id : null, card_id: item.card.id, zone,
-        });
-        const sameKey = (a: DeckKey, b: DeckKey) => a.oracle_id === b.oracle_id && a.printing_id === b.printing_id;
-        const keys: DeckKey[] = [];
-        for (const item of items) {
-          const key = keyFor(item);
-          if (!keys.some((known) => sameKey(known, key))) keys.push(key);
+        for (const item of added) {
           let left = item.quantity;
           while (left > 0) {
             const part = Math.min(100, left);
-            await request(`/api/decks/${encodeURIComponent(target.id)}/cards`, { method: "POST", body: JSON.stringify({ cardId: item.card.id, quantity: part, zone }) });
+            await request(`/api/decks/${encodeURIComponent(target.id)}/cards`, {
+              method: "POST", body: JSON.stringify({ cardId: item.cardId, quantity: part, zone, links: [{ ...item, collectionId, quantity: part }] }),
+            });
             left -= part;
           }
         }
-        const find = (detail: DeckDetail, key: DeckKey) =>
-          detail.cards.find((card) => card.oracle_id === key.oracle_id && card.printing_id === key.printing_id && card.zone === zone)?.quantity ?? 0;
-        const afterDeck = await loadDeck(target.id);
-        const changes = keys.map((key) => ({ key, from: find(before, key), to: find(afterDeck, key) }));
+        const after = await loadDeck(target.id);
         pushUndo({
           label,
-          undo: async () => { for (const change of changes) await writeDeck(change.key, change.from); },
-          redo: async () => { for (const change of changes) await writeDeck(change.key, change.to); },
+          undo: async () => { await restoreDeck(after, before); await setCounts(collectionId, result.before); await restoreWishes(wishes, "before"); },
+          redo: async () => { await setCounts(collectionId, result.after); await restoreWishes(wishes, "after"); await restoreDeck(before, after); },
         });
       }
-      setScanItems((current) => current.filter((item) => !items.some((added) => added.key === item.key)));
+      setScanItems((current) => current.filter((item) => !items.some((done) => done.key === item.key)));
       flash(`${copies} card${copies === 1 ? "" : "s"} added to ${target.name}`);
       await refreshAfterChange();
       return true;
@@ -156,7 +166,7 @@ export function useScanState(deps: ScanDeps) {
       fail(reason, "Could not add the scanned cards.");
       return false;
     }
-  }, [live, setCounts, loadDeck, writeDeck, pushUndo, flash, fail, refreshAfterChange]);
+  }, [live, setCounts, loadDeck, restoreDeck, restoreWishes, pushUndo, flash, fail, refreshAfterChange]);
 
   return { scanItems, addScanned, updateScanItem, removeScanItem, clearScanItems, addScannedTo };
 }

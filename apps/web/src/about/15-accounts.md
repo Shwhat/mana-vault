@@ -34,7 +34,7 @@ When Mana Vault is updated from a version before 0.2.0, the collection and decks
 
 ## Changing your password
 
-1. Open the account menu (your user name at the right of the menu bar) and choose **Change password...**.
+1. Open the account menu (your user name at the right of the title bar) and choose **Change password...**.
 2. Enter the current password and the new one twice, then choose **Change password**.
 3. Every other browser and every phone signed in to the account is signed out. This browser (or phone) stays signed in.
 

@@ -26,15 +26,19 @@ export type Currency = "usd" | "eur";
 export type FinishCode = 0 | 1 | 2;
 export type Condition = "M" | "NM" | "LP" | "MP" | "HP" | "DMG";
 
-export type OwnedIn = { id: string; name: string; wishlist: boolean; regular: number; foil: number; etched: number; trade: number; allPrintings: number };
+export type OwnedIn = { id: string; name: string; wishlist: boolean; regular: number; foil: number; etched: number; proxies?: number; trade: number; allPrintings: number };
 export type CardDetail = Card & {
-  owned: { regular: number; foil: number; etched: number; allPrintings: number; collections: OwnedIn[] };
+  owned: { regular: number; foil: number; etched: number; proxies?: number; allPrintings: number; collections: OwnedIn[] };
   wanted: OwnedIn[];
   pricesUpdatedAt: string | null;
 };
 
-/** One kind of copy in a collection: a printing in one finish, condition and language. */
-export type CopyKey = { cardId: string; foil: FinishCode; condition: Condition; language: string };
+/** One kind of copy in a collection: a printing in one finish, condition and language, real or a proxy. */
+export type CopyKey = { cardId: string; foil: FinishCode; condition: Condition; language: string; proxy?: boolean };
+/** Details of a copy row that are not part of its key. */
+export type CopyExtras = {
+  purchase_price: number | null; price_currency: string | null; added_at: string | null; misprint: boolean; altered: boolean; signed: boolean;
+};
 export type CollectionEntry = Pick<Card, "id" | "name" | "set_code" | "set_name" | "collector_number" | "rarity" | "image_url" | "colors" | "mana_cost" | "mana_value" | "type_line"> &
   PriceFields & {
     oracle_id: string;
@@ -43,13 +47,16 @@ export type CollectionEntry = Pick<Card, "id" | "name" | "set_code" | "set_name"
     condition: Condition;
     language: string;
     trade: number;
-  };
+    proxy?: boolean;
+    /** The decks this row's copies are linked to. */
+    decks?: Array<{ id: string; name: string; quantity: number }>;
+  } & Partial<CopyExtras>;
 export type TradeEntry = CollectionEntry & { collection_id: string; collection_name: string };
 
 export type Person = { id: number; name: string };
 export type Sharing = { role: "owner" | "member"; owner: Person; displayName: string | null; sharedWith: Person[] };
 
-export type CompletionRule = "main" | "all" | "names";
+export type CompletionRule = "none" | "main" | "all" | "names";
 export type FinishRule = "any" | "regular" | "foil" | "both";
 export type CollectionKind = "collection" | "wishlist";
 
@@ -67,6 +74,8 @@ export type Collection = Sharing & {
   tradeCount: number;
   value: { usd: number; eur: number; unpricedUsd: number; unpricedEur: number };
   progress: { owned: number; total: number } | null;
+  /** When anything in the collection last changed. */
+  updatedAt?: string;
 };
 
 export type SetProgress = { code: string; name: string; owned: number; total: number; printedSize: number | null; known: boolean };
@@ -87,6 +96,7 @@ export type SetInfo = { code: string; name: string; set_type: string; released_a
 export type Offer = { id: string; kind: "collection" | "deck"; itemId: string; itemName: string; mode: "copy" | "share" | "transfer"; createdAt: string; user: string };
 
 export const COMPLETION_RULES: Array<[CompletionRule, string]> = [
+  ["none", "None (no completion tracking)"],
   ["main", "Main set (numbered cards only)"],
   ["all", "Every printing (variants and promos too)"],
   ["names", "Each card name once"],
@@ -113,7 +123,12 @@ export type Deck = Partial<Sharing> & {
   format: string;
   mode: DeckMode;
   card_count?: number;
+  /** The collection that receives copies added straight to this deck, remembered per deck. */
+  collection_id?: string | null;
 };
+
+/** A collection copy that fills a deck card. */
+export type DeckLink = CopyKey & { collectionId: string; collectionName: string; quantity: number };
 
 export type DeckCard = Pick<Card, "name" | "mana_cost" | "type_line" | "set_code" | "set_name" | "collector_number" | "image_url"> & {
   entry_id: number;
@@ -122,11 +137,21 @@ export type DeckCard = Pick<Card, "name" | "mana_cost" | "type_line" | "set_code
   printing_id: string | null;
   quantity: number;
   zone: Zone;
+  links?: DeckLink[];
+  /** Cards of this row with no linked copy. */
+  missing?: number;
+};
+
+/** A free copy that could fill a deck card. */
+export type Candidate = CopyKey & {
+  collectionId: string; collectionName: string; set_code: string; set_name: string; collector_number: string; image_url: string | null; quantity: number; free: number;
 };
 
 export type DeckDetail = Deck & { cards: DeckCard[] };
 
 export type ImportReport = {
+  format?: string;
+  formatName?: string;
   matchedRows: number;
   importedQuantity: number;
   unmatched: Array<{ row: number; name: string; reason: string }>;
@@ -156,7 +181,7 @@ export type BackupSummary = {
 
 export type User = { id: number; name: string };
 
-export type View = "cards" | "collection" | "deck" | "trade" | "about";
+export type View = "home" | "cards" | "collection" | "deck" | "trade" | "about";
 export type CollectionTab = "cards" | "completion" | "missing" | "stats";
 export type DeckTab = "cards" | "ownership" | "stats";
 
@@ -169,13 +194,13 @@ export type Stats = {
 export type Ownership = {
   mode: DeckMode; currency: Currency; needed: number; owned: number; missing: number; missingValue: number; unpriced: number;
   entries: Array<{
-    entryId: number; cardId: string; name: string; zone: Zone; needed: number; owned: number; missing: number; price: number | null;
+    entryId: number; cardId: string; name: string; zone: Zone; needed: number; owned: number; missing: number; price: number | null; proxies?: number;
     where: Array<{ id: string; name: string; quantity: number }>;
   }>;
 };
 
 /** Narrowing of the collection list: chosen by clicking a tag on a row or a bar in Statistics. */
-export type Facets = { rarity?: string; color?: string; type?: string; set?: string; curve?: string; finish?: string; trade?: boolean };
+export type Facets = { rarity?: string; color?: string; type?: string; set?: string; curve?: string; finish?: string; trade?: boolean; inDeck?: "yes" | "no"; proxy?: boolean };
 export type CollectionSort = "name" | "price-desc" | "price-asc" | "quantity" | "set";
 
 export const CONDITIONS: Array<[Condition, string]> = [
@@ -222,13 +247,17 @@ export function money(value: number | null | undefined, currency: Currency): str
   if (value === null || value === undefined) return "No price";
   return new Intl.NumberFormat(currency === "eur" ? "de-DE" : "en-US", { style: "currency", currency: currency.toUpperCase() }).format(value);
 }
-export const copyKey = (entry: Pick<CollectionEntry, "id" | "foil" | "condition" | "language">): CopyKey =>
-  ({ cardId: entry.id, foil: entry.foil, condition: entry.condition, language: entry.language });
+export const copyKey = (entry: Pick<CollectionEntry, "id" | "foil" | "condition" | "language" | "proxy">): CopyKey =>
+  ({ cardId: entry.id, foil: entry.foil, condition: entry.condition, language: entry.language, proxy: !!entry.proxy });
+export const sameCopy = (a: CopyKey, b: CopyKey) =>
+  a.cardId === b.cardId && a.foil === b.foil && a.condition === b.condition && a.language === b.language && !!a.proxy === !!b.proxy;
 /** A short description of a copy beyond its printing, such as "Foil, Lightly played, Japanese". Regular, Near mint, English are left out. */
 export function copyLabel(entry: Pick<CollectionEntry, "foil" | "condition" | "language">): string {
   return [entry.foil ? FINISHES[entry.foil]![1] : "", entry.condition !== "NM" ? conditionName(entry.condition) : "",
     entry.language !== "en" ? languageName(entry.language) : ""].filter(Boolean).join(", ");
 }
+/** The price of a copy row: proxies have none. */
+export const copyPrice = (entry: CollectionEntry, currency: Currency): number | null => (entry.proxy ? null : priceOf(entry, entry.foil, currency));
 
 export type Filters = {
   query: string;

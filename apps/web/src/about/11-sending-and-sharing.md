@@ -13,7 +13,7 @@ Collections and decks belong to the account that made them. You can send one to 
 ## Sending
 
 1. Open the collection (collection view) or deck.
-2. Choose **Send collection...** or **Send deck...** (Collection or Deck menu, or the Share group on the Collection or Decks ribbon tab).
+2. Choose **Send collection...** or **Send deck...** (the Share group on the Collection or Decks ribbon tab).
 3. Pick the account to send to from the list of this server's accounts, and pick Copy, Share or Transfer.
 4. Choose **Send**. The message "Sent to name. It is added when they accept it." confirms it.
 
@@ -21,7 +21,7 @@ The offer waits in their Inbox. Only one offer of the same item to the same pers
 
 ## The Inbox
 
-A count on your account menu (and on the phone's top bar) shows offers waiting for you. **Inbox...** in the account menu, the Collection and Deck menus or the ribbon opens it. It has two lists:
+A count on your account menu (and on the phone's top bar) shows offers waiting for you. **Inbox...** in the account menu opens it. It has two lists:
 
 - **Waiting for you**: each offer with its name, kind, way and sender, and **Accept...** or **Decline**.
 - **Sent by you, not yet answered**: your waiting offers, each with **Cancel offer**.

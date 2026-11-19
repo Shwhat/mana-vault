@@ -6,7 +6,7 @@ Mana Vault is a self-hosted Magic: The Gathering collection and deck manager for
 |---|---|
 | **Card search** | The full local card database: every printing, searchable by name, type, rules text, color, set, rarity, legality and mana value |
 | **Collections** | The printings you own, kept in as many collections as you like (binders, boxes, sets you are completing), with finish, condition, language, prices and set completion. Wishlists hold the cards you want |
-| **Decks** | Your decks, each with a format, a mode (Normal or Theme) and cards in the main deck, sideboard or commander zone |
+| **Decks** | Your decks, each with a format and cards in the main deck, sideboard or commander zone, linked to the collection copies that fill them |
 | **Trade** | The copies you are willing to trade, and a calculator that compares what you give with what you get |
 | **Card database** | The local copy of the card catalog, with prices, that search, imports and decks match against |
 
@@ -15,7 +15,7 @@ Card search is where cards are found. From a search result a card is added to th
 ## Principles
 
 1. **Your data stays on your server.** The collection, decks and accounts are stored in one database file in the server's data folder. Only card images and the card catalog download come from outside.
-2. **Portable formats.** Collections export as Moxfield-compatible CSV, decks as plain text or CSV, and the whole library as a readable JSON backup.
+2. **Portable formats.** Collections import from and export to the CSV files of Moxfield, ManaBox, Archidekt, Deckbox and TCGplayer and plain text lists, and the whole library is a readable JSON backup.
 3. **Your library is yours.** Collections and decks belong to your account; others see them only when you send or share them.
 4. **Every change shows its result.** Lists redraw at once and a short confirmation appears in the status bar.
 5. **Mistakes are easy to reverse.** Collection and deck edits, including bulk removes and moves, can be undone and redone.
@@ -31,7 +31,7 @@ Card search is where cards are found. From a search result a card is added to th
 | [Card search](/about/card-search) | The search box, filter syntax and the Filters panel |
 | [Collections](/about/collections) | Collections, the target collection, copy details, filter tags, the binder layout, picking rows, removing and moving cards |
 | [Set completion](/about/set-completion) | Linking sets, completion and finish rules, missing cards and exports |
-| [Decks](/about/decks) | Deck modes, formats, zones, building, the ownership check, renaming and deleting decks |
+| [Decks](/about/decks) | Formats, zones, linking deck cards to collection copies, building, the ownership check, renaming and deleting decks |
 | [Prices and statistics](/about/prices-and-statistics) | Prices, values, currency, sorting by price and the Statistics tabs |
 | [Wishlists and trading](/about/wishlists-and-trading) | Wishlists, the trade list, the trade view and the trade calculator |
 | [Sending and sharing](/about/sending-and-sharing) | Sending collections and decks as copies, shares or transfers, and the Inbox |

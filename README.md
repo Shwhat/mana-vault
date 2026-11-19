@@ -4,35 +4,39 @@ A self-hosted Magic: The Gathering collection and deck manager. Version 0.5.0.
 
 Mana Vault runs on your own server as one Docker container and is used from a desktop browser, a phone browser (installable as a home screen app) or the Android app. It keeps a local copy of the Scryfall card catalog, your collection and your decks in one SQLite database, behind a sign-in.
 
-The full user guide is built into the app: Help menu, **About Mana Vault**. The pages are in `apps/web/src/about`.
+The full user guide is built into the app: Help tab, **About Mana Vault**. The pages are in `apps/web/src/about`.
 
 ## Features
 
 - Card search across every printing, with filter syntax (`t:dragon c:red mv>=4`, `o:draw`, `set:lea`, `r:rare`, `id:wubg`, `legal:commander`, `usd<1`, `eur>=20`, negation with `-`), flavor name matching and a Filters panel.
 - Prices from Scryfall (USD regular, foil, etched; EUR regular, foil) stored with each card database update, shown in USD or EUR, with collection and deck values and sorting by price.
 - Statistics for collections and decks: stat tiles and bar charts for mana curve, color, type, rarity, finish and top sets; clicking a collection bar filters the list.
-- Copy details per collection row: finish (regular, foil, etched), condition, language and the number for trade.
+- Copy details per collection row: finish (regular, foil, etched), condition, language, proxy, the number for trade, purchase price and currency, date added, misprint, altered and signed.
+- Proxies: marked everywhere, worth nothing, left out of completion, value and statistics, and able to fill a deck slot.
 - Filter tags (click a set code or rarity) and a binder layout with pages of nine cards.
 - Wishlists: collections whose cards are wanted, not owned; add a card, a set's missing cards or a deck's missing cards in one step.
 - Deck ownership check: which cards you own across your collections, where they are, and the cost of the missing cards; export the missing cards as text.
 - Trade list of the copies marked for trade, and a trade calculator that compares what you give with what you get, with a copyable summary.
-- Any number of collections per account (binders, boxes, sets being completed), each copy in one place, with a target collection for adding (C cycles it).
-- Set completion: link a collection to any number of sets; count by main set, every printing or each card name once, and by any finish, regular only, foil only or one of each; Completion and Missing tabs with filters, add-from-list and text or CSV export of the missing list.
+- Any number of collections per account (binders, boxes, sets being completed), each copy in one place, with a target collection for adding (C cycles it). Every owned card is in a collection.
+- Set completion (off by default for new collections): link a collection to any number of sets; count by main set, every printing or each card name once, and by any finish, regular only, foil only or one of each; Completion and Missing tabs with filters, add-from-list and text or CSV export of the missing list.
 - Bulk editing: pick rows with Ctrl+click, Shift+click, Ctrl+A or Select mode; remove or move them between collections in one undoable step.
 - Collection tracking per printing, regular and foil, with plus, minus, move and remove controls.
-- Decks in Normal mode (any printing counts) or Theme mode (exact printing kept), with main deck, sideboard and commander zones and a target zone for adding; rename and delete.
+- Decks keep the exact printing, with main deck, sideboard and commander zones and a target zone for adding; rename and delete.
+- Linked deck cards: each deck card is linked to a copy in a collection (one deck per copy). Collection rows show their deck, deck rows show their collection, links follow moves, and unlinked cards show as missing with a + Wishlist button. Cards added straight to a deck go into the deck's own collection or a chosen one.
+- Wishlist want counts go down as copies are added.
 - Collections and decks belong to their account. Send them to another account as a copy, a share (both edit) or a transfer; the receiver accepts from an Inbox as a new item or, for collections, merged into one of theirs.
 - Undo and redo for collection and deck edits (150 steps).
-- Collection CSV import (Moxfield, ManaBox and similar, including condition, language, etched and tradelist counts) into a chosen collection, and decklist import (text or CSV), each with a preview and an Import review panel for skipped rows.
-- Exports: collection as Moxfield CSV with condition, language, finish and tradelist counts, decks as text or CSV, missing set and deck cards as text.
+- Import window: Mana Vault, Moxfield, ManaBox, Archidekt, Deckbox, TCGplayer or plain text, detected from the file and changeable, into a chosen or new collection, and decklist import (text or CSV), each with a preview and an Import review panel for skipped rows.
+- Export window: the whole collection, filtered cards, selected cards, missing cards or a deck, in any of the import formats.
 - JSON backup and restore of the signed-in account's own collections and decks and the card records they use.
-- Card database updates from Scryfall on demand or on a schedule, including the set list (printed sizes) and each printing's finishes.
-- Live camera card scanner: scans continuously, finds the exact printing from the set code and collector number (or the card name, with tolerance for reading mistakes), collects cards in a scanned list with edit, +1 and finish controls, and adds the list to a collection or deck as one undo step. Text recognition runs in the browser with files served by Mana Vault, so it works offline. Phone Scan tab; desktop scanner window.
+- Card database updates from Scryfall on demand or on a schedule, including the set list (printed sizes), each printing's finishes, power and toughness, and rulings.
+- Card page: art, rules text, power and toughness, every version with its market price, and rulings (offline in the app too), with a card actions button.
+- Live camera card scanner: scans continuously, finds the exact printing from the set code and collector number (or the card name, with tolerance for reading mistakes), collects cards in a scanned list with edit, +1 and finish controls, and adds the list to a collection or deck as one undo step. Text recognition runs in the browser with files served by Mana Vault, so it works offline. Settings for quick mode, sounds, camera, proxies, a set filter (any number of sets, with chips on the camera screen and a Not in set warning), ignoring promos, preferring foil, total value and copies owned. A printing picker when more than one printing fits, a strip for finish, condition and language, and an Add to window that can create a new collection or deck. Phone Scan tab; desktop scanner window.
 - Sign-in with accounts, password changes, 30-day sessions and protection against password guessing. New accounts can be turned off.
-- Desktop interface in the OpenSchem style: menu bar, customizable ribbon with a contextual Deck tab, dockable and floating panels (Filters, Collections, Decks, Card, Deck list, Import review), saved workspaces, status bar and light, dark or system theme.
-- Phone layout with bottom tabs, full-screen sheets and 44 pixel touch targets.
+- Desktop interface in the OpenSchem style: title bar, customizable ribbon (the only menu) with deck and collection commands added to their tabs when one is open, large, compact or icons-only buttons, right-click menus on rows, dockable and floating panels (Filters, Collections, Decks, Card, Deck list, Import review), saved workspaces, status bar and light, dark or system theme.
+- Phone layout with a Home screen, bottom tabs (Home, Search, Collection, Decks, Scan), a nested top-right menu, long-press menus on rows, full-screen sheets and 44 pixel touch targets.
 - Preferences (theme, foil, target zone, target and open collection, currency, collection sort and layout, ribbon, panels, workspaces, last deck) saved per account on the server.
-- Android app (Android 8.0 or newer, APK on the GitHub releases page): every phone feature, sign-in per phone with a device list, offline use of collections, decks, card search and scanning with sync when the connection returns, the phone's own text recognition for scanning, and notifications for new Inbox offers.
+- Android app (Android 8.0 or newer, APK on the GitHub releases page): every phone feature, sign-in per phone with a device list, offline use of collections, decks, card search and scanning (including new collections and decks) with sync when the connection returns and a Sync now button, the phone's own text recognition for scanning, and notifications for new Inbox offers.
 - Built-in About guide with release notes.
 
 ## Keyboard shortcuts
@@ -203,12 +207,12 @@ The browser suite uses Playwright's Chromium (`npx playwright install chromium` 
 
 | Path | Contents |
 |---|---|
-| `apps/server/src` | Fastify server: API, sign-in (`auth.ts`), collections, set completion and sending (`library.ts`), set list (`sets.ts`), search, imports, backups, catalog updates |
-| `apps/web/src` | React interface: `store.tsx` (state), `library-state.tsx` (collections, picking rows, decks admin, offers), `actions.tsx` (every command), `ribbon.ts` (ribbon and menus as data), `dock.ts` (panel layout model), `components/`, `panels/`, `views/`, `about/` (guide pages), `style.css` |
+| `apps/server/src` | Fastify server: API, sign-in (`auth.ts`), collections, set completion and sending (`library.ts`), decks (`decks.ts`), deck card links (`links.ts`), set list (`sets.ts`), search, imports, backups, catalog updates |
+| `apps/web/src` | React interface: `store.tsx` (state), `library-state.tsx` (collections, picking rows, decks admin, offers), `actions.tsx` (every command), `ribbon.ts` (ribbon and its dropdowns as data), `formats.ts` (export formats), `dock.ts` (panel layout model), `components/`, `panels/`, `views/`, `about/` (guide pages), `style.css` |
 | `apps/web/public` | Sign-in page, icons, manifest and service worker |
 | `apps/android` | Android app: Capacitor project (`android/`), native plugin, icons |
 | `apps/web/src/android` | The app's side of the interface: platform layer, device sign-in, offline copy and sync (`offline.ts`), card list (`catalog.ts`), app screens |
-| `apps/server/src/mobile.ts` | Device sign-in, cross-origin access for the app, `/api/sync`, `/api/sync/state`, `/api/catalog/compact` |
+| `apps/server/src/mobile.ts` | Device sign-in, cross-origin access for the app, `/api/sync`, `/api/sync/state`, `/api/catalog/compact`, `/api/rulings/compact` |
 | `tests/e2e` | Playwright browser tests (including the Android app with a stand-in for its native plugin) and the sample-data test server |
 | `docs/HANDOFF.md` | Project handoff: rules, code map, open items |
 
@@ -228,7 +232,7 @@ npm run apk:debug -w @mana-vault/android   # apps/android/android/app/build/outp
 
 ### Releases
 
-The `Android app` workflow builds a debug app for pull requests that change the interface or the app. For a version tag (`vX.Y.Z`) it builds the release app, signs it and attaches `mana-vault-X.Y.Z.apk` to the GitHub release.
+The `Android app` workflow builds a debug app for every pull request that changes the interface or the app, and for every push to main, and keeps it with the run as `mana-vault-X.Y.Z-debug` (Actions, the run, Artifacts). Debug builds are signed with the shared debug key in `apps/android/android/app/debug-shared.p12`, so each one installs over the one before it; the release app uses its own key and needs the debug app uninstalled first. For a version tag (`vX.Y.Z`) it builds the release app, signs it and attaches `mana-vault-X.Y.Z.apk` to the GitHub release.
 
 Signing needs a release key, made once on any computer with Java (keep the file and passwords safe and out of Git; an app signed with another key cannot update the installed app):
 

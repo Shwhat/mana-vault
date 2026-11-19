@@ -9,6 +9,9 @@ import { DatabaseSync } from "node:sqlite";
 import { initializeDatabase } from "./database.js";
 import { saveSets } from "./sets.js";
 import { importBulkFile } from "./import-bulk.js";
+import { chain } from "stream-chain";
+import { parser } from "stream-json";
+import { streamArray } from "stream-json/streamers/stream-array.js";
 
 const metadataUrl = "https://api.scryfall.com/bulk-data";
 const setsUrl = "https://api.scryfall.com/sets";
@@ -107,6 +110,13 @@ export async function importCardCatalog(
     } catch (error) {
       console.warn(`Could not update the set list: ${error instanceof Error ? error.message : String(error)}`);
     }
+    // rulings for the card page; a failure keeps the previous rulings
+    try {
+      const saved = await importRulings(database, options.fetcher ?? fetch);
+      console.log(`Saved ${saved.toLocaleString()} rulings`);
+    } catch (error) {
+      console.warn(`Could not update the rulings: ${error instanceof Error ? error.message : String(error)}`);
+    }
     return imported;
   } finally {
     database.close();
@@ -123,6 +133,42 @@ function findDefaultCards(metadata: BulkMetadata): Record<string, unknown> {
   );
   if (!bulkData) throw new Error("Scryfall did not return default_cards bulk data");
   return bulkData;
+}
+
+/** Downloads Scryfall's rulings file and replaces the stored rulings. Returns how many were saved. */
+export async function importRulings(database: DatabaseSync, fetcher: typeof fetch = fetch): Promise<number> {
+  const metadataResponse = await fetcher(metadataUrl, { headers: { "User-Agent": userAgent } });
+  if (!metadataResponse.ok) throw new Error(`Scryfall bulk-data request failed: ${metadataResponse.status}`);
+  const metadata = await metadataResponse.json() as BulkMetadata;
+  const entry = Array.isArray(metadata.data)
+    ? metadata.data.find((item): item is Record<string, unknown> => typeof item === "object" && item !== null && (item as { type?: unknown }).type === "rulings")
+    : undefined;
+  const uri = typeof entry?.download_uri === "string" ? entry.download_uri : null;
+  if (!uri || !uri.startsWith("https://")) throw new Error("Scryfall rulings metadata has no download URL");
+  const response = await fetcher(uri, { headers: { "User-Agent": userAgent } });
+  if (!response.ok || !response.body) throw new Error(`Scryfall rulings download failed: ${response.status}`);
+  const isGzip = new URL(uri).pathname.toLowerCase().endsWith(".gz");
+  const source = chain([Readable.from(responseChunks(response.body)), isGzip ? createGunzip() : new PassThrough(), parser(), streamArray()]);
+  const insert = database.prepare("INSERT INTO rulings (oracle_id, published_at, source, comment) VALUES (?, ?, ?, ?)");
+  let saved = 0;
+  database.exec("BEGIN");
+  try {
+    database.exec("DELETE FROM rulings");
+    for await (const item of source as AsyncIterable<{ value: unknown }>) {
+      const value = item.value as Record<string, unknown> | null;
+      if (!value || typeof value.oracle_id !== "string" || typeof value.comment !== "string") continue;
+      insert.run(value.oracle_id, typeof value.published_at === "string" ? value.published_at : "", typeof value.source === "string" ? value.source : "", value.comment);
+      saved += 1;
+    }
+    if (!saved) throw new Error("The rulings file held no rulings");
+    database.prepare("INSERT INTO catalog_metadata (key, value) VALUES ('rulings_at', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value")
+      .run(new Date().toISOString());
+    database.exec("COMMIT");
+  } catch (error) {
+    database.exec("ROLLBACK");
+    throw error;
+  }
+  return saved;
 }
 
 function optionalString(value: unknown): string | null {

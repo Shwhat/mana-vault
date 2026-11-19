@@ -1,7 +1,8 @@
 // ---------- preferences: saved per user on the server ----------
 import { request, APP_VERSION } from "./api";
+import { isApp } from "./android/platform";
 import { DEFAULT_WORKSPACE, isOpen, openPanel, PRESETS, type Layout, type Workspace, validLayout } from "./dock";
-import type { RibbonTab } from "./ribbon";
+import type { RibbonSize, RibbonTab } from "./ribbon";
 import type { CollectionSort, Currency, Zone } from "./types";
 
 export type Theme = "light" | "dark" | "system";
@@ -30,6 +31,22 @@ export type Prefs = {
   scanFoil: boolean;
   /** Scanner: which camera to use. */
   scanCamera: "environment" | "user";
+  /** Scanner: take the first matching printing without asking. */
+  scanQuick: boolean;
+  /** Scanner: play a sound when a card is added. */
+  scanSounds: boolean;
+  /** Scanner: only cards from these sets are added; others give a "Not in set" warning. */
+  scanSets: string[];
+  scanIgnorePromos: boolean;
+  /** Scanner: new scans are proxies. */
+  scanProxy: boolean;
+  scanCondition: string;
+  scanLanguage: string;
+  /** Scanner: show the total value of the scanned list. */
+  scanShowTotal: boolean;
+  /** Scanner: show how many copies of the last card are already in your collections. */
+  scanShowOwned: boolean;
+  ribbonSize: RibbonSize;
   appVersion: string;
 };
 
@@ -39,7 +56,8 @@ export function defaultPrefs(): Prefs {
     theme: "light", foil: false, zone: "main", ribbon: null, ribbonTab: "home", layout: preset.layout,
     workspace: DEFAULT_WORKSPACE, workspaces: {}, lastDeckId: null, targetCollection: null, openCollection: null,
     currency: "usd", collectionSort: "name", collectionLayout: "list",
-    scanVibrate: true, scanFoil: false, scanCamera: "environment", appVersion: APP_VERSION,
+    scanVibrate: true, scanFoil: false, scanCamera: "environment", scanQuick: false, scanSounds: true, scanSets: [], scanIgnorePromos: false,
+    scanProxy: false, scanCondition: "NM", scanLanguage: "en", scanShowTotal: false, scanShowOwned: false, ribbonSize: "large", appVersion: APP_VERSION,
   };
 }
 
@@ -72,6 +90,16 @@ export function mergePrefs(saved: unknown): Prefs {
     scanVibrate: value.scanVibrate !== false,
     scanFoil: value.scanFoil === true,
     scanCamera: value.scanCamera === "user" ? "user" : "environment",
+    scanQuick: value.scanQuick === true,
+    scanSounds: value.scanSounds !== false,
+    scanSets: Array.isArray(value.scanSets) ? value.scanSets.filter((code): code is string => typeof code === "string" && /^[a-z0-9]{2,8}$/.test(code)).slice(0, 50) : [],
+    scanIgnorePromos: value.scanIgnorePromos === true,
+    scanProxy: value.scanProxy === true,
+    scanCondition: ["M", "NM", "LP", "MP", "HP", "DMG"].includes(String(value.scanCondition)) ? String(value.scanCondition) : "NM",
+    scanLanguage: typeof value.scanLanguage === "string" && /^[a-z]{2,3}$/.test(value.scanLanguage) ? value.scanLanguage : "en",
+    scanShowTotal: value.scanShowTotal === true,
+    scanShowOwned: value.scanShowOwned === true,
+    ribbonSize: value.ribbonSize === "compact" || value.ribbonSize === "icons" ? value.ribbonSize : "large",
     appVersion: APP_VERSION,
   };
 }
@@ -81,11 +109,28 @@ export async function loadPrefs(): Promise<Prefs> {
 }
 
 let timer: number | undefined;
-export function savePrefs(prefs: Prefs) {
+let pending: Prefs | null = null;
+/** Saves preferences after a short pause, so quick changes are sent once; `now` sends at once (the open deck or collection). */
+export function savePrefs(prefs: Prefs, now = false) {
   window.clearTimeout(timer);
+  pending = prefs;
   timer = window.setTimeout(() => {
+    pending = null;
     void request("/api/prefs", { method: "PUT", body: JSON.stringify(prefs) }).catch(() => undefined);
-  }, 400);
+  }, now ? 0 : 400);
+}
+
+// a change still waiting when the page is left or reloaded is sent at once
+if (typeof window !== "undefined") {
+  window.addEventListener("pagehide", () => {
+    if (!pending || isApp()) return;
+    window.clearTimeout(timer);
+    void fetch("/api/prefs", {
+      method: "PUT", keepalive: true, credentials: "same-origin",
+      headers: { "content-type": "application/json", "x-mana-vault": "1" }, body: JSON.stringify(pending),
+    }).catch(() => undefined);
+    pending = null;
+  });
 }
 
 const media = typeof window !== "undefined" ? window.matchMedia("(prefers-color-scheme: dark)") : null;

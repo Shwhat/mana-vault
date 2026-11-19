@@ -3,20 +3,24 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { csvCell, downloadBlob, fetchFile, downloadText, pickFile, request, slugify } from "./api";
 import { confirmDialog, dialog } from "./components/Dialog";
 import { activatePanel, clone, type Layout, openPanel, type PanelId, PRESETS, type Workspace } from "./dock";
-import { type Counts, entryKey, useLibraryState } from "./library-state";
+import { type Counts, entryKey, useLibraryState, type WishChange } from "./library-state";
 import { useScanState } from "./scan-state";
+import { isApp } from "./android/platform";
 import { applyTheme, type Prefs, savePrefs } from "./prefs";
 import {
-  type BackupSummary, type Card, type CardDetail, type CatalogStatus, type Collection, type CollectionEntry, type CollectionTab,
-  type CompletionReport, type Deck, type DeckCard, type DeckTab, type Facets, type FinishCode, type Ownership, type PriceFields, type Stats,
-  type DeckDetail, type DeckMode, EMPTY_FILTERS, type Filters, type ImportReport, type TradeEntry, type User, type View, type Zone, capitalize,
-  cardTypes, colorKey, conditionName, copyKey, copyLabel, curveKey, languageName, money, priceOf, pricesOf,
+  type BackupSummary, type Candidate, type Card, type CardDetail, type CatalogStatus, type Collection, type CollectionEntry, type CollectionTab,
+  type CompletionReport, type CopyKey, type Deck, type DeckCard, type DeckTab, type Facets, type FinishCode, type Ownership, type PriceFields, type Stats,
+  type DeckDetail, EMPTY_FILTERS, type Filters, type ImportReport, type TradeEntry, type User, type View, type Zone, capitalize,
+  cardTypes, colorKey, copyKey, copyPrice, curveKey, money, priceOf, pricesOf,
 } from "./types";
+import { candidateLabel } from "./components/LibraryDialogs";
 
 export type Selection = { view: "cards" | "collection" | "deck"; key: string; printingId: string } | null;
 export type Flash = { text: string; kind: "ok" | "err"; id: number } | null;
 type UndoEntry = { label: string; undo: () => Promise<void>; redo: () => Promise<void> };
 export type Review = { title: string; report: ImportReport; done: boolean } | null;
+/** A right-click or long-press menu: where it opens and its commands. */
+export type ContextMenu = { x: number; y: number; title: string; items: Array<{ label: string; run: () => void }> } | null;
 type DeckKey = { deckId: string; oracle_id: string; printing_id: string | null; card_id: string; zone: Zone };
 /** One line of the trade calculator. Lines are kept until the page is reloaded or the trade is cleared. */
 export type TradeLine = {
@@ -32,6 +36,8 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
   const [prefs, setPrefsState] = useState(initialPrefs);
   const [view, setViewState] = useState<View>(() => {
     if (window.location.pathname.startsWith("/about")) return "about";
+    // phones open on Home
+    if (isApp() || window.innerWidth < 900) return "home";
     return PRESETS[initialPrefs.workspace]?.().view ?? initialPrefs.workspaces[initialPrefs.workspace]?.view ?? "cards";
   });
   const [lastView, setLastView] = useState<Exclude<View, "about">>("cards");
@@ -71,6 +77,9 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
   const bumpStacks = useCallback(() => setStackVersion((value) => value + 1), []);
   const undoQueue = useRef<Promise<void>>(Promise.resolve());
   const [scannerOpen, setScannerOpen] = useState(false);
+  // the card page shows over the current view; the printing id of the card shown
+  const [cardPage, setCardPage] = useState<string | null>(null);
+  const [contextMenu, setContextMenu] = useState<ContextMenu>(null);
   const searchInput = useRef<HTMLInputElement | null>(null);
   const flashTimer = useRef<number | undefined>(undefined);
   const catalogPoll = useRef<(() => void) | null>(null);
@@ -81,8 +90,9 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
   // ---------- preferences and layout ----------
   const setPrefs = useCallback((change: Partial<Prefs> | ((current: Prefs) => Partial<Prefs>)) => {
     setPrefsState((current) => {
-      const next = { ...current, ...(typeof change === "function" ? change(current) : change) };
-      savePrefs(next);
+      const delta = typeof change === "function" ? change(current) : change;
+      const next = { ...current, ...delta };
+      savePrefs(next, "lastDeckId" in delta || "openCollection" in delta || "targetCollection" in delta);
       return next;
     });
   }, []);
@@ -103,6 +113,7 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
   // ---------- views ----------
   const setView = useCallback((next: View) => {
     if (next === "about") return;
+    setCardPage(null);
     setViewState(next);
     setLastView(next);
     if (window.location.pathname.startsWith("/about")) window.history.pushState(null, "", "/");
@@ -470,31 +481,37 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
 
   const collectionName = useCallback((id: string | null) => live.current.collections?.find((item) => item.id === id)?.name ?? "the collection", []);
 
-  const addToCollection = useCallback(async (cardId: string, name: string, collectionId?: string, foilOverride?: boolean) => {
+  /** Puts wishlist rows back as they were before (or after) cards were added, for undo and redo. */
+  const restoreWishes = useCallback(async (changes: WishChange[], side: "before" | "after") => {
+    for (const change of changes) await setCounts(change.collectionId, [change[side]]);
+  }, [setCounts]);
+
+  const addToCollection = useCallback(async (cardId: string, name: string, collectionId?: string, foilOverride?: boolean, proxy = false) => {
     const target = collectionId ?? prefs.targetCollection;
     if (!target) {
-      flash("Create a collection first (Collection menu, New collection)", "err");
+      flash("Create a collection first", "err");
       return;
     }
     const foil = foilOverride ?? prefs.foil;
-    const key = { cardId, foil: (foil ? 1 : 0) as FinishCode, condition: "NM" as const, language: "en" };
+    const key = { cardId, foil: (foil ? 1 : 0) as FinishCode, condition: "NM" as const, language: "en", proxy };
     try {
-      const entry = await request<CollectionEntry>(`/api/collections/${encodeURIComponent(target)}/cards`, {
+      const entry = await request<CollectionEntry & { wishlist?: WishChange[] }>(`/api/collections/${encodeURIComponent(target)}/cards`, {
         method: "POST", body: JSON.stringify({ ...key, quantity: 1 }),
       });
       const after = entry.quantity;
       const where = collectionName(target);
+      const wishes = entry.wishlist ?? [];
       pushUndo({
-        label: `Add ${name}${foil ? " (foil)" : ""}`,
-        undo: () => setCounts(target, [{ ...key, quantity: after - 1 }]),
-        redo: () => setCounts(target, [{ ...key, quantity: after }]),
+        label: `Add ${name}${foil ? " (foil)" : ""}${proxy ? " (proxy)" : ""}`,
+        undo: async () => { await setCounts(target, [{ ...key, quantity: after - 1 }]); await restoreWishes(wishes, "before"); },
+        redo: async () => { await setCounts(target, [{ ...key, quantity: after }]); await restoreWishes(wishes, "after"); },
       });
-      flash(`${name}${foil ? " (foil)" : ""} added to ${where}`);
+      flash(`${name}${foil ? " (foil)" : ""}${proxy ? " (proxy)" : ""} added to ${where}`);
       await refreshAfterChange();
     } catch (reason) {
       fail(reason, "Could not add the card.");
     }
-  }, [prefs.foil, prefs.targetCollection, pushUndo, setCounts, collectionName, flash, fail, refreshAfterChange]);
+  }, [prefs.foil, prefs.targetCollection, pushUndo, setCounts, restoreWishes, collectionName, flash, fail, refreshAfterChange]);
 
   const setCollectionQuantity = useCallback(async (entry: CollectionEntry, quantity: number) => {
     const target = live.current.prefs.openCollection;
@@ -533,33 +550,91 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
     }
   }, [loadDeck]);
 
+  /** Brings a deck back to an earlier state: card counts first, then the copies linked to each card. Used by undo and redo. */
+  const restoreDeck = useCallback(async (_from: DeckDetail, to: DeckDetail) => {
+    const now = await loadDeck(to.id);
+    const same = (a: DeckCard, b: DeckCard) => a.card_id === b.card_id && a.zone === b.zone;
+    const key = (card: DeckCard): DeckKey => ({ deckId: to.id, oracle_id: card.oracle_id, printing_id: card.printing_id, card_id: card.card_id, zone: card.zone });
+    for (const card of now.cards) if (!to.cards.some((other) => same(card, other))) await writeDeck(key(card), 0);
+    for (const card of to.cards) await writeDeck(key(card), card.quantity);
+    const settled = await loadDeck(to.id);
+    const linkText = (card?: DeckCard) => JSON.stringify((card?.links ?? []).map((link) => [link.collectionId, link.cardId, link.foil, link.condition, link.language, !!link.proxy, link.quantity]));
+    for (const card of to.cards) {
+      const entry = settled.cards.find((other) => same(card, other));
+      if (!entry || linkText(entry) === linkText(card)) continue;
+      await request(`/api/decks/${encodeURIComponent(to.id)}/entries/${entry.entry_id}/links`, { method: "PUT", body: JSON.stringify({ links: card.links ?? [] }) });
+    }
+  }, [loadDeck, writeDeck]);
+
   const keyOf = (detail: DeckDetail, card: DeckCard, zone: Zone = card.zone): DeckKey => ({
     deckId: detail.id, oracle_id: card.oracle_id, printing_id: card.printing_id, card_id: card.card_id, zone,
   });
 
-  const addToDeck = useCallback(async (cardId: string, name: string) => {
+  /** Free copies of a card in the account's collections that could fill a deck card. */
+  const loadCandidates = useCallback(async (cardId: string, entryId?: number): Promise<Candidate[]> => {
+    const current = live.current.deck;
+    if (!current) return [];
+    return request<Candidate[]>(`/api/decks/${encodeURIComponent(current.id)}/candidates?cardId=${encodeURIComponent(cardId)}${entryId && entryId > 0 ? `&entryId=${entryId}` : ""}`);
+  }, []);
+
+  /**
+   * Adds a printing to the open deck. A free copy in one collection is linked at once; when copies are in more than
+   * one collection the person picks one; with none the card is missing.
+   */
+  const addToDeck = useCallback(async (cardId: string, name: string, chosen?: Candidate | null) => {
     const current = live.current.deck;
     if (!current) {
-      flash("Open or create a deck first (Deck menu, Open deck or New deck)", "err");
+      flash("Open or create a deck first", "err");
       return;
     }
     const zone = prefs.zone;
+    let link: Candidate | null = chosen ?? null;
+    if (chosen === undefined) {
+      try {
+        const candidates = await loadCandidates(cardId);
+        const places = new Set(candidates.map((item) => item.collectionId));
+        if (places.size > 1) {
+          dialog(`Add ${name} to ${current.name}`, [
+            ["copy", "Use the copy in", "0", "select", [...candidates.map((item, index): [string, string] => [String(index), candidateLabel(item)]), ["", "None (missing)"]]],
+          ], async (values) => { await addToDeck(cardId, name, values.copy === "" ? null : candidates[Number(values.copy)] ?? null); }, "Add");
+          return;
+        }
+        link = candidates[0] ?? null;
+      } catch {
+        link = null;
+      }
+    }
     try {
-      const card = await request<CardDetail>(`/api/cards/${encodeURIComponent(cardId)}`);
-      await request(`/api/decks/${encodeURIComponent(current.id)}/cards`, { method: "POST", body: JSON.stringify({ cardId, quantity: 1, zone }) });
-      const key: DeckKey = {
-        deckId: current.id, oracle_id: card.oracle_id ?? "", printing_id: current.mode === "theme" ? cardId : null, card_id: cardId, zone,
-      };
-      const detail = await loadDeck(current.id);
-      const after = detail.cards.find((item) => item.oracle_id === key.oracle_id && item.printing_id === key.printing_id && item.zone === zone)?.quantity ?? 1;
+      const before = await loadDeck(current.id);
+      const links = link ? [{ ...link, quantity: 1 }] : undefined;
+      await request(`/api/decks/${encodeURIComponent(current.id)}/cards`, { method: "POST", body: JSON.stringify({ cardId, quantity: 1, zone, links }) });
+      const after = await loadDeck(current.id);
       const zoneLabel = zone === "main" ? "" : ` (${zone})`;
-      pushUndo({ label: `Add ${name} to ${current.name}`, undo: () => writeDeck(key, after - 1), redo: () => writeDeck(key, after) });
-      flash(`${name} added to ${current.name}${zoneLabel}`);
+      pushUndo({ label: `Add ${name} to ${current.name}`, undo: () => restoreDeck(after, before), redo: () => restoreDeck(before, after) });
+      flash(`${name} added to ${current.name}${zoneLabel}${link ? `, from ${link.collectionName}` : ""}`);
       await refreshAfterChange();
     } catch (reason) {
       fail(reason, "Could not add the card to the deck.");
     }
-  }, [prefs.zone, loadDeck, writeDeck, pushUndo, flash, fail, refreshAfterChange]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefs.zone, loadDeck, loadCandidates, pushUndo, flash, fail, refreshAfterChange]);
+
+  /** Replaces the copies linked to a deck card. */
+  const setDeckLinks = useCallback(async (card: DeckCard, links: Array<CopyKey & { collectionId: string; quantity: number }>) => {
+    const current = live.current.deck;
+    if (!current) return;
+    try {
+      const before = await loadDeck(current.id);
+      await request(`/api/decks/${encodeURIComponent(current.id)}/entries/${card.entry_id}/links`, { method: "PUT", body: JSON.stringify({ links }) });
+      const after = await loadDeck(current.id);
+      pushUndo({ label: `Link ${card.name}`, undo: () => restoreDeck(after, before), redo: () => restoreDeck(before, after) });
+      flash(links.length ? `${card.name} linked to ${links.map((link) => collectionName(link.collectionId)).join(", ")}` : `${card.name} is now missing`);
+      await refreshAfterChange();
+    } catch (reason) {
+      fail(reason, "Could not link the copies.");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadDeck, pushUndo, collectionName, flash, fail, refreshAfterChange]);
 
   const setDeckQuantity = useCallback(async (card: DeckCard, quantity: number) => {
     const current = live.current.deck;
@@ -600,11 +675,12 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
     }
   }, [writeDeck, pushUndo, flash, fail, refreshAfterChange]);
 
-  const createDeck = useCallback(async (name: string, format: string, mode: DeckMode) => {
-    const created = await request<Deck>("/api/decks", { method: "POST", body: JSON.stringify({ name, format, mode }) });
-    await openDeck(created.id, true);
+  const createDeck = useCallback(async (name: string, format: string, open = true): Promise<Deck> => {
+    const created = await request<Deck>("/api/decks", { method: "POST", body: JSON.stringify({ name, format, id: crypto.randomUUID() }) });
+    if (open) await openDeck(created.id, true);
     await reloadDecks();
     flash(`${created.name} created`);
+    return created;
   }, [openDeck, reloadDecks, flash]);
 
   // ---------- imports, exports and backups ----------
@@ -612,78 +688,6 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
     setReview({ title, report, done });
     if (report.unmatched.length) showPanel("review");
   }, [showPanel]);
-
-  const previewDialog = (
-    title: string, fileName: string, report: ImportReport, onImport: (into: string) => Promise<void>,
-    into?: { label: string; value: string; options: Array<[string, string]> },
-  ) => {
-    dialog(title, into ? [["into", into.label, into.value, "select", into.options]] : [], async (values) => {
-      if (report.matchedRows === 0) return false;
-      await onImport(String(values.into ?? ""));
-    }, "Import matched rows", (
-      <div className="dlgtext">
-        <p><b>{fileName}</b></p>
-        <p>{report.matchedRows} matched rows ({report.importedQuantity} cards) will be added. {report.unmatched.length} rows will be skipped.</p>
-        {report.unmatched.length > 0 && (
-          <div className="msglist">
-            {report.unmatched.slice(0, 8).map((item) => (
-              <div className="msg" key={`${item.row}-${item.name}`}><span className="lv w">Row {item.row}</span><span>{item.name ? `${item.name}: ` : ""}{item.reason}</span></div>
-            ))}
-          </div>
-        )}
-        {report.unmatched.length > 8 && <p className="note">The Import review panel lists all {report.unmatched.length} skipped rows.</p>}
-        {report.matchedRows === 0 && <p className="note err">No rows matched the card database, so there is nothing to import.</p>}
-      </div>
-    ), 520);
-  };
-
-  const importCollection = useCallback(async () => {
-    const list = live.current.collections ?? [];
-    if (!list.length) return flash("Create a collection first (Collection menu, New collection)", "err");
-    const file = await pickFile(".csv,text/csv");
-    if (!file) return;
-    if (file.size > 5 * 1024 * 1024) return flash("The CSV file must be 5 MB or smaller", "err");
-    try {
-      const content = await file.text();
-      const preferred = live.current.prefs.openCollection ?? list[0]!.id;
-      const report = await request<ImportReport>(`/api/collections/${encodeURIComponent(preferred)}/import/preview`, {
-        method: "POST", headers: { "content-type": "text/csv" }, body: content,
-      });
-      showReview(`Collection import preview: ${file.name}`, report, false);
-      previewDialog("Import collection CSV", file.name, report, async (into) => {
-        try {
-          const result = await request<ImportReport>(`/api/collections/${encodeURIComponent(into)}/import`, {
-            method: "POST", headers: { "content-type": "text/csv" }, body: content,
-          });
-          showReview(`Collection import into ${collectionName(into)}: ${file.name}`, result, true);
-          flash(`Imported ${result.importedQuantity} cards from ${result.matchedRows} rows into ${collectionName(into)}`);
-          await refreshAfterChange();
-        } catch (reason) {
-          fail(reason, "Could not import the collection CSV.");
-        }
-      }, { label: "Into collection", value: preferred, options: list.map((item) => [item.id, item.name]) });
-    } catch (reason) {
-      fail(reason, "Could not read the collection CSV.");
-    }
-  }, [flash, fail, showReview, refreshAfterChange, collectionName]);
-
-  const exportCollection = useCallback(async () => {
-    try {
-      const id = live.current.prefs.openCollection;
-      if (!id) return flash("Create a collection first (Collection menu, New collection)", "err");
-      const entries = await request<CollectionEntry[]>(`/api/collections/${encodeURIComponent(id)}/cards`);
-      if (!entries.length) return flash(`${collectionName(id)} is empty, so there is nothing to export`, "err");
-      const rows = [
-        ["Count", "Tradelist Count", "Name", "Edition", "Condition", "Language", "Foil", "Tags", "Last Modified", "Collector Number", "Alter", "Proxy", "Purchase Price"],
-        ...entries.map((entry) => [entry.quantity, entry.trade, entry.name, entry.set_code, MOXFIELD_CONDITIONS[entry.condition] ?? conditionName(entry.condition),
-          languageName(entry.language), entry.foil === 2 ? "etched" : entry.foil === 1 ? "foil" : "", "", "", entry.collector_number, "", "", ""]),
-      ];
-      downloadText(`${slugify(collectionName(id))}.csv`, rows.map((row) => row.map(csvCell).join(",")).join("\r\n"), "text/csv;charset=utf-8");
-      flash(`${collectionName(id)} exported`);
-    } catch (reason) {
-      fail(reason, "Could not export the collection.");
-    }
-  }, [flash, fail, collectionName]);
 
   const downloadBackup = useCallback(async () => {
     try {
@@ -727,66 +731,6 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
     }
   }, [flash, fail, reloadCollections, reloadDecks, setPrefs, clearUndo]);
 
-  const importDeck = useCallback(async () => {
-    const current = live.current.deck;
-    if (!current) return flash("Open or create a deck first (Deck menu, Open deck or New deck)", "err");
-    const file = await pickFile(".txt,.csv,text/plain,text/csv");
-    if (!file) return;
-    if (file.size > 5 * 1024 * 1024) return flash("The decklist file must be 5 MB or smaller", "err");
-    try {
-      const contentType = file.name.toLowerCase().endsWith(".csv") ? "text/csv" : "text/plain";
-      const content = await file.text();
-      const base = `/api/decks/${encodeURIComponent(current.id)}/import`;
-      const report = await request<ImportReport>(`${base}/preview`, { method: "POST", headers: { "content-type": contentType }, body: content });
-      showReview(`Decklist preview for ${current.name}: ${file.name}`, report, false);
-      previewDialog(`Import decklist into ${current.name}`, file.name, report, async () => {
-        try {
-          const result = await request<ImportReport>(base, { method: "POST", headers: { "content-type": contentType }, body: content });
-          showReview(`Decklist import into ${current.name}: ${file.name}`, result, true);
-          flash(`Imported ${result.importedQuantity} cards from ${result.matchedRows} rows`);
-          await refreshAfterChange();
-        } catch (reason) {
-          fail(reason, "Could not import the decklist.");
-        }
-      });
-    } catch (reason) {
-      fail(reason, "Could not read the decklist.");
-    }
-  }, [flash, fail, showReview, refreshAfterChange]);
-
-  const exportDeckText = useCallback(() => {
-    const current = live.current.deck;
-    if (!current) return flash("Open a deck first", "err");
-    if (!current.cards.length) return flash(`${current.name} is empty, so there is nothing to export`, "err");
-    const lines = [`# ${current.name}`, ""];
-    for (const [zone, label] of [["commander", "Commander"], ["main", "Mainboard"], ["sideboard", "Sideboard"]] as const) {
-      const inZone = current.cards.filter((card) => card.zone === zone);
-      if (!inZone.length) continue;
-      lines.push(`// ${label}`);
-      for (const card of inZone) {
-        const printing = current.mode === "theme" ? ` (${card.set_code.toUpperCase()}) ${card.collector_number}` : "";
-        lines.push(`${card.quantity} ${card.name}${printing}`);
-      }
-      lines.push("");
-    }
-    downloadText(`${slugify(current.name)}.txt`, lines.join("\r\n"), "text/plain;charset=utf-8");
-    flash(`${current.name} exported as text`);
-  }, [flash]);
-
-  const exportDeckCsv = useCallback(() => {
-    const current = live.current.deck;
-    if (!current) return flash("Open a deck first", "err");
-    if (!current.cards.length) return flash(`${current.name} is empty, so there is nothing to export`, "err");
-    const rows = [
-      ["Name", "Quantity", "Set Code", "Collector Number", "Zone", "Mode"],
-      ...current.cards.map((card) => [
-        card.name, card.quantity, current.mode === "theme" ? card.set_code : "", current.mode === "theme" ? card.collector_number : "", card.zone, current.mode,
-      ]),
-    ];
-    downloadText(`${slugify(current.name)}.csv`, rows.map((row) => row.map(csvCell).join(",")).join("\r\n"), "text/csv;charset=utf-8");
-    flash(`${current.name} exported as CSV`);
-  }, [flash]);
-
   // ---------- workspaces ----------
   const applyWorkspace = useCallback((name: string) => {
     const workspace: Workspace | undefined = PRESETS[name]?.() ?? prefs.workspaces[name];
@@ -823,8 +767,10 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
       (!facets.set || entry.set_code === facets.set) &&
       (!facets.curve || curveKey(entry.mana_value, entry.type_line) === facets.curve) &&
       (!facets.finish || String(entry.foil) === facets.finish) &&
-      (!facets.trade || entry.trade > 0));
-    const price = (entry: CollectionEntry) => priceOf(entry, entry.foil, currency);
+      (!facets.trade || entry.trade > 0) &&
+      (!facets.proxy || !!entry.proxy) &&
+      (!facets.inDeck || (facets.inDeck === "yes" ? !!entry.decks?.length : !entry.decks?.length)));
+    const price = (entry: CollectionEntry) => copyPrice(entry, currency);
     const byName = (a: CollectionEntry, b: CollectionEntry) => a.name.localeCompare(b.name) || a.set_code.localeCompare(b.set_code);
     const sorts: Record<string, (a: CollectionEntry, b: CollectionEntry) => number> = {
       name: () => 0,
@@ -917,7 +863,7 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
     openDeck, closeDeck: () => { setDeck(null); setPrefs({ lastDeckId: null }); }, collectionName, checked, setChecked, visibleCollection,
   });
 
-  const scan = useScanState({ userId: user.id, live, flash, fail, pushUndo, setCounts, writeDeck, loadDeck, refreshAfterChange });
+  const scan = useScanState({ userId: user.id, live, flash, fail, pushUndo, setCounts, loadDeck, restoreDeck, restoreWishes, refreshAfterChange });
 
   /** Clicking a collection row: plain click picks it, Ctrl adds or removes it, Shift picks a range. */
   const pickRow = useCallback((entry: CollectionEntry, modifiers: { ctrl: boolean; shift: boolean }) => {
@@ -972,17 +918,12 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
     flashMsg, flash, fail,
     undoStack, redoStack, undo, redo,
     addToCollection, setCollectionQuantity, addToDeck, setDeckQuantity, moveDeckCard,
-    importCollection, exportCollection, downloadBackup, restoreBackup, importDeck, exportDeckText, exportDeckCsv,
+    showReview, downloadBackup, restoreBackup, loadCandidates, setDeckLinks, restoreDeck, loadDeck, restoreWishes,
     applyWorkspace, saveWorkspace, deleteWorkspace,
-    scannerOpen, setScannerOpen, ...scan,
+    scannerOpen, setScannerOpen, ...scan, cardPage, setCardPage, contextMenu, setContextMenu,
     refreshAfterChange,
   };
 }
-
-/** The condition names Moxfield uses in its CSV files. */
-const MOXFIELD_CONDITIONS: Record<string, string> = {
-  M: "Mint", NM: "Near Mint", LP: "Lightly Played", MP: "Moderately Played", HP: "Heavily Played", DMG: "Damaged",
-};
 
 const ZONE_ORDER: Record<Zone, number> = { commander: 0, main: 1, sideboard: 2 };
 export function sortDeck(cards: DeckCard[]): DeckCard[] {

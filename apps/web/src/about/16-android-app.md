@@ -28,7 +28,7 @@ The app needs Android 8.0 or newer. Updates install over the old app and keep it
 
 The phone signs in once. The server gives it its own device sign-in, which the phone keeps in encrypted app storage; the password is not stored. The device sign-in has no expiry. It ends when:
 
-- you choose **Sign out** on the phone (More, Account),
+- you choose **Sign out** on the phone (Menu, Account),
 - you remove the phone in **Devices...**,
 - you change your password on another device (every phone except the one making the change is signed out).
 
@@ -36,33 +36,33 @@ A phone that is signed out shows the first-run screen again.
 
 ### Devices
 
-**Devices...** (More on the phone, or the account menu on the desktop) lists every phone signed in to your account, with the time it last reached the server. **This phone** marks the phone you are using. **Remove** signs that phone out at its next connection; removing this phone signs it out at once.
+**Devices...** (Menu, Account on the phone, or the account menu on the desktop) lists every phone signed in to your account, with the time it last reached the server. **This phone** marks the phone you are using. **Remove** signs that phone out at its next connection; removing this phone signs it out at once.
 
 ## Using the app
 
-The app always uses the phone layout described in [Screen layout](/about/screen-layout): the Cards, Collection, Decks, Scan and More tabs, sheets and large touch targets.
+The app always uses the phone layout described in [Screen layout](/about/screen-layout): the Home, Search, Collection, Decks and Scan tabs, the Menu at the top right, card pages, sheets and large touch targets. A long press on a card opens its menu.
 
 | Phone feature | What it does |
 |---|---|
-| Back button | Closes the open window, then the open sheet, then leaves the scanner or the About guide, then returns to the Cards tab. On the Cards tab it puts the app in the background |
+| Back button | Closes the open window, then the open sheet, menu, printing picker or scanner settings, then the card page, then leaves the scanner or the About guide, then returns to Home. On Home it puts the app in the background |
 | Exports and backups | Open the Android share sheet, to save the file to the phone or send it to another app |
 | Imports and restores | Use the Android file picker |
 | Card images | Load from Scryfall and are kept by the phone as they are viewed |
 
 ## Without a connection
 
-The phone keeps a copy of your library: every collection and deck you own or share, with their cards, set completion, the Inbox, the trade list and your preferences, plus the card list (every printing's name, set, collector number, type, mana cost, rarity, colors, finishes and image address).
+The phone keeps a copy of your library: every collection and deck you own or share, with their cards, set completion, the Inbox, the trade list and your preferences, plus the card list (every printing's name, set, collector number, type, mana cost, rules text, power and toughness, rarity, colors, finishes and image address) and every card's rulings.
 
-When the server cannot be reached, the app shows **Offline** in the top bar and keeps working from the copy.
+The app goes **Offline** only when the server cannot be reached: when a request fails, a quick check of the server follows, and only when that also fails does the app go offline. A slow answer or another error keeps it online. While offline, the app checks again every 10 seconds, and whenever it is used.
 
 | Works offline | Needs a connection |
 |---|---|
 | Browsing and filtering collections and decks | Importing, backups and restores |
 | Card search by name and flavor name, with the color, type, set, rarity and mana value filters | Card search in rules text and the search syntax (such as `o:` or `usd>`) |
-| Card details, with how many copies you own | Prices of cards not opened before |
-| Adding, removing, editing and moving copies | Creating and deleting collections and decks |
+| Card details and card pages, with rules text and rulings | Prices of cards not opened before |
+| Adding, removing, editing and moving copies | Deleting collections and decks |
 | Adding and changing deck cards | Collection settings other than the name and description |
-| Renaming collections and decks | Sending, accepting and declining offers |
+| Renaming collections and decks, creating collections and decks (New collection... and New deck... in Add to, and the Import window's new collection) | Sending, accepting and declining offers |
 | Scanning cards and adding the scanned list | Updating the card database |
 | Undo and redo | Devices, Change password and statistics not opened before |
 
@@ -70,21 +70,32 @@ A command that needs a connection while offline shows "You are offline. This nee
 
 ### Sync
 
-Every change made offline waits on the phone in order. The number of waiting changes shows beside **Offline**. Changes are sent:
+The top bar always shows the sync button:
+
+| Shows | Meaning |
+|---|---|
+| Synced and the time since the last sync (now, 5m, 2h) | Everything is sent and current |
+| Waiting, with the number of waiting changes | Changes are waiting to be sent |
+| Offline, with the number of waiting changes | The server cannot be reached |
+| Syncing | Changes are being sent and the copy updated |
+
+Tapping it syncs now and downloads a fresh copy of everything. When the last sync stopped for a reason other than the connection, the button's text is amber and pointing at it shows the reason; the next sync tries again.
+
+Every change made offline waits on the phone in order. Changes are sent:
 
 - when the connection returns,
 - when the app opens,
 - every minute while the app is open,
-- when you tap **Offline** or **Waiting** in the top bar, or choose **Sync now** (More, Account).
+- when you tap the sync button in the top bar, or choose **Sync now** (Menu, Account).
 
-While changes are being sent the top bar shows **Syncing**. After sending, the phone downloads a fresh copy of anything that changed on the server, and a newer card list when the server's card database was updated. When everything is sent and current, the top bar shows nothing.
+After sending, the phone downloads the lists of collections and decks, then only the collections and decks that changed on the server since the last sync, a newer card list when the server's card database was updated, and newer rulings.
 
 How the server applies offline changes:
 
 | Change | Rule |
 |---|---|
 | Setting a copy count (quantity, remove) | Applied as a difference: the server adds the change you made to its current count. If you set 3 copies to 5 while someone else raised them to 4, the result is 6 |
-| Adding copies, moving copies, deck cards added | Applied as sent |
+| Adding copies, moving copies, deck cards added, collections and decks created | Applied as sent. Copies linked to a deck card are linked only while they are still free |
 | A change to a collection or deck that was deleted, or that you no longer share | Not applied |
 | A change sent twice (for example after a dropped connection) | Applied once |
 
@@ -102,7 +113,7 @@ The scanner works as described in [Scanning cards](/about/scanning-cards), with 
 
 ## Notifications
 
-**Notifications...** (More, Account) has two settings, kept on the phone:
+**Notifications...** (Menu, Account) has two settings, kept on the phone:
 
 | Setting | Default | Meaning |
 |---|---|---|
@@ -115,6 +126,6 @@ Android asks for notification permission the first time the setting is turned on
 
 ## Updates
 
-Once a day, when the app opens, it checks GitHub for a newer release. When there is one, the window **Update available** shows both versions and **Open the download page**. **Check for updates...** (More, Account) checks at once and also links to the releases page.
+Once a day, when the app opens, it checks GitHub for a newer release. When there is one, the window **Update available** shows both versions and **Open the download page**. **Check for updates...** (Menu, Account) checks at once and also links to the releases page.
 
 The app's version always matches the server version it was released with. An app and a server of different versions work together as long as both are 0.5.0 or newer.

@@ -6,11 +6,13 @@ import { syncNow, syncStatus } from "./android/offline";
 import { appSettings, isApp, native, saveSettings } from "./android/platform";
 import { confirmDialog, customDialog, dialog } from "./components/Dialog";
 import { RibbonCustomize } from "./components/RibbonCustomize";
-import { collectionDialog, copyDialog, inboxDialog, moveDialog, renameDeckDialog, sendDialog, sharingDialog } from "./components/LibraryDialogs";
+import { collectionDialog, copyDialog, inboxDialog, linkDialog, moveDialog, newDeckDialog, renameDeckDialog, sendDialog, sharingDialog } from "./components/LibraryDialogs";
+import { exportWindow, importWindow } from "./components/FileWindows";
+import { entryKey } from "./library-state";
 import { isOpen, type PanelId, PANELS, PRESET_NAMES, removePanel } from "./dock";
-import { DEFAULT_RIBBON } from "./ribbon";
+import { DEFAULT_RIBBON, RIBBON_MENUS, type RibbonSize } from "./ribbon";
 import { type Store, useApp } from "./store";
-import { capitalize, type CollectionTab, type DeckTab, FORMATS, type Zone } from "./types";
+import { capitalize, type CollectionTab, type DeckTab, type Zone } from "./types";
 
 export type Action = {
   label: string;
@@ -21,6 +23,8 @@ export type Action = {
   run: () => void;
   on?: boolean;
   disabled?: boolean;
+  /** For a button that opens a list: the commands in the list. */
+  items?: string[];
 };
 
 /** Every keyboard shortcut, in the order the shortcut list shows them. */
@@ -59,7 +63,7 @@ export function useActions(store: Store): Record<string, Action> {
     const open = store.collections?.find((item) => item.id === prefs.openCollection) ?? null;
     const target = store.collections?.find((item) => item.id === prefs.targetCollection) ?? null;
     const picked = store.checked.size;
-    const noCollection = () => store.flash("Create a collection first (Collection menu, New collection)", "err");
+    const noCollection = () => store.flash("Create a collection first", "err");
     const showTab = (tab: CollectionTab) => {
       store.setView("collection");
       store.setCollectionTab(tab);
@@ -69,7 +73,7 @@ export function useActions(store: Store): Record<string, Action> {
       store.setDeckTab(tab);
     };
     const entry = store.view === "collection" && store.selection?.view === "collection"
-      ? store.collection?.find((item) => `${item.id}:${item.foil}:${item.condition}:${item.language}` === store.selection?.key) ?? null : null;
+      ? store.collection?.find((item) => entryKey(item) === store.selection?.key) ?? null : null;
     const markable = store.view === "collection" ? store.pickedEntries() : [];
     const currency = (value: "usd" | "eur", label: string): Action => ({
       label, short: value.toUpperCase(), icon: value, on: prefs.currency === value,
@@ -93,9 +97,39 @@ export function useActions(store: Store): Record<string, Action> {
       label, icon, on: prefs.theme === value,
       run: () => { store.setPrefs({ theme: value }); store.flash(label); },
     });
+    const size = (value: RibbonSize, label: string): Action => ({
+      label, icon: "ribbon", on: prefs.ribbonSize === value,
+      run: () => store.setPrefs({ ribbonSize: value }),
+    });
+    const allTrade = markable.length > 0 && markable.every((item) => item.trade >= item.quantity && !item.proxy);
+    const deckCard = store.view === "deck" && store.selection?.view === "deck" ? deck?.cards.find((card) => String(card.entry_id) === store.selection?.key) ?? null : null;
 
     const actions: Record<string, Action> = {
-      "view.cards": { label: "Card search", short: "Cards", icon: "cards", key: "1", on: store.view === "cards", run: () => store.setView("cards") },
+      "view.home": { label: "Home", short: "Home", icon: "home", on: store.view === "home", run: () => store.setView("home") },
+      "view.cards": { label: "Card search", short: "Search", icon: "cards", key: "1", on: store.view === "cards", run: () => store.setView("cards") },
+      "io.import": { label: "Import...", short: "Import", icon: "csvin", run: () => importWindow(store) },
+      "io.export": { label: "Export...", short: "Export", icon: "csv", run: () => exportWindow(store) },
+      "trade.toggle": {
+        label: allTrade ? "Unmark for trade" : "Mark for trade", short: "For trade", icon: "trade", on: allTrade, disabled: !markable.length,
+        run: () => void store.markTrade(markable, !allTrade),
+      },
+      "deck.link": {
+        label: "Link copies...", short: "Link copies", icon: "link", disabled: !deckCard,
+        run: () => (deckCard ? void linkDialog(store, deckCard) : store.flash("Select a card in the deck first", "err")),
+      },
+      "ribbon.large": size("large", "Large buttons"),
+      "ribbon.compact": size("compact", "Compact buttons"),
+      "ribbon.icons": size("icons", "Icons only"),
+      "menu.theme": { label: "Theme", short: "Theme", icon: prefs.theme === "dark" ? "theme" : prefs.theme === "system" ? "system" : "sun", run: () => undefined },
+      "menu.currency": { label: "Currency", short: prefs.currency.toUpperCase(), icon: prefs.currency, run: () => undefined },
+      "menu.panels": { label: "Panels", short: "Panels", icon: "panels", run: () => undefined },
+      "menu.workspace": { label: "Workspace", short: "Workspace", icon: "workspace", run: () => undefined },
+      "menu.zone": {
+        label: "Target zone", short: prefs.zone === "main" ? "Main deck" : capitalize(prefs.zone), icon: prefs.zone === "sideboard" ? "zside" : prefs.zone === "commander" ? "zcmd" : "zmain",
+        disabled: !deck, run: () => undefined,
+      },
+      "menu.backup": { label: "Backup", short: "Backup", icon: "backup", run: () => undefined },
+      "menu.ribbonSize": { label: "Button size", short: "Button size", icon: "ribbon", run: () => undefined },
       "view.collection": { label: "Collection view", short: "Collection", icon: "collection", key: "2", on: store.view === "collection", run: () => store.setView("collection") },
       "collection.new": { label: "New collection...", short: "New collection", icon: "newcol", run: () => collectionDialog(store) },
       "collection.settings": {
@@ -125,8 +159,7 @@ export function useActions(store: Store): Record<string, Action> {
         label: "Move selected...", short: "Move", icon: "move", disabled: store.view !== "collection" || !picked || (store.collections?.length ?? 0) < 2,
         run: () => moveDialog(store, store.pickedEntries()),
       },
-      exportMissingText: { label: "Export missing list (text)", short: "Missing text", icon: "txt", disabled: !open?.sets.length, run: () => void store.exportMissing("text") },
-      exportMissingCsv: { label: "Export missing list (CSV)", short: "Missing CSV", icon: "csv", disabled: !open?.sets.length, run: () => void store.exportMissing("csv") },
+      exportMissing: { label: "Export missing cards...", short: "Export missing", icon: "csv", disabled: !open?.sets.length || open.completion === "none", run: () => exportWindow(store, "missing") },
       "collection.send": {
         label: "Send collection...", short: "Send", icon: "send", disabled: !open,
         run: () => (open ? void sendDialog(store, "collection", open) : noCollection()),
@@ -181,7 +214,7 @@ export function useActions(store: Store): Record<string, Action> {
       "wishlist.add": {
         label: "Add to wishlist", short: "Wishlist", icon: "wish", key: "W", disabled: !selected,
         run: () => (selected
-          ? void store.addToWishlist([{ cardId: selected.id, foil: prefs.foil ? 1 : 0, condition: "NM", language: "en", quantity: 1 }], selected.name)
+          ? void store.addToWishlist([{ cardId: selected.id, foil: prefs.foil ? 1 : 0, condition: "NM", language: "en", proxy: false, quantity: 1 }], selected.name)
           : store.flash("Select a card first", "err")),
       },
       "wishlist.missing": {
@@ -242,34 +275,11 @@ export function useActions(store: Store): Record<string, Action> {
         disabled: store.catalogRequestPending || !store.catalog || store.catalog.update.isUpdating,
         run: () => void store.updateCatalog(),
       },
-      importCollection: { label: "Import collection CSV...", short: "Import CSV", icon: "csvin", run: () => void store.importCollection() },
-      exportCollection: { label: "Export collection (Moxfield CSV)", short: "Moxfield CSV", icon: "csv", run: () => void store.exportCollection() },
+      importCollection: { label: "Import collection...", short: "Import", icon: "csvin", run: () => importWindow(store, "collection") },
+      exportCollection: { label: "Export collection...", short: "Export", icon: "csv", run: () => exportWindow(store, "collection") },
       backup: { label: "Download backup", short: "Backup", icon: "backup", run: () => void store.downloadBackup() },
       restore: { label: "Restore backup...", short: "Restore", icon: "restore", run: () => void store.restoreBackup() },
-      newDeck: {
-        label: "New deck...", short: "New deck", icon: "newdeck", key: "Ctrl+N",
-        run: () => dialog("New deck", [
-          ["name", "Deck name", ""],
-          ["format", "Format", "commander", "select", FORMATS.map((format) => [format, capitalize(format)])],
-          ["mode", "Deck mode", "normal", "select", [["normal", "Normal (any printing works)"], ["theme", "Theme (keeps each selected printing)"]]],
-        ], async (values) => {
-          const name = String(values.name);
-          if (!name) {
-            store.flash("Enter a deck name", "err");
-            return false;
-          }
-          if (name.length > 100) {
-            store.flash("Deck names can be up to 100 characters", "err");
-            return false;
-          }
-          try {
-            await store.createDeck(name, String(values.format), values.mode === "theme" ? "theme" : "normal");
-          } catch (reason) {
-            store.fail(reason, "Could not create the deck.");
-            return false;
-          }
-        }, "Create deck", <p className="note">Normal decks track each card by name, so any printing counts. Theme decks keep the exact printing and artwork you add.</p>),
-      },
+      newDeck: { label: "New deck...", short: "New deck", icon: "newdeck", key: "Ctrl+N", run: () => newDeckDialog(store) },
       openDeck: {
         label: "Open deck...", short: "Open deck", icon: "opendeck", key: "Ctrl+O",
         run: () => {
@@ -279,7 +289,7 @@ export function useActions(store: Store): Record<string, Action> {
           }
           dialog("Open deck", [
             ["deck", "Deck", deck?.id ?? store.decks[0]?.id ?? "", "select",
-              store.decks.map((item) => [item.id, `${item.name} (${capitalize(item.format)}, ${item.mode === "theme" ? "Theme" : "Normal"}, ${item.card_count ?? 0} cards)`])],
+              store.decks.map((item) => [item.id, `${item.name} (${capitalize(item.format)}, ${item.card_count ?? 0} cards)`])],
           ], async (values) => { await store.openDeck(String(values.deck)); store.setView("deck"); }, "Open");
         },
       },
@@ -290,9 +300,8 @@ export function useActions(store: Store): Record<string, Action> {
       },
       "deck.send": { label: "Send deck...", short: "Send", icon: "send", disabled: !deck, run: () => (deck ? void sendDialog(store, "deck", deck) : store.flash("Open a deck first", "err")) },
       "deck.sharing": { label: "Deck sharing...", short: "Sharing", icon: "people", disabled: !deck, run: () => sharingDialog(store, "deck") },
-      importDeck: { label: "Import decklist...", short: "Import list", icon: "listin", disabled: !deck, run: () => void store.importDeck() },
-      exportDeckText: { label: "Export deck (text)", short: "Text", icon: "txt", disabled: !deck, run: store.exportDeckText },
-      exportDeckCsv: { label: "Export deck (CSV)", short: "CSV", icon: "csv", disabled: !deck, run: store.exportDeckCsv },
+      importDeck: { label: "Import decklist...", short: "Import list", icon: "listin", disabled: !deck, run: () => importWindow(store, "deck") },
+      exportDeck: { label: "Export deck...", short: "Export", icon: "txt", disabled: !deck, run: () => exportWindow(store, "deck") },
       undo: {
         label: store.undoStack.length ? `Undo ${store.undoStack[store.undoStack.length - 1]!.label}` : "Undo", short: "Undo", icon: "undo", key: "Ctrl+Z",
         disabled: !store.undoStack.length, run: () => void store.undo(),
@@ -317,7 +326,7 @@ export function useActions(store: Store): Record<string, Action> {
           if (!name) { store.flash("Enter a workspace name", "err"); return false; }
           if (PRESET_NAMES.includes(name)) { store.flash(`${name} is a built-in workspace. Choose another name.`, "err"); return false; }
           store.saveWorkspace(name);
-        }, "Save", <p className="note">A workspace keeps the panel layout and the current view. Saving with an existing name replaces it.</p>),
+        }, "Save"),
       },
       "workspace.manage": {
         label: "Manage workspaces...", short: "Manage", icon: "panels",
@@ -351,7 +360,7 @@ export function useActions(store: Store): Record<string, Action> {
             store.fail(reason, "Could not change the password.");
             return false;
           }
-        }, "Change password", <p className="note">Passwords need at least 8 characters. Changing it signs out every other device.</p>),
+        }, "Change password"),
       },
       signout: {
         label: "Sign out", short: "Sign out", icon: "signout",
@@ -397,7 +406,7 @@ export function useActions(store: Store): Record<string, Action> {
             }
             await saveSettings({ notifications: enabled, wifiOnly });
             store.flash(enabled ? "Notifications on" : "Notifications off");
-          }, "Save", <p className="note">The phone checks the server about every 15 minutes. Android decides the exact time.</p>);
+          }, "Save");
         },
       },
       "app.update": {
@@ -405,6 +414,7 @@ export function useActions(store: Store): Record<string, Action> {
         run: () => { void checkForUpdate(true); },
       },
     };
+    for (const [id, items] of Object.entries(RIBBON_MENUS)) if (actions[id]) actions[id]!.items = items;
     return actions;
   }, [store]);
 }
@@ -443,7 +453,7 @@ function WorkspaceList() {
             <button type="button" className="btn small" onClick={() => store.deleteWorkspace(name)}>Delete</button>
           </span></div>
       ))}
-      {!names.length && <p className="note">Saved workspaces appear here. Use Save workspace to add one.</p>}
+      {!names.length && <p className="note">No saved workspaces</p>}
     </div>
   );
 }

@@ -39,7 +39,7 @@ test("copy details change finish, condition, language and trade, sort by price, 
   await signUp(page);
   await add(page, ["Shivan Dragon", "Llanowar Elves", "Sol Ring"]);
   await openCollection(page);
-  await page.locator("#view-collection .filterbar select").selectOption("price-desc");
+  await page.locator("#view-collection .filterbar select").first().selectOption("price-desc");
   await expect(rows(page).locator(".rowtitle b")).toHaveText(["Shivan Dragon", "Llanowar Elves", "Sol Ring"]);
   await expect(rows(page).nth(2).locator(".price")).toHaveText("No price");
 
@@ -71,7 +71,7 @@ test("tags and statistics bars filter the collection, and the binder shows pages
   await page.getByRole("button", { name: "Remove filter Rarity: Uncommon" }).click();
   await expect(rows(page)).toHaveCount(4);
 
-  await menu(page, "Collection", "Collection statistics");
+  await page.locator(".colhead .seg button", { hasText: "Statistics" }).click();
   await expect(page.locator(".tilerow")).toContainText("$1,150.00");
   await expect(page.locator(".chartcard", { hasText: "Mana curve" })).toBeVisible();
   await page.locator(".chartcard", { hasText: "Color" }).locator(".barrow", { hasText: "Red" }).click();
@@ -88,10 +88,10 @@ test("tags and statistics bars filter the collection, and the binder shows pages
   await expect(rows(page)).toHaveCount(4);
 });
 
-test("deck ownership counts collection copies, and missing cards go to a wishlist", async ({ page }) => {
+test("deck cards are linked to collection copies, and missing cards go to a wishlist", async ({ page }) => {
   await signUp(page);
   await add(page, ["Counterspell"]);
-  await menu(page, "Deck", "New deck...");
+  await menu(page, "Decks", "New deck...");
   await page.keyboard.type("Blue deck");
   await page.locator(".dlgbtns .primary").click();
   await expect(status(page)).toHaveText("Blue deck created");
@@ -104,7 +104,8 @@ test("deck ownership counts collection copies, and missing cards go to a wishlis
   await page.keyboard.press("Shift+Enter");
   await expect(status(page)).toHaveText("Serra Angel added to Blue deck");
 
-  await menu(page, "Deck", "Deck ownership");
+  await page.keyboard.press("3");
+  await page.locator("#view-deck .seg button", { hasText: "Ownership" }).click();
   await expect(page.locator(".stattile")).toContainText("1 of 3 owned, 2 missing, $230.00 to buy");
   await expect(page.locator(".orow", { hasText: "Counterspell" })).toContainText("Main collection (1)");
   await page.getByRole("button", { name: "Add missing to wishlist" }).click();
@@ -116,7 +117,7 @@ test("deck ownership counts collection copies, and missing cards go to a wishlis
   await expect(status(page)).toHaveText("Undone: Add missing cards of Blue deck to Wishlist");
   await expect(page.locator(".colitem", { hasText: "Wishlist" })).toContainText("0 cards");
 
-  await menu(page, "Deck", "Deck statistics");
+  await page.locator("#view-deck .seg button", { hasText: "Statistics" }).click();
   await expect(page.locator(".tilerow")).toContainText("$380.00");
 });
 
@@ -126,7 +127,7 @@ test("the trade list and calculator compare both sides", async ({ page, context 
   await add(page, ["Shivan Dragon", "Dark Ritual"]);
   await openCollection(page);
   await rows(page).filter({ hasText: "Shivan Dragon" }).locator(".rowtitle").click();
-  await menu(page, "Trade", "Mark for trade");
+  await menu(page, "Collection", "Mark for trade");
   await expect(status(page)).toHaveText("Shivan Dragon marked for trade");
   await page.keyboard.press("4");
   await expect(page.locator(".tradelist .row")).toHaveCount(1);
@@ -158,8 +159,10 @@ test("the Moxfield export keeps condition, language, finish and trade counts", a
   await page.fill("#f-trade", "1");
   await page.locator(".dlgbtns .primary").click();
   await expect(status(page)).toHaveText("Atraxa, Praetors' Voice changed");
+  await menu(page, "Home", "Export...");
+  await page.locator("#ex-format").selectOption("moxfield");
   const download = page.waitForEvent("download");
-  await menu(page, "File", "Export collection (Moxfield CSV)");
+  await page.locator("dialog[open]").getByRole("button", { name: "Export", exact: true }).click();
   const text = readFileSync(await (await download).path()!, "utf8");
-  expect(text.split("\r\n")[1]).toBe(`"1","1","Atraxa, Praetors' Voice","c16","Moderately Played","German","foil","","","28","","",""`);
+  expect(text.split("\r\n")[1]).toBe(`"1","1","Atraxa, Praetors' Voice","c16","Moderately Played","German","foil","","","28","False","False",""`);
 });

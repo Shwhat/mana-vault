@@ -84,6 +84,8 @@ export function registerScanRoutes(app: FastifyInstance, database: DatabaseSync)
   app.get<{ Params: { cardId: string } }>("/api/cards/:cardId/printings", async (request, reply) => {
     const card = database.prepare("SELECT oracle_id FROM cards WHERE id = ?").get(request.params.cardId);
     if (!card) return reply.code(404).send({ error: "Card printing not found" });
-    return database.prepare(`SELECT ${CARD_COLUMNS} FROM cards WHERE oracle_id = ? ${NEWEST}`).all(String(card.oracle_id));
+    return database.prepare(
+      `SELECT ${CARD_COLUMNS}, promo, variation, price_usd, price_usd_foil, price_usd_etched, price_eur, price_eur_foil FROM cards WHERE oracle_id = ? ${NEWEST}`,
+    ).all(String(card.oracle_id));
   });
 }

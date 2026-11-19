@@ -3,7 +3,12 @@
 /** 0 regular, 1 foil, 2 etched. */
 export type FinishCode = 0 | 1 | 2;
 export type Condition = "M" | "NM" | "LP" | "MP" | "HP" | "DMG";
-export type CopyKey = { cardId: string; foil: FinishCode; condition: Condition; language: string };
+/** A proxy is a stand-in printed copy: kept apart from real copies, with no value. */
+export type CopyKey = { cardId: string; foil: FinishCode; condition: Condition; language: string; proxy: boolean };
+/** Details of a copy row that are not part of its key. */
+export type CopyExtras = {
+  purchasePrice: number | null; priceCurrency: string | null; addedAt: string | null; misprint: boolean; altered: boolean; signed: boolean;
+};
 export type Currency = "usd" | "eur";
 
 export const CONDITIONS: Array<[Condition, string]> = [
@@ -53,14 +58,44 @@ export function readFinish(value: unknown): FinishCode | null {
   return null;
 }
 
+/** Reads a yes or no flag: true, 1, "true", "yes" and "1" are yes. */
+export function readFlag(value: unknown): boolean {
+  if (value === true || value === 1) return true;
+  return typeof value === "string" && ["true", "yes", "y", "1"].includes(value.trim().toLowerCase());
+}
+
 /** Reads the key of a copy from a request item. */
 export function readCopyKey(value: Record<string, unknown>): CopyKey | null {
   const foil = readFinish(value.foil);
   const condition = readCondition(value.condition);
   const language = readLanguage(value.language);
   if (typeof value.cardId !== "string" || !value.cardId || foil === null || !condition || !language) return null;
-  return { cardId: value.cardId, foil, condition, language };
+  return { cardId: value.cardId, foil, condition, language, proxy: readFlag(value.proxy) };
 }
+
+/** Reads the details of a copy from a request item. Missing details are empty. */
+export function readCopyExtras(value: Record<string, unknown>): CopyExtras | string {
+  const price = value.purchasePrice;
+  if (price !== undefined && price !== null && (typeof price !== "number" || !Number.isFinite(price) || price < 0 || price > 1_000_000)) {
+    return "A purchase price must be a number from 0 to 1,000,000";
+  }
+  const currency = value.priceCurrency;
+  if (currency !== undefined && currency !== null && (typeof currency !== "string" || !/^[A-Za-z]{3}$/.test(currency))) {
+    return "A purchase currency is a three letter code such as USD";
+  }
+  const added = value.addedAt;
+  if (added !== undefined && added !== null && (typeof added !== "string" || !Number.isFinite(Date.parse(added)))) {
+    return "The date added must be a date";
+  }
+  return {
+    purchasePrice: typeof price === "number" ? Math.round(price * 100) / 100 : null,
+    priceCurrency: typeof currency === "string" ? currency.toUpperCase() : null,
+    addedAt: typeof added === "string" ? new Date(added).toISOString() : null,
+    misprint: readFlag(value.misprint), altered: readFlag(value.altered), signed: readFlag(value.signed),
+  };
+}
+
+export const NO_EXTRAS: CopyExtras = { purchasePrice: null, priceCurrency: null, addedAt: null, misprint: false, altered: false, signed: false };
 
 export const FINISH_NAMES = ["regular", "foil", "etched"] as const;
 

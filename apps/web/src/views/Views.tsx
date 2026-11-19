@@ -1,8 +1,10 @@
 // ---------- central work area: card search, collection and deck views ----------
 import type { Action } from "../actions";
+import { rowMenu } from "../components/ContextMenu";
+import { linkDialog } from "../components/LibraryDialogs";
 import { Icon } from "../icons";
 import { sortDeck, useApp, zoneLabel } from "../store";
-import { anyPrice, capitalize, type DeckCard, type DeckTab, money, pricesOf, ZONES, type Zone } from "../types";
+import { anyPrice, capitalize, copyLabel, type DeckCard, type DeckTab, money, pricesOf, ZONES, type Zone } from "../types";
 import { StatsPanel } from "./StatsView";
 
 export function Thumb({ url, small }: { url: string | null; small?: boolean }) {
@@ -30,7 +32,7 @@ export function CardsView({ actions, onFilters }: { actions: Record<string, Acti
               if (event.key === "ArrowDown") { event.preventDefault(); store.moveSelection(1); (event.target as HTMLInputElement).blur(); }
               if (event.key === "Escape") (event.target as HTMLInputElement).blur();
             }}
-            placeholder="Search names, types and rules text, or filters such as t:dragon c:red mv>=4"
+            placeholder="Search cards"
             aria-label="Search cards"
           />
           <kbd>/</kbd>
@@ -38,19 +40,13 @@ export function CardsView({ actions, onFilters }: { actions: Record<string, Acti
         {onFilters && <button type="button" className={anyFilter ? "btn on" : "btn"} onClick={onFilters}>Filters</button>}
         <span className="phpos">{loading ? "Searching" : `${cards.length} ${cards.length === 1 ? "result" : "results"}`}</span>
       </div>
-      {deck && (
-        <div className="ctxbar">
-          Building <b>{deck.name}</b>, {deck.mode === "theme" ? "Theme mode: the selected printing is kept" : "Normal mode: any printing counts"}.
-          New cards go to <b>{zoneLabel(store.prefs.zone).toLowerCase()}</b>.
-        </div>
-      )}
       <div className="list" role="listbox" aria-label="Search results">
         {searchError && <div className="emptynote err">{searchError}</div>}
         {!searchError && !loading && cards.length === 0 && (
           <div className="empty">
             <Icon name="find" />
             <b>{catalogEmpty ? "The card database is empty" : anyFilter ? "No matching cards" : "No cards found"}</b>
-            <span>{catalogEmpty ? "Use Update card database on the Database tab to load the card catalog." : "Try a different search or clear a filter."}</span>
+
             {catalogEmpty && <button type="button" className="btn primary" onClick={actions.updateCatalog?.run} disabled={actions.updateCatalog?.disabled}>Update card database</button>}
           </div>
         )}
@@ -65,6 +61,14 @@ export function CardsView({ actions, onFilters }: { actions: Record<string, Acti
               className={active ? "row active" : "row"}
               onClick={() => store.select({ view: "cards", key: card.id, printingId: card.id })}
               onDoubleClick={() => void store.addToCollection(card.id, card.name)}
+              {...rowMenu(store, card.name, () => [
+                { label: "Card page", run: () => store.setCardPage(card.id) },
+                { label: "Add to collection", run: () => void store.addToCollection(card.id, card.name) },
+                { label: "Add as proxy", run: () => void store.addToCollection(card.id, card.name, undefined, undefined, true) },
+                { label: "Add to wishlist", run: () => void store.addToWishlist([{ cardId: card.id, foil: store.prefs.foil ? 1 : 0, condition: "NM", language: "en", proxy: false, quantity: 1 }], card.name) },
+                !!deck && { label: `Add to ${deck.name}`, run: () => void store.addToDeck(card.id, card.name) },
+                { label: "Add to trade (you get)", run: () => void store.getCard(card.id) },
+              ])}
             >
               <Thumb url={card.image_url} />
               <div className="rowmain">
@@ -84,7 +88,7 @@ export function CardsView({ actions, onFilters }: { actions: Record<string, Acti
                 <button type="button" className="btn small" title="Add to collection (Enter)" onClick={(event) => { event.stopPropagation(); void store.addToCollection(card.id, card.name); }}>+ Collection</button>
                 <button type="button" className="btn small" title="Add to wishlist (W)" onClick={(event) => {
                   event.stopPropagation();
-                  void store.addToWishlist([{ cardId: card.id, foil: store.prefs.foil ? 1 : 0, condition: "NM", language: "en", quantity: 1 }], card.name);
+                  void store.addToWishlist([{ cardId: card.id, foil: store.prefs.foil ? 1 : 0, condition: "NM", language: "en", proxy: false, quantity: 1 }], card.name);
                 }}>+ Wishlist</button>
                 {deck && <button type="button" className="btn small" title="Add to deck (Shift+Enter)" onClick={(event) => { event.stopPropagation(); void store.addToDeck(card.id, card.name); }}>+ Deck</button>}
               </div>
@@ -111,7 +115,6 @@ export function NoDeck({ actions, compact }: { actions: Record<string, Action>; 
     <div className={compact ? "empty compact" : "empty"}>
       <Icon name="deck" />
       <b>No deck is open</b>
-      <span>Open a deck or create a new one to start building.</span>
       <span className="btnrow">
         <button type="button" className="btn primary" onClick={actions.newDeck?.run}>New deck...</button>
         <button type="button" className="btn" onClick={actions.openDeck?.run}>Open deck...</button>
@@ -147,7 +150,6 @@ function OwnershipTab({ actions }: { actions: Record<string, Action> }) {
           <span className="meterfill" style={{ width: `${percent}%` }} /></span>
       </div>
       <div className="rulesline">
-        <span>{report.mode === "theme" ? "Theme deck: only the exact printing counts." : "Normal deck: any printing counts."} Copies in your collections count, wishlists do not. Each copy counts once.</span>
         <button type="button" className="btn small" disabled={!report.missing} onClick={actions["deck.missingWishlist"]?.run}>Add missing to wishlist</button>
         <button type="button" className="btn small" disabled={!report.missing} onClick={actions["deck.exportMissing"]?.run}>Export missing</button>
       </div>
@@ -159,7 +161,7 @@ function OwnershipTab({ actions }: { actions: Record<string, Action> }) {
             onClick={() => store.select({ view: "deck", key: String(entry.entryId), printingId: entry.cardId })}>
             <span role="cell" className="mname">{entry.name}{entry.zone !== "main" && <span className="badge"> {zoneLabel(entry.zone)}</span>}</span>
             <span role="cell"><span className={entry.missing ? "badge" : "badge own"}>{entry.owned} of {entry.needed}</span></span>
-            <span role="cell" className="sub">{entry.where.length ? entry.where.map((place) => `${place.name} (${place.quantity})`).join(", ") : "Not in your collections"}</span>
+            <span role="cell" className="sub">{entry.where.length ? entry.where.map((place) => `${place.name} (${place.quantity})`).join(", ") : "Missing"}{entry.proxies ? ` (${entry.proxies} proxy)` : ""}</span>
             <span role="cell" className="mnum">{entry.missing ? `${entry.missing} x ${money(entry.price, currency)}` : "Owned"}</span>
           </div>
         ))}
@@ -174,14 +176,12 @@ export function DeckView({ actions }: { actions: Record<string, Action> }) {
   if (!deck) return <div className="view"><div id="pagetabs"><span className="phname">Deck</span></div><NoDeck actions={actions} /></div>;
   const total = deck.cards.reduce((sum, card) => sum + card.quantity, 0);
   const tabs: Array<[DeckTab, string]> = [["cards", "Cards"], ["ownership", "Ownership"], ["stats", "Statistics"]];
-  const owned = new Map((store.ownership?.entries ?? []).map((entry) => [entry.entryId, entry]));
   const currency = store.prefs.currency;
   return (
     <div className="view" id="view-deck">
       <div id="pagetabs">
         <span className="phname">{deck.name}</span>
         <span className="phdesc">{capitalize(deck.format)}</span>
-        <span className={deck.mode === "theme" ? "badge main" : "badge"}>{deck.mode === "theme" ? "Theme" : "Normal"}</span>
         {deck.role === "member" && <span className="badge">Shared by {deck.owner?.name}</span>}
         {deck.role === "owner" && (deck.sharedWith?.length ?? 0) > 0 && <span className="badge">Shared with {deck.sharedWith!.map((person) => person.name).join(", ")}</span>}
         <div className="seg" role="tablist" aria-label="Deck view">
@@ -189,7 +189,6 @@ export function DeckView({ actions }: { actions: Record<string, Action> }) {
             <button key={id} type="button" role="tab" aria-selected={store.deckTab === id} className={store.deckTab === id ? "on" : ""} onClick={() => store.setDeckTab(id)}>{label}</button>
           ))}
         </div>
-        <span className="phwhere">{deck.mode === "theme" ? "Each card keeps the exact printing you selected" : "Cards are tracked by name; any printing counts"}</span>
         <span className="phpos">{total} cards{store.deckStats ? `, value ${money(store.deckStats.value, currency)}` : ""}
           {store.ownership && store.ownership.needed > 0 ? `, ${store.ownership.owned} owned` : ""}</span>
       </div>
@@ -200,7 +199,6 @@ export function DeckView({ actions }: { actions: Record<string, Action> }) {
           <div className="empty">
             <Icon name="deck" />
             <b>This deck is empty</b>
-            <span>Search for cards and use Add to deck, or import a decklist.</span>
             <span className="btnrow">
               <button type="button" className="btn primary" onClick={() => store.setView("cards")}>Search cards</button>
               <button type="button" className="btn" onClick={actions.importDeck?.run}>Import decklist...</button>
@@ -213,19 +211,39 @@ export function DeckView({ actions }: { actions: Record<string, Action> }) {
             {group.cards.map((card) => {
               const key = String(card.entry_id);
               const active = selection?.view === "deck" && selection.key === key;
+              const missing = card.missing ?? 0;
               return (
                 <div key={key} data-key={key} role="option" aria-selected={active} className={active ? "row active" : "row"}
-                  onClick={() => store.select({ view: "deck", key, printingId: card.card_id })}>
+                  onClick={() => store.select({ view: "deck", key, printingId: card.card_id })}
+                  {...rowMenu(store, card.name, () => [
+                    { label: "Card page", run: () => store.setCardPage(card.card_id) },
+                    { label: "Link copies...", run: () => void linkDialog(store, card) },
+                    missing > 0 && { label: "Add missing to wishlist", run: () => void store.addToWishlist([{ cardId: card.card_id, foil: 0, condition: "NM", language: "en", proxy: false, quantity: missing }], card.name) },
+                    { label: "Remove from deck", run: () => void store.setDeckQuantity(card, 0) },
+                  ])}>
                   <Thumb url={card.image_url} />
                   <div className="rowmain">
                     <div className="rowtitle"><b>{card.name}</b><span className="mana">{card.mana_cost}</span></div>
                     <div className="rowsub">{card.type_line}</div>
-                    <div className="rowmeta">{card.printing_id ? <>{card.set_name} <span className="badge">{card.set_code.toUpperCase()}</span> {card.collector_number}</> : "Any printing"}</div>
+                    <div className="rowmeta">{card.set_name} <span className="badge">{card.set_code.toUpperCase()}</span> {card.collector_number}</div>
+                    <div className="rowtags">
+                      {(card.links ?? []).map((link) => (
+                        <button key={`${link.collectionId}:${link.cardId}:${link.foil}:${link.condition}:${link.language}:${link.proxy ? 1 : 0}`} type="button" className="tag badge col"
+                          title={`${link.quantity} from ${link.collectionName}${copyLabel(link) ? `, ${copyLabel(link)}` : ""}`}
+                          onClick={(event) => { event.stopPropagation(); store.openCollection(link.collectionId); store.setView("collection"); }}>
+                          {link.collectionName}{link.quantity > 1 ? ` ×${link.quantity}` : ""}</button>
+                      ))}
+                      {(card.links ?? []).some((link) => link.proxy) && <span className="badge proxy">PROXY</span>}
+                      {missing > 0 && <span className="badge miss">Missing{missing < card.quantity ? ` ${missing}` : ""}</span>}
+                      {missing > 0 && (
+                        <button type="button" className="tag badge wish" title={`Add ${missing} ${card.name} to your wishlist`}
+                          onClick={(event) => { event.stopPropagation(); void store.addToWishlist([{ cardId: card.card_id, foil: 0, condition: "NM", language: "en", proxy: false, quantity: missing }], card.name); }}>
+                          + Wishlist</button>
+                      )}
+                    </div>
                   </div>
-                  {owned.has(card.entry_id) && (
-                    <span className={owned.get(card.entry_id)!.missing ? "badge" : "badge own"} title={owned.get(card.entry_id)!.where.map((place) => `${place.name}: ${place.quantity}`).join(", ") || "Not in your collections"}>
-                      Own {owned.get(card.entry_id)!.owned} of {card.quantity}</span>
-                  )}
+                  <button type="button" className="btn small icon-only" title={`Link copies of ${card.name}`} aria-label={`Link copies of ${card.name}`}
+                    onClick={(event) => { event.stopPropagation(); void linkDialog(store, card); }}><Icon name="link" /></button>
                   <Quantity value={card.quantity} name={card.name} max={100} onChange={(quantity) => void store.setDeckQuantity(card, quantity)} />
                   <select className="zonesel" aria-label={`Move ${card.name} to zone`} value={card.zone}
                     onClick={(event) => event.stopPropagation()}

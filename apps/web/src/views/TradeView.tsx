@@ -78,7 +78,6 @@ function TradeList() {
           <div className="empty">
             <Icon name="trade" />
             <b>Nothing is marked for trade</b>
-            <span>In a collection, pick rows and use Mark for trade, or set For trade in Copy details. Copies in wishlists and in collections shared with you are not listed.</span>
           </div>
         )}
         {shown.map((entry) => {
@@ -109,7 +108,6 @@ export function TradeView({ actions }: { actions: Record<string, Action> }) {
     <div className="view" id="view-trade">
       <div id="pagetabs">
         <span className="phname">Trade</span>
-        <span className="phwhere">Compare what you give with what you get at current card database prices</span>
       </div>
       <div className="tradegrid">
         <TradeList />

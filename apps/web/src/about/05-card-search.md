@@ -72,7 +72,8 @@ Click a result (or move to it with Up and Down) to select it. The Card panel sho
 | Add one copy to the open deck, in the target zone | Shift+Enter, **+ Deck**, **Add to deck** |
 | Add one copy to the wishlist | W, **+ Wishlist**, **Add to wishlist** |
 | Add one copy to the trade calculator's You get side | G, **Add to trade (you get)**, **You get** |
+| Open the card page | **Card page** in the right-click menu; a tap on a phone |
 
 ## Empty results
 
-When the card database has no printings, the results area says so and offers **Update card database**. Otherwise it suggests a different search.
+When the card database has no printings, the results area says so and offers **Update card database**. Otherwise it shows "No matching cards" or "No cards found".

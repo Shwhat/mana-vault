@@ -36,7 +36,6 @@ export function FiltersPanel({ actions }: { actions: Record<string, Action> }) {
           <input id="flt-mvmax" type="number" min="0" max="100" step="0.5" value={filters.mvMax} placeholder="Max" onChange={(event) => { store.setFilters({ mvMax: event.target.value }); store.setView("cards"); }} /></div>
       </div>
       <div className="btnrow"><button type="button" className="btn" disabled={actions.clearFilters?.disabled} onClick={actions.clearFilters?.run}>Clear filters</button></div>
-      <p className="note">The search box also accepts filters: <code>t:</code> type, <code>c:</code> color, <code>o:</code> rules text, <code>set:</code>, <code>r:</code> rarity, <code>mv</code> with =, &lt;, &gt;, &lt;=, &gt;=, and <code>legal:</code> format. All filters must match.</p>
     </div>
   );
 }
@@ -50,7 +49,7 @@ export function CollectionsPanel({ actions }: { actions: Record<string, Action> 
         <span className="sub grow">{list.length} {list.length === 1 ? "collection" : "collections"}</span>
         <button type="button" className="btn small" onClick={actions["collection.new"]?.run}>New...</button>
       </div>
-      {store.collections !== null && list.length === 0 && <p className="note pad">No collections yet. Use New to create one, such as a binder or a set you are completing.</p>}
+      {store.collections !== null && list.length === 0 && <p className="note pad">No collections yet</p>}
       {list.map((item) => {
         const target = store.prefs.targetCollection === item.id;
         return (
@@ -87,17 +86,15 @@ export function DecksPanel({ actions }: { actions: Record<string, Action> }) {
         <input className="search" value={term} onChange={(event) => setTerm(event.target.value)} placeholder="Find a deck" aria-label="Find a deck" />
         <button type="button" className="btn small" onClick={actions.newDeck?.run}>New...</button>
       </div>
-      {store.decks.length === 0 && <p className="note pad">No decks yet. Use New deck to create one.</p>}
+      {store.decks.length === 0 && <p className="note pad">No decks yet</p>}
       {shown.map((deck) => (
         <div key={deck.id} className={store.deck?.id === deck.id ? "navitem active" : "navitem"} role="button" onClick={() => void store.openDeck(deck.id)}
           onDoubleClick={() => store.setView("deck")}>
           <span className="nl">{deck.name}</span>
           {(deck.role === "member" || (deck.sharedWith?.length ?? 0) > 0) && <span className="badge">Shared</span>}
-          <span className={deck.mode === "theme" ? "badge main" : "badge"}>{deck.mode === "theme" ? "Theme" : "Normal"}</span>
           <span className="cnt">{deck.card_count ?? 0}</span>
         </div>
       ))}
-      {store.decks.length > 0 && <p className="note pad">Click a deck to open it. Double-click to show it in the work area.</p>}
     </div>
   );
 }
@@ -105,7 +102,7 @@ export function DecksPanel({ actions }: { actions: Record<string, Action> }) {
 export function CardPanel({ actions }: { actions: Record<string, Action> }) {
   const store = useApp();
   const card = store.cardDetail;
-  if (!card) return <div className="pbody"><p className="note">Select a card in a list to see its details here.</p></div>;
+  if (!card) return <div className="pbody"><p className="note">No card selected</p></div>;
   const owned = card.owned;
   const currency = store.prefs.currency;
   const prices = card.prices;
@@ -143,7 +140,7 @@ export function CardPanel({ actions }: { actions: Record<string, Action> }) {
         <div className="prow"><label>Foil</label><span>{money(currency === "usd" ? prices?.usd_foil : prices?.eur_foil, currency)}</span></div>
         {currency === "usd" && prices?.usd_etched !== null && prices?.usd_etched !== undefined && (
           <div className="prow"><label>Etched</label><span>{money(prices.usd_etched, currency)}</span></div>)}
-        <p className="note">{card.pricesUpdatedAt ? `From the card database update on ${new Date(card.pricesUpdatedAt).toLocaleDateString()}.` : "Prices arrive with the next card database update."}</p>
+        {card.pricesUpdatedAt && <p className="note">{new Date(card.pricesUpdatedAt).toLocaleDateString()}</p>}
       </div>
       <div className="pgrp">
         <h4>Owned</h4>
@@ -154,7 +151,7 @@ export function CardPanel({ actions }: { actions: Record<string, Action> }) {
             <span>{item.regular || item.foil || item.etched ? copies(item) : "Other printings only"}
               {item.allPrintings > item.regular + item.foil + item.etched ? ` (${item.allPrintings} with other printings)` : ""}{item.trade ? `, ${item.trade} for trade` : ""}</span></div>
         ))}
-        {!owned.collections.length && <p className="note">Not in any of your collections.</p>}
+        {!owned.collections.length && <p className="note">Not owned</p>}
         {card.wanted.map((item) => (
           <div className="prow" key={item.id}><label title={item.name}>{item.name}</label><span>Wanted: {item.allPrintings} {item.allPrintings === 1 ? "copy" : "copies"} (wishlist)</span></div>
         ))}
@@ -172,14 +169,14 @@ export function DeckListPanel({ actions }: { actions: Record<string, Action> }) 
     <div className="pbody flush">
       <div className="dlhead">
         <div className="ident">{deck.name}</div>
-        <div className="sub">{capitalize(deck.format)}, {deck.mode === "theme" ? "Theme" : "Normal"} mode, {total} cards</div>
+        <div className="sub">{capitalize(deck.format)}, {total} cards</div>
         <div className="seg" role="group" aria-label="Target zone">
           {(["zone.main", "zone.sideboard", "zone.commander"] as const).map((id) => (
             <button key={id} type="button" className={actions[id]?.on ? "on" : ""} onClick={actions[id]?.run}>{actions[id]?.short}</button>
           ))}
         </div>
       </div>
-      {deck.cards.length === 0 && <p className="note pad">This deck is empty. Select a card and press Shift+Enter, or use Add to deck.</p>}
+      {deck.cards.length === 0 && <p className="note pad">This deck is empty</p>}
       {zoneGroups(deck.cards).map((group) => (
         <div key={group.zone}>
           <div className="navgroup">{zoneLabel(group.zone)} <span className="cnt">{group.count}</span></div>
@@ -203,7 +200,7 @@ export function DeckListPanel({ actions }: { actions: Record<string, Action> }) 
 export function ReviewPanel() {
   const store = useApp();
   const { review } = store;
-  if (!review) return <div className="pbody"><p className="note">After you preview or run an import, rows that did not match a card are listed here.</p></div>;
+  if (!review) return <div className="pbody"><p className="note">No import yet</p></div>;
   return (
     <div className="pbody flush">
       <div className="revhead">
@@ -211,7 +208,7 @@ export function ReviewPanel() {
         <span className="sub">{review.done ? "Imported" : "Preview"}: {review.report.matchedRows} matched rows ({review.report.importedQuantity} cards), {review.report.unmatched.length} skipped</span>
         <button type="button" className="btn small" onClick={() => store.setReview(null)}>Clear</button>
       </div>
-      {review.report.unmatched.length === 0 && <p className="note pad">Every row matched a card.</p>}
+      {review.report.unmatched.length === 0 && <p className="note pad">Every row matched</p>}
       {review.report.unmatched.map((item) => (
         <div className="msg" key={`${item.row}-${item.name}`}>
           <span className="lv w">Skipped</span>

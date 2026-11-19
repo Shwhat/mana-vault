@@ -28,7 +28,7 @@
 | Target collection | The collection that Add to collection puts cards into |
 | Open collection | The collection shown in the collection view |
 | Linked set | A set whose completion a collection tracks |
-| Completion rule | Main set, Every printing or Each card name once; decides which cards a linked set needs |
+| Completion rule | None, Main set, Every printing or Each card name once; decides which cards a linked set needs |
 | Finish rule | Any finish, Regular only, Foil only or One of each; decides which finishes count |
 | Printed size | The number of numbered cards printed in a set, from Scryfall's set list |
 | Picked rows | Collection rows chosen for a bulk move or remove |
@@ -37,9 +37,15 @@
 | Copy, Share, Transfer | The three ways to send: their own copy, one item you both edit, or moving it to them |
 | Inbox | The list of offers waiting for you and offers you sent |
 | Foil | The shiny finish of a printing. Regular and foil copies are counted separately |
-| Deck | A named list of cards with a format and a mode |
-| Normal mode | A deck mode that keeps cards by name, so any printing counts |
-| Theme mode | A deck mode that keeps the exact printing of each card |
+| Deck | A named list of printings with a format, linked to the collection copies that fill them |
+| Link | The tie between a deck card and the copy in a collection that fills it. A copy fills one deck card at a time |
+| Missing | A deck card with no linked copy |
+| Free copy | A copy in a collection that fills no deck card |
+| Proxy | A printed stand-in card, kept apart from real copies, with no value |
+| Want | The number of copies a wishlist row asks for; it goes down as copies are added to collections |
+| Card page | The full view of one card: art, text, versions with prices, rulings and where you own it |
+| Quick mode | A scanner setting that takes the first matching printing instead of asking |
+| Set filter | The scanner sets outside which a card gives a "Not in set" warning |
 | Zone | Where a card sits in a deck: main deck, sideboard or commander |
 | Target zone | The zone that Add to deck puts cards into |
 | Scanned list | Cards recognized by the scanner or added by name, waiting on this device to be added to a collection or deck |
@@ -51,8 +57,9 @@
 | Selected card | The row last clicked or moved to with Up and Down; its details show in the Card panel |
 | Panel | A dockable window beside the work area: Filters, Collections, Decks, Card, Deck list or Import review |
 | Workspace | A saved arrangement of panels and a view |
-| Ribbon | The tabs of buttons under the menu bar |
-| Contextual tab | A ribbon tab shown only when it applies; the amber Deck tab appears while a deck is open |
+| Ribbon | The tabs of buttons under the title bar; the program's only menu |
+| Context group | A ribbon group shown only while that part of the program is in use, such as Build while a deck is open |
+| List button | A ribbon button with ▾ that opens a list of related commands |
 | Import preview | The check of an import file that shows what would be added before anything changes |
 | Backup | A JSON file with one account's own collections, decks and the card records they use |
 | Session | A signed-in browser, kept for 30 days |
