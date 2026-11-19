@@ -29,6 +29,14 @@ export type Prefs = {
   collectionLayoutPhone: CollectionLayout;
   /** The size of card pictures in Grid. */
   gridSize: GridSize;
+  /** Card search results (also the deck's Add tab and the trade searches): Grid, Binder or List, on the desktop and on a phone. */
+  searchLayout: CollectionLayout;
+  searchLayoutPhone: CollectionLayout;
+  searchSize: GridSize;
+  /** All collections also lists the cards in wishlists. */
+  allWishlists: boolean;
+  /** Trade: the you give search looks in every collection, not only cards marked for trade. */
+  tradeAllCards: boolean;
   /** How the collection and deck switchers sort their lists. */
   collectionSwitchSort: SwitchSort;
   deckSwitchSort: SwitchSort;
@@ -69,6 +77,7 @@ export function defaultPrefs(): Prefs {
     theme: "light", foil: false, zone: "main", ribbon: null, ribbonTab: "home", layout: preset.layout,
     workspace: DEFAULT_WORKSPACE, workspaces: {}, lastDeckId: null, targetCollection: null, openCollection: null,
     currency: "usd", collectionSort: "name", collectionLayout: "grid", collectionLayoutPhone: "grid", gridSize: "m",
+    searchLayout: "grid", searchLayoutPhone: "grid", searchSize: "m", allWishlists: false, tradeAllCards: false,
     collectionSwitchSort: "recent", deckSwitchSort: "recent", recent: {}, deckView: "list", deckGroup: "type", deckSort: "name",
     scanVibrate: true, scanFoil: false, scanCamera: "environment", scanQuick: false, scanSounds: true, scanSets: [], scanIgnorePromos: false,
     scanProxy: false, scanCondition: "NM", scanLanguage: "en", scanShowTotal: false, scanShowOwned: false, ribbonSize: "large", appVersion: APP_VERSION,
@@ -104,6 +113,11 @@ export function mergePrefs(saved: unknown): Prefs {
     collectionLayout: layoutOf(value.collectionLayout, "grid"),
     collectionLayoutPhone: layoutOf(value.collectionLayoutPhone, layoutOf(value.collectionLayout, "grid")),
     gridSize: value.gridSize === "s" || value.gridSize === "l" ? value.gridSize : "m",
+    searchLayout: layoutOf(value.searchLayout, "grid"),
+    searchLayoutPhone: layoutOf(value.searchLayoutPhone, "grid"),
+    searchSize: value.searchSize === "s" || value.searchSize === "l" ? value.searchSize : "m",
+    allWishlists: value.allWishlists === true,
+    tradeAllCards: value.tradeAllCards === true,
     collectionSwitchSort: switchSortOf(value.collectionSwitchSort, ["recent", "name", "created", "cards", "value"]),
     deckSwitchSort: switchSortOf(value.deckSwitchSort, ["recent", "name", "created", "cards", "format", "commander"]),
     recent: value.recent && typeof value.recent === "object"

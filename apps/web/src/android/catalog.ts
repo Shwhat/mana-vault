@@ -87,7 +87,7 @@ const newest = (a: CompactCard, b: CompactCard) =>
   a.collector_number.length - b.collector_number.length || a.collector_number.localeCompare(b.collector_number);
 
 /** Card search on the phone: every word must appear in the name (or flavor name), with the filters from the Filters panel. */
-export async function searchCards(params: URLSearchParams): Promise<Card[]> {
+export async function searchCards(params: URLSearchParams): Promise<Card[] | { total: number; cards: Card[] }> {
   const { cards } = await needCatalog();
   const words = normalize(params.get("q") ?? "").split(" ").filter(Boolean);
   const color = params.get("color")?.toUpperCase();
@@ -97,7 +97,10 @@ export async function searchCards(params: URLSearchParams): Promise<Card[]> {
   const min = params.get("mvMin") ? Number(params.get("mvMin")) : null;
   const max = params.get("mvMax") ? Number(params.get("mvMax")) : null;
   const limit = Math.min(100, Number(params.get("limit") ?? 40) || 40);
+  const offset = Math.max(0, Number(params.get("offset") ?? 0) || 0);
+  const paged = params.get("paged") === "1";
   const found: Card[] = [];
+  let total = 0;
   for (const card of cards) {
     if (set && card.set_code !== set) continue;
     if (rarity && card.rarity !== rarity) continue;
@@ -109,10 +112,11 @@ export async function searchCards(params: URLSearchParams): Promise<Card[]> {
       const text = normalize(`${card.name} ${card.flavor_name ?? ""}`);
       if (!words.every((word) => text.includes(word))) continue;
     }
-    found.push(card);
-    if (found.length >= limit) break;
+    total += 1;
+    if (total > offset && found.length < limit) found.push(card);
+    else if (!paged && found.length >= limit) break;
   }
-  return found;
+  return paged ? { total, cards: found } : found;
 }
 
 /** Every printing of the card's name, newest first. */

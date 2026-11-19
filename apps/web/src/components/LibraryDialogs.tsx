@@ -9,7 +9,7 @@ import {
   type Candidate, capitalize, type Collection, type CollectionEntry, COMPLETION_RULES, CONDITIONS, copyLabel, type DeckCard, FINISH_RULES, FINISHES, type FinishCode,
   FORMATS, formatName, LANGUAGES, type Offer, SEND_MODES, type SetInfo,
 } from "../types";
-import { customDialog, dialog } from "./Dialog";
+import { closeDialog, customDialog, dialog } from "./Dialog";
 
 /** Search box plus a checkable set list. The chosen codes are kept in `holder.sets` for the dialog's OK handler. */
 function SetPicker({ holder, initial }: { holder: { sets: string[] }; initial: Array<{ code: string; name: string }> }) {
@@ -255,6 +255,7 @@ function acceptDialog(store: Store, offer: Offer) {
 function InboxList() {
   const store = useApp();
   const { inbox, sent } = store.offers;
+  const waiting = (store.trades ?? []).filter((trade) => trade.status === "open" && trade.turn === "me");
   const mode = (offer: Offer) => (offer.mode === "copy" ? "Copy" : offer.mode === "share" ? "Share" : "Transfer");
   return (
     <div className="inbox">
@@ -268,6 +269,14 @@ function InboxList() {
             <button type="button" className="btn small primary" onClick={() => acceptDialog(store, offer)}>Accept...</button>
             <button type="button" className="btn small" onClick={() => void store.decline(offer).catch((reason) => store.fail(reason, "Could not decline it."))}>Decline</button>
           </span>
+        </div>
+      ))}
+      <h4>Trades waiting for your answer</h4>
+      {waiting.length === 0 && <p className="note">No trades are waiting</p>}
+      {waiting.map((trade) => (
+        <div className="wsrow" key={trade.id}>
+          <span><b>{trade.name}</b> <span className="badge">Trade</span><span className="sub"> {trade.mine ? "with" : "from"} {trade.with?.name}</span></span>
+          <button type="button" className="btn small primary" onClick={() => { closeDialog(); store.chooseTrade(trade.id); store.setView("trade"); }}>Open trade</button>
         </div>
       ))}
       <h4>Sent by you, not yet answered</h4>
@@ -284,6 +293,7 @@ function InboxList() {
 
 export function inboxDialog(store: Store) {
   void store.reloadOffers();
+  void store.reloadTrades();
   customDialog("Inbox", () => <InboxList />, 560);
 }
 

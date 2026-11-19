@@ -40,7 +40,7 @@ Messages appear at the right end of the status bar (on the phone, in a banner ab
 | Card database update started | Update card database |
 | Card database updated with N printings | An update finished |
 | Undone: change, or Redone: change | Undo or Redo |
-| Filters cleared | Clear filters |
+| Filters cleared | Clear filters, for the open view |
 | Light theme, Dark theme, or System theme | Changing the theme |
 | Workspace name, Workspace name saved, Workspace name deleted | Using, saving or deleting a workspace |
 | Ribbon reset | Reset ribbon |
@@ -50,7 +50,13 @@ Messages appear at the right end of the status bar (on the phone, in a banner ab
 | Card name no longer for trade | Unmark for trade |
 | N cards added to wishlist name | Adding to the wishlist |
 | Missing cards exported (N cards) | Export missing deck cards |
-| Card name added to what you give, or to what you get | Adding to the trade calculator |
+| Card name added to what you give, or to what you get | Adding to a trade |
+| Trade name started, renamed, cancelled, reopened, declined or deleted | The trade commands |
+| Trade name completed | Complete trade |
+| Trade name sent | Send trade |
+| Trade name accepted and completed | Accept trade |
+| Trade list copied, Trade list exported | Copy list, Export |
+| New share link made, Link copied, Share link turned off | Share trade binder |
 | Trade summary copied | Copy trade summary |
 | Trade cleared | Clear trade |
 | Binder layout, or List layout | Switching the collection layout |
@@ -92,7 +98,13 @@ Messages appear at the right end of the status bar (on the phone, in a banner ab
 | Those copies are already for trade, or None of those copies are for trade | Mark or Unmark for trade with nothing to change | |
 | There is nothing to add to the wishlist | Adding nothing to the wishlist | |
 | You own every card in deck name | Add missing to wishlist or Export missing with nothing missing | |
-| Add cards to the trade first | Copy trade summary with both sides empty | Add cards to the trade |
+| Add cards to the trade first | Copy list or Export with an empty trade | Add cards to the trade |
+| Start or open a trade first | A trade command with no trade open | Choose a trade, or start one with New... |
+| Give the trade a name | New or Rename with an empty name | Type a name |
+| Create a collection for the cards you get first | Complete, Send or Accept without a collection to receive cards | Create a collection |
+| Those cards are already there | Moving rows into the collection they are in | Choose another collection |
+| Open a collection linked to a set first | Missing cards commands in All collections | Open one collection |
+| A price is a number of 0 or more | A trade line price that is not a number | Type a number, or empty the box to use the card price |
 | Could not copy to the clipboard | The browser refused clipboard access | Allow clipboard access for the site, or use a secure (HTTPS) address |
 | Could not action. | The action failed and the server gave no reason, often because the server could not be reached | Check the connection and try again |
 

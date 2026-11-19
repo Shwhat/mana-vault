@@ -1,10 +1,12 @@
 // ---------- central work area: card search, collection and deck views ----------
 import type { Action } from "../actions";
-import { rowMenu } from "../components/ContextMenu";
+import type { FoundCard } from "../card-search";
+import { CardResults, countLine } from "../components/CardResults";
+import { LayoutRows, OptionsButton } from "../components/Options";
 import { linkDialog } from "../components/LibraryDialogs";
 import { Icon } from "../icons";
-import { sortDeck, useApp, zoneLabel } from "../store";
-import { anyPrice, capitalize, copyLabel, type DeckCard, type DeckTab, money, pricesOf, ZONES, type Zone } from "../types";
+import { sortDeck, type Store, useApp, zoneLabel } from "../store";
+import { copyLabel, type DeckCard, type DeckTab, money, ZONES, type Zone } from "../types";
 import { StatsPanel } from "./StatsView";
 
 export function Thumb({ url, small }: { url: string | null; small?: boolean }) {
@@ -13,11 +15,35 @@ export function Thumb({ url, small }: { url: string | null; small?: boolean }) {
     : <span className={small ? "thumb-img sm none" : "thumb-img none"}>MV</span>;
 }
 
+/** The menu and buttons of a search result in card search. */
+export function searchMenu(store: Store, card: FoundCard) {
+  const wish = () => void store.addToWishlist([{ cardId: card.id, foil: store.prefs.foil ? 1 : 0, condition: "NM", language: "en", proxy: false, quantity: 1 }], card.name);
+  return [
+    { label: "Card page", run: () => store.setCardPage(card.id) },
+    { label: "Add to collection", run: () => void store.addToCollection(card.id, card.name) },
+    { label: "Add as proxy", run: () => void store.addToCollection(card.id, card.name, undefined, undefined, true) },
+    { label: "Add to wishlist", run: wish },
+    !!store.deck && { label: `Add to ${store.deck.name}`, run: () => void store.addToDeck(card.id, card.name) },
+    { label: "Add to trade (you get)", run: () => void store.getCard(card.id) },
+  ];
+}
+
+/** Layout and card size for search results. The deck's Add tab and the trade searches share them. */
+export function SearchOptions() {
+  const store = useApp();
+  return (
+    <OptionsButton title="Search options">
+      <LayoutRows name="Search results" layout={store.searchLayout} size={store.prefs.searchSize} onLayout={store.setSearchLayout} onSize={(searchSize) => store.setPrefs({ searchSize })} />
+    </OptionsButton>
+  );
+}
+
 export function CardsView({ actions, onFilters }: { actions: Record<string, Action>; onFilters?: () => void }) {
   const store = useApp();
-  const { filters, cards, loading, searchError, selection, deck } = store;
+  const { filters, selection, deck, search } = store;
   const anyFilter = store.filtersActive;
   const catalogEmpty = store.catalog?.printingCount === 0;
+  const add = (card: FoundCard) => void store.addToCollection(card.id, card.name);
   return (
     <div className="view" id="view-cards">
       <div id="pagetabs">
@@ -38,64 +64,31 @@ export function CardsView({ actions, onFilters }: { actions: Record<string, Acti
           <kbd>/</kbd>
         </label>
         {onFilters && <button type="button" className={anyFilter ? "btn on" : "btn"} onClick={onFilters}>Filters</button>}
-        <span className="phpos">{loading ? "Searching" : `${cards.length} ${cards.length === 1 ? "result" : "results"}`}</span>
+        <SearchOptions />
+        <span className="phpos">{countLine(search)}</span>
       </div>
-      <div className="list" role="listbox" aria-label="Search results">
-        {searchError && <div className="emptynote err">{searchError}</div>}
-        {!searchError && !loading && cards.length === 0 && (
-          <div className="empty">
-            <Icon name="find" />
-            <b>{catalogEmpty ? "The card database is empty" : anyFilter ? "No matching cards" : "No cards found"}</b>
-
-            {catalogEmpty && <button type="button" className="btn primary" onClick={actions.updateCatalog?.run} disabled={actions.updateCatalog?.disabled}>Update card database</button>}
-          </div>
+      <CardResults
+        search={search} layout={store.searchLayout} size={store.prefs.searchSize} label="Search results" resetKey={filters}
+        activeId={selection?.view === "cards" ? selection.key : null}
+        onPick={(card) => store.select({ view: "cards", key: card.id, printingId: card.id })}
+        onOpen={add}
+        menu={(card) => searchMenu(store, card)}
+        onTag={(change) => store.setFilters(change)}
+        buttons={(card) => (
+          <>
+            <button type="button" className="btn small" title="Add to collection (Enter)" onClick={(event) => { event.stopPropagation(); add(card); }}>+ Collection</button>
+            <button type="button" className="btn small" title="Add to wishlist (W)" onClick={(event) => {
+              event.stopPropagation();
+              void store.addToWishlist([{ cardId: card.id, foil: store.prefs.foil ? 1 : 0, condition: "NM", language: "en", proxy: false, quantity: 1 }], card.name);
+            }}>+ Wishlist</button>
+            {deck && <button type="button" className="btn small" title="Add to deck (Shift+Enter)" onClick={(event) => { event.stopPropagation(); void store.addToDeck(card.id, card.name); }}>+ Deck</button>}
+          </>
         )}
-        {cards.map((card) => {
-          const active = selection?.view === "cards" && selection.key === card.id;
-          return (
-            <div
-              key={card.id}
-              data-key={card.id}
-              role="option"
-              aria-selected={active}
-              className={active ? "row active" : "row"}
-              onClick={() => store.select({ view: "cards", key: card.id, printingId: card.id })}
-              onDoubleClick={() => void store.addToCollection(card.id, card.name)}
-              {...rowMenu(store, card.name, () => [
-                { label: "Card page", run: () => store.setCardPage(card.id) },
-                { label: "Add to collection", run: () => void store.addToCollection(card.id, card.name) },
-                { label: "Add as proxy", run: () => void store.addToCollection(card.id, card.name, undefined, undefined, true) },
-                { label: "Add to wishlist", run: () => void store.addToWishlist([{ cardId: card.id, foil: store.prefs.foil ? 1 : 0, condition: "NM", language: "en", proxy: false, quantity: 1 }], card.name) },
-                !!deck && { label: `Add to ${deck.name}`, run: () => void store.addToDeck(card.id, card.name) },
-                { label: "Add to trade (you get)", run: () => void store.getCard(card.id) },
-              ])}
-            >
-              <Thumb url={card.image_url} />
-              <div className="rowmain">
-                <div className="rowtitle"><b>{card.name}</b><span className="mana">{card.mana_cost}</span></div>
-                <div className="rowsub">{card.type_line}</div>
-                <div className="rowmeta">{card.set_name}{" "}
-                  <button type="button" className="tag badge" title={`Show only cards from ${card.set_name}`}
-                    onClick={(event) => { event.stopPropagation(); store.setFilters({ set: card.set_code }); }}>{card.set_code.toUpperCase()}</button>{" "}
-                  {card.collector_number}{" "}
-                  <button type="button" className={`tag rar ${card.rarity}`} title={`Show only ${card.rarity} cards`}
-                    onClick={(event) => { event.stopPropagation(); store.setFilters({ rarity: card.rarity }); }}>{capitalize(card.rarity)}</button>
-                  {card.flavor_name && <span className="copylbl"> Also printed as {card.flavor_name}</span>}
-                </div>
-              </div>
-              <span className="price">{money(anyPrice(pricesOf(card), store.prefs.currency), store.prefs.currency)}</span>
-              <div className="rowact">
-                <button type="button" className="btn small" title="Add to collection (Enter)" onClick={(event) => { event.stopPropagation(); void store.addToCollection(card.id, card.name); }}>+ Collection</button>
-                <button type="button" className="btn small" title="Add to wishlist (W)" onClick={(event) => {
-                  event.stopPropagation();
-                  void store.addToWishlist([{ cardId: card.id, foil: store.prefs.foil ? 1 : 0, condition: "NM", language: "en", proxy: false, quantity: 1 }], card.name);
-                }}>+ Wishlist</button>
-                {deck && <button type="button" className="btn small" title="Add to deck (Shift+Enter)" onClick={(event) => { event.stopPropagation(); void store.addToDeck(card.id, card.name); }}>+ Deck</button>}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+        empty={<>
+          <b>{catalogEmpty ? "The card database is empty" : anyFilter ? "No matching cards" : "No cards found"}</b>
+          {catalogEmpty && <button type="button" className="btn primary" onClick={actions.updateCatalog?.run} disabled={actions.updateCatalog?.disabled}>Update card database</button>}
+        </>}
+      />
     </div>
   );
 }

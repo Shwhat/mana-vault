@@ -23,7 +23,12 @@ export function Picker({ id, label, value, options, onChange, className, prefix,
       <button ref={button} id={id} type="button" className={`picker${className ? ` ${className}` : ""}`} aria-haspopup="listbox" aria-expanded={open}
         aria-label={`${label}: ${current?.label ?? "none"}`} title={title} disabled={disabled} data-value={value}
         onClick={(event) => { event.stopPropagation(); setOpen(!open); }}
-        onKeyDown={(event) => { if (event.key === "ArrowDown" || event.key === "ArrowUp") { event.preventDefault(); setOpen(true); } }}>
+        onKeyDown={(event) => {
+          if (event.key === "ArrowDown" || event.key === "ArrowUp") { event.preventDefault(); setOpen(true); }
+          // in a dialog, Enter confirms it, as from any other field
+          const form = event.currentTarget.closest("form");
+          if (event.key === "Enter" && form) { event.preventDefault(); form.requestSubmit(); }
+        }}>
         <span className="pkval">{prefix}{current?.label ?? ""}</span><span className="pkcaret" aria-hidden="true">▾</span>
       </button>
       {open && <PickerList label={label} value={value} options={options} anchor={button.current}

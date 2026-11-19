@@ -47,7 +47,7 @@ At the top right of the camera:
 | Control | What it does |
 |---|---|
 | **Scanned list** (phone, with the number of cards scanned) | Opens the scanned list sheet |
-| **Torch** | Turns the camera light on or off. Dimmed when the camera has no light (most computer cameras) |
+| **Torch** | Turns the camera light on or off. The scanner opens a back camera that has a light when there is one, and remembers it; in the Android app, when the camera itself cannot switch its light, the phone's own light control is used. On a camera without a light (most computer cameras) the scanner shows "This camera has no light" |
 | **Scanner settings** | Opens the scanner settings. A number on it shows the active filters (each set, and Ignore promos) |
 | Set chips with a lock (for example **LEA**) | One for each set in the set filter. Tapping one opens the scanner settings |
 | PROXY | Shown while Mark as proxy is on |

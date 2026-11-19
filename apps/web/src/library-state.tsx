@@ -5,7 +5,7 @@ import { confirmDialog } from "./components/Dialog";
 import type { Prefs } from "./prefs";
 import {
   type Collection, type CollectionEntry, type CollectionKind, type CompletionReport, type CompletionRule, type CopyExtras, type CopyKey, copyKey, copyLabel,
-  type Currency, type DeckDetail, type FinishCode, type FinishRule, type Offer, type Ownership, type Person, sameCopy,
+  ALL_COLLECTIONS, type Currency, type DeckDetail, type FinishCode, type FinishRule, type Offer, type Ownership, type Person, sameCopy,
 } from "./types";
 
 export type Counts = Array<CopyKey & { quantity: number; trade?: number; purchasePrice?: number | null; priceCurrency?: string | null; addedAt?: string | null;
@@ -46,8 +46,19 @@ export type LibraryDeps = {
   visibleCollection: CollectionEntry[];
 };
 
-export const entryKey = (entry: Pick<CollectionEntry, "id" | "foil" | "condition" | "language" | "proxy">) =>
-  `${entry.id}:${entry.foil}:${entry.condition}:${entry.language}${entry.proxy ? ":p" : ""}`;
+export const entryKey = (entry: Pick<CollectionEntry, "id" | "foil" | "condition" | "language" | "proxy" | "collection_id">) =>
+  `${entry.collection_id ? `${entry.collection_id}/` : ""}${entry.id}:${entry.foil}:${entry.condition}:${entry.language}${entry.proxy ? ":p" : ""}`;
+
+/** Rows grouped by the collection they belong to: their own in All collections, otherwise the open one. */
+export function byCollection(entries: CollectionEntry[], open: string | null): Map<string, CollectionEntry[]> {
+  const groups = new Map<string, CollectionEntry[]>();
+  for (const entry of entries) {
+    const id = entry.collection_id ?? open;
+    if (!id || id === ALL_COLLECTIONS) continue;
+    groups.set(id, [...(groups.get(id) ?? []), entry]);
+  }
+  return groups;
+}
 const sameKey = sameCopy;
 
 export function useLibraryState(deps: LibraryDeps) {
@@ -156,20 +167,23 @@ export function useLibraryState(deps: LibraryDeps) {
   }, [live]);
 
   const removePicked = useCallback(async () => {
-    const target = live.current.prefs.openCollection;
     const entries = pickedEntries();
-    if (!target || !entries.length) return flash("Pick one or more rows first", "err");
+    const groups = byCollection(entries, live.current.prefs.openCollection);
+    if (!groups.size || !entries.length) return flash("Pick one or more rows first", "err");
     const cards = entries.reduce((sum, entry) => sum + entry.quantity, 0);
-    const name = collectionName(target);
+    const name = groups.size === 1 ? collectionName([...groups.keys()][0]!) : `${groups.size} collections`;
     const label = entries.length === 1 ? copyLabel(entries[0]!) : "";
     const what = entries.length === 1 ? `${entries[0]!.name}${label ? ` (${label.toLowerCase()})` : ""} (${cards} ${cards === 1 ? "card" : "cards"})` : `${entries.length} entries (${cards} cards)`;
     const ok = await confirmDialog("Remove cards", <>Remove {what} from {name}?</>, "Remove");
     if (!ok) return;
-    const before: Counts = entries.map((entry) => ({ ...copyKey(entry), quantity: entry.quantity, trade: entry.trade }));
-    const after: Counts = before.map((item) => ({ ...item, quantity: 0 }));
+    const steps = [...groups].map(([target, rows]) => {
+      const before: Counts = rows.map((entry) => ({ ...copyKey(entry), quantity: entry.quantity, trade: entry.trade }));
+      return { target, before, after: before.map((item) => ({ ...item, quantity: 0 })) };
+    });
+    const run = async (which: "before" | "after") => { for (const step of steps) await setCounts(step.target, step[which]); };
     try {
-      await setCounts(target, after);
-      pushUndo({ label: `Remove ${entries.length === 1 ? entries[0]!.name : `${entries.length} entries`}`, undo: () => setCounts(target, before), redo: () => setCounts(target, after) });
+      await run("after");
+      pushUndo({ label: `Remove ${entries.length === 1 ? entries[0]!.name : `${entries.length} entries`}`, undo: () => run("before"), redo: () => run("after") });
       depsRef.current.setChecked(new Set());
       flash(`Removed ${what} from ${name}`);
       await refreshAfterChange();
@@ -180,16 +194,26 @@ export function useLibraryState(deps: LibraryDeps) {
 
   /** Moves copies to another collection. Without counts, every copy of each entry moves. */
   const moveEntries = useCallback(async (entries: CollectionEntry[], to: string, counts?: Map<string, number>) => {
-    const from = live.current.prefs.openCollection;
-    if (!from || !entries.length) return;
-    const items: Counts = entries.map((entry) => ({ ...copyKey(entry), quantity: counts?.get(entryKey(entry)) ?? entry.quantity }));
+    const groups = byCollection(entries, live.current.prefs.openCollection);
+    groups.delete(to);
+    if (!groups.size) return flash("Those cards are already there", "err");
     try {
-      const { moved } = await request<{ moved: Counts }>(`/api/collections/${encodeURIComponent(from)}/move`, { method: "POST", body: JSON.stringify({ to, items }) });
-      if (!moved.length) return flash("Nothing was moved", "err");
-      const back = (source: string, target: string) => request(`/api/collections/${encodeURIComponent(source)}/move`, { method: "POST", body: JSON.stringify({ to: target, items: moved }) }).then(() => undefined);
-      const cards = moved.reduce((sum, item) => sum + item.quantity, 0);
+      const steps: Array<{ from: string; moved: Counts }> = [];
+      for (const [from, rows] of groups) {
+        const items: Counts = rows.map((entry) => ({ ...copyKey(entry), quantity: counts?.get(entryKey(entry)) ?? entry.quantity }));
+        const { moved } = await request<{ moved: Counts }>(`/api/collections/${encodeURIComponent(from)}/move`, { method: "POST", body: JSON.stringify({ to, items }) });
+        if (moved.length) steps.push({ from, moved });
+      }
+      if (!steps.length) return flash("Nothing was moved", "err");
+      const shift = async (back: boolean) => {
+        for (const step of steps) {
+          const [source, target] = back ? [to, step.from] : [step.from, to];
+          await request(`/api/collections/${encodeURIComponent(source)}/move`, { method: "POST", body: JSON.stringify({ to: target, items: step.moved }) });
+        }
+      };
+      const cards = steps.flatMap((step) => step.moved).reduce((sum, item) => sum + item.quantity, 0);
       const label = entries.length === 1 ? `Move ${entries[0]!.name}` : `Move ${entries.length} entries`;
-      pushUndo({ label, undo: () => back(to, from), redo: () => back(from, to) });
+      pushUndo({ label, undo: () => shift(true), redo: () => shift(false) });
       depsRef.current.setChecked(new Set());
       flash(`Moved ${cards} ${cards === 1 ? "card" : "cards"} to ${collectionName(to)}`);
       await refreshAfterChange();
@@ -201,8 +225,8 @@ export function useLibraryState(deps: LibraryDeps) {
   // ---------- copy details and trade marks ----------
   /** Changes a copy's finish, condition, language or trade count. Copies that end up alike are merged into one row. */
   const editCopy = useCallback(async (entry: CollectionEntry, change: CopyChange) => {
-    const target = live.current.prefs.openCollection;
-    if (!target) return;
+    const target = entry.collection_id ?? live.current.prefs.openCollection;
+    if (!target || target === ALL_COLLECTIONS) return;
     const from = copyKey(entry);
     const to: CopyKey = { cardId: entry.id, foil: change.foil, condition: change.condition, language: change.language, proxy: change.proxy };
     const oldExtras = extrasFor(entry);
@@ -215,7 +239,7 @@ export function useLibraryState(deps: LibraryDeps) {
       before = [{ ...from, quantity: entry.quantity, trade: entry.trade, ...oldExtras }];
       after = [{ ...from, quantity: entry.quantity, trade: change.trade, ...newExtras }];
     } else {
-      const existing = (live.current.collection ?? []).find((item) => sameKey(copyKey(item), to));
+      const existing = (live.current.collection ?? []).find((item) => item.collection_id === entry.collection_id && sameKey(copyKey(item), to));
       const quantity = Math.min(10_000, entry.quantity + (existing?.quantity ?? 0));
       before = [{ ...from, quantity: entry.quantity, trade: entry.trade, ...oldExtras }, { ...to, quantity: existing?.quantity ?? 0, trade: existing?.trade ?? 0 }];
       after = [{ ...from, quantity: 0 }, { ...to, quantity, trade: Math.min(quantity, change.trade + (existing?.trade ?? 0)), ...(existing ? {} : newExtras) }];
@@ -233,15 +257,19 @@ export function useLibraryState(deps: LibraryDeps) {
 
   /** Marks every copy of the given rows for trade, or clears their marks. */
   const markTrade = useCallback(async (entries: CollectionEntry[], on: boolean) => {
-    const target = live.current.prefs.openCollection;
     const changed = entries.filter((entry) => !entry.proxy && (on ? entry.trade < entry.quantity : entry.trade > 0));
-    if (!target || !changed.length) return flash(on ? "Those copies are already for trade" : "None of those copies are for trade", "err");
-    const before: Counts = changed.map((entry) => ({ ...copyKey(entry), quantity: entry.quantity, trade: entry.trade }));
-    const after: Counts = changed.map((entry) => ({ ...copyKey(entry), quantity: entry.quantity, trade: on ? entry.quantity : 0 }));
+    const groups = byCollection(changed, live.current.prefs.openCollection);
+    if (!groups.size) return flash(on ? "Those copies are already for trade" : "None of those copies are for trade", "err");
+    const steps = [...groups].map(([target, rows]) => ({
+      target,
+      before: rows.map((entry) => ({ ...copyKey(entry), quantity: entry.quantity, trade: entry.trade })) as Counts,
+      after: rows.map((entry) => ({ ...copyKey(entry), quantity: entry.quantity, trade: on ? entry.quantity : 0 })) as Counts,
+    }));
+    const run = async (which: "before" | "after") => { for (const step of steps) await setCounts(step.target, step[which]); };
     const what = changed.length === 1 ? changed[0]!.name : `${changed.length} entries`;
     try {
-      await setCounts(target, after);
-      pushUndo({ label: on ? `Mark ${what} for trade` : `Unmark ${what} for trade`, undo: () => setCounts(target, before), redo: () => setCounts(target, after) });
+      await run("after");
+      pushUndo({ label: on ? `Mark ${what} for trade` : `Unmark ${what} for trade`, undo: () => run("before"), redo: () => run("after") });
       flash(on ? `${what} marked for trade` : `${what} no longer for trade`);
       await refreshAfterChange();
     } catch (reason) {
@@ -280,7 +308,7 @@ export function useLibraryState(deps: LibraryDeps) {
 
   const addMissingToWishlist = useCallback(async () => {
     const id = live.current.prefs.openCollection;
-    if (!id) return flash("Create a collection first", "err");
+    if (!id || id === ALL_COLLECTIONS) return flash("Open a collection linked to a set first", "err");
     try {
       const report = await request<CompletionReport>(`/api/collections/${encodeURIComponent(id)}/completion`);
       if (!report.missing.length) return flash(`Nothing is missing from ${collectionName(id)}`, "err");
@@ -335,7 +363,7 @@ export function useLibraryState(deps: LibraryDeps) {
   // ---------- missing list exports ----------
   const exportMissing = useCallback(async (format: "text" | "csv") => {
     const id = live.current.prefs.openCollection;
-    if (!id) return flash("Create a collection first", "err");
+    if (!id || id === ALL_COLLECTIONS) return flash("Open a collection linked to a set first", "err");
     let report: CompletionReport;
     try {
       report = await request<CompletionReport>(`/api/collections/${encodeURIComponent(id)}/completion`);

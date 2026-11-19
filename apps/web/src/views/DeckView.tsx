@@ -15,7 +15,12 @@ import {
   formatName, money, ZONES, type Zone,
 } from "../types";
 import { StatsPanel } from "./StatsView";
-import { NoDeck, OwnershipTab, Quantity, Thumb } from "./Views";
+import { NoDeck, OwnershipTab, Quantity, SearchOptions, Thumb } from "./Views";
+import type { CardSearch, FoundCard } from "../card-search";
+import { CardResults, countLine, useViewSearch } from "../components/CardResults";
+import { OptionsButton, Segments } from "../components/Options";
+import { choices, type Choice, Picker } from "../components/Picker";
+import { filterCount, matchesFilters } from "../filters";
 
 type Hover = { url: string; x: number; y: number } | null;
 type HoverProps = { onHover?: (url: string | null, event?: ReactMouseEvent) => void };
@@ -23,6 +28,7 @@ type HoverProps = { onHover?: (url: string | null, event?: ReactMouseEvent) => v
 const GROUPS: Array<[DeckGroup, string]> = [["type", "Type"], ["mana", "Mana value"], ["color", "Color"], ["rarity", "Rarity"], ["tag", "Tag"], ["none", "None"]];
 const SORTS: Array<[DeckSort, string]> = [["name", "Name"], ["mana", "Mana value"], ["price", "Price"]];
 const VIEWS: Array<[DeckViewKind, string]> = [["list", "List"], ["text", "Text"], ["stacks", "Stacks"], ["grid", "Grid"]];
+const ZONE_CHOICES: Choice[] = ZONES.map((zone) => ({ value: zone.id, label: zone.label }));
 
 /** The commands for one deck card: right-click on the desktop, a long press on a phone. */
 function cardMenu(store: Store, card: DeckCard) {
@@ -101,11 +107,10 @@ function ListRow({ card, flag, onHover }: { card: DeckCard; flag?: string } & Ho
           onClick={(event) => { event.stopPropagation(); void linkDialog(store, card); }}><Icon name="link" /></button>
       )}
       <Quantity value={card.quantity} name={card.name} max={100} onChange={(quantity) => void store.setDeckQuantity(card, quantity)} />
-      <select className="zonesel" aria-label={`Move ${card.name} to zone`} value={card.zone}
-        onClick={(event) => event.stopPropagation()}
-        onChange={(event) => void store.moveDeckCard(card, event.target.value as Zone)}>
-        {ZONES.map((zone) => <option key={zone.id} value={zone.id}>{zone.label}</option>)}
-      </select>
+      <span onClick={(event) => event.stopPropagation()}>
+        <Picker className="zonesel" label={`Move ${card.name} to zone`} value={card.zone}
+          onChange={(value) => void store.moveDeckCard(card, value as Zone)} options={ZONE_CHOICES} />
+      </span>
       <button type="button" className="btn small icon-only" title={`Remove ${card.name}`} aria-label={`Remove ${card.name} from deck`}
         onClick={(event) => { event.stopPropagation(); void store.setDeckQuantity(card, 0); }}><Icon name="del" /></button>
     </div>
@@ -223,9 +228,7 @@ function QuickAdd() {
       <input id="quickadd" list="quicknames" value={text} onChange={(event) => setText(event.target.value)} placeholder="Add a card: 2 Sol Ring" aria-label="Quick add"
         autoComplete="off" />
       <datalist id="quicknames">{names.map((name) => <option key={name} value={count ? `${count} ${name}` : name} />)}</datalist>
-      <select aria-label="Add to zone" value={zone} onChange={(event) => store.setPrefs({ zone: event.target.value as Zone })}>
-        {ZONES.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
-      </select>
+      <Picker id="quickzone" label="Add to zone" value={zone} onChange={(value) => store.setPrefs({ zone: value as Zone })} options={ZONE_CHOICES} />
       <button type="submit" className="btn small primary" disabled={busy || !text.trim()}>Add</button>
     </form>
   );
@@ -285,29 +288,33 @@ function Tokens() {
   );
 }
 
-function CardsTab({ actions, legality }: { actions: Record<string, Action>; legality: Legality }) {
+/** View, group, sort and Edit as text for the Cards tab, with a count of active filters. */
+function DeckOptions({ actions }: { actions: Record<string, Action> }) {
+  const store = useApp();
+  const { deckView: view, deckGroup, deckSort } = store.prefs;
+  return (
+    <OptionsButton title="Deck options" count={filterCount(store.filterSets.deck, true)}>
+      <div className="prow"><label>View</label><Segments label="Show cards as" value={view} options={VIEWS} onChange={(deckView) => store.setPrefs({ deckView })} /></div>
+      <div className="prow"><label htmlFor="deck-group">Group</label>
+        <Picker id="deck-group" label="Group by" value={deckGroup} onChange={(value) => store.setPrefs({ deckGroup: value as DeckGroup })} options={choices(GROUPS)} /></div>
+      <div className="prow"><label htmlFor="deck-sort">Sort</label>
+        <Picker id="deck-sort" label="Sort by" value={deckSort} onChange={(value) => store.setPrefs({ deckSort: value as DeckSort })} options={choices(SORTS)} /></div>
+      {filterCount(store.filterSets.deck, true) > 0 && (
+        <div className="prow"><label>Filters</label><button type="button" className="btn small" onClick={() => store.clearFilters("deck")}>Clear filters</button></div>
+      )}
+      <div className="btnrow"><button type="button" className="btn small" onClick={actions["deck.editText"]?.run}>Edit as text...</button></div>
+    </OptionsButton>
+  );
+}
+
+/** The deck's cards, by zone, filtered by the deck's filter box and Filters panel. */
+function CardsTab({ actions, legality, cards }: { actions: Record<string, Action>; legality: Legality; cards: DeckCard[] }) {
   const store = useApp();
   const deck = store.deck!;
   const [hover, setHover] = useState<Hover>(null);
   const onHover = store.phone ? undefined : (url: string | null, event?: ReactMouseEvent) => setHover(url && event ? { url, x: event.clientX, y: event.clientY } : null);
-  const { deckView: view, deckGroup, deckSort } = store.prefs;
   return (
     <>
-      <div className="deckbar">
-        <QuickAdd />
-        <div className="seg" role="group" aria-label="Show cards as">
-          {VIEWS.map(([value, label]) => (
-            <button key={value} type="button" className={view === value ? "on" : ""} aria-pressed={view === value} onClick={() => store.setPrefs({ deckView: value })}>{label}</button>
-          ))}
-        </div>
-        <select aria-label="Group by" value={deckGroup} onChange={(event) => store.setPrefs({ deckGroup: event.target.value as DeckGroup })}>
-          {GROUPS.map(([value, label]) => <option key={value} value={value}>Group: {label}</option>)}
-        </select>
-        <select aria-label="Sort by" value={deckSort} onChange={(event) => store.setPrefs({ deckSort: event.target.value as DeckSort })}>
-          {SORTS.map(([value, label]) => <option key={value} value={value}>Sort: {label}</option>)}
-        </select>
-        <button type="button" className="btn small" onClick={actions["deck.editText"]?.run}>Edit as text...</button>
-      </div>
       <LegalityBar legality={legality} format={deck.format} />
       <div className="list deckbody" role="listbox" aria-label="Deck cards" onScroll={() => setHover(null)}>
         {deck.cards.length === 0 && (
@@ -315,21 +322,66 @@ function CardsTab({ actions, legality }: { actions: Record<string, Action>; lega
             <Icon name="deck" />
             <b>This deck is empty</b>
             <span className="btnrow">
-              <button type="button" className="btn primary" onClick={() => store.setView("cards")}>Search cards</button>
+              <button type="button" className="btn primary" onClick={() => store.setDeckTab("add")}>Add cards</button>
               <button type="button" className="btn" onClick={actions.importDeck?.run}>Import decklist...</button>
             </span>
           </div>
         )}
+        {deck.cards.length > 0 && cards.length === 0 && <div className="emptynote">No deck cards match the filters</div>}
         {ZONE_ORDER.map((zone) => {
-          const cards = deck.cards.filter((card) => card.zone === zone);
-          return cards.length ? <Board key={zone} zone={zone} cards={cards} legality={legality} onHover={onHover} /> : null;
+          const inZone = cards.filter((card) => card.zone === zone);
+          return inZone.length ? <Board key={zone} zone={zone} cards={inZone} legality={legality} onHover={onHover} /> : null;
         })}
-        <Tokens />
+        {cards.length === deck.cards.length && <Tokens />}
       </div>
       {hover && (
         <img className="hoverpreview" src={hover.url} alt="" aria-hidden="true"
           style={{ left: hover.x + 260 + 24 > window.innerWidth ? hover.x - 284 : hover.x + 24, top: Math.max(8, Math.min(hover.y - 120, window.innerHeight - 372)) }} />
       )}
+    </>
+  );
+}
+
+const ADD_BUTTONS: Array<[Zone, string]> = [["main", "Main"], ["sideboard", "Side"], ["maybeboard", "Maybe"], ["commander", "Commander"]];
+
+/** The Add tab: Quick add, Edit as text and a full card search; each result adds to Main, Side, Maybe or Commander. */
+function AddTab({ actions, search }: { actions: Record<string, Action>; search: CardSearch }) {
+  const store = useApp();
+  const deck = store.deck!;
+  const counts = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const card of deck.cards) map.set(`${card.oracle_id}:${card.zone}`, (map.get(`${card.oracle_id}:${card.zone}`) ?? 0) + card.quantity);
+    return map;
+  }, [deck.cards]);
+  const inDeck = (card: FoundCard, zone: Zone) => counts.get(`${card.oracle_id ?? ""}:${zone}`) ?? 0;
+  const add = (card: FoundCard, zone: Zone) => void store.addToDeck(card.id, card.name, undefined, { zone });
+  return (
+    <>
+      <div className="deckbar">
+        <QuickAdd />
+        <button type="button" className="btn small" onClick={actions["deck.editText"]?.run}>Edit as text...</button>
+      </div>
+      <CardResults
+        search={search} layout={store.searchLayout} size={store.prefs.searchSize} label="Cards to add" resetKey={store.filterSets.deckAdd}
+        activeId={store.selection?.view === "cards" ? store.selection.key : null}
+        onPick={(card) => store.select({ view: "cards", key: card.id, printingId: card.id })}
+        onOpen={(card) => add(card, store.prefs.zone)}
+        menu={(card) => [
+          { label: "Card page", run: () => store.setCardPage(card.id) },
+          ...ADD_BUTTONS.map(([zone]) => ({ label: `Add to ${zoneLabel(zone)}`, run: () => add(card, zone) })),
+          { label: "Add to wishlist", run: () => void store.addToWishlist([{ cardId: card.id, foil: 0, condition: "NM", language: "en", proxy: false, quantity: 1 }], card.name) },
+        ]}
+        onTag={(change) => store.setScopeFilters(change, "deckAdd")}
+        buttons={(card) => ADD_BUTTONS.map(([zone, text]) => {
+          const count = inDeck(card, zone);
+          return (
+            <button key={zone} type="button" className={count ? "btn small on" : "btn small"} title={`Add to ${zoneLabel(zone)}${count ? ` (${count} in the deck)` : ""}`}
+              aria-label={`Add ${card.name} to ${zoneLabel(zone)}`}
+              onClick={(event) => { event.stopPropagation(); add(card, zone); }}>+ {text}{count ? <span className="cbadge">{count}</span> : null}</button>
+          );
+        })}
+        empty={<b>No matching cards</b>}
+      />
     </>
   );
 }
@@ -431,12 +483,10 @@ function Description() {
   return (
     <div className="list deckinfo">
       <div className="prow"><label htmlFor="deck-cover">Cover card</label>
-        <select id="deck-cover" value={deck.cover_card_id ?? ""}
-          onChange={(event) => void store.updateDeckInfo({ coverCardId: event.target.value || null }, event.target.value ? "Cover card changed" : "Cover card removed")}>
-          <option value="">The commander</option>
-          {[...new Map(deck.cards.map((card) => [card.card_id, card])).values()].sort((a, b) => a.name.localeCompare(b.name))
-            .map((card) => <option key={card.card_id} value={card.card_id}>{card.name} ({card.set_code.toUpperCase()})</option>)}
-        </select></div>
+        <Picker id="deck-cover" label="Cover card" value={deck.cover_card_id ?? ""}
+          onChange={(value) => void store.updateDeckInfo({ coverCardId: value || null }, value ? "Cover card changed" : "Cover card removed")}
+          options={[{ value: "", label: "The commander" }, ...[...new Map(deck.cards.map((card) => [card.card_id, card])).values()].sort((a, b) => a.name.localeCompare(b.name))
+            .map((card) => ({ value: card.card_id, label: card.name, detail: card.set_code.toUpperCase() }))]} /></div>
       {(cover?.image_url ?? deck.image_url) && <img className="coverimg" src={cover?.image_url ?? deck.image_url ?? ""} alt="" />}
       <div className="prow"><label>Format</label><span><button type="button" className="lnk" onClick={() => formatDialog(store)}>{formatName(deck.format)}</button></span></div>
       <h4>Description</h4>
@@ -488,41 +538,66 @@ export function DeckView({ actions }: { actions: Record<string, Action> }) {
   const store = useApp();
   const { deck } = store;
   const legality = useMemo(() => checkDeck(deck?.format ?? "casual", deck?.cards ?? []), [deck?.format, deck?.cards]);
+  const filters = store.filterSets.deck;
+  const shown = useMemo(() => (deck?.cards ?? []).filter((card) => matchesFilters(card, filters)), [deck?.cards, filters]);
+  const search = useViewSearch(store.filterSets.deckAdd, !!deck && store.deckTab === "add");
   if (!deck) {
     return (
       <div className="view" id="view-deck">
-        <div id="pagetabs"><Switcher kind="deck" actions={actions} /></div>
+        <div id="pagetabs" className="colhead"><Switcher kind="deck" actions={actions} /></div>
         <NoDeck actions={actions} />
       </div>
     );
   }
   const counted = deck.cards.filter((card) => card.zone === "main" || card.zone === "commander").reduce((sum, card) => sum + card.quantity, 0);
-  const tabs: Array<[DeckTab, string]> = [["cards", "Cards"], ["ownership", "Ownership"], ["stats", "Statistics"], ["playtest", "Playtest"], ["description", "Description"], ["history", "History"]];
+  const tabs: Array<[DeckTab, string]> = [["cards", "Cards"], ["add", "Add"], ["ownership", "Ownership"], ["stats", "Statistics"], ["playtest", "Playtest"],
+    ["description", "Description"], ["history", "History"]];
   const currency = store.prefs.currency;
   const errors = legality.problems.filter((item) => item.level === "err").length;
+  const tab = store.deckTab;
+  const filtered = tab === "cards" && shown.length < deck.cards.length;
   return (
     <div className="view" id="view-deck">
-      <div id="pagetabs" className="deckhead">
+      <div id="pagetabs" className="colhead deckhead">
         <Switcher kind="deck" actions={actions} />
-        <button type="button" className={legality.checked ? (errors ? "badge illegal fmt" : "badge own fmt") : "badge fmt"}
-          title={legality.checked ? (errors ? `${errors} legality problems` : `Legal in ${formatName(deck.format)}`) : "Casual decks are not checked"}
-          onClick={() => formatDialog(store)}>{formatName(deck.format)}</button>
-        {deck.role === "member" && <span className="badge">Shared by {deck.owner?.name}</span>}
-        {deck.role === "owner" && (deck.sharedWith?.length ?? 0) > 0 && <span className="badge">Shared with {deck.sharedWith!.map((person) => person.name).join(", ")}</span>}
-        <div className="seg" role="tablist" aria-label="Deck view">
+        <div className="seg tabscroll" role="tablist" aria-label="Deck view">
           {tabs.map(([id, label]) => (
-            <button key={id} type="button" role="tab" aria-selected={store.deckTab === id} className={store.deckTab === id ? "on" : ""} onClick={() => store.setDeckTab(id)}>{label}</button>
+            <button key={id} type="button" role="tab" aria-selected={tab === id} className={tab === id ? "on" : ""} onClick={() => store.setDeckTab(id)}>{label}</button>
           ))}
         </div>
-        <span className="phpos">{counted} cards{store.deckStats ? `, ${money(store.deckStats.value, currency)}` : ""}
-          {store.ownership && store.ownership.needed > 0 ? `, ${store.ownership.owned} owned` : ""}</span>
+        {deck.role === "member" && <span className="badge">Shared by {deck.owner?.name}</span>}
+        {deck.role === "owner" && (deck.sharedWith?.length ?? 0) > 0 && <span className="badge">Shared with {deck.sharedWith!.map((person) => person.name).join(", ")}</span>}
+        {tab === "cards" && (
+          <label className="searchbox">
+            <Icon name="find" className="nicon" />
+            <input value={filters.query} onChange={(event) => store.setScopeFilters({ query: event.target.value }, "deck")} placeholder="Filter deck cards" aria-label="Filter deck cards" />
+          </label>
+        )}
+        {tab === "add" && (
+          <label className="searchbox">
+            <Icon name="find" className="nicon" />
+            <input value={store.filterSets.deckAdd.query} onChange={(event) => store.setScopeFilters({ query: event.target.value }, "deckAdd")}
+              placeholder="Search cards to add" aria-label="Search cards to add" />
+          </label>
+        )}
+        {tab === "cards" && <DeckOptions actions={actions} />}
+        {tab === "add" && <SearchOptions />}
+        <span className="phpos">
+          <button type="button" className={legality.checked ? (errors ? "badge illegal fmt" : "badge own fmt") : "badge fmt"}
+            title={legality.checked ? (errors ? `${errors} legality problems` : `Legal in ${formatName(deck.format)}`) : "Casual decks are not checked"}
+            onClick={() => formatDialog(store)}>{formatName(deck.format)}</button>{" "}
+          {tab === "add" ? countLine(search) : <>{counted} cards{store.deckStats ? `, ${money(store.deckStats.value, currency)}` : ""}
+            {store.ownership && store.ownership.needed > 0 ? `, ${store.ownership.owned} owned` : ""}
+            {filtered ? `, showing ${shown.reduce((sum, card) => sum + card.quantity, 0)}` : ""}</>}
+        </span>
       </div>
-      {store.deckTab === "cards" && <CardsTab actions={actions} legality={legality} />}
-      {store.deckTab === "ownership" && <OwnershipTab actions={actions} />}
-      {store.deckTab === "stats" && <StatsPanel stats={store.deckStats} kind="deck" extra={<ManaBalance cards={deck.cards} />} />}
-      {store.deckTab === "playtest" && <Playtest />}
-      {store.deckTab === "description" && <Description />}
-      {store.deckTab === "history" && <History />}
+      {tab === "cards" && <CardsTab actions={actions} legality={legality} cards={shown} />}
+      {tab === "add" && <AddTab actions={actions} search={search} />}
+      {tab === "ownership" && <OwnershipTab actions={actions} />}
+      {tab === "stats" && <StatsPanel stats={store.deckStats} kind="deck" extra={<ManaBalance cards={deck.cards} />} />}
+      {tab === "playtest" && <Playtest />}
+      {tab === "description" && <Description />}
+      {tab === "history" && <History />}
     </div>
   );
 }

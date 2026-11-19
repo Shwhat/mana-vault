@@ -7,11 +7,12 @@ import { Icon } from "../icons";
 import { entryKey } from "../library-state";
 import { type Store, useApp } from "../store";
 import {
-  capitalize, COLOR_NAMES, COMPLETION_RULES, conditionName, copyLabel, copyPrice, FINISH_RULES, FINISHES, type Collection, type CollectionEntry,
-  type CollectionLayout, type CollectionSort, type GridSize,
+  ALL_COLLECTIONS, capitalize, COLOR_NAMES, COMPLETION_RULES, conditionName, copyLabel, copyPrice, FINISH_RULES, FINISHES, type Collection, type CollectionEntry,
+  type CollectionSort, type GridSize,
   type CollectionTab, type Facets, languageName, money,
 } from "../types";
 import { choices, Picker } from "../components/Picker";
+import { LayoutRows, OptionsButton } from "../components/Options";
 import { Switcher } from "../components/Switcher";
 import { StatsPanel } from "./StatsView";
 import { Quantity, Thumb } from "./Views";
@@ -47,7 +48,7 @@ function Tags({ entry }: { entry: CollectionEntry }) {
   );
   const label = copyLabel(entry);
   return (
-    <div className="rowmeta">{entry.set_name} {tag({ set: entry.set_code }, entry.set_code.toUpperCase(), "badge", `Show only cards from ${entry.set_name}`)} {entry.collector_number}{" "}
+    <div className="rowmeta">{entry.collection_name && <span className="badge where" title={`In ${entry.collection_name}`}>{entry.collection_name}</span>} {entry.set_name} {tag({ set: entry.set_code }, entry.set_code.toUpperCase(), "badge", `Show only cards from ${entry.set_name}`)} {entry.collector_number}{" "}
       {tag({ rarity: entry.rarity }, capitalize(entry.rarity), `rar ${entry.rarity}`, `Show only ${entry.rarity} cards`)}
       {label && <span className="copylbl" title={[conditionName(entry.condition), languageName(entry.language)].join(", ")}> {label}</span>}
       {(entry.decks ?? []).length > 0 && (
@@ -91,7 +92,7 @@ export function Meter({ owned, total, label }: { owned: number; total: number; l
 function CollectionHeader({ current, actions }: { current: Collection; actions: Record<string, Action> }) {
   const store = useApp();
   // a collection without a completion rule tracks no completion
-  const tabs: Array<[CollectionTab, string]> = current.completion === "none"
+  const tabs: Array<[CollectionTab, string]> = store.allCollections ? [["cards", "Cards"]] : current.completion === "none"
     ? [["cards", "Cards"], ["stats", "Statistics"]]
     : [["cards", "Cards"], ["completion", "Completion"], ["missing", "Missing"], ["stats", "Statistics"]];
   const currency = store.prefs.currency;
@@ -119,9 +120,9 @@ function CollectionHeader({ current, actions }: { current: Collection; actions: 
           <input value={store.collectionFilter} onChange={(event) => store.setCollectionFilter(event.target.value)} placeholder="Filter by card or set name" aria-label="Filter collection" />
         </label>
       )}
-      {store.collectionTab === "cards" && <OptionsButton />}
-      <button type="button" className="btn small addbtn" title={isTarget ? `Search for cards to add to ${current.name}` : `Add new cards to ${current.name}, then search for them`}
-        onClick={() => { if (!isTarget) store.setTargetCollection(current.id); actions.find?.run(); }}>+ Add</button>
+      {store.collectionTab === "cards" && <CollectionOptions />}
+      {!store.allCollections && <button type="button" className="btn small addbtn" title={isTarget ? `Search for cards to add to ${current.name}` : `Add new cards to ${current.name}, then search for them`}
+        onClick={() => { if (!isTarget) store.setTargetCollection(current.id); actions.find?.run(); }}>+ Add</button>}
       <span className="phpos" title={unpriced ? `${unpriced} cards have no price` : undefined}>
         {current.cardCount.toLocaleString()} cards ({rows.toLocaleString()} unique), {current.kind === "wishlist" ? "wanted " : ""}{money(current.value[currency], currency)}
         {filtered ? `, showing ${shownRows.toLocaleString()} of ${rows.toLocaleString()}` : ""}
@@ -130,68 +131,26 @@ function CollectionHeader({ current, actions }: { current: Collection; actions: 
   );
 }
 
-/** Sort, layout, card size, For trade only, In decks or not and Select, behind one button with a count of active filters. */
-function OptionsButton() {
+/** Sort, layout, card size, For trade only, In decks or not, wishlists in All collections and Select, behind one button with a count of active filters. */
+function CollectionOptions() {
   const store = useApp();
-  const [open, setOpen] = useState(false);
-  const box = useRef<HTMLDivElement>(null);
-  const button = useRef<HTMLButtonElement>(null);
   const active = (store.facets.trade ? 1 : 0) + (store.facets.inDeck ? 1 : 0);
-  const layout = store.layout;
-  useEffect(() => {
-    if (!open) return;
-    const close = (event: Event) => {
-      if (event.target instanceof Node && (box.current?.contains(event.target) || button.current?.contains(event.target))) return;
-      setOpen(false);
-    };
-    const key = (event: KeyboardEvent) => { if (event.key === "Escape") setOpen(false); };
-    window.addEventListener("mousedown", close);
-    window.addEventListener("touchstart", close);
-    window.addEventListener("keydown", key);
-    return () => {
-      window.removeEventListener("mousedown", close);
-      window.removeEventListener("touchstart", close);
-      window.removeEventListener("keydown", key);
-    };
-  }, [open]);
-  const rect = button.current?.getBoundingClientRect();
-  const style = store.phone || !rect ? undefined : { left: Math.max(4, Math.min(rect.left, window.innerWidth - 300)), top: rect.bottom + 2 };
-  const layouts: Array<[CollectionLayout, string]> = [["grid", "Grid"], ["binder", "Binder"], ["list", "List"]];
-  const sizes: Array<[GridSize, string]> = [["s", "Small"], ["m", "Medium"], ["l", "Large"]];
   return (
-    <>
-      <button ref={button} type="button" className={active ? "btn small on" : "btn small"} aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen(!open)}>
-        Options{active ? <span className="cbadge">{active}</span> : null} ▾</button>
-      {open && (
-        <div ref={box} className={store.phone ? "optpop phone" : "optpop"} style={style} role="dialog" aria-label="Collection options">
-          <div className="prow"><label htmlFor="opt-sort">Sort</label>
-            <Picker id="opt-sort" label="Sort" value={store.prefs.collectionSort} onChange={(value) => store.setPrefs({ collectionSort: value as CollectionSort })}
-              options={choices(SORTS)} /></div>
-          <div className="prow"><label>Layout</label>
-            <div className="seg" role="group" aria-label="Collection layout">
-              {layouts.map(([value, label]) => (
-                <button key={value} type="button" className={layout === value ? "on" : ""} aria-pressed={layout === value} onClick={() => store.setCollectionLayout(value)}>{label}</button>
-              ))}
-            </div></div>
-          {layout === "grid" && (
-            <div className="prow"><label>Card size</label>
-              <div className="seg" role="group" aria-label="Card size">
-                {sizes.map(([value, label]) => (
-                  <button key={value} type="button" className={store.prefs.gridSize === value ? "on" : ""} aria-pressed={store.prefs.gridSize === value}
-                    onClick={() => store.setPrefs({ gridSize: value })}>{label}</button>
-                ))}
-              </div></div>
-          )}
-          <div className="prow"><label htmlFor="opt-deck">Decks</label>
-            <Picker id="opt-deck" label="Filter by deck" value={store.facets.inDeck ?? ""} onChange={(value) => store.setFacet({ inDeck: (value || undefined) as Facets["inDeck"] })}
-              options={choices([["", "In decks or not"], ["yes", "In a deck"], ["no", "Not in a deck"]])} /></div>
-          <label className="optcheck"><input type="checkbox" checked={!!store.facets.trade} onChange={() => store.setFacet({ trade: !store.facets.trade })} /> For trade only</label>
-          <label className="optcheck"><input type="checkbox" checked={store.selectMode}
-            onChange={() => { store.setSelectMode(!store.selectMode); if (store.selectMode) store.setChecked(new Set()); }} /> Select several cards</label>
-          <div className="btnrow end"><button type="button" className="btn small" onClick={() => setOpen(false)}>Done</button></div>
-        </div>
+    <OptionsButton title="Collection options" count={active}>
+      <div className="prow"><label htmlFor="opt-sort">Sort</label>
+        <Picker id="opt-sort" label="Sort" value={store.prefs.collectionSort} onChange={(value) => store.setPrefs({ collectionSort: value as CollectionSort })}
+          options={choices(SORTS)} /></div>
+      <LayoutRows name="Collection" layout={store.layout} size={store.prefs.gridSize} onLayout={store.setCollectionLayout} onSize={(gridSize) => store.setPrefs({ gridSize })} />
+      <div className="prow"><label htmlFor="opt-deck">Decks</label>
+        <Picker id="opt-deck" label="Filter by deck" value={store.facets.inDeck ?? ""} onChange={(value) => store.setFacet({ inDeck: (value || undefined) as Facets["inDeck"] })}
+          options={choices([["", "In decks or not"], ["yes", "In a deck"], ["no", "Not in a deck"]])} /></div>
+      <label className="optcheck"><input type="checkbox" checked={!!store.facets.trade} onChange={() => store.setFacet({ trade: !store.facets.trade })} /> For trade only</label>
+      {store.allCollections && (
+        <label className="optcheck"><input type="checkbox" checked={store.prefs.allWishlists} onChange={() => store.setPrefs({ allWishlists: !store.prefs.allWishlists })} /> Include wishlists</label>
       )}
-    </>
+      <label className="optcheck"><input type="checkbox" checked={store.selectMode}
+        onChange={() => { store.setSelectMode(!store.selectMode); if (store.selectMode) store.setChecked(new Set()); }} /> Select several cards</label>
+    </OptionsButton>
   );
 }
 
@@ -234,7 +193,7 @@ function Pocket({ entry }: { entry: CollectionEntry }) {
   const currency = store.prefs.currency;
   return (
     <div data-key={key} role="option" aria-selected={active} className={active ? "pocket active" : "pocket"}
-      title={`${entry.name}, ${entry.set_name} ${entry.collector_number}${label ? `, ${label}` : ""}`}
+      title={`${entry.name}, ${entry.set_name} ${entry.collector_number}${label ? `, ${label}` : ""}${entry.collection_name ? `, in ${entry.collection_name}` : ""}`}
       onClick={(event) => store.pickRow(entry, { ctrl: event.ctrlKey || event.metaKey, shift: event.shiftKey })}
       onDoubleClick={() => copyDialog(store, entry)} {...entryMenu(store, entry)}>
       {entry.image_url ? <img src={entry.image_url} alt={entry.name} loading="lazy" draggable={false} /> : <span className="pocketname">{entry.name}</span>}
@@ -492,9 +451,23 @@ function MissingTab({ current, actions }: { current: Collection; actions: Record
   );
 }
 
+/** All collections as one collection for the header: totals of every collection, wishlists only when chosen in Options. */
+function allCollections(store: Store): Collection | null {
+  const list = store.collections ?? [];
+  if (!list.length) return null;
+  const counted = list.filter((item) => store.prefs.allWishlists || item.kind !== "wishlist");
+  const sum = (pick: (item: Collection) => number) => counted.reduce((total, item) => total + pick(item), 0);
+  return {
+    id: ALL_COLLECTIONS, name: "All collections", realName: "All collections", description: "", completion: "none", finish: "any", kind: "collection", sets: [],
+    entryCount: sum((item) => item.entryCount), cardCount: sum((item) => item.cardCount), tradeCount: sum((item) => item.tradeCount),
+    value: { usd: sum((item) => item.value.usd), eur: sum((item) => item.value.eur), unpricedUsd: sum((item) => item.value.unpricedUsd), unpricedEur: sum((item) => item.value.unpricedEur) },
+    progress: null, role: "owner", owner: { id: store.user.id, name: store.user.name }, displayName: null, sharedWith: [],
+  };
+}
+
 export function CollectionView({ actions }: { actions: Record<string, Action> }) {
   const store = useApp();
-  const current = store.collections?.find((item) => item.id === store.prefs.openCollection) ?? null;
+  const current = store.allCollections ? allCollections(store) : store.collections?.find((item) => item.id === store.prefs.openCollection) ?? null;
   if (store.collections === null) return <div className="view"><div className="emptynote">Loading collections</div></div>;
   if (!current) {
     return (

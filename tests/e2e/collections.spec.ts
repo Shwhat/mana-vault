@@ -1,14 +1,14 @@
 import type { Browser, Page } from "@playwright/test";
-import { menu, signUp, status, test, expect, useWorkspace, switchTo } from "./fixtures";
+import { menu, signUp, status, test, expect, useWorkspace, switchTo, choose } from "./fixtures";
 
 const rows = (page: Page) => page.locator("#view-collection .row");
 
 async function newCollection(page: Page, name: string, sets: string[] = []) {
   await menu(page, "Collection", "New collection...");
   await expect(page.locator("#f-name")).toBeFocused();
-  await expect(page.locator("#f-completion")).toHaveValue("none");
+  await expect(page.locator("#f-completion")).toHaveAttribute("data-value", "none");
   await page.keyboard.type(name);
-  if (sets.length) await page.locator("#f-completion").selectOption("main");
+  if (sets.length) await choose(page, page.locator("#f-completion"), "main");
   for (const set of sets) {
     await page.fill("#set-search", set);
     await page.locator(".setrow", { hasText: set }).first().locator("input").check();
@@ -58,23 +58,23 @@ test("collections link sets, show completion and missing cards", async ({ page }
 
   await page.locator(".seg button", { hasText: "Missing" }).click();
   await expect(page.locator("#view-collection .row")).toHaveCount(6);
-  await page.locator(".filterbar select").nth(1).selectOption("rare");
+  await choose(page, page.locator(".filterbar .picker").nth(1), "rare");
   await expect(page.locator("#view-collection .row")).toHaveCount(1);
   await page.locator("#view-collection .row", { hasText: "Shivan Dragon" }).getByRole("button", { name: "+ Collection" }).click();
   await expect(status(page)).toHaveText("Shivan Dragon added to Alpha binder");
   await expect(page.locator(".filterbar")).toContainText("0 of 5 missing");
 
   await page.getByRole("button", { name: "Export..." }).click();
-  await expect(page.locator("#ex-what")).toHaveValue("missing");
-  await page.locator("#ex-format").selectOption("text");
+  await expect(page.locator("#ex-what")).toHaveAttribute("data-value", "missing");
+  await choose(page, page.locator("#ex-format"), "text");
   const download = page.waitForEvent("download");
   await page.locator("dialog[open]").getByRole("button", { name: "Export", exact: true }).click();
   const file = await download;
   expect(file.suggestedFilename()).toBe("alpha-binder-missing.txt");
 
   await menu(page, "Collection", "Collection settings...");
-  await page.locator("#f-completion").selectOption("all");
-  await page.locator("#f-finish").selectOption("both");
+  await choose(page, page.locator("#f-completion"), "all");
+  await choose(page, page.locator("#f-finish"), "both");
   await page.locator(".dlgbtns .primary").click();
   await page.locator(".seg button", { hasText: "Completion" }).click();
   await expect(page.locator(".rulesline")).toContainText("Every printing (variants and promos too). One of each (regular and foil).");
@@ -108,7 +108,7 @@ test("rows can be picked in bulk, removed, restored and moved", async ({ page })
   await page.keyboard.press("Control+a");
   await expect(page.locator(".pickbar")).toContainText("4 picked");
   await page.locator(".pickbar").getByRole("button", { name: "Move...", exact: true }).click();
-  await expect(page.locator("#f-to")).toHaveValue(/.+/);
+  await expect(page.locator("#f-to")).toHaveAttribute("data-value", /.+/);
   await page.locator(".dlgbtns .primary").click();
   await expect(status(page)).toHaveText("Moved 4 cards to Trade box");
   await expect(rows(page)).toHaveCount(0);
@@ -130,8 +130,8 @@ test("collections and decks can be sent to another account", async ({ page, brow
   await addFromSearch(page, ["Sol Ring"]);
 
   await menu(page, "Collection", "Send collection...");
-  await page.locator("#f-to").selectOption({ label: other.name });
-  await page.locator("#f-mode").selectOption("copy");
+  await choose(page, page.locator("#f-to"), { label: other.name });
+  await choose(page, page.locator("#f-mode"), "copy");
   await page.locator(".dlgbtns .primary").click();
   await expect(status(page)).toHaveText(`Sent to ${other.name}. It is added when they accept it.`);
   await expect(page.locator("dialog[open]")).toHaveCount(0);
@@ -143,8 +143,8 @@ test("collections and decks can be sent to another account", async ({ page, brow
   await page.keyboard.press("Enter");
   await expect(page.locator("#docname")).toHaveText("Deck: Shared deck");
   await menu(page, "Decks", "Send deck...");
-  await page.locator("#f-to").selectOption({ label: other.name });
-  await page.locator("#f-mode").selectOption("share");
+  await choose(page, page.locator("#f-to"), { label: other.name });
+  await choose(page, page.locator("#f-mode"), "share");
   await page.locator(".dlgbtns .primary").click();
 
   await other.page.reload();

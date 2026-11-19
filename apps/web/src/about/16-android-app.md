@@ -40,13 +40,14 @@ A phone that is signed out shows the first-run screen again.
 
 ## Using the app
 
-The app always uses the phone layout described in [Screen layout](/about/screen-layout): the Home, Search, Collection, Decks and Scan tabs, the Menu at the top right, card pages, sheets and large touch targets. A long press on a card opens its menu.
+The app always uses the phone layout described in [Screen layout](/about/screen-layout): the Home, Search, Collection, Decks, Trade and Scan tabs, the Menu at the top right, card pages, sheets and large touch targets. A long press on a card opens its menu.
 
 | Phone feature | What it does |
 |---|---|
 | Back button | Closes the open window, then the open sheet, menu, printing picker or scanner settings, then the card page, then leaves the scanner or the About guide, then returns to Home. On Home it puts the app in the background |
 | Exports and backups | Open the Android share sheet, to save the file to the phone or send it to another app |
 | Imports and restores | Use the Android file picker |
+| Trades | Work online only: trades are saved on the server |
 | Card images | Load from Scryfall and are kept by the phone as they are viewed |
 
 ## Without a connection
@@ -110,6 +111,7 @@ The scanner works as described in [Scanning cards](/about/scanning-cards), with 
 - The phone's own text recognition reads the card, instead of the recognition files the browser loads. It reads English text and needs no download.
 - Without a connection, cards are matched against the card list on the phone with the same rules as the server: set code and collector number first, then the card name.
 - The camera asks for permission the first time the scanner opens.
+- **Torch** uses the camera's own light when it can switch it; otherwise the app switches the phone's light directly. When the phone has no light, the scanner says "This camera has no light", and when the light cannot be switched while the camera is in use, "The light could not be turned on while the camera is in use".
 
 ## Notifications
 

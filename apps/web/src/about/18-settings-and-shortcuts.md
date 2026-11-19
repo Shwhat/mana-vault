@@ -7,10 +7,14 @@ Preferences are saved for your account on the server and follow you to every bro
 | Setting | Choices | Default | Where to change it |
 |---|---|---|---|
 | Theme | Light, Dark, System | Light | Theme list on the View ribbon tab, phone Menu |
-| Add as foil | On, Off | Off | Home ribbon tab, FOIL in the status bar, F |
-| Target zone | Main deck, Sideboard, Commander, Maybeboard | Main deck | Zone list beside Quick add, Target zone list on the Decks ribbon tab, Deck list panel, ZONE in the status bar, Z |
-| Target collection | Any of your collections | Your first collection | Home ribbon tab, ADD TO in the status bar, Collections panel, C |
-| Open collection | Any of your collections | Your first collection | Collection switcher, Collections panel |
+| Add as foil | On, Off | Off | FOIL in the status bar, F |
+| Target zone | Main deck, Sideboard, Commander, Maybeboard | Main deck | Zone list beside Quick add on the deck's Add tab, Target zone list on the Decks ribbon tab, Deck list panel, ZONE in the status bar, Z |
+| Target collection | Any of your collections | Your first collection | ADD TO in the status bar, Collections panel, + Add in the collection view, C |
+| Open collection | Any of your collections, or All collections | Your first collection | Collection switcher, Collections panel |
+| Search layout, desktop and phone | Grid, Binder, List | Grid | Options in card search, the deck's Add tab and the trade view; each device type remembers its own |
+| Search card size | Small, Medium, Large | Medium | Options in card search (Grid layout) |
+| Include wishlists | On, Off | Off | Options in All collections |
+| All cards, not only for trade | On, Off | Off | The You give search of a trade |
 | Switcher sort (collections, decks) | Recently opened, Name, Date created, Card count, Value (collections), Format and Commander (decks) | Recently opened | Sort in the switcher list |
 | Recently opened | When each collection and deck was last opened | None | Opening a collection or deck |
 | Prices (currency) | US dollars, Euros | US dollars | Currency list on the View ribbon tab, PRICES in the status bar, Statistics tabs |
@@ -47,9 +51,9 @@ System follows the device's light or dark setting and changes with it. A new ver
 
 ## Undo and redo
 
-- Undo (Ctrl+Z) reverses the last collection or deck edit: adding a card (and the wishlist wants it lowered), changing a count, removing an entry or deck card (one or many at once), moving cards between collections, Copy details, marking or unmarking for trade, adding to the wishlist, moving a deck card between zones, linking copies to a deck card, and adding a scanned list (one step for the whole list, including the deck links), tags on deck cards, and Edit as text. Redo (Ctrl+Y or Ctrl+Shift+Z) repeats it.
+- Undo (Ctrl+Z) reverses the last collection or deck edit: adding a card (and the wishlist wants it lowered), changing a count, removing an entry or deck card (one or many at once), moving cards between collections, Copy details, marking or unmarking for trade, adding to the wishlist, moving a deck card between zones, linking copies to a deck card, and adding a scanned list (one step for the whole list, including the deck links), tags on deck cards, Edit as text, and completing a trade. Redo (Ctrl+Y or Ctrl+Shift+Z) repeats it.
 - Up to 150 edits are kept. The history lasts until the page is reloaded.
-- Imports, backup restores, creating, changing or deleting collections and decks, sending and accepting, card database updates, preference changes and trade calculator changes cannot be undone. A backup restore, or deleting or leaving a collection or deck, clears the history.
+- Imports, backup restores, creating, changing or deleting collections and decks, sending and accepting, card database updates, preference changes, changes to a trade's lines, and accepting a trade from another account cannot be undone. A backup restore, or deleting or leaving a collection or deck, clears the history.
 - An undo sets the counts back to what they were before the edit. If someone else changed the same card in the meantime, their change to that card is replaced.
 - The Undo and Redo items name the edit they affect. A message confirms each one, such as "Undone: Add Sol Ring".
 
@@ -94,8 +98,8 @@ Shortcuts work when no text box, menu or window has focus, except the Ctrl short
 
 | Key | Action |
 |---|---|
-| T | Add to trade (you give): the selected collection row |
-| G | Add to trade (you get): the selected card |
+| T | Add to trade (you give): the selected collection row goes into the open trade (a new one when none is open) |
+| G | Add to trade (you get): the selected card goes into the open trade |
 
 ### Editing
 

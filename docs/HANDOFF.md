@@ -1,10 +1,10 @@
 # Mana Vault handoff
 
-Last updated: 2026-11-19, version 0.7.0.
+Last updated: 2026-11-19, version 0.8.0.
 
 ## Project
 
-Mana Vault is Devon's self-hosted Magic: The Gathering collection and deck manager (repository Shwhat/mana-vault). It runs as one Docker container (Node.js 22, Fastify, SQLite) and serves a React interface for desktop browsers and phones. Version 0.1.0 rebuilt the interface in the OpenSchem design style (program-design-guide skill, "look and shell" adoption), added sign-in, per-account preferences, undo, the About guide and Dockhand-ready deployment. Version 0.2.0 added multiple collections per account, set completion, bulk editing, per-account ownership of collections and decks, sending (copy, share, transfer) with an Inbox, and deck rename and delete. Version 0.3.0 added prices and values, statistics, deck ownership, wishlists, the trade list and trade calculator, copy details (finish, condition, language, trade count), filter tags, the binder layout and flavor name matching. The 0.3.0 features came from a comparison with AeroEagle/mtg-collection-viewer. Version 0.4.0 rebuilt the camera scanner as a continuous, ManaBox-style live scanner with a scanned list. Version 0.5.0 added the Android app (Capacitor around the same interface) with device sign-in, offline use and sync, phone text recognition and Inbox notifications. Version 0.6.0 linked deck cards to collection copies, added proxies and copy details, import and export windows for seven formats, a ManaBox-style scanner with settings and a printing picker, the card page with rulings, a ribbon-only menu with right-click menus, and the phone Home screen. Version 0.7.0 added the Moxfield-style deck builder (Quick add, Edit as text, four views, groups, tags, maybeboard, format checks, playtest, description, history, tokens), the shared collection and deck switcher, the Grid collection layout, and layout fixes from Devon's screenshots.
+Mana Vault is Devon's self-hosted Magic: The Gathering collection and deck manager (repository Shwhat/mana-vault). It runs as one Docker container (Node.js 22, Fastify, SQLite) and serves a React interface for desktop browsers and phones. Version 0.1.0 rebuilt the interface in the OpenSchem design style (program-design-guide skill, "look and shell" adoption), added sign-in, per-account preferences, undo, the About guide and Dockhand-ready deployment. Version 0.2.0 added multiple collections per account, set completion, bulk editing, per-account ownership of collections and decks, sending (copy, share, transfer) with an Inbox, and deck rename and delete. Version 0.3.0 added prices and values, statistics, deck ownership, wishlists, the trade list and trade calculator, copy details (finish, condition, language, trade count), filter tags, the binder layout and flavor name matching. The 0.3.0 features came from a comparison with AeroEagle/mtg-collection-viewer. Version 0.4.0 rebuilt the camera scanner as a continuous, ManaBox-style live scanner with a scanned list. Version 0.5.0 added the Android app (Capacitor around the same interface) with device sign-in, offline use and sync, phone text recognition and Inbox notifications. Version 0.6.0 linked deck cards to collection copies, added proxies and copy details, import and export windows for seven formats, a ManaBox-style scanner with settings and a printing picker, the card page with rulings, a ribbon-only menu with right-click menus, and the phone Home screen. Version 0.7.0 added the Moxfield-style deck builder (Quick add, Edit as text, four views, groups, tags, maybeboard, format checks, playtest, description, history, tokens), the shared collection and deck switcher, the Grid collection layout, and layout fixes from Devon's screenshots. Version 0.8.0 added saved trades (two-column builder, complete with undo, trading between accounts with counter-offers, wishlist matches, public trade binder), card search views (Grid, Binder, List) with paging and owned counts, filters that follow the open view, All collections, the deck header and Add tab, one picker everywhere, ribbon cleanup and scanner fixes (outline and light).
 
 ## Rules
 
@@ -20,6 +20,20 @@ Mana Vault is Devon's self-hosted Magic: The Gathering collection and deck manag
 - Every pull request that changes what the app does, or the rules it follows, also updates the About guide: the affected pages, Capabilities, and a new entry in the release notes. It also raises the version. The version is shown in the guide.
 - Every change gets tests; `npm run test:all` must pass before delivery. Where Playwright cannot download its browser, run it with an installed Chrome: `PW_CHANNEL=chrome npm run test:all`.
 - Deployment follows the docker-server-setup skill: Dockhand only, no Watchtower, absolute data path, UID 65532, no cloudflared or reverse proxy in the stack.
+
+## Decisions (0.8.0 trading, search views, filters per view)
+
+- Specification: `docs/SPEC-0.8.0.md` in the claude.ai project. Devon said "build push merge".
+- Card search: `GET /api/cards?paged=1&offset=N` returns `{ total, cards }`, each card with `owned` (non-proxy copies in owned or shared non-wishlist collections). Without `paged` the old array answer stays (Quick add suggestions use it). The app's offline search supports the same parameters. `useCardSearch` (`card-search.ts`) loads 60 at a time; `CardResults` (`components/CardResults.tsx`) draws Grid, Binder (9 per page, loads ahead) or List, used by card search, the deck Add tab and both trade searches. Owned counts change at once after Add to collection through `ownedHooks` in the store (every open search registers its `owned` updater). Prefs `searchLayout`, `searchLayoutPhone`, `searchSize`.
+- Filters per view (`filters.ts`): scopes `cards`, `collection`, `deck`, `deckAdd`, `tradeGive`, `tradeGet` held in `filterSets` in the store (memory only, not prefs). `filterScope` follows the view, the deck tab and the trade search last focused (`tradeSide`). `matchesFilters` applies the panel locally to collection rows and deck cards; collection rows carry `legal` (comma list from `legalFormats` on the server), deck cards use `legalities`. Facets and the filter box are no longer cleared on collection switch.
+- All collections: id `all` (`ALL_COLLECTIONS`) stored as `openCollection`. Rows come from `GET /api/library/cards` (`?wishlists=1` with pref `allWishlists`) with `collection_id` and `collection_name`. `entryKey` includes the collection, and `byCollection` groups rows so remove, move, trade marks, Copy details and counts act on each row's own collection (one undo step). Only the Cards tab; completion and statistics are per collection.
+- Deck view: header like the collection header; tab `add` (DeckTab) holds Quick add, Edit as text and the search. Zone buttons count by oracle id and zone.
+- Picker (`components/Picker.tsx`) replaces every native select; Enter on a picker inside a form submits the form (dialogs confirm with Enter as before). Tests use `choose(page, locator, value | { label })` from the fixtures.
+- Ribbon: Home Add group removed; Trade tab Open (view.trade), Trade (trade.new, trade.complete, trade.send), Share (trade.copy, trade.share). T and G stay as keys and add to the open trade (a new trade is started when none is open).
+- Trades (`apps/server/src/trades.ts`, client `trade-state.tsx`, `views/TradeView.tsx`, `components/TradeDialogs.tsx`): tables `trades`, `trade_lines` (side relative to the owner; `present` flips sides for the partner), `trade_shares`. A line change by either account sets `turn_id` to the other account (counter-offer). Local complete stores a JSON record; undo calls `/reopen`, which reverses it. Accepting a proposal completes both sides and cannot be undone. Deck warning before complete is done in the browser from the source collections' `decks` field. Price `null` means the card database price. The open trade id is kept in localStorage `mana-vault.openTrade`. `/share/:token` is the only public page (`PUBLIC_PATHS` pattern in the guard).
+- Scanner: `guideBox` keeps the outline clear of the right-side buttons (`GUIDE_SIDE = 64`). Light: the scanner looks for a back camera with `torch` capability (remembered in localStorage `mana-vault.torchCamera`), then in the app the native `setTorch` (CameraManager), else the note "This camera has no light". Must be checked on a phone.
+- Phone bottom bar: Home, Search, Collection, Decks, Trade, Scan at 10.5 px labels; the top bar gets Filters (collection, deck, trade) and Trades with a count.
+- Chrome's `Element.scrollTo` now returns a promise; effects must not return it (React treats it as a cleanup).
 
 ## Decisions (0.7.0 deck builder, switchers, card views)
 
@@ -146,7 +160,12 @@ Devon said "build all of it now" for the seven proposals without a question roun
 | `apps/web/src/components/LibraryDialogs.tsx` | Collection settings (Wishlist checkbox) with the set picker, Copy details (`copyDialog`), Move, Send, Inbox, Accept, Sharing and Rename deck dialogs |
 | `apps/web/src/views/CollectionView.tsx` | Collection header (switcher, Options, + Add, count line) and the Cards (chips, list, `Binder`, `Grid`, `Pocket`), Completion, Missing and Statistics tabs; the `Meter` |
 | `apps/web/src/views/StatsView.tsx` | `StatsPanel`: stat tiles, `BarList`, mana curve columns |
-| `apps/web/src/views/TradeView.tsx` | Trade list and trade calculator |
+| `apps/web/src/views/TradeView.tsx` | Trade view: trade picker, balance bar, two columns with lines (`LineRow`) and searches (`GiveSearch`, `GetSearch`), wishlist matches |
+| `apps/web/src/trade-state.tsx` | `useTradeState`: trades, open trade, lines, complete with undo, send, accept, decline, copy, export, share link |
+| `apps/web/src/components/TradeDialogs.tsx` | New, Rename, Complete, Send, Accept and Share trade binder dialogs |
+| `apps/server/src/trades.ts` | Trade tables and routes, completing and reopening, proposals, matches, share link and the public `/share/:token` page |
+| `apps/web/src/card-search.ts`, `filters.ts` | Paged card search hook; filter scopes, `matchesFilters`, `searchParams` |
+| `apps/web/src/components/CardResults.tsx`, `Options.tsx`, `Picker.tsx` | Search result views and `useViewSearch`; the Options button, `Segments`, `LayoutRows`; the app's choice list |
 | `apps/web/src/views/Views.tsx` | Card search (prices, tags, + Wishlist), `OwnershipTab`, `NoDeck`, `Quantity`, `zoneGroups` |
 | `apps/web/src/views/DeckView.tsx` | The deck view: header with switcher and format badge, Cards tab (Quick add, legality bar, List, Text, Stacks, Grid, tokens, hover preview), Ownership, Statistics with Mana symbols and sources, Playtest, Description, History |
 | `apps/web/src/deck-rules.ts` | Grouping and sorting deck cards, `checkDeck` legality, `manaBalance`, `deckText`, `parseQuickAdd`, `shuffle` |
@@ -174,7 +193,6 @@ None known.
 
 - Android app: sharing CSV or text files into the app, deep links, instant notifications, more than one server or account, background sync of waiting changes; leaving the browser OCR files (about 11 MB) and the x86 libraries out of the APK (55 MB now).
 - Price history and price change alerts (prices are a snapshot of the last catalog update).
-- Saving the trade calculator, or applying a finished trade to collections in one step.
 - A built-in demo document (program-design-guide section 6) was not part of the 0.1.0 specification.
 - Optional command line (program-design-guide section 3) was not built.
 - The ribbon customize window uses a shared Name box for new and renamed tabs and groups.
@@ -182,7 +200,6 @@ None known.
 
 ## Known limits
 
-- Search returns at most 40 results.
 - The Android app has had one camera test on a phone (0.5.0); 0.6.0 was tested in Chromium with a stand-in for the native plugin. ML Kit reading, the camera permission, notifications, the share sheet and the Back button need checking on a phone.
 - The app's release signing needs the four `ANDROID_*` repository secrets (README, Android app); without them the tag build fails with a clear message.
 - Offline in the app: card search matches names only (no search syntax), prices only for cards opened before, statistics only when opened before.
@@ -191,11 +208,11 @@ None known.
 - Sending works only between accounts on the same server. Offers have no expiry.
 - Main set needs Scryfall's printed size for each set; it arrives with the first card database update after 0.2.0. Prices and flavor names arrive with the first card database update after 0.3.0.
 - Undo history is per page load and reverses by sending the reverse change; a concurrent edit to the same card by someone else is overwritten by an undo.
-- The trade calculator is lost on page reload.
+- Trades work online only (not queued offline in the app). Accepting a trade with another account cannot be undone.
 - Imports up to 5 MB and 5,000 rows; backups up to 25 MB.
 - Card images load from Scryfall's servers.
 - The server serves the built files registered at startup; restart it after rebuilding the interface (Docker does this on every deploy).
 
 ## Where work stopped
 
-0.1.0 to 0.7.0 are merged to main (0.7.0 in the pull request for branch `deck-builder-0.7.0`). All checks pass (`PW_CHANNEL=chrome npm run test:all`: typecheck, 117 server tests, 25 web tests, 34 browser tests). The debug APK for 0.7.0 comes from the `Android app` workflow on the merge to main (Debug build pre-release). After deploying, run Update card database once to get the mana each card makes and its tokens (needed for Mana symbols and sources and the Tokens list). Next: try 0.7.0 on a phone (switcher sheet, grid scrolling, deck builder), then a phone test of the scanner with real cards, then create the release key and the four repository secrets and tag a release.
+0.1.0 to 0.8.0 are merged to main (0.8.0 in the pull request for branch `v0.8.0`). All checks pass (`PW_CHANNEL=chrome npm run test:all`: typecheck, 123 server tests, 25 web tests, 36 browser tests). The debug APK for 0.8.0 comes from the `Android app` workflow on the merge to main (Debug build pre-release). Next: check the scanner light and outline on a phone (the light needs a real device), try trading between two accounts, then a phone test of the scanner with real cards, then create the release key and the four repository secrets and tag a release.

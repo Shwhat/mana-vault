@@ -1,4 +1,4 @@
-import { menu, row, search, signUp, status, test, expect } from "./fixtures";
+import { menu, row, search, signUp, status, test, expect, choose } from "./fixtures";
 
 test("sign-in protects the app and accounts work", async ({ page }) => {
   await page.goto("/");
@@ -28,7 +28,7 @@ test("search, filters and adding to the collection with undo", async ({ page }) 
   await expect(page.locator(".emptynote.err")).toContainText('Unsupported search filter "bad"');
 
   await search(page, "");
-  await page.locator("#flt-rarity").selectOption("mythic");
+  await choose(page, page.locator("#flt-rarity"), "mythic");
   await expect(page.locator("#view-cards .row")).toHaveCount(1);
   await page.locator(".pbody .btn", { hasText: "Clear filters" }).click();
 
@@ -96,7 +96,7 @@ test("deck building with zones, moves and undo", async ({ page }) => {
   await page.keyboard.press("3");
   await expect(page.locator("#view-deck .boardhead")).toHaveText(["Main deck 2", "Sideboard 1"]);
   const side = page.locator("#view-deck .row").nth(1);
-  await side.locator(".zonesel").selectOption("main");
+  await choose(page, side.locator(".zonesel"), "main");
   await expect(page.locator("#view-deck .boardhead")).toHaveText(["Main deck 3"]);
   await expect(page.locator("#view-deck .row")).toHaveCount(2);
   await page.keyboard.press("Control+z");
@@ -107,8 +107,8 @@ test("deck building with zones, moves and undo", async ({ page }) => {
   await expect(page.locator("#view-deck .boardhead")).toHaveText(["Main deck 2", "Sideboard 1"]);
 
   await menu(page, "Home", "Export...");
-  await page.locator("#ex-what").selectOption("deck");
-  await page.locator("#ex-format").selectOption("text");
+  await choose(page, page.locator("#ex-what"), "deck");
+  await choose(page, page.locator("#ex-format"), "text");
   const download = page.waitForEvent("download");
   await page.locator("dialog[open]").getByRole("button", { name: "Export", exact: true }).click();
   const file = await download;
@@ -126,7 +126,7 @@ test("collection CSV import shows the detected format, a preview and the review 
     buffer: Buffer.from("Count,Name,Edition,Foil\n2,Sol Ring,lea,\n1,Not A Real Card,,\n3,Counterspell,,foil\n"),
   });
   await expect(page.locator("dialog[open]")).toContainText("2 rows (5 cards) match. 1 rows are skipped.");
-  await expect(page.locator("#io-format option").first()).toHaveText("Detected: Moxfield CSV");
+  await expect(page.locator("#io-format")).toContainText("Detected: Moxfield CSV");
   await page.locator("dialog[open]").getByRole("button", { name: "Import", exact: true }).click();
   await expect(status(page)).toHaveText("Imported 5 cards from 2 rows into Main collection");
   await expect(page.locator("dialog[open]")).toHaveCount(0);
@@ -276,7 +276,7 @@ test.describe("phone layout", () => {
 
   test("tabs, card page and the nested menu", async ({ page }) => {
     await signUp(page, "phone");
-    await expect(page.locator("#ptabs .ptab")).toHaveText(["Home", "Search", "Collection", "Decks", "Scan"]);
+    await expect(page.locator("#ptabs .ptab")).toHaveText(["Home", "Search", "Collection", "Decks", "Trade", "Scan"]);
     await expect(page.locator("#view-home")).toBeVisible();
     await expect(page.locator("#titlebar")).toHaveCount(0);
     await page.locator(".ptab", { hasText: "Search" }).click();

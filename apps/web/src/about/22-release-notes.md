@@ -2,6 +2,24 @@
 
 The installed version is shown at the top of this guide.
 
+## 0.8.0 (2026-11-19): Saved trades, search views, filters per view and All collections
+
+- Card search shows results as a Grid (the default), Binder pages or a List, chosen with **Options** with the card size; the desktop and phones each remember their choice. Pictures show the price and how many copies you own; click selects, double-click adds, right-click or long press opens the menu.
+- Card search shows every result instead of the first 40: more load while scrolling or turning binder pages, and the count line shows the total.
+- The Filters panel filters the open view: card search, the open collection, the deck's cards or the deck's Add tab results, and the trade searches, without switching to card search. A Filtering line names the view. Each view keeps its own filters; collection filters, tags and the filter box stay when another collection opens, and deck filters stay when another deck opens. Clear filters clears the open view only. Legal in works in collections and decks.
+- All collections is the first entry of the collection switcher: every row of every collection, with its collection, wishlists only with Include wishlists in Options. Every action acts on each row's own collection.
+- The deck header is laid out like the collection header: the switcher, the tabs Cards, Add, Ownership, Statistics, Playtest, Description and History (scrolling sideways on phones), a filter box, Options (view, group, sort, Edit as text, with a count of active filters) and the count line with the format badge. The Cards tab shows only the cards.
+- The deck's new Add tab holds Quick add with its zone, Edit as text, and a card search with pictures and the buttons + Main, + Side, + Maybe and + Commander, each showing how many are already in the deck.
+- Trading: saved trades with a name and a status (Open, Done or Cancelled), with New, Rename, Cancel and Delete. Two columns, You give (your cards for trade, or every card) and You get (the card database), each with its own search. Each line has its own count, finish, condition and a price that can be changed by hand (marked EDITED), and a balance bar compares the sides.
+- Complete trade moves the cards in one step that can be undone, warns about cards used in decks and lowers wishlist wants for the cards you get.
+- Trades can be sent to another account on the server; changes go back as counter-offers until one side accepts, which completes the trade for both. Waiting trades show in the Inbox and on the phone's top bar.
+- Wishlist matches both ways, Copy list, Export (CSV), and a public link to your trade binder (only cards marked for trade; it can be replaced or turned off). It is the only page that opens without signing in.
+- The phone's bottom bar adds Trade, with slightly smaller labels. Collection, deck and trade views have a Filters button in the top bar.
+- Every choice list is the app's own list, the same on every screen: the import and export windows, every dialog, the scanner's Add to, settings and strip, and the sort, group, zone and filter lists. Long lists have a Find box; on phones the list is a sheet.
+- The Home ribbon tab no longer has the Add group (Add to collection, Target, Wishlist, Add as foil); those commands remain on result buttons, menus, the status bar and their keys. The Trade ribbon tab has New trade, Complete, Send, Copy list and Share binder in place of You give and You get.
+- Fixed: the scanner's card outline ran under the buttons on the right side of the camera.
+- Fixed: the scanner's light did not come on. The scanner now opens a back camera that has a light, and in the Android app falls back to the phone's own light control; a camera without a light says "This camera has no light".
+
 ## 0.7.0 (2026-11-19): Deck builder, switchers and card grid
 
 - Deck builder: Quick add (type "2 Sol Ring", with names suggested), Edit as text with Check and Apply as one undo step, and the views List, Text, Stacks and Grid, grouped by type, mana value, color, rarity or tag and sorted by name, mana value or price.

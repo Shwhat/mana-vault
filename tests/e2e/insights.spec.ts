@@ -1,7 +1,7 @@
 // Browser tests for 0.3.0: prices, copy details, filter tags, binder, statistics, wishlists, deck ownership and trade.
 import { readFileSync } from "node:fs";
 import type { Page } from "@playwright/test";
-import { menu, search, signUp, status, test, expect } from "./fixtures";
+import { menu, search, signUp, status, test, expect, choose } from "./fixtures";
 
 const rows = (page: Page) => page.locator("#view-collection .list .row");
 
@@ -40,7 +40,7 @@ test("copy details change finish, condition, language and trade, sort by price, 
   await add(page, ["Shivan Dragon", "Llanowar Elves", "Sol Ring"]);
   await openCollection(page);
   await page.getByRole("button", { name: /Options/ }).click();
-  await page.locator("#opt-sort").selectOption("price-desc");
+  await choose(page, page.locator("#opt-sort"), "price-desc");
   await page.locator(".optpop").getByRole("button", { name: "Done" }).click();
   await expect(rows(page).locator(".rowtitle b")).toHaveText(["Shivan Dragon", "Llanowar Elves", "Sol Ring"]);
   await expect(rows(page).nth(2).locator(".price")).toHaveText("No price");
@@ -48,9 +48,9 @@ test("copy details change finish, condition, language and trade, sort by price, 
   await rows(page).nth(1).locator(".rowtitle").click();
   await page.keyboard.press("e");
   await expect(page.locator("dialog[open]")).toContainText("Copy details: Llanowar Elves");
-  await page.locator("#f-foil").selectOption("2");
-  await page.locator("#f-condition").selectOption("LP");
-  await page.locator("#f-language").selectOption("ja");
+  await choose(page, page.locator("#f-foil"), "2");
+  await choose(page, page.locator("#f-condition"), "LP");
+  await choose(page, page.locator("#f-language"), "ja");
   await page.fill("#f-trade", "1");
   await page.locator(".dlgbtns .primary").click();
   await expect(status(page)).toHaveText("Llanowar Elves changed");
@@ -125,7 +125,7 @@ test("deck cards are linked to collection copies, and missing cards go to a wish
   await expect(page.locator(".tilerow")).toContainText("$380.00");
 });
 
-test("the trade list and calculator compare both sides", async ({ page, context }) => {
+test("a saved trade: give trade cards, get from search, change a price, complete and undo", async ({ page, context }) => {
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   await signUp(page);
   await add(page, ["Shivan Dragon", "Dark Ritual"]);
@@ -134,21 +134,37 @@ test("the trade list and calculator compare both sides", async ({ page, context 
   await menu(page, "Collection", "Mark for trade");
   await expect(status(page)).toHaveText("Shivan Dragon marked for trade");
   await page.keyboard.press("4");
-  await expect(page.locator(".tradelist .row")).toHaveCount(1);
-  await page.locator(".tradelist .row").getByRole("button", { name: "Give" }).click();
-  await search(page, "Serra Angel");
-  await page.locator("#view-cards .row").first().click();
-  await page.keyboard.press("g");
+  await expect(page.locator("#view-trade .empty.compact")).toContainText("No trades yet");
+  const give = page.locator('.tradecol[aria-label="You give"]');
+  const get = page.locator('.tradecol[aria-label="You get"]');
+  await expect(give.locator(".tsearch .row")).toHaveCount(1);
+  await give.locator(".tsearch .row").getByRole("button", { name: "+ Give (1 for trade)" }).click();
+  await expect(status(page)).toHaveText("Shivan Dragon added to what you give");
+  await expect(page.locator("#trade-pick")).toContainText("Trade");
+  await get.getByRole("textbox", { name: "Search cards you get" }).fill("Serra Angel");
+  await get.locator(".tsearch .row", { hasText: "Serra Angel" }).first().getByRole("button", { name: "+ Get" }).click();
   await expect(status(page)).toHaveText("Serra Angel added to what you get");
-  await page.keyboard.press("4");
-  await expect(page.locator(".tradecalc .stattile")).toContainText("$820.00");
-  await expect(page.locator(".tradecalc .stattile")).toContainText("In their favor");
-  await page.getByRole("button", { name: "Copy trade summary" }).click();
-  await expect(status(page)).toHaveText("Trade summary copied");
-  expect(await page.evaluate(() => navigator.clipboard.readText())).toContain("Difference: $820.00 in their favor");
-  await page.getByRole("button", { name: "Clear trade..." }).click();
+  await expect(page.locator(".tradebalance")).toContainText("$820.00 in their favor");
+  await get.getByRole("textbox", { name: "Price each of Serra Angel" }).fill("20");
+  await get.getByRole("textbox", { name: "Price each of Serra Angel" }).press("Enter");
+  await expect(get.locator(".badge.edited")).toBeVisible();
+
+  await page.getByRole("button", { name: "Copy list" }).click();
+  await expect(status(page)).toHaveText("Trade list copied");
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toContain("Difference:");
+
+  await page.getByRole("button", { name: "Complete trade..." }).click();
   await page.locator(".dlgbtns .primary").click();
-  await expect(page.locator(".tradecalc .stattile")).toContainText("Add cards to both sides");
+  await expect(status(page)).toContainText("completed");
+  await expect(page.locator("#view-trade .badge.status-done")).toHaveText("Done");
+  await page.keyboard.press("2");
+  await expect(rows(page).filter({ hasText: "Serra Angel" })).toHaveCount(1);
+  await expect(rows(page).filter({ hasText: "Shivan Dragon" })).toHaveCount(0);
+  await page.keyboard.press("Control+z");
+  await expect(status(page)).toContainText("Undone: Complete");
+  await expect(rows(page).filter({ hasText: "Shivan Dragon" })).toHaveCount(1);
+  await page.keyboard.press("4");
+  await expect(page.locator("#view-trade .badge.status-open")).toHaveText("Open");
 });
 
 test("the Moxfield export keeps condition, language, finish and trade counts", async ({ page }) => {
@@ -157,14 +173,14 @@ test("the Moxfield export keeps condition, language, finish and trade counts", a
   await openCollection(page);
   await rows(page).first().locator(".rowtitle").click();
   await page.keyboard.press("e");
-  await page.locator("#f-foil").selectOption("1");
-  await page.locator("#f-condition").selectOption("MP");
-  await page.locator("#f-language").selectOption("de");
+  await choose(page, page.locator("#f-foil"), "1");
+  await choose(page, page.locator("#f-condition"), "MP");
+  await choose(page, page.locator("#f-language"), "de");
   await page.fill("#f-trade", "1");
   await page.locator(".dlgbtns .primary").click();
   await expect(status(page)).toHaveText("Atraxa, Praetors' Voice changed");
   await menu(page, "Home", "Export...");
-  await page.locator("#ex-format").selectOption("moxfield");
+  await choose(page, page.locator("#ex-format"), "moxfield");
   const download = page.waitForEvent("download");
   await page.locator("dialog[open]").getByRole("button", { name: "Export", exact: true }).click();
   const text = readFileSync(await (await download).path()!, "utf8");

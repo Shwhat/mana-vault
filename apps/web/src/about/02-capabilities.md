@@ -8,7 +8,10 @@ This page lists what Mana Vault does in the current version, followed by what is
 
 - Search every printing in the local card database by name, type line and rules text.
 - Narrow results with filter syntax in the search box (type, color, color identity, rules text, set, rarity, mana value, legality) and with the Filters panel.
-- Show up to 40 results per search, sorted by name and then newest printing first.
+- The Filters panel filters the open view: card search, the open collection or the open deck (its cards, or the cards to add). Each view keeps its own filters.
+- Show every result, sorted by name and then newest printing first, loading more while scrolling or turning binder pages, with the total in the count line.
+- Show results as a Grid or Binder of card pictures with prices and how many you own, or as a List. Each device type remembers its own choice. The deck's Add tab and the trade searches use the same views.
+- Click a result to select it, double-click to add it, right-click or long press for its menu.
 - Search by price with `usd` and `eur`, and find cards by their flavor names (such as a Godzilla series name).
 - Click a result's set code or rarity to filter by it.
 - Show each result's price.
@@ -24,6 +27,8 @@ This page lists what Mana Vault does in the current version, followed by what is
 - Narrow the list with filter tags by clicking a set code or rarity on a row, or a bar in Statistics.
 - Show a collection as a grid of card pictures that loads more while scrolling (Small, Medium or Large), as binder pages of nine cards with a page box, or as a list. Each device type remembers its own layout.
 - Open collections from a switcher with search, five sort orders and the keyboard.
+- All collections, the first entry of the switcher, lists every row of every collection with its collection, wishlists included when chosen in Options. Edits act on each row's own collection.
+- Filters, tags and the filter box stay when another collection opens.
 - Show statistics: mana curve, colors, types, rarity, finish, top sets by value, average and median prices.
 - Change counts with plus and minus buttons, and remove entries.
 - Pick many rows with Ctrl+click, Shift+click, Ctrl+A or Select mode, then remove or move them in one step.
@@ -41,8 +46,14 @@ This page lists what Mana Vault does in the current version, followed by what is
 - Mark any collection as a wishlist. Its cards are wanted, not owned.
 - Add a card, every missing card of a set, or every missing card of a deck to the wishlist in one step.
 - Lower wishlist wants as copies of the card are added to collections, oldest want first.
-- Mark copies for trade, and list every copy for trade in the trade list.
-- Compare what you give with what you get in the trade calculator, and copy a summary.
+- Mark copies for trade.
+- Save trades with a name and a status (Open, Done or Cancelled); start, rename, cancel and delete them.
+- Build a trade in two columns, each with its own search: You give searches your cards for trade (or every card), You get searches the card database. Each line has its own count, finish, condition and a price that can be changed by hand.
+- See the balance of both sides in a bar with the difference.
+- Complete a trade in one step that can be undone: given cards leave their collections, cards you get are added and wishlist wants go down, with a warning for cards used in decks.
+- Send a trade to another account; changes go back as counter-offers until one side accepts, which completes it for both.
+- See wishlist matches both ways: cards others have for trade that you want, and your trade cards others want.
+- Copy or export the trade list, and share a public link to your trade binder that can be replaced or turned off.
 
 ### Set completion
 
@@ -55,7 +66,8 @@ This page lists what Mana Vault does in the current version, followed by what is
 
 - Create decks with a name and one of 21 formats; every deck keeps the printing of each card.
 - Open decks from a switcher with search, six sort orders, cover card, commander, format and card count.
-- Add cards by typing them (Quick add, such as 2 Sol Ring), from card search or from the scanner.
+- Add cards by typing them (Quick add, such as 2 Sol Ring), from the Add tab's card search with + Main, + Side, + Maybe and + Commander (each showing how many are already in the deck), from card search or from the scanner.
+- Filter the deck's cards with a filter box and the Filters panel.
 - Edit the whole deck as text, checked before it is applied, as one step that can be undone.
 - Show the cards as a list, text, stacks of pictures or a grid, grouped by type, mana value, color, rarity or your own tags, and sorted by name, mana value or price.
 - Check a deck against its format: deck and sideboard size, copies of each card, banned and not legal cards, and the commander's color identity.
@@ -93,7 +105,7 @@ This page lists what Mana Vault does in the current version, followed by what is
 - Limit scans to any number of sets, with a "Not in set" warning for other cards, and ignore promos.
 - Set the finish, condition and language of the next cards on the strip, mark scans as proxies, and show the scanned list's total value and copies already owned.
 - Read light text on dark title bars, and cards held larger, smaller or off center.
-- Continuous autofocus, tap to focus and the torch where the camera supports them.
+- Continuous autofocus, tap to focus and the light: the scanner uses a back camera that has a light, and in the Android app falls back to the phone's own light control. Cameras without a light say so.
 - Last card strip with the card's page, edit and +1.
 - Edit, remove or clear scanned rows, and add cards by name.
 - Add the whole scanned list to any collection or deck, or a new one, as one undo step; cards added to a deck go into a collection for it, remembered per deck, and are linked.
@@ -118,7 +130,8 @@ This page lists what Mana Vault does in the current version, followed by what is
 - Right-click menus on cards and rows; a long press opens them on a phone.
 - Card page with art, rules text, power and toughness, every version with market prices, rulings, and where you own the card.
 - Home view with totals, recent scans and the Inbox.
-- Phone layout with Home, Search, Collection, Decks and Scan tabs, a nested menu at the top right, full-screen sheets and an installable home screen app.
+- Phone layout with Home, Search, Collection, Decks, Trade and Scan tabs, a nested menu at the top right, full-screen sheets and an installable home screen app.
+- The app's own choice lists everywhere, with a search box for long lists and a sheet on phones.
 - A built-in About guide (this guide).
 
 ### Android app

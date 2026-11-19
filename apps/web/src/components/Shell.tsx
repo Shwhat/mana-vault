@@ -130,7 +130,7 @@ export function PhoneShell({ actions }: { actions: Record<string, Action> }) {
   }, [store.selection]);
 
   const leave = () => { setSheet(null); store.setScannerOpen(false); store.setCardPage(null); };
-  const tab = (id: "home" | "cards" | "collection" | "deck", label: string, icon: string) => (
+  const tab = (id: "home" | "cards" | "collection" | "deck" | "trade", label: string, icon: string) => (
     <button type="button" className={store.view === id && !sheet && !store.scannerOpen && !store.cardPage ? "ptab on" : "ptab"}
       onClick={() => { leave(); store.setView(id); }}>
       <Icon name={icon} /><span>{label}</span>
@@ -153,6 +153,10 @@ export function PhoneShell({ actions }: { actions: Record<string, Action> }) {
         <span className="brand" aria-hidden="true">M</span>
         <span className="ptitle">{title}</span>
         {isApp() && <SyncChip />}
+        {(store.view === "collection" || store.view === "deck" || store.view === "trade") && !store.cardPage && !store.scannerOpen && (
+          <button type="button" className={store.filtersActive ? "pbtn on" : "pbtn"} onClick={() => setSheet(sheet === "filters" ? null : "filters")}>Filters</button>
+        )}
+        {store.waitingTrades > 0 && <button type="button" className="pbtn" onClick={() => { leave(); store.setView("trade"); }}>Trades <span className="cbadge">{store.waitingTrades}</span></button>}
         {store.offers.inbox.length > 0 && <button type="button" className="pbtn" onClick={actions.inbox?.run}>Inbox <span className="cbadge">{store.offers.inbox.length}</span></button>}
         <button type="button" className={sheet === "menu" ? "pbtn on" : "pbtn"} aria-label="Menu" onClick={() => setSheet(sheet === "menu" ? null : "menu")}><Icon name="menu" /></button>
       </div>
@@ -167,6 +171,7 @@ export function PhoneShell({ actions }: { actions: Record<string, Action> }) {
         {tab("cards", "Search", "find")}
         {tab("collection", "Collection", "collection")}
         {tab("deck", "Decks", "deck")}
+        {tab("trade", "Trade", "trade")}
         <button type="button" className={store.scannerOpen && !sheet && !store.cardPage ? "ptab on" : "ptab"} onClick={() => { setSheet(null); store.setCardPage(null); store.setScannerOpen(true); }}>
           <Icon name="scan" /><span>Scan</span>
         </button>

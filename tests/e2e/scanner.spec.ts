@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import { menu, signUp, status, test, expect, switchTo } from "./fixtures";
+import { menu, signUp, status, test, expect, switchTo, choose } from "./fixtures";
 
 type Read = { lines: string[]; info: string } | null;
 
@@ -84,7 +84,7 @@ test("the scanner reads cards continuously into the scanned list and adds them a
 
   // edit: another printing and quantity; rows that end up alike are combined
   await listRow(page, "LEA #161").getByRole("button", { name: "Edit Lightning Bolt" }).click();
-  await page.locator("#f-printing").selectOption({ label: "Magic 2010 (M10 #146), 2009" });
+  await choose(page, page.locator("#f-printing"), { label: "Magic 2010 (M10 #146), 2009" });
   await page.locator("#f-quantity").fill("2");
   await page.locator(".dlgbtns .primary").click();
   await expect(listRow(page, "Lightning Bolt")).toContainText("3x Lightning Bolt");
@@ -96,7 +96,7 @@ test("the scanner reads cards continuously into the scanned list and adds them a
 
   // Add to: the whole list goes into the collection as one undo step
   await page.getByRole("button", { name: "Add to..." }).click();
-  await expect(page.locator("#add-target")).toHaveValue(/^collection:/);
+  await expect(page.locator("#add-target")).toHaveAttribute("data-value", /^collection:/);
   await page.locator("dialog[open]").getByRole("button", { name: "Add", exact: true }).click();
   await expect(status(page)).toHaveText("6 cards added to Main collection");
   await expect(page.locator(".scanlisthead")).toHaveText("0 cards scanned");
@@ -128,8 +128,8 @@ test("the scanned list stays after a reload and goes into a deck through a colle
   await expect(listRow(page, "Lightning Bolt")).toContainText("1x Lightning Bolt");
 
   await page.getByRole("button", { name: "Add to..." }).click();
-  await page.locator("#add-target").selectOption({ label: "Burn" });
-  await expect(page.locator("#add-receiver option:checked")).toHaveText("New collection: Burn");
+  await choose(page, page.locator("#add-target"), { label: "Burn" });
+  await expect(page.locator("#add-receiver .pkval")).toHaveText("New collection: Burn");
   await page.locator("dialog[open]").getByRole("button", { name: "Add", exact: true }).click();
   await expect(status(page)).toHaveText("1 card added to Burn");
   await expect(page.locator("dialog[open]")).toHaveCount(0);
@@ -148,8 +148,9 @@ test("the scanned list stays after a reload and goes into a deck through a colle
   await expect(listRow(page, "Sol Ring")).toBeVisible();
   await page.getByRole("button", { name: "Add to..." }).click();
   // a collection named Burn now exists too: pick the deck
-  await page.locator("#add-target").selectOption(await page.locator('#add-target optgroup[label="Decks"] option', { hasText: "Burn" }).getAttribute("value") ?? "");
-  await expect(page.locator("#add-receiver option:checked")).toHaveText("Burn");
+  await page.locator("#add-target").click();
+  await page.locator('.pkpop .pkopt[data-value^="deck:"]', { hasText: "Burn" }).click();
+  await expect(page.locator("#add-receiver .pkval")).toHaveText("Burn");
   await page.locator(".dlgbtns .btn", { hasText: "Cancel" }).click();
   await page.locator(".scanlistfoot .btn", { hasText: "Clear" }).click();
   await page.locator(".dlgbtns .primary", { hasText: "Clear" }).click();

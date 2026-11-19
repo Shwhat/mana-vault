@@ -13,7 +13,6 @@ export const DEFAULT_RIBBON: RibbonTab[] = [
   {
     id: "home", name: "Home", groups: [
       { name: "Search", items: ["find", "scan", "clearFilters"] },
-      { name: "Add", items: ["addCollection", "collection.target", "wishlist.add", "foil"] },
       { name: "Views", items: ["view.home", "view.cards", "view.collection", "view.deck", "view.trade"] },
       { name: "Files", items: ["io.import", "io.export", "menu.backup"] },
       { name: "Edit", items: ["undo", "redo"] },
@@ -40,8 +39,8 @@ export const DEFAULT_RIBBON: RibbonTab[] = [
   {
     id: "trade", name: "Trade", groups: [
       { name: "Open", items: ["view.trade"] },
-      { name: "Trade", items: ["trade.give", "trade.get"] },
-      { name: "Summary", items: ["trade.copy", "trade.clear"] },
+      { name: "Trade", items: ["trade.new", "trade.complete", "trade.send"] },
+      { name: "Share", items: ["trade.copy", "trade.share"] },
     ],
   },
   {

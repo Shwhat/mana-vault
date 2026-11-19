@@ -21,10 +21,10 @@ The ribbon is the only menu. It has tabs of grouped buttons. A button shows an i
 
 | Tab | Groups and buttons |
 |---|---|
-| Home | Search: Find, Scan card, Clear filters. Add: Add to collection, Target, Wishlist, Add as foil. Views: Home, Search, Collection, Deck, Trade. Files: Import, Export, Backup ▾ (Download backup, Restore backup...). Edit: Undo, Redo |
+| Home | Search: Find, Scan card, Clear filters. Views: Home, Search, Collection, Deck, Trade. Files: Import, Export, Backup ▾ (Download backup, Restore backup...). Edit: Undo, Redo |
 | Collection | Collection: New collection, Settings, Delete (Leave when shared with you). Selection: Select all, Move, Remove, Details, For trade (Mark for trade or Unmark for trade). Layout: Grid (Grid layout), Binder (Binder layout), List (List layout). Wishlist: Missing to wishlist. Share: Send, Sharing |
 | Decks | Deck: New deck, Open deck, Rename, Delete (Leave when shared with you). Build: Add to deck, Target zone ▾ (Main deck, Sideboard, Commander, Maybeboard), Link copies, Tags (Tags...), Edit as text (Edit as text...). Check: Format (Deck format...), Playtest, History (Deck history). Missing: Missing to wishlist. Share: Send, Sharing |
-| Trade | Open: Trade (Trade view, shown at all times). Trade: You give, You get. Summary: Copy summary, Clear trade |
+| Trade | Open: Trade (Trade view, shown at all times). Trade: New trade (New trade...), Complete (Complete trade...), Send (Send trade...). Share: Copy list (Copy trade list), Share binder (Share trade binder...) |
 | View | Look: Theme ▾ (Light theme, Dark theme, System theme), Currency ▾ (Prices in US dollars, Prices in euros). Panels: Panels ▾ (Filters panel, Collections panel, Decks panel, Card panel, Deck list panel, Import review panel), Workspace ▾ (Save workspace..., Manage workspaces..., Reset panels). Ribbon: Button size ▾ (Large buttons, Compact buttons, Icons only), Customize. Card database: Update database |
 | Help | Help: Shortcuts, About |
 
@@ -87,10 +87,10 @@ The work area in the middle shows one of five views, chosen with the Views group
 | View | Shows |
 |---|---|
 | Home | Totals for your collections (cards owned, value, collections, decks), Scan cards, Search and Import buttons, offers waiting in your Inbox, and your recent scans |
-| Card search | Search results with prices |
+| Card search | Search results as a grid of card pictures, binder pages or a list, with prices and owned counts; see [Card search](/about/card-search) |
 | Collection | The open collection, in four tabs: Cards (a grid of card pictures, binder pages or a list), Completion, Missing and Statistics; see [Collections](/about/collections), [Set completion](/about/set-completion) and [Prices and statistics](/about/prices-and-statistics) |
-| Deck | The open deck, in six tabs: Cards (Quick add, the format check, and the cards by zone and group as a list, text, stacks or grid), Ownership, Statistics, Playtest, Description and History; see [Decks](/about/decks) |
-| Trade | The trade list and the trade calculator; see [Wishlists and trading](/about/wishlists-and-trading) |
+| Deck | The open deck, in seven tabs: Cards (the format check and the cards by zone and group as a list, text, stacks or grid), Add (Quick add and a card search), Ownership, Statistics, Playtest, Description and History; see [Decks](/about/decks) |
+| Trade | Saved trades: You give and You get with their searches, the balance bar and wishlist matches; see [Wishlists and trading](/about/wishlists-and-trading) |
 
 Click a row to select it; its details appear in the Card panel. Up and Down select the previous or next row. The About guide and the card page also open in the work area and close with **Close**, **Back** or Esc. The About guide also closes when you open a collection, deck, card or view, or select a card in a panel.
 
@@ -109,7 +109,7 @@ The card page shows one card in full. It opens from **Card page** in a right-cli
 
 | Panel | Shows |
 |---|---|
-| Filters | Type, set code, color, rarity, legal format and mana value range filters for card search, and **Clear filters** |
+| Filters | Type, set code, color, rarity, legal format and mana value range filters for the open view (card search, collection, deck or a search inside them), with a Filtering line naming it, and **Clear filters** |
 | Collections | Your collections with card counts, values, completion bars and percentages, Wishlist and Shared badges, **Add here** to choose the target collection, and **New...** |
 | Decks | Every deck with its card count and a Shared badge for shared decks, a box to find a deck by name or commander, and **New...**. Click a deck to open it in the work area |
 | Card | The selected card: image, name, type, **Add to collection**, **Add to deck**, **Add to wishlist**, **You get**, mana cost, mana value, rules text, set, number, rarity, artist, release date, flavor name, regular, foil and etched prices, copies owned of this printing (regular, foil and etched), of all printings and in each of your collections with the number for trade, and copies wanted in each wishlist |
@@ -163,13 +163,17 @@ A workspace is a saved panel layout and view. Three are built in:
 
 Below 900 pixels wide, and always in the Android app, the title bar, ribbon, panels and status bar are replaced by:
 
-- A top bar with the deck name, "Card", "Scan" or "Mana Vault", in the Android app the sync button (see [Android app](/about/android-app)), an **Inbox** button with a count when offers are waiting, and the **Menu** button at the top right.
+- A top bar with the deck name, "Card", "Scan" or "Mana Vault", in the Android app the sync button (see [Android app](/about/android-app)), **Filters** in the collection, deck and trade views, **Trades** with a count when trades wait for your answer, an **Inbox** button with a count when offers are waiting, and the **Menu** button at the top right.
 - The current view, filling the screen. Phones open on Home. The card search adds a **Filters** button under the search box.
-- A bottom tab bar: **Home**, **Search**, **Collection**, **Decks** and **Scan**. Search is card search. Decks shows the open deck, with the deck switcher at the top. Scan opens the camera scanner in place of the view (see [Scanning cards](/about/scanning-cards)).
+- A bottom tab bar: **Home**, **Search**, **Collection**, **Decks**, **Trade** and **Scan**. Search is card search. Decks shows the open deck, with the deck switcher at the top. Scan opens the camera scanner in place of the view (see [Scanning cards](/about/scanning-cards)).
 - Tapping a card opens its card page (except while picking rows).
 - **Menu** opens a sheet with one section per ribbon tab (Home, Collection, Decks, Trade, View, Help). Tapping a section opens it; lists such as Backup or Theme open inside it. The last section, **Account**, is open and holds Inbox, Change password, Devices and Sign out; the Android app adds Sync now, Notifications and Check for updates. Commands that do not apply are not shown.
 - Sheets that slide up from the bottom: **Filters**, **Menu** and the scanned list in the scanner. Close a sheet with **Close**, by tapping outside it, or with Esc.
 - In a collection, **Select several cards** in **Options** turns on checkboxes; tap rows to pick them and use the bar above the list to move or remove them.
 - Messages appear as a short banner above the tab bar.
 
-Panels (including the Collections panel), workspaces and ribbon customizing are desktop only; on the phone, switch collections and decks with the switcher at the top of the view, which opens as a full sheet. Choices made on one layout are kept for the other, except the collection layout (Grid, Binder or List), which each layout remembers on its own.
+Panels (including the Collections panel), workspaces and ribbon customizing are desktop only; on the phone, switch collections and decks with the switcher at the top of the view, which opens as a full sheet. Choices made on one layout are kept for the other, except the collection layout and the search layout (Grid, Binder or List), which each layout remembers on its own.
+
+## Choice lists
+
+Every list of choices (in windows, Options, the Filters panel, the scanner and the deck) is the app's own list: click or tap the button showing the current choice, then the choice you want. Up and Down move through the list, Enter chooses and Esc closes it. Long lists have a **Find** box at the top. On a phone the list opens as a sheet with **Close**. In a window, Enter on a list button confirms the window.
