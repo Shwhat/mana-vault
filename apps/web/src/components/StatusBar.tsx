@@ -3,7 +3,7 @@ import type { Action } from "../actions";
 import { customDialog } from "./Dialog";
 import { useApp, zoneLabel } from "../store";
 
-const VIEW_NAMES = { cards: "Card search", collection: "Collection", deck: "Deck", about: "About" } as const;
+const VIEW_NAMES = { cards: "Card search", collection: "Collection", deck: "Deck", trade: "Trade", about: "About" } as const;
 
 export function StatusBar({ actions }: { actions: Record<string, Action> }) {
   const store = useApp();
@@ -40,6 +40,8 @@ export function StatusBar({ actions }: { actions: Record<string, Action> }) {
           ADD TO: {target ? target.name.toUpperCase() : "NO COLLECTION"}
         </span>
         <span className={`pt${store.prefs.foil ? " on" : ""}`} role="button" title={actions.foil?.label} onClick={actions.foil?.run}>FOIL</span>
+        <span className="pt on-plain" role="button" title="Currency for prices and values (click to switch)"
+          onClick={actions[store.prefs.currency === "usd" ? "currency.eur" : "currency.usd"]?.run}>PRICES: {store.prefs.currency.toUpperCase()}</span>
         <span className="pt on-plain" role="button" title="Target zone for Add to deck (Z cycles it)" onClick={actions["zone.cycle"]?.run}>
           ZONE: {zoneLabel(store.prefs.zone).toUpperCase()}
         </span>

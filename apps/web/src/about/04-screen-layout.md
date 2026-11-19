@@ -8,16 +8,17 @@ From top to bottom: menu bar, ribbon, the main area (panels around the work area
 
 ## Menu bar
 
-The menu bar holds seven menus, the name of the open deck, and the account menu on the right. An amber count beside your user name shows offers waiting in your Inbox. Opening a menu and moving the pointer to another menu name switches menus. Clicking elsewhere or pressing Esc closes the menu. Items that cannot be used right now are grey. A check mark shows a setting that is on.
+The menu bar holds eight menus, the name of the open deck, and the account menu on the right. An amber count beside your user name shows offers waiting in your Inbox. Opening a menu and moving the pointer to another menu name switches menus. Clicking elsewhere or pressing Esc closes the menu. Items that cannot be used right now are grey. A check mark shows a setting that is on.
 
 | Menu | Items |
 |---|---|
-| File | Import collection CSV..., Export collection (Moxfield CSV), Export missing list (text), Export missing list (CSV), Download backup, Restore backup..., Import decklist..., Export deck (text), Export deck (CSV) |
+| File | Import collection CSV..., Export collection (Moxfield CSV), Export missing list (text), Export missing list (CSV), Download backup, Restore backup..., Import decklist..., Export deck (text), Export deck (CSV), Export missing deck cards (text) |
 | Edit | Undo, Redo, Select all rows, Move selected..., Remove selected..., Find card, Clear filters |
-| Cards | Scan card..., Add to collection, Cycle target collection, Add to deck, Add as foil, Update card database |
-| Collection | New collection..., Collection settings..., Delete collection... (Leave shared collection... for a collection shared with you), Collection cards, Set completion, Missing cards, Send collection..., Collection sharing..., Inbox... |
-| Deck | New deck..., Open deck..., Rename deck..., Delete deck... (Leave shared deck... for a deck shared with you), Main deck, Sideboard, Commander, Cycle target zone, Send deck..., Deck sharing..., Inbox... |
-| View | Card search, Collection view, Deck view, Light theme, Dark theme, System theme, Filters panel, Collections panel, Decks panel, Card panel, Deck list panel, Import review panel, Save workspace..., Manage workspaces..., Reset panels, Customize ribbon... |
+| Cards | Scan card..., Add to collection, Cycle target collection, Add to deck, Add as foil, Add to wishlist, Update card database |
+| Collection | New collection..., Collection settings..., Delete collection... (Leave shared collection... for a collection shared with you), Collection cards, Set completion, Missing cards, Collection statistics, Binder layout, Copy details..., Mark for trade, Unmark for trade, Add missing cards to wishlist, Send collection..., Collection sharing..., Inbox... |
+| Deck | New deck..., Open deck..., Rename deck..., Delete deck... (Leave shared deck... for a deck shared with you), Main deck, Sideboard, Commander, Cycle target zone, Deck cards, Deck ownership, Deck statistics, Add missing deck cards to wishlist, Export missing deck cards (text), Send deck..., Deck sharing..., Inbox... |
+| Trade | Trade view, Add to trade (you give), Add to trade (you get), Copy trade summary, Clear trade..., Mark for trade, Unmark for trade |
+| View | Card search, Collection view, Deck view, Trade view, Light theme, Dark theme, System theme, Prices in US dollars, Prices in euros, Filters panel, Collections panel, Decks panel, Card panel, Deck list panel, Import review panel, Save workspace..., Manage workspaces..., Reset panels, Customize ribbon... |
 | Help | Keyboard shortcuts, About Mana Vault |
 | Account (your user name) | Inbox... (with the number waiting), Change password..., Sign out |
 
@@ -29,13 +30,14 @@ The ribbon has tabs of grouped buttons. A button shows an icon and a short label
 
 | Tab | Groups and buttons |
 |---|---|
-| Home | Search: Find, Scan card, Clear filters. Add: Add to collection, Target, Add to deck, Add as foil. Views: Cards, Collection, Deck. Edit: Undo, Redo |
-| Collection | Collection: New collection, Settings, Delete (Leave when shared with you). View: Cards, Completion, Missing. Selection: Select all, Move, Remove. Import and export: Import CSV, Moxfield CSV, Missing text, Missing CSV. Share: Send, Sharing, Inbox. Backup: Backup, Restore |
-| Decks | Deck: New deck, Open deck, Rename, Delete (Leave when shared with you). Import: Import list. Export: Text, CSV. Share: Send, Sharing, Inbox |
-| Database | Card database: Update database |
+| Home | Search: Find, Scan card, Clear filters. Add: Add to collection, Target, Add to deck, Add as foil, Wishlist. Views: Cards, Collection, Deck, Trade. Edit: Undo, Redo |
+| Collection | Collection: New collection, Settings, Delete (Leave when shared with you). View: Cards, Completion, Missing, Statistics, Binder. Selection: Select all, Move, Remove, Details, For trade, Not for trade. Import and export: Import CSV, Moxfield CSV, Missing text, Missing CSV, Missing to wishlist. Share: Send, Sharing, Inbox. Backup: Backup, Restore |
+| Decks | Deck: New deck, Open deck, Rename, Delete (Leave when shared with you). Import: Import list. Export: Text, CSV. Check: Cards, Ownership, Statistics, Missing to wishlist, Missing text. Share: Send, Sharing, Inbox |
+| Trade | Trade: Trade, You give, You get. Summary: Copy summary, Clear trade. Trade list: For trade, Not for trade |
+| Database | Card database: Update database. Prices: USD, EUR |
 | View | Theme: Light theme, Dark theme, System theme. Panels: Filters, Collections, Decks, Card, Deck list, Import review. Workspace: Save workspace, Manage, Reset panels. Ribbon: Customize |
 | Help | Help: Shortcuts, About |
-| Deck (amber, only while a deck is open) | Target zone: Main, Sideboard, Commander (Cycle zone is available to add with Customize ribbon). Build: Add to deck, Deck, Cards. Export: Text, CSV |
+| Deck (amber, only while a deck is open) | Target zone: Main, Sideboard, Commander (Cycle zone is available to add with Customize ribbon). Build: Add to deck, Deck, Cards. Check: Ownership, Statistics. Export: Text, CSV |
 
 The Deck tab is selected automatically when a deck is opened. The **Workspace** list at the right end of the tab row switches workspaces.
 
@@ -52,13 +54,14 @@ Changes apply at once and are saved for your account. When Mana Vault is updated
 
 ## Work area
 
-The work area in the middle shows one of three views, chosen with the Home tab, the View menu or keys 1, 2 and 3. Each view has a header row with its name, a search or filter box where it applies, and a count on the right.
+The work area in the middle shows one of four views, chosen with the Home tab, the View menu or keys 1, 2, 3 and 4. Each view has a header row with its name, a search or filter box where it applies, and a count on the right.
 
 | View | Shows |
 |---|---|
-| Card search | Search results. A yellow bar under the header names the open deck, its mode and the target zone |
-| Collection | The open collection, in three tabs: Cards (entries with count, move and remove buttons), Completion and Missing; see [Collections](/about/collections) and [Set completion](/about/set-completion) |
-| Deck | The open deck grouped by zone, with count controls, a zone list to move cards and a remove button |
+| Card search | Search results with prices. A yellow bar under the header names the open deck, its mode and the target zone |
+| Collection | The open collection, in four tabs: Cards (rows as a list or binder pages), Completion, Missing and Statistics; see [Collections](/about/collections), [Set completion](/about/set-completion) and [Prices and statistics](/about/prices-and-statistics) |
+| Deck | The open deck, in three tabs: Cards (grouped by zone, with count controls, owned counts, a zone list and a remove button), Ownership and Statistics; see [Decks](/about/decks) |
+| Trade | The trade list and the trade calculator; see [Wishlists and trading](/about/wishlists-and-trading) |
 
 Click a row to select it; its details appear in the Card panel. Up and Down select the previous or next row. The About guide also opens in the work area and closes with **Close** or Esc.
 
@@ -67,9 +70,9 @@ Click a row to select it; its details appear in the Card panel. Up and Down sele
 | Panel | Shows |
 |---|---|
 | Filters | Type, set code, color, rarity, legal format and mana value range filters for card search, and **Clear filters** |
-| Collections | Your collections with card counts, completion bars and percentages, Shared badges, **Add here** to choose the target collection, and **New...** |
+| Collections | Your collections with card counts, values, completion bars and percentages, Wishlist and Shared badges, **Add here** to choose the target collection, and **New...** |
 | Decks | Every deck with its mode, card count and a Shared badge for shared decks, a box to find a deck, and **New...**. Click a deck to open it; double-click to also show it in the work area |
-| Card | The selected card: image, name, type, **Add to collection**, **Add to deck**, mana cost, mana value, rules text, set, number, rarity, artist, release date, and copies owned of this printing (regular and foil), of all printings, and in each of your collections |
+| Card | The selected card: image, name, type, **Add to collection**, **Add to deck**, **Add to wishlist**, **You get**, mana cost, mana value, rules text, set, number, rarity, artist, release date, flavor name, regular, foil and etched prices, copies owned of this printing (regular, foil and etched), of all printings and in each of your collections with the number for trade, and copies wanted in each wishlist |
 | Deck list | The open deck in compact form by zone, with plus and minus buttons, and the Main, Sideboard and Commander target zone switch |
 | Import review | The rows skipped by the latest import or import preview, with row number, card name and reason, and **Clear** |
 
@@ -110,6 +113,7 @@ A workspace is a saved panel layout and view. Three are built in:
 | Last update failed | Shown in red after a failed update; click it to read the reason |
 | ADD TO | The target collection for Add to collection; click to cycle it |
 | FOIL | Click to switch Add as foil on or off (highlighted when on) |
+| PRICES | The currency for prices and values, USD or EUR; click to switch it |
 | ZONE | The target zone for Add to deck; click to cycle it |
 | Message | Confirmations in blue and problems in red, at the right end |
 
@@ -119,7 +123,7 @@ Below 900 pixels wide, the menu bar, ribbon, panels and status bar are replaced 
 
 - A top bar with the deck name or "Mana Vault", an **Inbox** button with a count when offers are waiting, a **Decks** button while in the deck view, and a menu button.
 - The current view, filling the screen. The card search adds **Filters** and **Scan** buttons under the search box.
-- A bottom tab bar: **Cards**, **Collection**, **Decks** and **More**. Decks shows the open deck, or the deck list when no deck is open.
+- A bottom tab bar: **Cards**, **Collection**, **Decks** and **More**. The trade view opens from **Menu** (Trade view). Decks shows the open deck, or the deck list when no deck is open.
 - Sheets that slide up from the bottom: **Filters**, **Card** (opens when a card is tapped, except while picking rows), **Decks**, and **Menu** (every menu command that applies on a phone, plus Inbox, Change password and Sign out).
 - In a collection, **Select** turns on checkboxes; tap rows to pick them and use the bar above the list to move or remove them. Close a sheet with **Close**, by tapping outside it, or with Esc.
 - Messages appear as a short banner above the tab bar.

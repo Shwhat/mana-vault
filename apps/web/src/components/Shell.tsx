@@ -7,6 +7,7 @@ import { CardPanel, CollectionsPanel, DeckListPanel, DecksPanel, FiltersPanel, R
 import { MENUS } from "../ribbon";
 import { useApp } from "../store";
 import { CollectionView } from "../views/CollectionView";
+import { TradeView } from "../views/TradeView";
 import { CardsView, DeckView } from "../views/Views";
 import { About } from "./About";
 import { Dock } from "./Dock";
@@ -19,6 +20,7 @@ function CenterView({ actions, onFilters }: { actions: Record<string, Action>; o
   if (store.view === "about") return <About />;
   if (store.view === "collection") return <CollectionView actions={actions} />;
   if (store.view === "deck") return <DeckView actions={actions} />;
+  if (store.view === "trade") return <TradeView actions={actions} />;
   return <CardsView actions={actions} onFilters={onFilters} />;
 }
 

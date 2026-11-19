@@ -52,7 +52,39 @@ The last deck you opened opens again the next time you sign in.
 
 ## The deck view
 
-Press **3** (or **Deck**) to open it. The header shows the deck name, format, mode and total cards. Cards are grouped under Commander, Main deck and Sideboard headings with a count for each zone, and sorted by name. Each row shows the image, name, mana cost, type line, the printing (Theme) or "Any printing" (Normal), the count controls, the zone list and a remove button.
+Press **3** (or **Deck**) to open it. The header shows the deck name, format, mode, the tabs **Cards**, **Ownership** and **Statistics** (also **Deck cards**, **Deck ownership** and **Deck statistics** in the Deck menu and ribbon), the total cards, the deck's value and how many cards you own.
+
+On the Cards tab, cards are grouped under Commander, Main deck and Sideboard headings with a count for each zone, and sorted by name. Each row shows the image, name, mana cost, type line, the printing (Theme) or "Any printing" (Normal), an "Own N of M" badge (green when every copy is owned; pointing at it lists where the copies are), the count controls, the zone list and a remove button.
+
+The Statistics tab is described in [Prices and statistics](/about/prices-and-statistics).
+
+## Ownership
+
+The Ownership tab checks which deck cards you own.
+
+- Copies in every collection you can use count: your own and those shared with you. Wishlists do not count.
+- A Normal deck counts any printing of a card. A Theme deck counts only the exact printing.
+- Each copy counts once. When the same card is in more than one zone, copies go first to the commander zone, then the main deck, then the sideboard.
+- Copies in any finish, condition or language count.
+- Copies in a deck do not reserve them: two decks that use the same card both count the same copies.
+
+| Item | Shows |
+|---|---|
+| Cards you own | The share of deck cards you own, the numbers owned and missing, and the cost of the missing cards |
+| Card | Card name, with the zone when not the main deck |
+| Owned | Copies owned of copies needed |
+| Where | Each collection that holds copies, with how many |
+| To buy | Missing copies times the price, or Owned |
+
+The price of a missing card is its cheapest printing for a Normal deck and the chosen printing for a Theme deck, in the regular finish (foil when the printing only comes in foil). Click a row to see the card in the Card panel.
+
+- **Add missing to wishlist** (or **Add missing deck cards to wishlist**) adds the missing copies to your wishlist in one step that can be undone; see [Wishlists and trading](/about/wishlists-and-trading). Normal decks add the newest printing of each card.
+- **Export missing** (or **Export missing deck cards (text)**) downloads deck-name-missing.txt with one line per card, such as `2 Lightning Bolt`. Theme decks add the printing: `2 Lightning Bolt (M10) 146`.
+
+| Message | Cause |
+|---|---|
+| You own every card in deck name | Add missing to wishlist or Export missing with nothing missing |
+| Missing cards exported (N cards) | Export missing finished |
 
 ## Undo
 

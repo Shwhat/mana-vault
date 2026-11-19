@@ -8,7 +8,14 @@ The full user guide is built into the app: Help menu, **About Mana Vault**. The 
 
 ## Features
 
-- Card search across every printing, with filter syntax (`t:dragon c:red mv>=4`, `o:draw`, `set:lea`, `r:rare`, `id:wubg`, `legal:commander`, negation with `-`) and a Filters panel.
+- Card search across every printing, with filter syntax (`t:dragon c:red mv>=4`, `o:draw`, `set:lea`, `r:rare`, `id:wubg`, `legal:commander`, `usd<1`, `eur>=20`, negation with `-`), flavor name matching and a Filters panel.
+- Prices from Scryfall (USD regular, foil, etched; EUR regular, foil) stored with each card database update, shown in USD or EUR, with collection and deck values and sorting by price.
+- Statistics for collections and decks: stat tiles and bar charts for mana curve, color, type, rarity, finish and top sets; clicking a collection bar filters the list.
+- Copy details per collection row: finish (regular, foil, etched), condition, language and the number for trade.
+- Filter tags (click a set code or rarity) and a binder layout with pages of nine cards.
+- Wishlists: collections whose cards are wanted, not owned; add a card, a set's missing cards or a deck's missing cards in one step.
+- Deck ownership check: which cards you own across your collections, where they are, and the cost of the missing cards; export the missing cards as text.
+- Trade list of the copies marked for trade, and a trade calculator that compares what you give with what you get, with a copyable summary.
 - Any number of collections per account (binders, boxes, sets being completed), each copy in one place, with a target collection for adding (C cycles it).
 - Set completion: link a collection to any number of sets; count by main set, every printing or each card name once, and by any finish, regular only, foil only or one of each; Completion and Missing tabs with filters, add-from-list and text or CSV export of the missing list.
 - Bulk editing: pick rows with Ctrl+click, Shift+click, Ctrl+A or Select mode; remove or move them between collections in one undoable step.
@@ -16,15 +23,15 @@ The full user guide is built into the app: Help menu, **About Mana Vault**. The 
 - Decks in Normal mode (any printing counts) or Theme mode (exact printing kept), with main deck, sideboard and commander zones and a target zone for adding; rename and delete.
 - Collections and decks belong to their account. Send them to another account as a copy, a share (both edit) or a transfer; the receiver accepts from an Inbox as a new item or, for collections, merged into one of theirs.
 - Undo and redo for collection and deck edits (150 steps).
-- Collection CSV import (Moxfield and similar) into a chosen collection, and decklist import (text or CSV), each with a preview and an Import review panel for skipped rows.
-- Exports: collection as Moxfield CSV, decks as text or CSV.
+- Collection CSV import (Moxfield, ManaBox and similar, including condition, language, etched and tradelist counts) into a chosen collection, and decklist import (text or CSV), each with a preview and an Import review panel for skipped rows.
+- Exports: collection as Moxfield CSV with condition, language, finish and tradelist counts, decks as text or CSV, missing set and deck cards as text.
 - JSON backup and restore of the signed-in account's own collections and decks and the card records they use.
 - Card database updates from Scryfall on demand or on a schedule, including the set list (printed sizes) and each printing's finishes.
 - Camera card scanner with in-browser text recognition.
 - Sign-in with accounts, password changes, 30-day sessions and protection against password guessing. New accounts can be turned off.
 - Desktop interface in the OpenSchem style: menu bar, customizable ribbon with a contextual Deck tab, dockable and floating panels (Filters, Collections, Decks, Card, Deck list, Import review), saved workspaces, status bar and light, dark or system theme.
 - Phone layout with bottom tabs, full-screen sheets and 44 pixel touch targets.
-- Preferences (theme, foil, target zone, target and open collection, ribbon, panels, workspaces, last deck) saved per account on the server.
+- Preferences (theme, foil, target zone, target and open collection, currency, collection sort and layout, ribbon, panels, workspaces, last deck) saved per account on the server.
 - Built-in About guide with release notes.
 
 ## Keyboard shortcuts
@@ -32,13 +39,19 @@ The full user guide is built into the app: Help menu, **About Mana Vault**. The 
 | Key | Action |
 |---|---|
 | / | Find card |
-| 1, 2, 3 | Card search, collection, deck view |
+| 1, 2, 3, 4 | Card search, collection, deck, trade view |
 | Up, Down | Previous or next row |
 | Enter | Add the selected card to the collection |
 | Shift+Enter | Add the selected card to the open deck |
 | F | Switch Add as foil |
 | Z | Cycle the target zone |
 | C | Cycle the target collection |
+| W | Add the selected card to the wishlist |
+| E | Copy details of the selected collection row |
+| B | Switch the collection between list and binder |
+| Page Up, Page Down | Previous or next binder page |
+| T | Add the selected collection row to the trade (you give) |
+| G | Add the selected card to the trade (you get) |
 | Ctrl+A | Pick every row the collection filter shows |
 | Ctrl+click, Shift+click | Pick more rows, or a range |
 | Delete | Remove the picked collection rows |

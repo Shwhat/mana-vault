@@ -20,13 +20,16 @@ The first line must hold column names. Column names are matched without regard t
 | Count | Quantity, Qty | No | Copies, a whole number from 1 to 10,000. Empty means 1 |
 | Edition | Set, Set Code, Set Name | No | Set code or full set name |
 | Collector Number | collector_number, Number | No | Collector number |
-| Foil | | No | true, yes, y, 1 or foil for foil; empty, false, no, n, 0, nonfoil or non-foil for regular |
+| Foil | Finish, Printing | No | true, yes, y, 1 or foil for foil; etched for etched; empty, false, no, n, 0, nonfoil, non-foil, normal or regular for regular |
+| Condition | | No | Mint, Near Mint, Lightly Played, Moderately Played, Heavily Played, Damaged, their codes M, NM, LP, MP, HP, D or DMG, the ManaBox forms such as near_mint, and Excellent (Lightly played), Good or Played (Moderately played), Poor (Heavily played). Empty means Near mint |
+| Language | Lang | No | A language name such as Japanese, or a Scryfall code such as ja or zhs. Empty means English |
+| Tradelist Count | Trade Count, Trade | No | How many of the row's copies are for trade, 0 or more; more than the count is treated as the count. Empty means 0 |
 
 ### How a row is matched
 
-- The name is matched without regard to capital letters.
+- The name is matched without regard to capital letters. It can also be a printing's flavor name, or the front face of a two-faced card (such as Delver of Secrets for Delver of Secrets // Insectile Aberration); an exact card name is preferred.
 - When a set or collector number is given, the printing must match them. Otherwise, and when several printings match, the newest printing is used.
-- Rows that list the same printing and finish are added together.
+- Rows that list the same printing, finish, condition and language are added together.
 - A file can hold up to 5,000 card rows.
 
 ## Exporting the collection
@@ -36,16 +39,20 @@ The first line must hold column names. Column names are matched without regard t
 | Column | Value |
 |---|---|
 | Count | Copies |
-| Tradelist Count | 0 |
+| Tradelist Count | Copies for trade |
 | Name | Card name |
-| Edition | Set name |
-| Condition, Language, Tags, Last Modified, Alter, Proxy, Purchase Price | Empty |
-| Foil | true or false |
+| Edition | Set code |
+| Condition | Mint, Near Mint, Lightly Played, Moderately Played, Heavily Played or Damaged |
+| Language | Language name, such as English |
+| Foil | foil, etched, or empty for regular |
+| Tags, Last Modified, Alter, Proxy, Purchase Price | Empty |
 | Collector Number | Collector number |
+
+Exporting and importing again gives the same rows.
 
 ## Exporting a missing list
 
-The missing cards of a collection linked to sets export as text or CSV; see [Set completion](/about/set-completion).
+The missing cards of a collection linked to sets export as text or CSV; see [Set completion](/about/set-completion). The missing cards of a deck export as text; see [Decks](/about/decks).
 
 ## Importing a decklist
 
@@ -55,7 +62,7 @@ The missing cards of a collection linked to sets export as text or CSV; see [Set
 
 ### Text decklists
 
-One card per line: a count, an optional "x", then the card name, for example `4 Lightning Bolt` or `1x Sol Ring`.
+One card per line: a count, an optional "x", then the card name, for example `4 Lightning Bolt` or `1x Sol Ring`. Card names match the same way as collection rows: exact name, flavor name, or front face.
 
 - A printing can follow the name as a set code in brackets or parentheses and an optional collector number: `1 Lightning Bolt (M10) 146` or `1 Sol Ring [LEA] #269`.
 - A line reading `Main`, `Mainboard`, `Deck`, `Side`, `Sideboard` or `Commander` (optionally after `//` or `#`, optionally ending with a colon) starts that zone. Lines before any heading go to the main deck.

@@ -2,7 +2,7 @@
 import { request, APP_VERSION } from "./api";
 import { DEFAULT_WORKSPACE, isOpen, openPanel, PRESETS, type Layout, type Workspace, validLayout } from "./dock";
 import type { RibbonTab } from "./ribbon";
-import type { Zone } from "./types";
+import type { CollectionSort, Currency, Zone } from "./types";
 
 export type Theme = "light" | "dark" | "system";
 
@@ -20,6 +20,10 @@ export type Prefs = {
   targetCollection: string | null;
   /** The collection shown in the collection view. */
   openCollection: string | null;
+  currency: Currency;
+  collectionSort: CollectionSort;
+  /** List shows rows, Binder shows pages of nine card images. */
+  collectionLayout: "list" | "binder";
   appVersion: string;
 };
 
@@ -27,7 +31,8 @@ export function defaultPrefs(): Prefs {
   const preset = PRESETS[DEFAULT_WORKSPACE]!();
   return {
     theme: "light", foil: false, zone: "main", ribbon: null, ribbonTab: "home", layout: preset.layout,
-    workspace: DEFAULT_WORKSPACE, workspaces: {}, lastDeckId: null, targetCollection: null, openCollection: null, appVersion: APP_VERSION,
+    workspace: DEFAULT_WORKSPACE, workspaces: {}, lastDeckId: null, targetCollection: null, openCollection: null,
+    currency: "usd", collectionSort: "name", collectionLayout: "list", appVersion: APP_VERSION,
   };
 }
 
@@ -54,6 +59,9 @@ export function mergePrefs(saved: unknown): Prefs {
     lastDeckId: typeof value.lastDeckId === "string" ? value.lastDeckId : null,
     targetCollection: typeof value.targetCollection === "string" ? value.targetCollection : null,
     openCollection: typeof value.openCollection === "string" ? value.openCollection : null,
+    currency: value.currency === "eur" ? "eur" : "usd",
+    collectionSort: ["price-desc", "price-asc", "quantity", "set"].includes(String(value.collectionSort)) ? value.collectionSort as CollectionSort : "name",
+    collectionLayout: value.collectionLayout === "binder" ? "binder" : "list",
     appVersion: APP_VERSION,
   };
 }

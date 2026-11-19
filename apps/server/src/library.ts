@@ -3,10 +3,12 @@ import { randomUUID } from "node:crypto";
 import type { FastifyInstance, FastifyReply } from "fastify";
 import type { DatabaseSync } from "node:sqlite";
 import { listSets } from "./sets.js";
+import { type CopyKey, type Currency, PRICE_COLUMNS, priceSql, readCopyKey } from "./copies.js";
 
 export type Kind = "collection" | "deck";
 export type Completion = "main" | "all" | "names";
 export type Finish = "any" | "regular" | "foil" | "both";
+export type CollectionKind = "collection" | "wishlist";
 type Role = "owner" | "member";
 
 const COMPLETIONS: Completion[] = ["main", "all", "names"];
@@ -103,7 +105,7 @@ export function collectionCompletion(database: DatabaseSync, collectionId: strin
      WHERE cc.collection_id = ? AND c.set_code IN (SELECT set_code FROM collection_sets WHERE collection_id = ?)`,
   ).all(collectionId, collectionId)) {
     const entry = owned.get(String(row.card_id)) ?? { regular: 0, foil: 0 };
-    if (Number(row.foil) === 1) entry.foil += Number(row.quantity);
+    if (Number(row.foil) >= 1) entry.foil += Number(row.quantity);
     else entry.regular += Number(row.quantity);
     owned.set(String(row.card_id), entry);
   }
@@ -157,11 +159,24 @@ export function collectionCompletion(database: DatabaseSync, collectionId: strin
 
 // ---------- collections ----------
 
+/** The value of every copy in a collection, in both currencies, and how many copies have no price. */
+export function collectionValue(database: DatabaseSync, id: string): { usd: number; eur: number; unpricedUsd: number; unpricedEur: number } {
+  const row = database.prepare(
+    `SELECT COALESCE(SUM(i.quantity * ${priceSql("usd")}), 0) AS usd, COALESCE(SUM(i.quantity * ${priceSql("eur")}), 0) AS eur,
+            COALESCE(SUM(CASE WHEN ${priceSql("usd")} IS NULL THEN i.quantity END), 0) AS unpriced_usd,
+            COALESCE(SUM(CASE WHEN ${priceSql("eur")} IS NULL THEN i.quantity END), 0) AS unpriced_eur
+     FROM collection_cards i JOIN cards c ON c.id = i.card_id WHERE i.collection_id = ?`,
+  ).get(id);
+  const round = (value: unknown) => Math.round(Number(value ?? 0) * 100) / 100;
+  return { usd: round(row?.usd), eur: round(row?.eur), unpricedUsd: Number(row?.unpriced_usd ?? 0), unpricedEur: Number(row?.unpriced_eur ?? 0) };
+}
+
 function collectionSummary(database: DatabaseSync, id: string, userId: number) {
   const row = database.prepare(
-    `SELECT c.id, c.name, c.description, c.completion, c.finish, c.created_at, c.updated_at,
+    `SELECT c.id, c.name, c.description, c.completion, c.finish, c.kind, c.created_at, c.updated_at,
             (SELECT COUNT(*) FROM collection_cards WHERE collection_id = c.id) AS entry_count,
-            (SELECT COALESCE(SUM(quantity), 0) FROM collection_cards WHERE collection_id = c.id) AS card_count
+            (SELECT COALESCE(SUM(quantity), 0) FROM collection_cards WHERE collection_id = c.id) AS card_count,
+            (SELECT COALESCE(SUM(trade), 0) FROM collection_cards WHERE collection_id = c.id) AS trade_count
      FROM collections c WHERE c.id = ?`,
   ).get(id);
   if (!row) return null;
@@ -178,9 +193,12 @@ function collectionSummary(database: DatabaseSync, id: string, userId: number) {
     description: String(row.description),
     completion: String(row.completion) as Completion,
     finish: String(row.finish) as Finish,
+    kind: String(row.kind) as CollectionKind,
     sets,
     entryCount: Number(row.entry_count),
     cardCount: Number(row.card_count),
+    tradeCount: Number(row.trade_count),
+    value: collectionValue(database, id),
     progress: progress ? progress.overall : null,
     ...sharing,
   };
@@ -195,7 +213,7 @@ export function listCollections(database: DatabaseSync, userId: number) {
   return ids.map((id) => collectionSummary(database, id, userId)!);
 }
 
-type CollectionInput = { name: string; description: string; completion: Completion; finish: Finish; sets: string[] };
+type CollectionInput = { name: string; description: string; completion: Completion; finish: Finish; kind: CollectionKind; sets: string[] };
 
 function readCollectionInput(body: unknown): CollectionInput | string {
   const value = (body && typeof body === "object" ? body : {}) as Record<string, unknown>;
@@ -207,11 +225,13 @@ function readCollectionInput(body: unknown): CollectionInput | string {
   if (!COMPLETIONS.includes(completion)) return "Choose a completion rule: main, all or names";
   const finish = (value.finish ?? "any") as Finish;
   if (!FINISHES.includes(finish)) return "Choose a finish rule: any, regular, foil or both";
+  const kind = (value.kind ?? "collection") as CollectionKind;
+  if (kind !== "collection" && kind !== "wishlist") return "A collection is either a collection or a wishlist";
   const sets = value.sets ?? [];
   if (!Array.isArray(sets) || sets.length > 300 || !sets.every((code) => typeof code === "string" && /^[a-z0-9]{2,8}$/i.test(code))) {
     return "Sets must be a list of set codes";
   }
-  return { name, description, completion, finish, sets: [...new Set(sets.map((code: string) => code.toLowerCase()))] };
+  return { name, description, completion, finish, kind, sets: [...new Set(sets.map((code: string) => code.toLowerCase()))] };
 }
 
 function saveCollectionSets(database: DatabaseSync, id: string, sets: string[]): string | null {
@@ -226,27 +246,37 @@ function saveCollectionSets(database: DatabaseSync, id: string, sets: string[]):
 
 export function createCollection(database: DatabaseSync, ownerId: number, input: CollectionInput): string {
   const id = randomUUID();
-  database.prepare("INSERT INTO collections (id, owner_id, name, description, completion, finish) VALUES (?, ?, ?, ?, ?, ?)")
-    .run(id, ownerId, input.name, input.description, input.completion, input.finish);
+  database.prepare("INSERT INTO collections (id, owner_id, name, description, completion, finish, kind) VALUES (?, ?, ?, ?, ?, ?, ?)")
+    .run(id, ownerId, input.name, input.description, input.completion, input.finish, input.kind);
   const problem = saveCollectionSets(database, id, input.sets);
   if (problem) throw new Error(problem);
   return id;
 }
 
-const ENTRY_COLUMNS = `c.id, c.name, c.set_code, c.set_name, c.collector_number, c.rarity, c.image_url, c.colors, i.quantity, i.foil`;
+export const ENTRY_COLUMNS = `c.id, c.oracle_id, c.name, c.mana_cost, c.mana_value, c.type_line, c.set_code, c.set_name, c.collector_number, c.rarity,
+  c.image_url, c.colors, ${PRICE_COLUMNS}, i.quantity, i.foil, i.condition, i.language, i.trade`;
+const KEY_WHERE = "card_id = ? AND foil = ? AND condition = ? AND language = ?";
+const KEY_CONFLICT = "ON CONFLICT(collection_id, card_id, foil, condition, language)";
+const keyValues = (key: CopyKey) => [key.cardId, key.foil, key.condition, key.language] as const;
 
-function readItems(body: unknown, allowZero: boolean): Array<{ cardId: string; foil: boolean; quantity: number }> | string {
+type Item = CopyKey & { quantity: number; trade?: number };
+
+function readItems(body: unknown, allowZero: boolean): Item[] | string {
   const items = body && typeof body === "object" ? (body as { items?: unknown }).items : undefined;
   if (!Array.isArray(items) || !items.length || items.length > 10_000) return "Provide a list of 1 to 10,000 cards";
-  const result = [];
+  const result: Item[] = [];
   for (const item of items) {
     const value = (item && typeof item === "object" ? item : {}) as Record<string, unknown>;
     const quantity = value.quantity;
-    if (typeof value.cardId !== "string" || typeof value.foil !== "boolean" || typeof quantity !== "number" ||
-      !Number.isInteger(quantity) || quantity < (allowZero ? 0 : 1) || quantity > 10_000) {
-      return `Each card needs a cardId, a foil flag and a quantity from ${allowZero ? 0 : 1} to 10,000`;
+    const key = readCopyKey(value);
+    if (!key || typeof quantity !== "number" || !Number.isInteger(quantity) || quantity < (allowZero ? 0 : 1) || quantity > 10_000) {
+      return `Each card needs a cardId, a finish, a known condition and language, and a quantity from ${allowZero ? 0 : 1} to 10,000`;
     }
-    result.push({ cardId: value.cardId, foil: value.foil, quantity });
+    const trade = value.trade;
+    if (trade !== undefined && (typeof trade !== "number" || !Number.isInteger(trade) || trade < 0 || trade > quantity)) {
+      return "The number for trade must be a whole number from 0 to the quantity";
+    }
+    result.push({ ...key, quantity, ...(trade === undefined ? {} : { trade }) });
   }
   return result;
 }
@@ -269,8 +299,9 @@ function transaction<T>(database: DatabaseSync, work: () => T): T {
 
 export function copyCollectionCards(database: DatabaseSync, from: string, to: string) {
   database.prepare(
-    `INSERT INTO collection_cards (collection_id, card_id, foil, quantity) SELECT ?, card_id, foil, quantity FROM collection_cards WHERE collection_id = ?
-     ON CONFLICT(collection_id, card_id, foil) DO UPDATE SET quantity = MIN(10000, quantity + excluded.quantity)`,
+    `INSERT INTO collection_cards (collection_id, card_id, foil, condition, language, quantity, trade)
+       SELECT ?, card_id, foil, condition, language, quantity, trade FROM collection_cards WHERE collection_id = ?
+     ${KEY_CONFLICT} DO UPDATE SET quantity = MIN(10000, quantity + excluded.quantity), trade = MIN(MIN(10000, quantity + excluded.quantity), trade + excluded.trade)`,
   ).run(to, from);
 }
 
@@ -354,40 +385,73 @@ export function registerLibraryRoutes(app: FastifyInstance, database: DatabaseSy
        WHERE i.collection_id = ? ORDER BY c.name, c.set_code, c.collector_number`,
     ).all(request.params.collectionId));
 
-  app.post<{ Params: { collectionId: string }; Body: { cardId?: unknown; quantity?: unknown; foil?: unknown } }>(
+  app.post<{ Params: { collectionId: string }; Body: Record<string, unknown> }>(
     "/api/collections/:collectionId/cards",
     async (request, reply) => {
-      const { cardId, quantity = 1, foil = false } = request.body ?? {};
-      if (typeof cardId !== "string" || typeof quantity !== "number" || !Number.isInteger(quantity) || quantity < 1 || quantity > 10_000 || typeof foil !== "boolean") {
-        return reply.code(400).send({ error: "Provide a cardId, a quantity from 1 to 10000, and a foil flag" });
+      const body = request.body ?? {};
+      const quantity = body.quantity ?? 1;
+      const key = readCopyKey(body);
+      if (!key || typeof quantity !== "number" || !Number.isInteger(quantity) || quantity < 1 || quantity > 10_000) {
+        return reply.code(400).send({ error: "Provide a cardId, a quantity from 1 to 10000, and a finish" });
       }
       const id = request.params.collectionId;
       const result = database.prepare(
-        `INSERT INTO collection_cards (collection_id, card_id, foil, quantity)
-         SELECT ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM cards WHERE id = ?)
-         ON CONFLICT(collection_id, card_id, foil) DO UPDATE SET quantity = MIN(10000, quantity + excluded.quantity)`,
-      ).run(id, cardId, foil ? 1 : 0, quantity, cardId);
+        `INSERT INTO collection_cards (collection_id, card_id, foil, condition, language, quantity)
+         SELECT ?, ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM cards WHERE id = ?)
+         ${KEY_CONFLICT} DO UPDATE SET quantity = MIN(10000, quantity + excluded.quantity)`,
+      ).run(id, ...keyValues(key), quantity, key.cardId);
       if (!result.changes) return reply.code(404).send({ error: "Card printing not found" });
       touch(database, "collection", id);
-      return database.prepare(`SELECT ${ENTRY_COLUMNS} FROM collection_cards i JOIN cards c ON c.id = i.card_id WHERE i.collection_id = ? AND i.card_id = ? AND i.foil = ?`)
-        .get(id, cardId, foil ? 1 : 0);
+      return database.prepare(`SELECT ${ENTRY_COLUMNS} FROM collection_cards i JOIN cards c ON c.id = i.card_id WHERE i.collection_id = ? AND i.${KEY_WHERE.replaceAll(" AND ", " AND i.")}`)
+        .get(id, ...keyValues(key));
     },
   );
+
+  // adds copies of many cards at once (wishlists, missing lists) and returns each entry's count before the change, for undo
+  app.post<{ Params: { collectionId: string } }>("/api/collections/:collectionId/cards/add", async (request, reply) => {
+    const items = readItems(request.body, false);
+    if (typeof items === "string") return reply.code(400).send({ error: items });
+    const id = request.params.collectionId;
+    const current = database.prepare(`SELECT quantity, trade FROM collection_cards WHERE collection_id = ? AND ${KEY_WHERE}`);
+    const insert = database.prepare(
+      `INSERT INTO collection_cards (collection_id, card_id, foil, condition, language, quantity)
+       SELECT ?, ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM cards WHERE id = ?)
+       ${KEY_CONFLICT} DO UPDATE SET quantity = MIN(10000, quantity + excluded.quantity)`,
+    );
+    const result = transaction(database, () => {
+      const before: Item[] = [];
+      const after: Item[] = [];
+      for (const item of items) {
+        const row = current.get(id, ...keyValues(item));
+        const { trade: _trade, ...key } = item;
+        if (!insert.run(id, ...keyValues(item), item.quantity, item.cardId).changes) continue;
+        const have = Number(row?.quantity ?? 0);
+        before.push({ ...key, quantity: have, trade: Number(row?.trade ?? 0) });
+        after.push({ ...key, quantity: Math.min(10_000, have + item.quantity), trade: Number(row?.trade ?? 0) });
+      }
+      touch(database, "collection", id);
+      return { before, after };
+    });
+    return { added: result.after.reduce((sum, item, index) => sum + item.quantity - result.before[index]!.quantity, 0), ...result };
+  });
 
   // sets exact counts for many entries at once; a count of 0 removes the entry
   app.put<{ Params: { collectionId: string } }>("/api/collections/:collectionId/cards", async (request, reply) => {
     const items = readItems(request.body, true);
     if (typeof items === "string") return reply.code(400).send({ error: items });
     const id = request.params.collectionId;
+    // without a trade number the copies for trade are kept, and never more than the new quantity
     const upsert = database.prepare(
-      `INSERT INTO collection_cards (collection_id, card_id, foil, quantity) SELECT ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM cards WHERE id = ?)
-       ON CONFLICT(collection_id, card_id, foil) DO UPDATE SET quantity = excluded.quantity`,
+      `INSERT INTO collection_cards (collection_id, card_id, foil, condition, language, quantity, trade)
+       SELECT ?, ?, ?, ?, ?, ?, COALESCE(?, 0) WHERE EXISTS (SELECT 1 FROM cards WHERE id = ?)
+       ${KEY_CONFLICT} DO UPDATE SET quantity = excluded.quantity,
+         trade = MIN(excluded.quantity, CASE WHEN ? IS NULL THEN trade ELSE excluded.trade END)`,
     );
-    const remove = database.prepare("DELETE FROM collection_cards WHERE collection_id = ? AND card_id = ? AND foil = ?");
+    const remove = database.prepare(`DELETE FROM collection_cards WHERE collection_id = ? AND ${KEY_WHERE}`);
     transaction(database, () => {
       for (const item of items) {
-        if (item.quantity === 0) remove.run(id, item.cardId, item.foil ? 1 : 0);
-        else upsert.run(id, item.cardId, item.foil ? 1 : 0, item.quantity, item.cardId);
+        if (item.quantity === 0) remove.run(id, ...keyValues(item));
+        else upsert.run(id, ...keyValues(item), item.quantity, item.trade ?? null, item.cardId, item.trade ?? null);
       }
       touch(database, "collection", id);
     });
@@ -402,20 +466,25 @@ export function registerLibraryRoutes(app: FastifyInstance, database: DatabaseSy
     const to = typeof request.body?.to === "string" ? request.body.to : "";
     if (!to || to === from) return reply.code(400).send({ error: "Choose a different collection to move to" });
     if (!access(database, "collection", to, userOf(request))) return notFound(reply, "collection");
-    const current = database.prepare("SELECT quantity FROM collection_cards WHERE collection_id = ? AND card_id = ? AND foil = ?");
+    const current = database.prepare(`SELECT quantity, trade FROM collection_cards WHERE collection_id = ? AND ${KEY_WHERE}`);
     const moved = transaction(database, () => {
-      const result: Array<{ cardId: string; foil: boolean; quantity: number }> = [];
+      const result: Item[] = [];
       for (const item of items) {
-        const have = Number(current.get(from, item.cardId, item.foil ? 1 : 0)?.quantity ?? 0);
+        const row = current.get(from, ...keyValues(item));
+        const have = Number(row?.quantity ?? 0);
         const quantity = Math.min(have, item.quantity);
         if (!quantity) continue;
-        if (quantity === have) database.prepare("DELETE FROM collection_cards WHERE collection_id = ? AND card_id = ? AND foil = ?").run(from, item.cardId, item.foil ? 1 : 0);
-        else database.prepare("UPDATE collection_cards SET quantity = quantity - ? WHERE collection_id = ? AND card_id = ? AND foil = ?").run(quantity, from, item.cardId, item.foil ? 1 : 0);
+        // copies marked for trade stay behind while they fit; the rest of the marks move with the copies
+        const trade = Number(row?.trade ?? 0);
+        const stays = Math.min(trade, have - quantity);
+        if (quantity === have) database.prepare(`DELETE FROM collection_cards WHERE collection_id = ? AND ${KEY_WHERE}`).run(from, ...keyValues(item));
+        else database.prepare(`UPDATE collection_cards SET quantity = quantity - ?, trade = ? WHERE collection_id = ? AND ${KEY_WHERE}`).run(quantity, stays, from, ...keyValues(item));
         database.prepare(
-          `INSERT INTO collection_cards (collection_id, card_id, foil, quantity) VALUES (?, ?, ?, ?)
-           ON CONFLICT(collection_id, card_id, foil) DO UPDATE SET quantity = MIN(10000, quantity + excluded.quantity)`,
-        ).run(to, item.cardId, item.foil ? 1 : 0, quantity);
-        result.push({ cardId: item.cardId, foil: item.foil, quantity });
+          `INSERT INTO collection_cards (collection_id, card_id, foil, condition, language, quantity, trade) VALUES (?, ?, ?, ?, ?, ?, ?)
+           ${KEY_CONFLICT} DO UPDATE SET quantity = MIN(10000, quantity + excluded.quantity), trade = MIN(MIN(10000, quantity + excluded.quantity), trade + excluded.trade)`,
+        ).run(to, ...keyValues(item), quantity, trade - stays);
+        const { trade: _trade, ...key } = item;
+        result.push({ ...key, quantity });
       }
       touch(database, "collection", from);
       touch(database, "collection", to);
@@ -512,11 +581,11 @@ export function registerLibraryRoutes(app: FastifyInstance, database: DatabaseSy
             database.prepare("DELETE FROM collections WHERE id = ?").run(itemId);
           }
         } else if (mode === "copy") {
-          const source = database.prepare("SELECT description, completion, finish FROM collections WHERE id = ?").get(itemId)!;
+          const source = database.prepare("SELECT description, completion, finish, kind FROM collections WHERE id = ?").get(itemId)!;
           const sets = database.prepare("SELECT set_code FROM collection_sets WHERE collection_id = ?").all(itemId).map((row) => String(row.set_code));
           resultId = createCollection(database, me, {
             name, description: String(source.description), completion: String(source.completion) as Completion,
-            finish: String(source.finish) as Finish, sets,
+            finish: String(source.finish) as Finish, kind: String(source.kind) as CollectionKind, sets,
           });
           copyCollectionCards(database, itemId, resultId);
         } else {

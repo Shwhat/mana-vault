@@ -4,7 +4,7 @@ The card database is Mana Vault's local copy of every Magic printing. Search, th
 
 ## Where the data comes from
 
-Updates download Scryfall's Default Cards bulk file and Scryfall's set list (set names and printed sizes, used by [Set completion](/about/set-completion)) (one entry per printing in English or the printed language) over HTTPS. Each update adds new printings and refreshes the details of existing ones; no printing is removed. Card images are shown from Scryfall's image servers and are not stored.
+Updates download Scryfall's Default Cards bulk file and Scryfall's set list (set names and printed sizes, used by [Set completion](/about/set-completion)) (one entry per printing in English or the printed language) over HTTPS. Each update adds new printings and refreshes the details of existing ones, including prices (US dollars regular, foil and etched; euros regular and foil) and flavor names; no printing is removed. Prices are those of the day of the update; see [Prices and statistics](/about/prices-and-statistics). Card images are shown from Scryfall's image servers and are not stored.
 
 ## Updating
 

@@ -1,12 +1,52 @@
 // ---------- collection view: cards, set completion and missing cards ----------
 import { useMemo, useState } from "react";
 import type { Action } from "../actions";
-import { collectionDialog, moveDialog } from "../components/LibraryDialogs";
+import { collectionDialog, copyDialog, moveDialog } from "../components/LibraryDialogs";
 import { Icon } from "../icons";
 import { entryKey } from "../library-state";
-import { useApp } from "../store";
-import { capitalize, COMPLETION_RULES, FINISH_RULES, type Collection, type CollectionTab } from "../types";
+import { type Store, useApp } from "../store";
+import {
+  capitalize, COLOR_NAMES, COMPLETION_RULES, conditionName, copyLabel, FINISH_RULES, FINISHES, type Collection, type CollectionEntry, type CollectionSort,
+  type CollectionTab, type Facets, languageName, money, priceOf,
+} from "../types";
+import { StatsPanel } from "./StatsView";
 import { Quantity, Thumb } from "./Views";
+
+const ALL_FACETS: Facets = { rarity: undefined, color: undefined, type: undefined, set: undefined, curve: undefined, finish: undefined, trade: undefined };
+const SORTS: Array<[CollectionSort, string]> = [
+  ["name", "Name"], ["price-desc", "Price, highest first"], ["price-asc", "Price, lowest first"], ["quantity", "Quantity"], ["set", "Set and number"],
+];
+
+/** The chip text for each active filter tag. */
+function facetLabels(store: Store): Array<[keyof Facets, string]> {
+  const { facets } = store;
+  const set = facets.set ? (store.collection ?? []).find((entry) => entry.set_code === facets.set)?.set_name ?? facets.set.toUpperCase() : "";
+  const list: Array<[keyof Facets, string | false | undefined]> = [
+    ["rarity", facets.rarity && `Rarity: ${capitalize(facets.rarity)}`],
+    ["color", facets.color && `Color: ${COLOR_NAMES[facets.color] ?? facets.color}`],
+    ["type", facets.type && `Type: ${facets.type}`],
+    ["set", facets.set && `Set: ${set}`],
+    ["curve", facets.curve && `Mana value: ${facets.curve}`],
+    ["finish", facets.finish && `Finish: ${FINISHES.find(([code]) => String(code) === facets.finish)?.[1] ?? facets.finish}`],
+    ["trade", facets.trade && "For trade"],
+  ];
+  return list.filter((item): item is [keyof Facets, string] => !!item[1]);
+}
+
+/** Set code and rarity on a row are tags: clicking one lists only the cards that share it. */
+function Tags({ entry }: { entry: CollectionEntry }) {
+  const store = useApp();
+  const tag = (facet: Facets, text: string, className: string, title: string) => (
+    <button type="button" className={`tag ${className}`} title={title} onClick={(event) => { event.stopPropagation(); store.setFacet(facet); }}>{text}</button>
+  );
+  const label = copyLabel(entry);
+  return (
+    <div className="rowmeta">{entry.set_name} {tag({ set: entry.set_code }, entry.set_code.toUpperCase(), "badge", `Show only cards from ${entry.set_name}`)} {entry.collector_number}{" "}
+      {tag({ rarity: entry.rarity }, capitalize(entry.rarity), `rar ${entry.rarity}`, `Show only ${entry.rarity} cards`)}
+      {label && <span className="copylbl" title={[conditionName(entry.condition), languageName(entry.language)].join(", ")}> {label}</span>}
+    </div>
+  );
+}
 
 const percent = (owned: number, total: number) => (total ? Math.floor((owned / total) * 1000) / 10 : 0);
 
@@ -22,7 +62,8 @@ export function Meter({ owned, total, label }: { owned: number; total: number; l
 
 function CollectionHeader({ current }: { current: Collection }) {
   const store = useApp();
-  const tabs: Array<[CollectionTab, string]> = [["cards", "Cards"], ["completion", "Completion"], ["missing", "Missing"]];
+  const tabs: Array<[CollectionTab, string]> = [["cards", "Cards"], ["completion", "Completion"], ["missing", "Missing"], ["stats", "Statistics"]];
+  const currency = store.prefs.currency;
   const isTarget = store.prefs.targetCollection === current.id;
   return (
     <div id="pagetabs" className="colhead">
@@ -39,6 +80,7 @@ function CollectionHeader({ current }: { current: Collection }) {
       {isTarget
         ? <span className="badge main" title="Add to collection puts cards here">Adds here</span>
         : <button type="button" className="lnk" onClick={() => store.setTargetCollection(current.id)}>Add cards here</button>}
+      {current.kind === "wishlist" && <span className="badge wish" title="Cards here are wanted, not owned">Wishlist</span>}
       {current.role === "member" && <span className="badge">Shared by {current.owner.name}</span>}
       {current.role === "owner" && current.sharedWith.length > 0 && <span className="badge">Shared with {current.sharedWith.map((person) => person.name).join(", ")}</span>}
       {store.collectionTab === "cards" && (
@@ -51,7 +93,75 @@ function CollectionHeader({ current }: { current: Collection }) {
         <button type="button" className={store.selectMode ? "btn small on" : "btn small"} aria-pressed={store.selectMode}
           onClick={() => { store.setSelectMode(!store.selectMode); if (store.selectMode) store.setChecked(new Set()); }}>Select</button>
       )}
-      <span className="phpos">{current.entryCount} entries, {current.cardCount} cards</span>
+      <span className="phpos" title={current.value[currency === "usd" ? "unpricedUsd" : "unpricedEur"] ? `${current.value[currency === "usd" ? "unpricedUsd" : "unpricedEur"]} cards have no price` : undefined}>
+        {current.cardCount} cards
+      </span>
+    </div>
+  );
+}
+
+function CardsBar() {
+  const store = useApp();
+  const current = store.collections?.find((item) => item.id === store.prefs.openCollection);
+  const chips = facetLabels(store);
+  const layout = store.prefs.collectionLayout;
+  return (
+    <div className="filterbar">
+      <select aria-label="Sort collection" value={store.prefs.collectionSort} onChange={(event) => store.setPrefs({ collectionSort: event.target.value as CollectionSort })}>
+        {SORTS.map(([value, label]) => <option key={value} value={value}>Sort: {label}</option>)}
+      </select>
+      <div className="seg" role="group" aria-label="Collection layout">
+        <button type="button" className={layout === "list" ? "on" : ""} aria-pressed={layout === "list"} onClick={() => store.setPrefs({ collectionLayout: "list" })}>List</button>
+        <button type="button" className={layout === "binder" ? "on" : ""} aria-pressed={layout === "binder"} onClick={() => store.setPrefs({ collectionLayout: "binder" })}>Binder</button>
+      </div>
+      <button type="button" className={store.facets.trade ? "btn small on" : "btn small"} aria-pressed={!!store.facets.trade}
+        onClick={() => store.setFacet({ trade: !store.facets.trade })}>For trade only</button>
+      {chips.map(([key, text]) => (
+        <span className="chip" key={key}>{text}<button type="button" aria-label={`Remove filter ${text}`} onClick={() => store.setFacet({ [key]: undefined })}>×</button></span>
+      ))}
+      {chips.length > 1 && <button type="button" className="lnk" onClick={() => store.setFacet(ALL_FACETS)}>Clear tags</button>}
+      <span className="phpos">{store.visibleCollection.length} of {store.collection?.length ?? 0} rows, {current?.kind === "wishlist" ? "wanted value" : "value"} {money(current?.value[store.prefs.currency] ?? 0, store.prefs.currency)}</span>
+    </div>
+  );
+}
+
+const PAGE_SIZE = 9;
+
+/** Pages of nine card images, like a binder sheet. Page Up and Page Down turn the pages. */
+function Binder() {
+  const store = useApp();
+  const entries = store.visibleCollection;
+  const pages = Math.max(1, Math.ceil(entries.length / PAGE_SIZE));
+  const page = Math.min(store.binderPage, pages - 1);
+  const shown = entries.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
+  const currency = store.prefs.currency;
+  return (
+    <div className="binderwrap">
+      <div className="binder" role="listbox" aria-label={`Binder page ${page + 1} of ${pages}`}>
+        {shown.map((entry) => {
+          const key = entryKey(entry);
+          const active = store.checked.has(key);
+          const label = copyLabel(entry);
+          return (
+            <div key={key} data-key={key} role="option" aria-selected={active} className={active ? "pocket active" : "pocket"}
+              title={`${entry.name}, ${entry.set_name} ${entry.collector_number}${label ? `, ${label}` : ""}`}
+              onClick={(event) => store.pickRow(entry, { ctrl: event.ctrlKey || event.metaKey, shift: event.shiftKey })}
+              onDoubleClick={() => copyDialog(store, entry)}>
+              {entry.image_url ? <img src={entry.image_url} alt={entry.name} loading="lazy" /> : <span className="pocketname">{entry.name}</span>}
+              {entry.foil > 0 && <span className="badge foil pocketfoil">{entry.foil === 2 ? "ETCHED" : "FOIL"}</span>}
+              <span className="pocketqty">{entry.quantity}</span>
+              {entry.trade > 0 && <span className="badge trade pockettrade">TRADE {entry.trade}</span>}
+              <span className="pocketprice">{money(priceOf(entry, entry.foil, currency), currency)}</span>
+            </div>
+          );
+        })}
+        {Array.from({ length: PAGE_SIZE - shown.length }, (_, index) => <div key={`empty-${index}`} className="pocket emptypocket" aria-hidden="true" />)}
+      </div>
+      <div className="binderpager">
+        <button type="button" className="btn small" disabled={page === 0} onClick={() => store.setBinderPage(page - 1)}>Previous page</button>
+        <span>Page {page + 1} of {pages}</span>
+        <button type="button" className="btn small" disabled={page >= pages - 1} onClick={() => store.setBinderPage(page + 1)}>Next page</button>
+      </div>
     </div>
   );
 }
@@ -60,18 +170,24 @@ function CardsTab({ actions }: { actions: Record<string, Action> }) {
   const store = useApp();
   const { visibleCollection, collection, checked, selectMode } = store;
   const pickedCards = (collection ?? []).filter((entry) => checked.has(entryKey(entry))).reduce((sum, entry) => sum + entry.quantity, 0);
+  const currency = store.prefs.currency;
+  const binder = store.prefs.collectionLayout === "binder" && (collection?.length ?? 0) > 0;
   return (
     <>
+      {collection !== null && collection.length > 0 && <CardsBar />}
       {(checked.size > 1 || selectMode) && (
         <div className="pickbar" role="toolbar" aria-label="Picked rows">
           <span><b>{checked.size}</b> picked ({pickedCards} {pickedCards === 1 ? "card" : "cards"})</span>
           <button type="button" className="btn small" onClick={store.pickAll}>Select all</button>
           <button type="button" className="btn small" disabled={!checked.size || (store.collections?.length ?? 0) < 2} onClick={() => moveDialog(store, store.pickedEntries())}>Move...</button>
+          <button type="button" className="btn small" disabled={!checked.size} onClick={() => void store.markTrade(store.pickedEntries(), true)}>For trade</button>
+          <button type="button" className="btn small" disabled={!checked.size} onClick={() => void store.markTrade(store.pickedEntries(), false)}>Not for trade</button>
           <button type="button" className="btn small" disabled={!checked.size} onClick={() => void store.removePicked()}>Remove...</button>
           <button type="button" className="btn small" onClick={() => { store.setChecked(new Set()); store.setSelectMode(false); }}>Done</button>
         </div>
       )}
-      <div className="list" role="listbox" aria-label="Collection" aria-multiselectable="true">
+      {binder && <Binder />}
+      {!binder && <div className="list" role="listbox" aria-label="Collection" aria-multiselectable="true">
         {collection === null && <div className="emptynote">Loading the collection</div>}
         {collection !== null && collection.length === 0 && (
           <div className="empty">
@@ -84,19 +200,26 @@ function CardsTab({ actions }: { actions: Record<string, Action> }) {
             </span>
           </div>
         )}
+        {collection !== null && collection.length > 0 && visibleCollection.length === 0 && <div className="emptynote">No rows match the filter tags. Remove a tag to see more.</div>}
         {visibleCollection.map((entry) => {
           const key = entryKey(entry);
           const active = checked.has(key);
+          const price = priceOf(entry, entry.foil, currency);
           return (
             <div key={key} data-key={key} role="option" aria-selected={active} className={active ? "row active" : "row"}
               onClick={(event) => store.pickRow(entry, { ctrl: event.ctrlKey || event.metaKey, shift: event.shiftKey })}>
               {selectMode && <input type="checkbox" className="rowcheck" checked={active} readOnly aria-label={`Pick ${entry.name}`} />}
               <Thumb url={entry.image_url} />
               <div className="rowmain">
-                <div className="rowtitle"><b>{entry.name}</b>{entry.foil ? <span className="badge foil">FOIL</span> : null}</div>
-                <div className="rowmeta">{entry.set_name} <span className="badge">{entry.set_code.toUpperCase()}</span> {entry.collector_number} <span className={`rar ${entry.rarity}`}>{capitalize(entry.rarity)}</span></div>
+                <div className="rowtitle"><b>{entry.name}</b>{entry.foil ? <span className="badge foil">{entry.foil === 2 ? "ETCHED" : "FOIL"}</span> : null}
+                  {entry.trade > 0 && <span className="badge trade" title={`${entry.trade} of ${entry.quantity} for trade`}>FOR TRADE {entry.trade}</span>}</div>
+                <Tags entry={entry} />
               </div>
+              <span className="price" title={price === null ? "No price in the card database" : `${money(price, currency)} each`}>
+                {money(price === null ? null : price * entry.quantity, currency)}</span>
               <Quantity value={entry.quantity} name={entry.name} onChange={(quantity) => void store.setCollectionQuantity(entry, quantity)} />
+              <button type="button" className="btn small icon-only" title={`Copy details of ${entry.name}`} aria-label={`Copy details of ${entry.name}`}
+                onClick={(event) => { event.stopPropagation(); copyDialog(store, entry); }}><Icon name="edit" /></button>
               <button type="button" className="btn small icon-only" title={`Move ${entry.name}`} aria-label={`Move ${entry.name} to another collection`}
                 disabled={(store.collections?.length ?? 0) < 2}
                 onClick={(event) => { event.stopPropagation(); moveDialog(store, [entry]); }}><Icon name="move" /></button>
@@ -105,7 +228,7 @@ function CardsTab({ actions }: { actions: Record<string, Action> }) {
             </div>
           );
         })}
-      </div>
+      </div>}
     </>
   );
 }
@@ -188,6 +311,7 @@ function MissingTab({ current, actions }: { current: Collection; actions: Record
         <span className="phpos">{shown.length} of {report.missing.length} missing</span>
         <button type="button" className="btn small" onClick={actions.exportMissingText?.run}>Export text</button>
         <button type="button" className="btn small" onClick={actions.exportMissingCsv?.run}>Export CSV</button>
+        {current.kind !== "wishlist" && <button type="button" className="btn small" onClick={actions["wishlist.missing"]?.run}>Add all to wishlist</button>}
       </div>
       <div className="list" role="listbox" aria-label="Missing cards">
         {report.missing.length === 0 && (
@@ -242,6 +366,9 @@ export function CollectionView({ actions }: { actions: Record<string, Action> })
       {store.collectionTab === "cards" && <CardsTab actions={actions} />}
       {store.collectionTab === "completion" && <CompletionTab current={current} />}
       {store.collectionTab === "missing" && <MissingTab current={current} actions={actions} />}
+      {store.collectionTab === "stats" && (
+        <StatsPanel stats={store.collectionStats} kind="collection" onFacet={(facet) => { store.setFacet({ ...ALL_FACETS, ...facet }); store.setCollectionTab("cards"); }} />
+      )}
     </div>
   );
 }

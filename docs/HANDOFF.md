@@ -1,30 +1,45 @@
 # Mana Vault handoff
 
-Last updated: 2026-11-18, version 0.2.0.
+Last updated: 2026-11-18, version 0.3.0.
 
 ## Project
 
-Mana Vault is Devon's self-hosted Magic: The Gathering collection and deck manager (repository Shwhat/mana-vault). It runs as one Docker container (Node.js 22, Fastify, SQLite) and serves a React interface for desktop browsers and phones. Version 0.1.0 rebuilt the interface in the OpenSchem design style (program-design-guide skill, "look and shell" adoption), added sign-in, per-account preferences, undo, the About guide and Dockhand-ready deployment. Version 0.2.0 added multiple collections per account, set completion, bulk editing, per-account ownership of collections and decks, sending (copy, share, transfer) with an Inbox, and deck rename and delete.
+Mana Vault is Devon's self-hosted Magic: The Gathering collection and deck manager (repository Shwhat/mana-vault). It runs as one Docker container (Node.js 22, Fastify, SQLite) and serves a React interface for desktop browsers and phones. Version 0.1.0 rebuilt the interface in the OpenSchem design style (program-design-guide skill, "look and shell" adoption), added sign-in, per-account preferences, undo, the About guide and Dockhand-ready deployment. Version 0.2.0 added multiple collections per account, set completion, bulk editing, per-account ownership of collections and decks, sending (copy, share, transfer) with an Inbox, and deck rename and delete. Version 0.3.0 added prices and values, statistics, deck ownership, wishlists, the trade list and trade calculator, copy details (finish, condition, language, trade count), filter tags, the binder layout and flavor name matching. The 0.3.0 features came from a comparison with AeroEagle/mtg-collection-viewer.
 
 ## Rules
 
 - Do not build or change the program until Devon says "build it". Settle the specification first with questions.
-- Before building, review the enabled skills and state which apply (program-design-guide, program-about-guide, docker-server-setup at minimum). Load each one that applies.
+- Before building, review the enabled skills and state which apply (program-design-guide, program-about-guide, docker-server-setup at minimum; dataviz for charts). Load each one that applies.
 - Do not commit or push until asked. Do not remind Devon about uncommitted work.
 - Never use em dashes anywhere (code, comments, docs, interface text). A static test enforces this.
 - Answer questions simply and directly, without extra unrequested actions.
-- Keep a task list while building, update the README feature list and keep the keyboard shortcut list current (README, About guide page 15, `SHORTCUTS` in `actions.tsx`).
+- Keep a task list while building, update the README feature list and keep the keyboard shortcut list current (README, About guide page 17 Settings and shortcuts, `SHORTCUTS` in `actions.tsx`, key handling in `main.tsx`).
 - Update this handoff (here and in the claude.ai manavault project, identical) with every build.
 - Raise the version in every place with each delivered build: `package.json`, `apps/server/package.json`, `apps/web/package.json` and `package-lock.json` (run `npm install --package-lock-only`). Patch for fixes, minor for features, major only when Devon says so. A static test checks they match.
 - Every pull request that changes what the app does, or the rules it follows, also updates the About guide: the affected pages, Capabilities, and a new entry in the release notes. It also raises the version. The version is shown in the guide.
-- Every change gets tests; `npm run test:all` must pass before delivery.
+- Every change gets tests; `npm run test:all` must pass before delivery. Where Playwright cannot download its browser, run it with an installed Chrome: `PW_CHANNEL=chrome npm run test:all`.
 - Deployment follows the docker-server-setup skill: Dockhand only, no Watchtower, absolute data path, UID 65532, no cloudflared or reverse proxy in the stack.
+
+## Decisions (0.3.0)
+
+Devon said "build all of it now" for the seven proposals without a question round, so these choices were made during the build and can be revisited:
+
+- Prices: Scryfall's usd, usd_foil, usd_etched, eur, eur_foil stored on `cards` at each catalog update; no price history. Currency pref `currency` (usd or eur), never converted. Copy price: regular, foil, etched (falls back to foil); EUR foil price for foil and etched. Normal decks priced at the cheapest printing, Theme decks at the chosen printing.
+- Copy key: a collection row is printing + finish (`foil` column 0 regular, 1 foil, 2 etched) + condition (M, NM, LP, MP, HP, DMG) + language (Scryfall code); `trade` is the count for trade (0 to quantity). Old rows become NM English. The API accepts `foil` as a boolean or 0 to 2; condition and language default to NM and en.
+- Wishlist: `collections.kind` ('collection' or 'wishlist'), a checkbox in Collection settings. Excluded from owned counts, ownership and the trade list. Wishlist commands use the first owned wishlist, creating one named Wishlist when there is none.
+- Deck ownership: copies in owned and shared collections (not wishlists), allocated commander, main, sideboard; any finish counts; copies are not reserved across decks.
+- Trade: trade list = rows with trade > 0 in collections the account owns. The trade calculator lives in the browser (store state) until reload; it never changes collections.
+- Statistics: computed on the server (`insights.ts`); single accent hue bars (dataviz: magnitude, not identity), Cards or Value measure, hover and focus tooltips; type counts each main type, front face only; curve excludes lands. Collection bars set filter tags.
+- Filter tags (`Facets` in the store): set, rarity, color, type, mana value, finish, for trade; client-side, cleared on collection switch. Sort pref `collectionSort`, layout pref `collectionLayout` (list or binder, 9 per page).
+- Flavor names: `cards.flavor_name`; search (plain words and `name:`) and both imports match flavor names and the front face of two-faced cards.
+- New keys: 4 trade view, W wishlist, E copy details, B binder, Page Up/Down binder pages, T you give, G you get.
+- Backup version 3 adds kind and copy details; versions 1 and 2 still restore.
 
 ## Decisions (0.2.0 specification)
 
 - Each account owns its collections and decks. Pre-0.2.0 shared data moves to the oldest account (collection named Main collection). Every new account gets an empty Main collection.
 - Each physical copy lives in one collection. Add to collection uses a target collection (pref `targetCollection`, key C). Move commands shift copies between collections.
-- Collections link to any number of sets (or none). Completion rule chosen per collection: main (numbered up to Scryfall printed_size; without it, numbered non-promo non-variant), all (every printing), names (one of each oracle card, printings from the linked sets only). Finish rule: any, regular, foil, both (one of each); finishes a printing never had are left out of the total.
+- Collections link to any number of sets (or none). Completion rule chosen per collection: main (numbered up to Scryfall printed_size; without it, numbered non-promo non-variant), all (every printing), names (one of each oracle card, printings from the linked sets only). Finish rule: any, regular, foil, both (one of each); finishes a printing never had are left out of the total. Etched counts as foil (0.3.0).
 - Missing view: counts and percent, list with set, rarity and color filters, add from the list, export as text or CSV.
 - Bulk editing: Ctrl+click, Shift+click, Ctrl+A, Select mode on phones; remove and move as one undo step.
 - Sending: sender picks Copy, Share or Transfer and it stays fixed. The receiver accepts or declines and chooses how it enters their library: new item with a name, or (collections sent as Copy or Transfer) merge into an existing collection; Share accepts with an optional personal display name. Recipients are picked from this server's account list.
@@ -35,7 +50,7 @@ Mana Vault is Devon's self-hosted Magic: The Gathering collection and deck manag
 - Scope: OpenSchem look and shell on the existing React + TypeScript + Vite and Node/Fastify/SQLite stack. Not a rewrite to plain JS or Go.
 - Desktop shell on wide screens; phone layout under 900 px (bottom tabs Cards, Collection, Decks, More; sheets; 44 px targets).
 - Sign-in follows the OpenSchem method: PBKDF2 hashes, HTTP-only cookie with automatic secure flag behind HTTPS, rate limits, safety header (`X-Mana-Vault: 1`) on every change, signup switch `MANAVAULT_SIGNUP`.
-- All accounts share one collection and one set of decks (replaced in 0.2.0 by per-account ownership). Preferences are per account.
+- Preferences are per account.
 - Undo covers collection and deck card edits by sending the reverse change. Imports, restores, deck creation and catalog updates are not undoable.
 - Tests: server unit tests, static checks, and a Playwright browser suite.
 
@@ -43,32 +58,37 @@ Mana Vault is Devon's self-hosted Magic: The Gathering collection and deck manag
 
 | Path | Contents |
 |---|---|
-| `apps/server/src/app.ts` | Fastify app: request guard and security headers, account routes (new accounts get a Main collection), prefs, card search, card detail with owned per collection, collection imports, decks (scoped by owner and members, rename, delete), backups, catalog status, SPA fallback for `/about/...` |
-| `apps/server/src/library.ts` | Access checks (owner or member), collections CRUD, bulk set (`PUT /cards`) and move, set completion and missing (`collectionCompletion`, `isMainPrinting`), members, shares (send, inbox, accept with new/merge, decline, cancel) |
+| `apps/server/src/app.ts` | Fastify app: request guard and security headers, account routes (new accounts get a Main collection), prefs, card search and card detail (prices, flavor name, owned per collection with etched and trade, wanted in wishlists), collection imports, decks (scoped by owner and members, rename, delete), backups, catalog status, SPA fallback for `/about/...` |
+| `apps/server/src/library.ts` | Access checks, collections CRUD (kind), `collectionValue`, `ENTRY_COLUMNS`, copy keys in POST/PUT (`trade`)/move, bulk add `POST /cards/add` (returns before and after for undo), set completion and missing, members, shares |
+| `apps/server/src/insights.ts` | `summarize` (stat tiles and buckets), `deckOwnership`, routes `/api/collections/:id/stats`, `/api/decks/:id/stats`, `/api/decks/:id/ownership`, `/api/trade` |
+| `apps/server/src/copies.ts` | Copy key parsing (`readCopyKey`, `readCondition`, `readLanguage`, `readFinish`), conditions and languages, `priceSql` per currency |
 | `apps/server/src/sets.ts` | Scryfall set list storage (`saveSets`) and set search (`listSets`) |
 | `apps/server/src/auth.ts` | Users, sessions (token hashes), prefs table, PBKDF2, rate limiter, cookie helpers |
 | `apps/server/src/index.ts` | Startup, environment variables, `-healthcheck` flag |
-| `apps/server/src/database.ts` | Schema and migrations: cards (finishes, promo, variation added in 0.2.0), sets, collections, collection_sets, collection_cards, members, shares, decks.owner_id; moves the old collection_items table into a Main collection; `assignUnowned` |
-| `apps/server/src/backup.ts` | Backup version 2 per account (collections, collection cards, decks, deck cards, card records); version 1 restores into a Main collection; restored items get new ids |
-| `apps/server/src/collection-import.ts`, `deck-import.ts`, `card-search.ts`, `catalog-updater.ts`, `import-*.ts` | Import, search and catalog logic; the bulk import also stores finishes, promo and variation, and the catalog update also downloads the set list |
-| `apps/web/src/main.tsx` | Boot (loads `/api/me` and prefs), keyboard shortcuts, desktop or phone shell, scanner |
-| `apps/web/src/store.tsx` | All app state and operations (`useStoreState`), undo stack, collections list, open and target collection, completion data, imports and exports, workspaces |
-| `apps/web/src/library-state.tsx` | Collections CRUD, row picking (`pick`), bulk remove and move, missing list export, deck rename and delete, offers (send, accept, decline, cancel, stop sharing) |
-| `apps/web/src/components/LibraryDialogs.tsx` | Collection settings with the set picker, Move, Send, Inbox, Accept, Sharing and Rename deck dialogs |
-| `apps/web/src/views/CollectionView.tsx` | Collection view header and the Cards, Completion and Missing tabs; the `Meter` |
+| `apps/server/src/database.ts` | Schema and migrations: cards (finishes, promo, variation; prices and flavor_name in 0.3.0), sets, collections (kind), collection_cards (0.3.0 key with condition, language, trade; `upgradeCopies` rebuilds the 0.2.0 table), members, shares, decks.owner_id; `cardPricesStatement` |
+| `apps/server/src/backup.ts` | Backup version 3 per account (collections with kind, copies with finish, condition, language, trade, decks, deck cards, card records); versions 1 and 2 restore with defaults |
+| `apps/server/src/collection-import.ts`, `deck-import.ts`, `card-search.ts`, `catalog-updater.ts`, `import-*.ts` | Import (condition, language, etched, tradelist counts, `nameMatch` for flavor and front face names), search (`usd`, `eur`, flavor names) and catalog logic; the bulk import stores prices and flavor names |
+| `apps/web/src/main.tsx` | Boot, keyboard shortcuts, desktop or phone shell, scanner |
+| `apps/web/src/store.tsx` | App state (`useStoreState`): undo stack, collections, facets and sort (`visibleCollection`), binder page, statistics, ownership, trade list, trade calculator (`TradeLine`), imports and exports (Moxfield CSV with condition, language, finish, tradelist) |
+| `apps/web/src/library-state.tsx` | Collections CRUD, row picking, bulk remove and move, `editCopy`, `markTrade`, wishlist helpers, deck missing export, offers |
+| `apps/web/src/types.ts` | Shared types; `priceOf`, `money`, `copyKey`, `copyLabel`, facet helpers (`cardTypes`, `colorKey`, `curveKey`, same rules as the server) |
+| `apps/web/src/components/LibraryDialogs.tsx` | Collection settings (Wishlist checkbox) with the set picker, Copy details (`copyDialog`), Move, Send, Inbox, Accept, Sharing and Rename deck dialogs |
+| `apps/web/src/views/CollectionView.tsx` | Collection header and the Cards (filter bar, tags, list, `Binder`), Completion, Missing and Statistics tabs; the `Meter` |
+| `apps/web/src/views/StatsView.tsx` | `StatsPanel`: stat tiles, `BarList`, mana curve columns |
+| `apps/web/src/views/TradeView.tsx` | Trade list and trade calculator |
+| `apps/web/src/views/Views.tsx` | Card search (prices, tags, + Wishlist) and the deck view (Cards, Ownership, Statistics tabs) |
 | `apps/web/src/actions.tsx` | The `ACTIONS` map: every command with label, short label, icon, key; shortcut list; workspace list |
-| `apps/web/src/ribbon.ts` | `DEFAULT_RIBBON` and `MENUS` as data (action names) |
-| `apps/web/src/dock.ts` | Panel registry, layout model (areas, columns, groups, floating), presets, move and remove operations |
-| `apps/web/src/prefs.ts` | Preference defaults, merge (ribbon reset on new version), save to server, theme |
-| `apps/web/src/icons.tsx` | `RI` inline SVG icon table |
-| `apps/web/src/components/` | MenuBar, Ribbon, RibbonCustomize, Dock, StatusBar, Dialog (`dialog()`, `customDialog()`, `confirmDialog()`), Shell (desktop and phone), About (loader and Markdown renderer), CardScanner |
-| `apps/web/src/panels/Panels.tsx` | Filters, Collections, Decks, Card, Deck list, Import review panels |
-| `apps/web/src/views/Views.tsx` | Card search, collection and deck views |
-| `apps/web/src/about/` | About guide pages `01-overview.md` to `19-release-notes.md` |
+| `apps/web/src/ribbon.ts` | `DEFAULT_RIBBON` (Trade tab added) and `MENUS` (Trade menu added) as data |
+| `apps/web/src/dock.ts` | Panel registry, layout model, presets, move and remove operations |
+| `apps/web/src/prefs.ts` | Preference defaults (currency, collectionSort, collectionLayout), merge (ribbon reset on new version), save to server, theme |
+| `apps/web/src/icons.tsx` | `RI` inline SVG icon table (trade, stats, binder, edit, wish, copy, owned, usd, eur added) |
+| `apps/web/src/components/` | MenuBar, Ribbon, RibbonCustomize, Dock, StatusBar (PRICES toggle), Dialog, Shell (desktop and phone), About, CardScanner |
+| `apps/web/src/panels/Panels.tsx` | Filters, Collections (values, Wishlist badge), Decks, Card (prices, etched, wanted), Deck list, Import review panels |
+| `apps/web/src/about/` | About guide pages `01-overview.md` to `21-release-notes.md` (09 Prices and statistics and 10 Wishlists and trading added in 0.3.0) |
 | `apps/web/src/static.test.ts` | Static checks: guide order and links, release note version, every label in the guide, versions equal, no em dashes |
 | `apps/web/public/login.html` | Self-contained sign-in page |
-| `tests/e2e/` | Playwright suites (`app.spec.ts`, `collections.spec.ts`), fixtures, sample-data server (`serve.mjs`, with a sample set list and finishes) |
-| `docker-compose.yml`, `.env.example`, `Dockerfile` | Dockhand-ready deployment |
+| `tests/e2e/` | Playwright suites (`app.spec.ts`, `collections.spec.ts`, `insights.spec.ts`), fixtures, sample-data server (`serve.mjs`, with sample prices and a flavor name) |
+| `docker-compose.yml`, `.env.example`, `Dockerfile` | Dockhand-ready deployment (unchanged in 0.3.0) |
 
 ## Open bugs
 
@@ -76,21 +96,25 @@ None known.
 
 ## Open ideas
 
-- Price information; deck statistics (mana curve, color counts).
+- Price history and price change alerts (prices are a snapshot of the last catalog update).
+- Saving the trade calculator, or applying a finished trade to collections in one step.
 - A built-in demo document (program-design-guide section 6) was not part of the 0.1.0 specification.
 - Optional command line (program-design-guide section 3) was not built.
 - The ribbon customize window uses a shared Name box for new and renamed tabs and groups.
+- Card images in the binder come from Scryfall; without internet the pockets show card names.
 
 ## Known limits
 
 - Search returns at most 40 results.
 - Sending works only between accounts on the same server. Offers have no expiry.
-- Main set needs Scryfall's printed size for each set; it arrives with the first card database update after 0.2.0. Printings imported before 0.2.0 have no finish list and count as available in both finishes until that update.
+- Main set needs Scryfall's printed size for each set; it arrives with the first card database update after 0.2.0. Prices and flavor names arrive with the first card database update after 0.3.0.
 - Undo history is per page load and reverses by sending the reverse change; a concurrent edit to the same card by someone else is overwritten by an undo.
+- The trade calculator is lost on page reload.
+- Deck ownership does not reserve copies between decks.
 - Imports up to 5 MB and 5,000 rows; backups up to 25 MB.
 - Card images load from Scryfall's servers.
 - The server serves the built files registered at startup; restart it after rebuilding the interface (Docker does this on every deploy).
 
 ## Where work stopped
 
-0.1.0 is merged to main and published. 0.2.0 is built on branch `collections-0.2.0` and all checks pass (`npm run test:all`: typecheck, 67 server tests, 7 static checks, 16 browser tests). The branch is pushed; it reaches Dockhand after it is merged to main.
+0.1.0 is merged to main and published. 0.2.0 is on branch `collections-0.2.0` (pushed, not merged). 0.3.0 is on branch `features-0.3.0` (pushed, not merged), started from `collections-0.2.0`, so merging it also brings in 0.2.0. All checks pass (`PW_CHANNEL=chrome npm run test:all`: typecheck, 81 server tests, 7 static checks, 22 browser tests). An upgrade of a real 0.2.0 database was checked by hand. After merging, run Update card database once to load prices and flavor names.

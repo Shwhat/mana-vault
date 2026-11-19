@@ -124,7 +124,10 @@ describe("collections", () => {
     const moved = (await call("ann", "POST", `/api/collections/${a}/move`, { to: b, items: [
       { cardId: "t1", foil: false, quantity: 2 }, { cardId: "t3", foil: true, quantity: 5 }, { cardId: "t4", foil: false, quantity: 1 },
     ] })).json().moved;
-    expect(moved).toEqual([{ cardId: "t1", foil: false, quantity: 2 }, { cardId: "t3", foil: true, quantity: 1 }]);
+    expect(moved).toEqual([
+      { cardId: "t1", foil: 0, condition: "NM", language: "en", quantity: 2 },
+      { cardId: "t3", foil: 1, condition: "NM", language: "en", quantity: 1 },
+    ]);
     const left = (await call("ann", "GET", `/api/collections/${a}/cards`)).json();
     expect(left.map((entry: { id: string; quantity: number }) => [entry.id, entry.quantity])).toEqual([["t1", 1], ["t2", 2]]);
     expect((await call("ann", "GET", `/api/collections/${b}/cards`)).json()).toHaveLength(2);
@@ -143,8 +146,8 @@ describe("collections", () => {
     const owned = (await call("ann", "GET", "/api/cards/t1")).json().owned;
     expect(owned).toMatchObject({ regular: 2, foil: 0, allPrintings: 3 });
     expect(owned.collections).toEqual([
-      { id: a, name: "A", regular: 2, foil: 0, allPrintings: 2 },
-      { id: b, name: "B", regular: 0, foil: 0, allPrintings: 1 },
+      { id: a, name: "A", wishlist: false, regular: 2, foil: 0, etched: 0, trade: 0, allPrintings: 2 },
+      { id: b, name: "B", wishlist: false, regular: 0, foil: 0, etched: 0, trade: 0, allPrintings: 1 },
     ]);
   });
 });
@@ -317,7 +320,7 @@ describe("backups per account", () => {
     await call("ann", "POST", `/api/collections/${col}/cards`, { cardId: "t1", quantity: 2, foil: true });
     await call("bob", "POST", "/api/collections", { name: "Bob's" });
     const backup = (await call("ann", "GET", "/api/backup")).body;
-    expect(JSON.parse(backup)).toMatchObject({ version: 2, collections: [{ name: "Binder", sets: ["tst"], completion: "names", finish: "both" }] });
+    expect(JSON.parse(backup)).toMatchObject({ version: 3, collections: [{ name: "Binder", sets: ["tst"], completion: "names", finish: "both" }] });
     await call("ann", "DELETE", `/api/collections/${col}`);
     const raw = (url: string, user: string) => app.inject({
       method: "POST", url, payload: backup,
