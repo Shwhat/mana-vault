@@ -232,7 +232,7 @@ npm run apk:debug -w @mana-vault/android   # apps/android/android/app/build/outp
 
 ### Releases
 
-The `Android app` workflow builds a debug app for every pull request that changes the interface or the app, and for every push to main, and keeps it with the run as `mana-vault-X.Y.Z-debug` (Actions, the run, Artifacts). Debug builds are signed with the shared debug key in `apps/android/android/app/debug-shared.p12`, so each one installs over the one before it; the release app uses its own key and needs the debug app uninstalled first. For a version tag (`vX.Y.Z`) it builds the release app, signs it and attaches `mana-vault-X.Y.Z.apk` to the GitHub release.
+The `Android app` workflow builds a debug app for every pull request that changes the interface or the app, and for every push to main, and keeps it with the run as `mana-vault-X.Y.Z-debug` (Actions, the run, Artifacts). After each push to main the APK is also on the **Debug build** pre-release on the releases page (tag `debug`), which the app's update check ignores. Debug builds are signed with the shared debug key in `apps/android/android/app/debug-shared.p12`, so each one installs over the one before it; the release app uses its own key and needs the debug app uninstalled first. For a version tag (`vX.Y.Z`) it builds the release app, signs it and attaches `mana-vault-X.Y.Z.apk` to the GitHub release.
 
 Signing needs a release key, made once on any computer with Java (keep the file and passwords safe and out of Git; an app signed with another key cannot update the installed app):
 
