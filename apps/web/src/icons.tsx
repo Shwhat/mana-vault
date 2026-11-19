@@ -1,0 +1,53 @@
+// ---------- icons: hand-written inline SVG, drawn in light-theme colors and inverted for the dark theme ----------
+const S = "#2b3442";
+const PLUS = '<path d="M15 12v6M12 15h6" stroke="#2f7d32" stroke-width="1.8"/>';
+
+const card = (x: number, y: number, fill = "#fff") =>
+  `<rect x="${x}" y="${y}" width="9" height="12.5" rx="1.2" fill="${fill}" stroke="#556" stroke-width="1.2"/>`;
+
+export const RI: Record<string, string> = {
+  cards: `<svg viewBox="0 0 20 20">${card(3, 3, "#dbe6f7")}${card(8, 5)}<path d="M10 9h5M10 11.5h5M10 14h3" stroke="#556"/></svg>`,
+  collection: '<svg viewBox="0 0 20 20"><rect x="3" y="3" width="14" height="14" rx="1.5" fill="#f4e2c2" stroke="#8a6d1d" stroke-width="1.2"/><path d="M3 7h14" stroke="#8a6d1d" stroke-width="1.1"/><rect x="5.5" y="9" width="4" height="5.5" fill="#fff" stroke="#8a6d1d"/><rect x="10.5" y="9" width="4" height="5.5" fill="#fff" stroke="#8a6d1d"/></svg>',
+  deck: `<svg viewBox="0 0 20 20"><rect x="6" y="2" width="9" height="12.5" rx="1.2" fill="#dbe6f7" stroke="#2b4f91" stroke-width="1.1"/><rect x="5" y="3.5" width="9" height="12.5" rx="1.2" fill="#dbe6f7" stroke="#2b4f91" stroke-width="1.1"/>${card(4, 5)}</svg>`,
+  find: `<svg viewBox="0 0 20 20"><circle cx="8.5" cy="8.5" r="5" fill="none" stroke="${S}" stroke-width="1.6"/><path d="M12.2 12.2l5 5" stroke="${S}" stroke-width="2"/></svg>`,
+  scan: `<svg viewBox="0 0 20 20"><path d="M2 7V3h4M14 3h4v4M18 13v4h-4M6 17H2v-4" fill="none" stroke="${S}" stroke-width="1.5"/><rect x="7" y="5" width="6" height="10" rx="1" fill="#dbe6f7" stroke="#2b4f91"/><path d="M5 10h10" stroke="#e0332b" stroke-width="1.2"/></svg>`,
+  addcol: '<svg viewBox="0 0 20 20"><rect x="2" y="3" width="12" height="12" rx="1.5" fill="#f4e2c2" stroke="#8a6d1d" stroke-width="1.2"/><path d="M2 7h12" stroke="#8a6d1d"/><rect x="4.5" y="9" width="3" height="4" fill="#fff" stroke="#8a6d1d" stroke-width=".9"/><rect x="8.5" y="9" width="3" height="4" fill="#fff" stroke="#8a6d1d" stroke-width=".9"/>' + PLUS + "</svg>",
+  adddeck: `<svg viewBox="0 0 20 20"><rect x="5" y="2" width="8" height="11" rx="1" fill="#dbe6f7" stroke="#2b4f91" stroke-width="1.1"/>${card(3, 4)}${PLUS}</svg>`,
+  foil: '<svg viewBox="0 0 20 20"><path d="M10 2l2 5.5 5.5.5-4.2 3.6 1.4 5.6L10 14.2 5.3 17.2l1.4-5.6L2.5 8l5.5-.5z" fill="#efe3fb" stroke="#7456a4" stroke-width="1.2" stroke-linejoin="round"/><path d="M15.5 2.5v3M14 4h3" stroke="#1f5fbf" stroke-width="1.1"/></svg>',
+  zone: `<svg viewBox="0 0 20 20"><rect x="2" y="4" width="16" height="12" rx="1.5" fill="#fff" stroke="${S}" stroke-width="1.2"/><path d="M8 4v12M13 4v12" stroke="${S}"/><rect x="3.3" y="6" width="3.4" height="5" fill="#dbe6f7" stroke="#2b4f91" stroke-width=".8"/></svg>`,
+  zmain: `<svg viewBox="0 0 20 20">${card(5.5, 3.5, "#dbe6f7")}<text x="10" y="13" font-size="7" text-anchor="middle" font-family="Arial" font-weight="bold" fill="#2b4f91">M</text></svg>`,
+  zside: `<svg viewBox="0 0 20 20">${card(5.5, 3.5, "#fff3d6")}<text x="10" y="13" font-size="7" text-anchor="middle" font-family="Arial" font-weight="bold" fill="#7a5200">S</text></svg>`,
+  zcmd: `<svg viewBox="0 0 20 20">${card(5.5, 3.5, "#efe3fb")}<path d="M7 12l1-4 2 2 2-2 1 4z" fill="#7456a4"/></svg>`,
+  update: '<svg viewBox="0 0 20 20"><ellipse cx="9" cy="5" rx="6" ry="2.2" fill="#dbe6f7" stroke="#2b4f91" stroke-width="1.1"/><path d="M3 5v8c0 1.2 2.7 2.2 6 2.2M15 5v4" fill="none" stroke="#2b4f91" stroke-width="1.1"/><path d="M3 9c0 1.2 2.7 2.2 6 2.2" fill="none" stroke="#2b4f91"/><path d="M17.5 13.5a3.5 3.5 0 11-1-2.5" fill="none" stroke="#2f7d32" stroke-width="1.4"/><path d="M17 9.5v2h-2" fill="none" stroke="#2f7d32" stroke-width="1.3"/></svg>',
+  csvin: '<svg viewBox="0 0 20 20"><rect x="3" y="2" width="14" height="16" fill="#e8f3ea" stroke="#2f7d32" stroke-width="1.2"/><text x="10" y="9" font-size="5.5" text-anchor="middle" font-family="Arial" font-weight="bold" fill="#2f7d32">CSV</text><path d="M10 10.5v5M7.8 13.5l2.2 2.2 2.2-2.2" fill="none" stroke="#2f7d32" stroke-width="1.3"/></svg>',
+  csv: '<svg viewBox="0 0 20 20"><rect x="3" y="2" width="14" height="16" fill="#e8f3ea" stroke="#2f7d32" stroke-width="1.2"/><text x="10" y="13" font-size="6" text-anchor="middle" font-family="Arial" font-weight="bold" fill="#2f7d32">CSV</text></svg>',
+  txt: '<svg viewBox="0 0 20 20"><rect x="3" y="2" width="14" height="16" fill="#fff" stroke="#556" stroke-width="1.2"/><text x="10" y="13" font-size="6" text-anchor="middle" font-family="Arial" font-weight="bold" fill="#2b3442">TXT</text></svg>',
+  listin: '<svg viewBox="0 0 20 20"><rect x="3" y="2" width="14" height="16" fill="#dbe6f7" stroke="#2b4f91" stroke-width="1.2"/><path d="M6 6h8M6 8.5h8M6 11h5" stroke="#2b4f91"/><path d="M13 11v5M11 14l2 2 2-2" fill="none" stroke="#2f7d32" stroke-width="1.4"/></svg>',
+  backup: '<svg viewBox="0 0 20 20"><path d="M3 3h12l2 2v12H3z" fill="#4a77c9" stroke="#2b4f91" stroke-width="1.1"/><rect x="6" y="4" width="7" height="4" fill="#fff"/><rect x="5.5" y="11" width="9" height="5" fill="#dbe6f7"/></svg>',
+  restore: '<svg viewBox="0 0 20 20"><path d="M2 6h6l2 2h8v9H2z" fill="#f4d58d" stroke="#8a6d1d" stroke-width="1.1"/><path d="M10 15V9.5M7.5 12L10 9.5l2.5 2.5" fill="none" stroke="#2b4f91" stroke-width="1.5"/></svg>',
+  newdeck: `<svg viewBox="0 0 20 20"><rect x="4" y="2" width="10" height="13" rx="1.2" fill="#fff" stroke="#556" stroke-width="1.2"/><path d="M6.5 6h5M6.5 8.5h5" stroke="#556"/>${PLUS}</svg>`,
+  opendeck: '<svg viewBox="0 0 20 20"><path d="M2 5h6l2 2h8v9H2z" fill="#f4d58d" stroke="#8a6d1d" stroke-width="1.1"/><rect x="8" y="9" width="5" height="6" rx=".6" fill="#dbe6f7" stroke="#2b4f91" stroke-width=".9"/></svg>',
+  undo: `<svg viewBox="0 0 20 20"><path d="M7 5L3 9l4 4M3 9h9a4 4 0 010 8H9" fill="none" stroke="${S}" stroke-width="1.6"/></svg>`,
+  redo: `<svg viewBox="0 0 20 20"><path d="M13 5l4 4-4 4M17 9H8a4 4 0 000 8h3" fill="none" stroke="${S}" stroke-width="1.6"/></svg>`,
+  clear: `<svg viewBox="0 0 20 20"><path d="M2 3h16l-6 7v6l-4 2v-8z" fill="#dbe6f7" stroke="#2b4f91" stroke-width="1.1"/><path d="M13 13l5 5M18 13l-5 5" stroke="#a33" stroke-width="1.5"/></svg>`,
+  filters: `<svg viewBox="0 0 20 20"><path d="M2 3h16l-6 7v6l-4 2v-8z" fill="#dbe6f7" stroke="#2b4f91" stroke-width="1.1"/></svg>`,
+  theme: `<svg viewBox="0 0 20 20"><path d="M14.5 13.5A6.5 6.5 0 017 4a6.5 6.5 0 107.5 9.5z" fill="${S}"/></svg>`,
+  sun: '<svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="3.5" fill="#f4d58d" stroke="#8a6d1d" stroke-width="1.2"/><path d="M10 2v2.5M10 15.5V18M2 10h2.5M15.5 10H18M4.3 4.3l1.8 1.8M13.9 13.9l1.8 1.8M4.3 15.7l1.8-1.8M13.9 6.1l1.8-1.8" stroke="#8a6d1d" stroke-width="1.3"/></svg>',
+  system: `<svg viewBox="0 0 20 20"><rect x="2" y="3" width="16" height="11" rx="1" fill="#fff" stroke="${S}" stroke-width="1.2"/><path d="M3 13.5L17 3.5V13.5z" fill="${S}"/><path d="M7 17h6M10 14v3" stroke="${S}" stroke-width="1.3"/></svg>`,
+  panels: `<svg viewBox="0 0 20 20"><rect x="2" y="3" width="16" height="14" fill="#fff" stroke="${S}" stroke-width="1.2"/><rect x="2" y="3" width="5" height="14" fill="#dbe6f7" stroke="${S}" stroke-width="1.2"/><rect x="13" y="3" width="5" height="14" fill="#dbe6f7" stroke="${S}" stroke-width="1.2"/></svg>`,
+  workspace: `<svg viewBox="0 0 20 20"><rect x="2" y="3" width="16" height="14" fill="#fff" stroke="${S}" stroke-width="1.2"/><path d="M2 6h16M7 6v11M7 12h11" stroke="${S}"/><path d="M14 13.5v3M12.5 15h3" stroke="#2f7d32" stroke-width="1.3"/></svg>`,
+  ribbon: '<svg viewBox="0 0 20 20"><rect x="2" y="4" width="16" height="4" fill="#dbe6f7" stroke="#2b4f91"/><rect x="2" y="9" width="16" height="7" fill="#fff" stroke="#556"/><path d="M5 12h3M10 12h3" stroke="#556" stroke-width="1.5"/></svg>',
+  keyboard: `<svg viewBox="0 0 20 20"><rect x="1.5" y="5" width="17" height="10" rx="1.5" fill="#fff" stroke="${S}" stroke-width="1.2"/><path d="M4 8h1.5M7 8h1.5M10 8h1.5M13 8h1.5M4 10.5h1.5M7 10.5h1.5M10 10.5h1.5M13 10.5h3M6 13h8" stroke="${S}" stroke-width="1.2"/></svg>`,
+  info: '<svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="7.5" fill="#dbe6f7" stroke="#2b4f91" stroke-width="1.3"/><circle cx="10" cy="6.3" r="1.1" fill="#2b4f91"/><path d="M10 8.8v5.5" stroke="#2b4f91" stroke-width="1.8"/></svg>',
+  key: `<svg viewBox="0 0 20 20"><circle cx="6.5" cy="10" r="3.5" fill="#f4d58d" stroke="#8a6d1d" stroke-width="1.2"/><path d="M10 10h8M15 10v3M17.5 10v2" stroke="#8a6d1d" stroke-width="1.5"/></svg>`,
+  signout: `<svg viewBox="0 0 20 20"><path d="M11 3H4v14h7" fill="none" stroke="${S}" stroke-width="1.4"/><path d="M8 10h9M14 7l3 3-3 3" fill="none" stroke="#a33" stroke-width="1.5"/></svg>`,
+  del: '<svg viewBox="0 0 20 20"><path d="M5 6h10l-1 11H6zM3 6h14M8 6V3h4v3" fill="none" stroke="#a33" stroke-width="1.4"/></svg>',
+  menu: `<svg viewBox="0 0 20 20"><path d="M3 5h14M3 10h14M3 15h14" stroke="${S}" stroke-width="1.8"/></svg>`,
+};
+
+/** Renders an icon from the table. The markup is a fixed string from this file, never user text. */
+export function Icon({ name, className }: { name: string; className?: string }) {
+  const svg = RI[name];
+  if (!svg) return null;
+  return <span className={className ? `ico ${className}` : "ico"} aria-hidden="true" dangerouslySetInnerHTML={{ __html: svg }} />;
+}

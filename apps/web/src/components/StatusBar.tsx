@@ -1,0 +1,44 @@
+// ---------- status bar ----------
+import type { Action } from "../actions";
+import { customDialog } from "./Dialog";
+import { useApp, zoneLabel } from "../store";
+
+const VIEW_NAMES = { cards: "Card search", collection: "My collection", deck: "Deck", about: "About" } as const;
+
+export function StatusBar({ actions }: { actions: Record<string, Action> }) {
+  const store = useApp();
+  const { catalog } = store;
+  const count = store.view === "cards" ? `${store.cards.length} ${store.cards.length === 1 ? "result" : "results"}`
+    : store.view === "collection" ? `${store.visibleCollection.length} entries`
+      : store.view === "deck" && store.deck ? `${store.deck.cards.reduce((sum, card) => sum + card.quantity, 0)} cards` : "";
+  const failed = catalog?.update.lastError;
+
+  return (
+    <div id="status">
+      <span id="st-view">{VIEW_NAMES[store.view]}</span>
+      {count && <span id="st-count">{count}</span>}
+      <span id="st-catalog" title={catalog?.update.scheduled ? `Automatic refresh every ${catalog.update.intervalHours} hours` : "Automatic refresh is off"}>
+        {catalog
+          ? `${catalog.printingCount.toLocaleString()} printings${catalog.updatedAt ? `, updated ${new Date(catalog.updatedAt).toLocaleDateString()}` : ""}`
+          : "Card database loading"}
+      </span>
+      {catalog?.update.isUpdating && <span className="st-warn">Updating card database</span>}
+      {failed && !catalog?.update.isUpdating && (
+        <span
+          className="st-err pt"
+          role="button"
+          onClick={() => customDialog("Card database update failed", () => <p className="dlgq">The last card database update failed: {failed}</p>, 420)}
+        >
+          Last update failed
+        </span>
+      )}
+      <span id="st-toggles">
+        <span className={`pt${store.prefs.foil ? " on" : ""}`} role="button" title={actions.foil?.label} onClick={actions.foil?.run}>FOIL</span>
+        <span className="pt on-plain" role="button" title="Target zone for Add to deck (Z cycles it)" onClick={actions["zone.cycle"]?.run}>
+          ZONE: {zoneLabel(store.prefs.zone).toUpperCase()}
+        </span>
+      </span>
+      <span id="st-msg" className={store.flashMsg?.kind === "err" ? "err" : ""} role="status" key={store.flashMsg?.id}>{store.flashMsg?.text ?? ""}</span>
+    </div>
+  );
+}

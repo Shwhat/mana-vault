@@ -1,0 +1,719 @@
+// ---------- state: the one place that holds the app's data and changes it ----------
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { csvCell, downloadBlob, downloadText, pickFile, request, slugify } from "./api";
+import { confirmDialog, dialog } from "./components/Dialog";
+import { activatePanel, clone, type Layout, openPanel, type PanelId, PRESETS, type Workspace } from "./dock";
+import { applyTheme, type Prefs, savePrefs } from "./prefs";
+import {
+  type BackupSummary, type Card, type CardDetail, type CatalogStatus, type CollectionEntry, type Deck, type DeckCard,
+  type DeckDetail, type DeckMode, EMPTY_FILTERS, type Filters, type ImportReport, type User, type View, type Zone, capitalize,
+} from "./types";
+
+export type Selection = { view: "cards" | "collection" | "deck"; key: string; printingId: string } | null;
+export type Flash = { text: string; kind: "ok" | "err"; id: number } | null;
+type UndoEntry = { label: string; undo: () => Promise<void>; redo: () => Promise<void> };
+export type Review = { title: string; report: ImportReport; done: boolean } | null;
+type DeckKey = { deckId: string; oracle_id: string; printing_id: string | null; card_id: string; zone: Zone };
+
+const UNDO_LIMIT = 150;
+
+const message = (reason: unknown, fallback: string) => (reason instanceof Error ? reason.message : fallback);
+
+export function useStoreState(user: User, initialPrefs: Prefs) {
+  const [prefs, setPrefsState] = useState(initialPrefs);
+  const [view, setViewState] = useState<View>(() => {
+    if (window.location.pathname.startsWith("/about")) return "about";
+    return PRESETS[initialPrefs.workspace]?.().view ?? initialPrefs.workspaces[initialPrefs.workspace]?.view ?? "cards";
+  });
+  const [lastView, setLastView] = useState<Exclude<View, "about">>("cards");
+  const [aboutSlug, setAboutSlug] = useState(() => window.location.pathname.replace(/^\/about\/?/, ""));
+  const [filters, setFiltersState] = useState<Filters>(EMPTY_FILTERS);
+  const [cards, setCards] = useState<Card[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [searchError, setSearchError] = useState("");
+  const [collection, setCollection] = useState<CollectionEntry[] | null>(null);
+  const [collectionFilter, setCollectionFilter] = useState("");
+  const [decks, setDecks] = useState<Deck[]>([]);
+  const [deck, setDeck] = useState<DeckDetail | null>(null);
+  const [selection, setSelection] = useState<Selection>(null);
+  const [cardDetail, setCardDetail] = useState<CardDetail | null>(null);
+  const [catalog, setCatalog] = useState<CatalogStatus | null>(null);
+  const [catalogRequestPending, setCatalogRequestPending] = useState(false);
+  const [review, setReview] = useState<Review>(null);
+  const [flashMsg, setFlashMsg] = useState<Flash>(null);
+  // the undo and redo stacks live in a ref so queued presses always see the latest stacks
+  const stacks = useRef<{ undo: UndoEntry[]; redo: UndoEntry[] }>({ undo: [], redo: [] });
+  const [, setStackVersion] = useState(0);
+  const bumpStacks = useCallback(() => setStackVersion((value) => value + 1), []);
+  const undoQueue = useRef<Promise<void>>(Promise.resolve());
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const searchInput = useRef<HTMLInputElement | null>(null);
+  const flashTimer = useRef<number | undefined>(undefined);
+  const catalogPoll = useRef<(() => void) | null>(null);
+  const previousUpdate = useRef<CatalogStatus["update"] | null>(null);
+  const live = useRef({ deck, collection, selection });
+  live.current = { deck, collection, selection };
+
+  // ---------- preferences and layout ----------
+  const setPrefs = useCallback((change: Partial<Prefs> | ((current: Prefs) => Partial<Prefs>)) => {
+    setPrefsState((current) => {
+      const next = { ...current, ...(typeof change === "function" ? change(current) : change) };
+      savePrefs(next);
+      return next;
+    });
+  }, []);
+
+  useEffect(() => applyTheme(prefs.theme), [prefs.theme]);
+
+  const setLayout = useCallback((layout: Layout) => setPrefs({ layout }), [setPrefs]);
+  const showPanel = useCallback((panel: PanelId) => setPrefs((current) => ({ layout: openPanel(current.layout, panel) })), [setPrefs]);
+  const focusPanel = useCallback((panel: PanelId) => setPrefs((current) => ({ layout: activatePanel(current.layout, panel) })), [setPrefs]);
+
+  const flash = useCallback((text: string, kind: "ok" | "err" = "ok") => {
+    window.clearTimeout(flashTimer.current);
+    setFlashMsg({ text, kind, id: Date.now() });
+    flashTimer.current = window.setTimeout(() => setFlashMsg(null), kind === "err" ? 7000 : 2600);
+  }, []);
+  const fail = useCallback((reason: unknown, fallback: string) => flash(message(reason, fallback), "err"), [flash]);
+
+  // ---------- views ----------
+  const setView = useCallback((next: View) => {
+    if (next === "about") return;
+    setViewState(next);
+    setLastView(next);
+    if (window.location.pathname.startsWith("/about")) window.history.pushState(null, "", "/");
+  }, []);
+
+  const openAbout = useCallback((slug = "") => {
+    setViewState((current) => {
+      if (current !== "about") setLastView(current);
+      return "about";
+    });
+    setAboutSlug(slug);
+    const path = slug ? `/about/${slug}` : "/about";
+    if (window.location.pathname !== path) window.history.pushState(null, "", path);
+  }, []);
+
+  const closeAbout = useCallback(() => {
+    setViewState(lastView);
+    window.history.pushState(null, "", "/");
+  }, [lastView]);
+
+  useEffect(() => {
+    const onPop = () => {
+      if (window.location.pathname.startsWith("/about")) {
+        setViewState("about");
+        setAboutSlug(window.location.pathname.replace(/^\/about\/?/, ""));
+      } else setViewState((current) => (current === "about" ? lastView : current));
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, [lastView]);
+
+  // ---------- loading ----------
+  const reloadCollection = useCallback(async () => {
+    try {
+      setCollection(await request<CollectionEntry[]>("/api/collection"));
+    } catch (reason) {
+      fail(reason, "Could not load the collection.");
+    }
+  }, [fail]);
+
+  const reloadDecks = useCallback(async () => {
+    try {
+      setDecks(await request<Deck[]>("/api/decks"));
+    } catch (reason) {
+      fail(reason, "Could not load the decks.");
+    }
+  }, [fail]);
+
+  const loadDeck = useCallback(async (id: string) => request<DeckDetail>(`/api/decks/${encodeURIComponent(id)}`), []);
+
+  const openDeck = useCallback(async (id: string, quiet = false) => {
+    try {
+      const detail = await loadDeck(id);
+      setDeck(detail);
+      setPrefs({ lastDeckId: id });
+      if (!quiet) flash(`${detail.name} opened`);
+    } catch (reason) {
+      if (!quiet) fail(reason, "Could not open the deck.");
+      else setPrefs({ lastDeckId: null });
+    }
+  }, [loadDeck, setPrefs, flash, fail]);
+
+  const reloadDeck = useCallback(async () => {
+    const current = live.current.deck;
+    if (!current) return;
+    try {
+      setDeck(await loadDeck(current.id));
+    } catch (reason) {
+      fail(reason, "Could not reload the deck.");
+    }
+  }, [loadDeck, fail]);
+
+  const reloadCardDetail = useCallback(async (printingId?: string) => {
+    const id = printingId ?? live.current.selection?.printingId;
+    if (!id) {
+      setCardDetail(null);
+      return;
+    }
+    try {
+      setCardDetail(await request<CardDetail>(`/api/cards/${encodeURIComponent(id)}`));
+    } catch {
+      setCardDetail(null);
+    }
+  }, []);
+
+  const select = useCallback((next: Selection) => {
+    setSelection(next);
+    if (next) void reloadCardDetail(next.printingId);
+    else setCardDetail(null);
+  }, [reloadCardDetail]);
+
+  useEffect(() => {
+    void reloadDecks();
+    if (initialPrefs.lastDeckId) void openDeck(initialPrefs.lastDeckId, true);
+    // first load only
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (view === "collection" && collection === null) void reloadCollection();
+  }, [view, collection, reloadCollection]);
+
+  // ---------- search ----------
+  const setFilters = useCallback((change: Partial<Filters>) => setFiltersState((current) => ({ ...current, ...change })), []);
+  const filtersActive = Object.values(filters).some((value) => value !== "");
+
+  useEffect(() => {
+    if (view !== "cards") return;
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      setLoading(true);
+      setSearchError("");
+      const params = new URLSearchParams({ q: filters.query });
+      if (filters.type.trim()) params.set("type", filters.type.trim());
+      if (filters.set.trim()) params.set("set", filters.set.trim());
+      if (filters.color) params.set("color", filters.color);
+      if (filters.rarity) params.set("rarity", filters.rarity);
+      if (filters.format) params.set("format", filters.format);
+      if (filters.mvMin) params.set("mvMin", filters.mvMin);
+      if (filters.mvMax) params.set("mvMax", filters.mvMax);
+      try {
+        setCards(await request<Card[]>(`/api/cards?${params}`, { signal: controller.signal }));
+      } catch (reason) {
+        if (!controller.signal.aborted) {
+          setCards([]);
+          setSearchError(message(reason, "The search failed."));
+        }
+      } finally {
+        if (!controller.signal.aborted) setLoading(false);
+      }
+    }, 250);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [view, filters]);
+
+  // ---------- card database status ----------
+  useEffect(() => {
+    let active = true;
+    let timer: number | undefined;
+    let pending = false;
+    let again = false;
+    const refresh = async () => {
+      if (pending) {
+        again = true;
+        return;
+      }
+      pending = true;
+      let delay = 60_000;
+      try {
+        const status = await request<CatalogStatus>("/api/catalog/status");
+        if (!active) return;
+        const previous = previousUpdate.current;
+        if (previous?.isUpdating && !status.update.isUpdating) {
+          if (status.update.lastError) flash(`Card database update failed: ${status.update.lastError}`, "err");
+          else flash(`Card database updated with ${(status.update.lastImportedCount ?? status.printingCount).toLocaleString()} printings`);
+        }
+        previousUpdate.current = status.update;
+        setCatalog(status);
+        if (status.update.isUpdating) delay = 2_000;
+      } catch {
+        // the status bar keeps its last known value
+      } finally {
+        pending = false;
+        if (active) {
+          if (again) {
+            again = false;
+            delay = 0;
+          }
+          timer = window.setTimeout(() => { void refresh(); }, delay);
+        }
+      }
+    };
+    catalogPoll.current = () => {
+      if (timer !== undefined) window.clearTimeout(timer);
+      if (pending) again = true;
+      else void refresh();
+    };
+    void refresh();
+    return () => {
+      active = false;
+      if (timer !== undefined) window.clearTimeout(timer);
+      catalogPoll.current = null;
+    };
+  }, [flash]);
+
+  const updateCatalog = useCallback(async () => {
+    setCatalogRequestPending(true);
+    try {
+      const result = await request<{ update: CatalogStatus["update"] }>("/api/catalog/update", { method: "POST", body: "{}" });
+      previousUpdate.current = result.update;
+      setCatalog((current) => (current ? { ...current, update: result.update } : current));
+      flash("Card database update started");
+      catalogPoll.current?.();
+    } catch (reason) {
+      fail(reason, "Could not start the card database update.");
+    } finally {
+      setCatalogRequestPending(false);
+    }
+  }, [flash, fail]);
+
+  // ---------- undo and redo ----------
+  const pushUndo = useCallback((entry: UndoEntry) => {
+    stacks.current = { undo: [...stacks.current.undo.slice(-(UNDO_LIMIT - 1)), entry], redo: [] };
+    bumpStacks();
+  }, [bumpStacks]);
+
+  const clearUndo = useCallback(() => {
+    stacks.current = { undo: [], redo: [] };
+    bumpStacks();
+  }, [bumpStacks]);
+
+  const refreshAfterChange = useCallback(async () => {
+    await Promise.all([
+      live.current.collection !== null ? reloadCollection() : Promise.resolve(),
+      reloadDeck(),
+      reloadDecks(),
+      reloadCardDetail(),
+    ]);
+  }, [reloadCollection, reloadDeck, reloadDecks, reloadCardDetail]);
+
+  /** Undo and redo run one at a time, in the order they were pressed. */
+  const step = useCallback((direction: "undo" | "redo") => {
+    undoQueue.current = undoQueue.current.then(async () => {
+      const from = direction === "undo" ? stacks.current.undo : stacks.current.redo;
+      const entry = from[from.length - 1];
+      if (!entry) return;
+      try {
+        await (direction === "undo" ? entry.undo() : entry.redo());
+        stacks.current = direction === "undo"
+          ? { undo: stacks.current.undo.slice(0, -1), redo: [...stacks.current.redo, entry] }
+          : { undo: [...stacks.current.undo, entry], redo: stacks.current.redo.slice(0, -1) };
+        bumpStacks();
+        await refreshAfterChange();
+        flash(`${direction === "undo" ? "Undone" : "Redone"}: ${entry.label}`);
+      } catch (reason) {
+        await refreshAfterChange();
+        fail(reason, direction === "undo" ? "Could not undo that change." : "Could not redo that change.");
+      }
+    });
+  }, [bumpStacks, refreshAfterChange, flash, fail]);
+
+  const undo = useCallback(() => step("undo"), [step]);
+  const redo = useCallback(() => step("redo"), [step]);
+  const undoStack = stacks.current.undo;
+  const redoStack = stacks.current.redo;
+
+  // ---------- collection ----------
+  const writeCollection = useCallback(async (cardId: string, foil: boolean, from: number, to: number) => {
+    if (to === from) return;
+    const url = `/api/collection/${encodeURIComponent(cardId)}`;
+    if (to <= 0) await request(`${url}?foil=${foil ? "true" : "false"}`, { method: "DELETE" });
+    else if (from <= 0) await request("/api/collection", { method: "POST", body: JSON.stringify({ cardId, quantity: to, foil }) });
+    else await request(url, { method: "PATCH", body: JSON.stringify({ quantity: to, foil }) });
+  }, []);
+
+  const addToCollection = useCallback(async (cardId: string, name: string) => {
+    const foil = prefs.foil;
+    try {
+      const entry = await request<CollectionEntry>("/api/collection", { method: "POST", body: JSON.stringify({ cardId, quantity: 1, foil }) });
+      const after = entry.quantity;
+      const label = `Add ${name}${foil ? " (foil)" : ""}`;
+      pushUndo({ label, undo: () => writeCollection(cardId, foil, after, after - 1), redo: () => writeCollection(cardId, foil, after - 1, after) });
+      flash(`${name}${foil ? " (foil)" : ""} added to collection`);
+      await refreshAfterChange();
+    } catch (reason) {
+      fail(reason, "Could not add the card.");
+    }
+  }, [prefs.foil, pushUndo, writeCollection, flash, fail, refreshAfterChange]);
+
+  const setCollectionQuantity = useCallback(async (entry: CollectionEntry, quantity: number) => {
+    const foil = Boolean(entry.foil);
+    const from = entry.quantity;
+    const to = Math.max(0, Math.min(10000, quantity));
+    if (from === to) return;
+    try {
+      await writeCollection(entry.id, foil, from, to);
+      const label = to === 0 ? `Remove ${entry.name}` : `${entry.name} quantity ${to}`;
+      pushUndo({ label, undo: () => writeCollection(entry.id, foil, to, from), redo: () => writeCollection(entry.id, foil, from, to) });
+      if (to === 0) flash(`${entry.name} removed from collection`);
+      await refreshAfterChange();
+    } catch (reason) {
+      fail(reason, "Could not update the collection.");
+    }
+  }, [writeCollection, pushUndo, flash, fail, refreshAfterChange]);
+
+  // ---------- decks ----------
+  const writeDeck = useCallback(async (key: DeckKey, to: number) => {
+    const detail = await loadDeck(key.deckId);
+    const entry = detail.cards.find((card) => card.oracle_id === key.oracle_id && card.printing_id === key.printing_id && card.zone === key.zone);
+    const base = `/api/decks/${encodeURIComponent(key.deckId)}/cards`;
+    if (entry) {
+      if (entry.quantity === to) return;
+      await request(`${base}/${encodeURIComponent(entry.oracle_id)}?zone=${entry.zone}&entryId=${entry.entry_id}`, {
+        method: "PATCH", body: JSON.stringify({ quantity: Math.max(0, to), zone: entry.zone }),
+      });
+    } else if (to > 0) {
+      await request(base, { method: "POST", body: JSON.stringify({ cardId: key.card_id, quantity: to, zone: key.zone }) });
+    }
+  }, [loadDeck]);
+
+  const keyOf = (detail: DeckDetail, card: DeckCard, zone: Zone = card.zone): DeckKey => ({
+    deckId: detail.id, oracle_id: card.oracle_id, printing_id: card.printing_id, card_id: card.card_id, zone,
+  });
+
+  const addToDeck = useCallback(async (cardId: string, name: string) => {
+    const current = live.current.deck;
+    if (!current) {
+      flash("Open or create a deck first (Deck menu, Open deck or New deck)", "err");
+      return;
+    }
+    const zone = prefs.zone;
+    try {
+      const card = await request<CardDetail>(`/api/cards/${encodeURIComponent(cardId)}`);
+      await request(`/api/decks/${encodeURIComponent(current.id)}/cards`, { method: "POST", body: JSON.stringify({ cardId, quantity: 1, zone }) });
+      const key: DeckKey = {
+        deckId: current.id, oracle_id: card.oracle_id ?? "", printing_id: current.mode === "theme" ? cardId : null, card_id: cardId, zone,
+      };
+      const detail = await loadDeck(current.id);
+      const after = detail.cards.find((item) => item.oracle_id === key.oracle_id && item.printing_id === key.printing_id && item.zone === zone)?.quantity ?? 1;
+      const zoneLabel = zone === "main" ? "" : ` (${zone})`;
+      pushUndo({ label: `Add ${name} to ${current.name}`, undo: () => writeDeck(key, after - 1), redo: () => writeDeck(key, after) });
+      flash(`${name} added to ${current.name}${zoneLabel}`);
+      await refreshAfterChange();
+    } catch (reason) {
+      fail(reason, "Could not add the card to the deck.");
+    }
+  }, [prefs.zone, loadDeck, writeDeck, pushUndo, flash, fail, refreshAfterChange]);
+
+  const setDeckQuantity = useCallback(async (card: DeckCard, quantity: number) => {
+    const current = live.current.deck;
+    if (!current) return;
+    const from = card.quantity;
+    const to = Math.max(0, Math.min(100, quantity));
+    if (from === to) return;
+    const key = keyOf(current, card);
+    try {
+      await writeDeck(key, to);
+      pushUndo({ label: to === 0 ? `Remove ${card.name}` : `${card.name} quantity ${to}`, undo: () => writeDeck(key, from), redo: () => writeDeck(key, to) });
+      if (to === 0) flash(`${card.name} removed from ${current.name}`);
+      await refreshAfterChange();
+    } catch (reason) {
+      fail(reason, "Could not update the deck.");
+    }
+  }, [writeDeck, pushUndo, flash, fail, refreshAfterChange]);
+
+  const moveDeckCard = useCallback(async (card: DeckCard, zone: Zone) => {
+    const current = live.current.deck;
+    if (!current || card.zone === zone) return;
+    const source = keyOf(current, card);
+    const target = keyOf(current, card, zone);
+    const before = current.cards.find((item) => item.oracle_id === card.oracle_id && item.printing_id === card.printing_id && item.zone === zone)?.quantity ?? 0;
+    try {
+      await request(`/api/decks/${encodeURIComponent(current.id)}/cards/${encodeURIComponent(card.oracle_id)}?zone=${card.zone}&entryId=${card.entry_id}`, {
+        method: "PATCH", body: JSON.stringify({ quantity: card.quantity, zone }),
+      });
+      pushUndo({
+        label: `Move ${card.name} to ${zone}`,
+        undo: async () => { await writeDeck(target, before); await writeDeck(source, card.quantity); },
+        redo: async () => { await writeDeck(source, 0); await writeDeck(target, before + card.quantity); },
+      });
+      flash(`${card.name} moved to ${zone === "main" ? "main deck" : zone}`);
+      await refreshAfterChange();
+    } catch (reason) {
+      fail(reason, "Could not move the card.");
+    }
+  }, [writeDeck, pushUndo, flash, fail, refreshAfterChange]);
+
+  const createDeck = useCallback(async (name: string, format: string, mode: DeckMode) => {
+    const created = await request<Deck>("/api/decks", { method: "POST", body: JSON.stringify({ name, format, mode }) });
+    await openDeck(created.id, true);
+    await reloadDecks();
+    flash(`${created.name} created`);
+  }, [openDeck, reloadDecks, flash]);
+
+  // ---------- imports, exports and backups ----------
+  const showReview = useCallback((title: string, report: ImportReport, done: boolean) => {
+    setReview({ title, report, done });
+    if (report.unmatched.length) showPanel("review");
+  }, [showPanel]);
+
+  const previewDialog = (title: string, fileName: string, report: ImportReport, onImport: () => Promise<void>) => {
+    dialog(title, [], async () => {
+      if (report.matchedRows === 0) return false;
+      await onImport();
+    }, "Import matched rows", (
+      <div className="dlgtext">
+        <p><b>{fileName}</b></p>
+        <p>{report.matchedRows} matched rows ({report.importedQuantity} cards) will be added. {report.unmatched.length} rows will be skipped.</p>
+        {report.unmatched.length > 0 && (
+          <div className="msglist">
+            {report.unmatched.slice(0, 8).map((item) => (
+              <div className="msg" key={`${item.row}-${item.name}`}><span className="lv w">Row {item.row}</span><span>{item.name ? `${item.name}: ` : ""}{item.reason}</span></div>
+            ))}
+          </div>
+        )}
+        {report.unmatched.length > 8 && <p className="note">The Import review panel lists all {report.unmatched.length} skipped rows.</p>}
+        {report.matchedRows === 0 && <p className="note err">No rows matched the card database, so there is nothing to import.</p>}
+      </div>
+    ), 520);
+  };
+
+  const importCollection = useCallback(async () => {
+    const file = await pickFile(".csv,text/csv");
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) return flash("The CSV file must be 5 MB or smaller", "err");
+    try {
+      const content = await file.text();
+      const report = await request<ImportReport>("/api/collection/import/preview", { method: "POST", headers: { "content-type": "text/csv" }, body: content });
+      showReview(`Collection import preview: ${file.name}`, report, false);
+      previewDialog("Import collection CSV", file.name, report, async () => {
+        try {
+          const result = await request<ImportReport>("/api/collection/import", { method: "POST", headers: { "content-type": "text/csv" }, body: content });
+          showReview(`Collection import: ${file.name}`, result, true);
+          flash(`Imported ${result.importedQuantity} cards from ${result.matchedRows} rows`);
+          await refreshAfterChange();
+          if (live.current.collection === null) await reloadCollection();
+        } catch (reason) {
+          fail(reason, "Could not import the collection CSV.");
+        }
+      });
+    } catch (reason) {
+      fail(reason, "Could not read the collection CSV.");
+    }
+  }, [flash, fail, showReview, refreshAfterChange, reloadCollection]);
+
+  const exportCollection = useCallback(async () => {
+    try {
+      const entries = await request<CollectionEntry[]>("/api/collection");
+      if (!entries.length) return flash("The collection is empty, so there is nothing to export", "err");
+      const rows = [
+        ["Count", "Tradelist Count", "Name", "Edition", "Condition", "Language", "Foil", "Tags", "Last Modified", "Collector Number", "Alter", "Proxy", "Purchase Price"],
+        ...entries.map((entry) => [entry.quantity, 0, entry.name, entry.set_name, "", "", Boolean(entry.foil), "", "", entry.collector_number, "", "", ""]),
+      ];
+      downloadText("mana-vault-collection.csv", rows.map((row) => row.map(csvCell).join(",")).join("\r\n"), "text/csv;charset=utf-8");
+      flash("Collection exported");
+    } catch (reason) {
+      fail(reason, "Could not export the collection.");
+    }
+  }, [flash, fail]);
+
+  const downloadBackup = useCallback(async () => {
+    try {
+      const response = await fetch("/api/backup", { credentials: "same-origin" });
+      if (response.status === 401) {
+        window.location.href = "/login";
+        return;
+      }
+      if (!response.ok) throw new Error(`The backup failed (${response.status}).`);
+      downloadBlob("mana-vault-backup.json", await response.blob());
+      flash("Backup downloaded");
+    } catch (reason) {
+      fail(reason, "Could not download the backup.");
+    }
+  }, [flash, fail]);
+
+  const restoreBackup = useCallback(async () => {
+    const file = await pickFile(".json,application/json");
+    if (!file) return;
+    if (file.size > 25 * 1024 * 1024) return flash("The backup file must be 25 MB or smaller", "err");
+    try {
+      const content = await file.text();
+      const headers = { "content-type": "application/vnd.mana-vault.backup+json" };
+      const summary = await request<BackupSummary>("/api/backup/validate", { method: "POST", headers, body: content });
+      const ok = await confirmDialog("Restore backup", (
+        <>
+          Replace the current collection and all {decks.length} decks with this backup from {new Date(summary.createdAt).toLocaleString()}?
+          It holds {summary.collectionEntryCount} collection entries, {summary.deckCount} decks with {summary.deckCardCount} deck cards,
+          and {summary.printingCount} card printings. The full card database is not changed. A restore cannot be undone.
+        </>
+      ), "Restore backup");
+      if (!ok) return;
+      await request("/api/backup/restore", { method: "POST", headers, body: content });
+      clearUndo();
+      setDeck(null);
+      setPrefs({ lastDeckId: null });
+      setReview(null);
+      await Promise.all([reloadCollection(), reloadDecks()]);
+      catalogPoll.current?.();
+      flash("Backup restored");
+    } catch (reason) {
+      fail(reason, "Could not restore the backup.");
+    }
+  }, [decks.length, flash, fail, reloadCollection, reloadDecks, setPrefs, clearUndo]);
+
+  const importDeck = useCallback(async () => {
+    const current = live.current.deck;
+    if (!current) return flash("Open or create a deck first (Deck menu, Open deck or New deck)", "err");
+    const file = await pickFile(".txt,.csv,text/plain,text/csv");
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) return flash("The decklist file must be 5 MB or smaller", "err");
+    try {
+      const contentType = file.name.toLowerCase().endsWith(".csv") ? "text/csv" : "text/plain";
+      const content = await file.text();
+      const base = `/api/decks/${encodeURIComponent(current.id)}/import`;
+      const report = await request<ImportReport>(`${base}/preview`, { method: "POST", headers: { "content-type": contentType }, body: content });
+      showReview(`Decklist preview for ${current.name}: ${file.name}`, report, false);
+      previewDialog(`Import decklist into ${current.name}`, file.name, report, async () => {
+        try {
+          const result = await request<ImportReport>(base, { method: "POST", headers: { "content-type": contentType }, body: content });
+          showReview(`Decklist import into ${current.name}: ${file.name}`, result, true);
+          flash(`Imported ${result.importedQuantity} cards from ${result.matchedRows} rows`);
+          await refreshAfterChange();
+        } catch (reason) {
+          fail(reason, "Could not import the decklist.");
+        }
+      });
+    } catch (reason) {
+      fail(reason, "Could not read the decklist.");
+    }
+  }, [flash, fail, showReview, refreshAfterChange]);
+
+  const exportDeckText = useCallback(() => {
+    const current = live.current.deck;
+    if (!current) return flash("Open a deck first", "err");
+    if (!current.cards.length) return flash(`${current.name} is empty, so there is nothing to export`, "err");
+    const lines = [`# ${current.name}`, ""];
+    for (const [zone, label] of [["commander", "Commander"], ["main", "Mainboard"], ["sideboard", "Sideboard"]] as const) {
+      const inZone = current.cards.filter((card) => card.zone === zone);
+      if (!inZone.length) continue;
+      lines.push(`// ${label}`);
+      for (const card of inZone) {
+        const printing = current.mode === "theme" ? ` (${card.set_code.toUpperCase()}) ${card.collector_number}` : "";
+        lines.push(`${card.quantity} ${card.name}${printing}`);
+      }
+      lines.push("");
+    }
+    downloadText(`${slugify(current.name)}.txt`, lines.join("\r\n"), "text/plain;charset=utf-8");
+    flash(`${current.name} exported as text`);
+  }, [flash]);
+
+  const exportDeckCsv = useCallback(() => {
+    const current = live.current.deck;
+    if (!current) return flash("Open a deck first", "err");
+    if (!current.cards.length) return flash(`${current.name} is empty, so there is nothing to export`, "err");
+    const rows = [
+      ["Name", "Quantity", "Set Code", "Collector Number", "Zone", "Mode"],
+      ...current.cards.map((card) => [
+        card.name, card.quantity, current.mode === "theme" ? card.set_code : "", current.mode === "theme" ? card.collector_number : "", card.zone, current.mode,
+      ]),
+    ];
+    downloadText(`${slugify(current.name)}.csv`, rows.map((row) => row.map(csvCell).join(",")).join("\r\n"), "text/csv;charset=utf-8");
+    flash(`${current.name} exported as CSV`);
+  }, [flash]);
+
+  // ---------- workspaces ----------
+  const applyWorkspace = useCallback((name: string) => {
+    const workspace: Workspace | undefined = PRESETS[name]?.() ?? prefs.workspaces[name];
+    if (!workspace) return;
+    setPrefs({ layout: clone(workspace.layout), workspace: name });
+    setView(workspace.view);
+    flash(`${name} workspace`);
+  }, [prefs.workspaces, setPrefs, setView, flash]);
+
+  const saveWorkspace = useCallback((name: string) => {
+    const workspaceView = view === "about" ? lastView : view;
+    setPrefs((current) => ({ workspaces: { ...current.workspaces, [name]: { layout: clone(current.layout), view: workspaceView } }, workspace: name }));
+    flash(`Workspace ${name} saved`);
+  }, [view, lastView, setPrefs, flash]);
+
+  const deleteWorkspace = useCallback((name: string) => {
+    setPrefs((current) => {
+      const workspaces = { ...current.workspaces };
+      delete workspaces[name];
+      return { workspaces };
+    });
+    flash(`Workspace ${name} deleted`);
+  }, [setPrefs, flash]);
+
+  // ---------- selection helpers for the keyboard ----------
+  const visibleCollection = useMemo(() => {
+    const term = collectionFilter.trim().toLowerCase();
+    const entries = collection ?? [];
+    return term ? entries.filter((entry) => `${entry.name} ${entry.set_name} ${entry.set_code}`.toLowerCase().includes(term)) : entries;
+  }, [collection, collectionFilter]);
+
+  const listItems = useCallback((): Array<NonNullable<Selection>> => {
+    if (view === "cards") return cards.map((card) => ({ view: "cards", key: card.id, printingId: card.id }));
+    if (view === "collection") return visibleCollection.map((entry) => ({ view: "collection", key: `${entry.id}:${entry.foil}`, printingId: entry.id }));
+    if (view === "deck" && deck) return sortDeck(deck.cards).map((card) => ({ view: "deck", key: String(card.entry_id), printingId: card.card_id }));
+    return [];
+  }, [view, cards, visibleCollection, deck]);
+
+  const moveSelection = useCallback((step: number) => {
+    const items = listItems();
+    if (!items.length) return;
+    const index = items.findIndex((item) => selection && item.key === selection.key && item.view === selection.view);
+    const next = items[Math.max(0, Math.min(items.length - 1, index < 0 ? 0 : index + step))];
+    if (next) {
+      select(next);
+      window.setTimeout(() => document.querySelector(`[data-key="${CSS.escape(next.key)}"]`)?.scrollIntoView({ block: "nearest" }), 0);
+    }
+  }, [listItems, selection, select]);
+
+  /** The selected row's printing and name, known at once without waiting for the card details to load. */
+  const selectedCard = useMemo((): { id: string; name: string } | null => {
+    if (!selection) return null;
+    const name = selection.view === "cards" ? cards.find((card) => card.id === selection.key)?.name
+      : selection.view === "collection" ? collection?.find((entry) => `${entry.id}:${entry.foil}` === selection.key)?.name
+        : deck?.cards.find((card) => String(card.entry_id) === selection.key)?.name;
+    const fallback = cardDetail?.id === selection.printingId ? cardDetail.name : undefined;
+    const resolved = name ?? fallback;
+    return resolved ? { id: selection.printingId, name: resolved } : null;
+  }, [selection, cards, collection, deck, cardDetail]);
+
+  return {
+    user, prefs, setPrefs, setLayout, showPanel, focusPanel,
+    view, setView, lastView, aboutSlug, openAbout, closeAbout,
+    filters, setFilters, filtersActive, cards, loading, searchError, searchInput,
+    collection, visibleCollection, collectionFilter, setCollectionFilter, reloadCollection,
+    decks, deck, openDeck, reloadDecks, createDeck,
+    selection, select, cardDetail, selectedCard, moveSelection,
+    catalog, catalogRequestPending, updateCatalog,
+    review, setReview,
+    flashMsg, flash, fail,
+    undoStack, redoStack, undo, redo,
+    addToCollection, setCollectionQuantity, addToDeck, setDeckQuantity, moveDeckCard,
+    importCollection, exportCollection, downloadBackup, restoreBackup, importDeck, exportDeckText, exportDeckCsv,
+    applyWorkspace, saveWorkspace, deleteWorkspace,
+    scannerOpen, setScannerOpen,
+  };
+}
+
+const ZONE_ORDER: Record<Zone, number> = { commander: 0, main: 1, sideboard: 2 };
+export function sortDeck(cards: DeckCard[]): DeckCard[] {
+  return [...cards].sort((a, b) => ZONE_ORDER[a.zone] - ZONE_ORDER[b.zone] || a.name.localeCompare(b.name));
+}
+
+export const zoneLabel = (zone: Zone) => (zone === "main" ? "Main deck" : capitalize(zone));
+
+export type Store = ReturnType<typeof useStoreState>;
+export const StoreContext = createContext<Store | null>(null);
+export function useApp(): Store {
+  const store = useContext(StoreContext);
+  if (!store) throw new Error("The app state is not ready");
+  return store;
+}

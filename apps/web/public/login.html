@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#2b3442">
+<title>Mana Vault - Sign in</title>
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="manifest" href="/manifest.webmanifest">
+<style>
+:root { --bg: #e9ebee; --card: #fff; --fg: #1d232c; --muted: #5d6775; --line: #c9ced6; --acc: #1f5fbf; --err: #b3261e; }
+@media (prefers-color-scheme: dark) { :root { --bg: #1b1f25; --card: #22272e; --fg: #e3e7ec; --muted: #9aa5b3; --line: #3a424d; --acc: #5b9bff; --err: #f28b82; } }
+* { box-sizing: border-box; }
+body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: var(--bg); color: var(--fg); font: 14px/1.4 "Segoe UI", system-ui, -apple-system, Arial, sans-serif; padding: 16px; }
+.card { width: 100%; max-width: 360px; background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 28px 28px 22px; }
+.brand { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
+.brand img { width: 36px; height: 36px; }
+.brand h1 { font-size: 20px; margin: 0; font-weight: 600; }
+.tabs { display: flex; border-bottom: 1px solid var(--line); margin-bottom: 16px; }
+.tabs button { flex: 1; background: none; border: 0; border-bottom: 2px solid transparent; padding: 8px 0; color: var(--muted); font: inherit; cursor: pointer; }
+.tabs button.on { color: var(--fg); border-bottom-color: var(--acc); font-weight: 600; }
+label { display: block; font-size: 12px; color: var(--muted); margin: 10px 0 4px; }
+input { width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 4px; background: var(--bg); color: var(--fg); font: inherit; font-size: 16px; }
+input:focus { outline: 2px solid var(--acc); outline-offset: -1px; }
+.go { width: 100%; margin-top: 18px; padding: 10px; border: 0; border-radius: 4px; background: var(--acc); color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
+@media (prefers-color-scheme: dark) { .go { color: #0b1220; } }
+.go:disabled { opacity: .6; cursor: default; }
+#msg { min-height: 20px; margin-top: 10px; color: var(--err); font-size: 13px; }
+.hint { color: var(--muted); font-size: 12px; margin-top: 4px; }
+.hidden { display: none; }
+</style>
+</head>
+<body>
+<form class="card" id="f" autocomplete="on">
+  <div class="brand"><img src="/icon.svg" alt=""><h1>Mana Vault</h1></div>
+  <div class="tabs" id="tabs"><button type="button" data-t="in" class="on">Sign in</button><button type="button" data-t="up">Create account</button></div>
+  <label for="name">User name</label>
+  <input id="name" name="username" autocomplete="username" autocapitalize="none" required autofocus>
+  <label for="pw">Password</label>
+  <input id="pw" name="password" type="password" autocomplete="current-password" required>
+  <div id="upx" class="hidden">
+    <div class="hint">At least 8 characters.</div>
+    <label for="pw2">Repeat password</label>
+    <input id="pw2" type="password" autocomplete="new-password">
+  </div>
+  <button class="go" id="go">Sign in</button>
+  <div id="msg" role="alert"></div>
+</form>
+<script>
+let mode = 'in';
+const $ = id => document.getElementById(id);
+function setMode(m) {
+  mode = m;
+  for (const b of document.querySelectorAll('#tabs button')) b.classList.toggle('on', b.dataset.t === m);
+  $('upx').classList.toggle('hidden', m !== 'up');
+  $('pw').autocomplete = m === 'up' ? 'new-password' : 'current-password';
+  $('go').textContent = m === 'up' ? 'Create account' : 'Sign in';
+  $('msg').textContent = '';
+}
+document.querySelectorAll('#tabs button').forEach(b => b.onclick = () => setMode(b.dataset.t));
+fetch('/api/config').then(r => r.json()).then(c => { if (!c.signup) $('tabs').classList.add('hidden'); }).catch(() => {});
+$('f').onsubmit = async e => {
+  e.preventDefault();
+  const name = $('name').value.trim(), password = $('pw').value;
+  if (mode === 'up' && password !== $('pw2').value) { $('msg').textContent = 'The passwords do not match.'; return; }
+  $('go').disabled = true; $('msg').textContent = '';
+  try {
+    const r = await fetch(mode === 'up' ? '/api/signup' : '/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Mana-Vault': '1' }, body: JSON.stringify({ name, password }) });
+    if (r.ok) { location.href = '/'; return; }
+    const j = await r.json().catch(() => ({}));
+    $('msg').textContent = j.error || 'Something went wrong.';
+  } catch (err) { $('msg').textContent = 'The server could not be reached.'; }
+  $('go').disabled = false;
+};
+</script>
+</body>
+</html>

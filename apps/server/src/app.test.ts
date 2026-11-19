@@ -5,7 +5,7 @@ import { cardInsertStatement, initializeDatabase } from "./database.js";
 
 async function setup() {
   const database = new DatabaseSync(":memory:");
-  const app = await buildApp(database);
+  const app = await buildApp(database, undefined, undefined, undefined, { requireSignIn: false });
   cardInsertStatement(database).run(
     "printing-1", "oracle-1", "Lightning Bolt", "{R}", 1, "Instant", "Lightning Bolt deals 3 damage to any target.",
     "R", "R", JSON.stringify({ commander: "legal", modern: "legal" }),
@@ -34,7 +34,7 @@ describe("API", () => {
       lastImportedCount: null,
       lastError: null,
     };
-    const app = await buildApp(database, undefined, () => updateStatus);
+    const app = await buildApp(database, undefined, () => updateStatus, undefined, { requireSignIn: false });
     const response = await app.inject({ method: "GET", url: "/api/catalog/status" });
     expect(response.statusCode).toBe(200);
     expect(response.json().update).toEqual(updateStatus);
@@ -58,7 +58,7 @@ describe("API", () => {
       isUpdating = true;
       return true;
     });
-    const app = await buildApp(database, undefined, updateStatus, requestUpdate);
+    const app = await buildApp(database, undefined, updateStatus, requestUpdate, { requireSignIn: false });
     const started = await app.inject({ method: "POST", url: "/api/catalog/update", payload: {} });
     const duplicate = await app.inject({ method: "POST", url: "/api/catalog/update", payload: {} });
     expect(started.statusCode).toBe(202);
@@ -322,6 +322,24 @@ describe("API", () => {
     expect(restored.statusCode).toBe(200);
     expect((await app.inject({ method: "GET", url: "/api/collection" })).json()[0].quantity).toBe(3);
     expect((await app.inject({ method: "GET", url: `/api/decks/${deck.json().id}` })).json().cards[0].quantity).toBe(2);
+    await app.close();
+    database.close();
+  });
+
+  it("backs up and restores colorless cards", async () => {
+    const { app, database } = await setup();
+    cardInsertStatement(database).run(
+      "sol-ring", "oracle-sol", "Sol Ring", "{1}", 1, "Artifact", "{T}: Add {C}{C}.", "", "",
+      JSON.stringify({ commander: "legal" }), "lea", "Limited Edition Alpha", "269", "uncommon", null, "1993-08-05", "Mark Tedin",
+    );
+    await app.inject({ method: "POST", url: "/api/collection", payload: { cardId: "sol-ring", quantity: 1 } });
+    const backup = await app.inject({ method: "GET", url: "/api/backup" });
+    const headers = { "content-type": "application/vnd.mana-vault.backup+json" };
+    const validation = await app.inject({ method: "POST", url: "/api/backup/validate", headers, payload: backup.body });
+    expect(validation.statusCode).toBe(200);
+    const broken = backup.body.replace('"colors":""', '"colors":"X"');
+    const rejected = await app.inject({ method: "POST", url: "/api/backup/validate", headers, payload: broken });
+    expect(rejected.json().error).toMatch(/invalid colors/);
     await app.close();
     database.close();
   });
