@@ -40,8 +40,10 @@ test("collections link sets, show completion and missing cards", async ({ page }
   await expect(page.locator("#view-collection .switcher")).toContainText("Alpha binder");
   await expect(page.locator(".colhead .badge.main")).toHaveCount(0);
   await page.locator(".colhead .addbtn").click();
-  await expect(page.locator("#view-cards")).toBeVisible();
+  // + Add goes to the card search with the search box focused; Esc leaves the box
+  await expect(page.getByRole("textbox", { name: "Search cards" })).toBeFocused();
   await page.keyboard.press("Escape");
+  await expect(page.getByRole("textbox", { name: "Search cards" })).not.toBeFocused();
   await expect(page.locator("#st-toggles")).toContainText("ADD TO: ALPHA BINDER");
   await page.keyboard.press("c");
   await expect(status(page)).toHaveText("New cards go to Main collection");

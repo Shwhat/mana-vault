@@ -132,9 +132,11 @@ test("the switcher opens collections and decks by search and keyboard, and one c
   await page.keyboard.press("Enter");
   await page.keyboard.press("2");
   await page.locator("#view-collection .switcher").click();
+  await page.keyboard.type("main");
+  await expect(page.locator(".swrow")).toHaveCount(1);
   await page.keyboard.press("ArrowDown");
   await page.keyboard.press("Enter");
-  await expect(page.locator("#view-collection .switcher")).not.toContainText("Trade binder");
+  await expect(page.locator("#view-collection .switcher")).toContainText("Main collection");
   await page.locator("#view-collection .switcher").click();
   await page.keyboard.press("Escape");
   await expect(page.locator(".swpop")).toHaveCount(0);
