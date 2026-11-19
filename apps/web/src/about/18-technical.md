@@ -47,10 +47,10 @@ The container checks itself every 30 seconds by running the server with `-health
 
 ## Limits
 
-- One collection and one set of decks are shared by all accounts on a server.
+- Sending is limited to accounts on the same server.
 - Search shows at most 40 results.
 - Imports accept files up to 5 MB and 5,000 rows; backups up to 25 MB.
-- Decks cannot be renamed or deleted in this version.
+- Set completion needs Scryfall's set list for printed sizes; it arrives with the first card database update after installing 0.2.0.
 - Card images need internet access to Scryfall's image servers.
 
 ## Third-party components

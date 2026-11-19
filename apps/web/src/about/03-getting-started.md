@@ -6,7 +6,7 @@ This page covers the first visit, loading the card database and adding the first
 
 1. Open Mana Vault in a browser. Visitors who are not signed in see the sign-in page.
 2. Choose **Create account**, enter a user name and a password (at least 8 characters) twice, and choose **Create account**. When the server owner has turned new accounts off, only **Sign in** is shown; ask the owner for an account.
-3. Mana Vault opens in the card search with the Deck building workspace.
+3. Mana Vault opens in the card search with the Deck building workspace. Your account starts with an empty collection named Main collection.
 
 ## Load the card database
 
@@ -17,6 +17,8 @@ A new server starts with an empty card database. Search, imports and decks all n
 3. When it finishes, the status bar shows the number of printings and a confirmation message.
 
 ## Add cards you own
+
+Cards go into the target collection, shown as ADD TO in the status bar. To keep cards in more than one place, use **New collection...** in the Collection menu; see [Collections](/about/collections).
 
 1. Type part of a card name in the search box (press **/** to jump there).
 2. Click a result to select it. Its details appear in the Card panel.
@@ -35,6 +37,8 @@ A new server starts with an empty card database. Search, imports and decks all n
 | To find | Look in |
 |---|---|
 | Search, collection and deck views | Ribbon Home tab, View menu, or keys 1, 2 and 3 |
+| Your collections and set completion | Collections panel, Collection menu and Collection ribbon tab |
+| Offers sent to you | Inbox, in the account menu |
 | Imports, exports and backups | File menu, Collection and Decks ribbon tabs |
 | Theme, panels and workspaces | View menu and View ribbon tab |
 | Your account | The account menu at the right end of the menu bar |

@@ -5,7 +5,8 @@ import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { fileURLToPath } from "node:url";
 import { buildApp } from "../../apps/server/dist/app.js";
-import { cardInsertStatement, initializeDatabase } from "../../apps/server/dist/database.js";
+import { cardExtrasStatement, cardInsertStatement, initializeDatabase } from "../../apps/server/dist/database.js";
+import { saveSets } from "../../apps/server/dist/sets.js";
 
 const port = Number(process.env.E2E_PORT ?? 4317);
 const directory = mkdtempSync(join(tmpdir(), "mana-vault-e2e-"));
@@ -26,9 +27,16 @@ const cards = [
   ["atraxa", "o-atraxa", "Atraxa, Praetors' Voice", "{G}{W}{U}{B}", 4, "Legendary Creature - Phyrexian Angel Horror", "Flying, vigilance, deathtouch, lifelink\nAt the beginning of your end step, proliferate.", "WUBG", "c16", "Commander 2016", "28", "mythic", "2016-11-11", "Victor Adame Minguez"],
 ];
 const insert = cardInsertStatement(database);
+const extras = cardExtrasStatement(database);
 for (const [id, oracle, name, cost, mv, type, text, colors, set, setName, number, rarity, released, artist] of cards) {
   insert.run(id, oracle, name, cost, mv, type, text, colors, colors, legal, set, setName, number, rarity, null, released, artist);
+  extras.run("nonfoil,foil", 0, 0, id);
 }
+// Limited Edition Alpha is treated as a 9-card set here so set completion has something to count
+saveSets(database, { data: [
+  { code: "lea", name: "Limited Edition Alpha", set_type: "core", released_at: "1993-08-05", printed_size: 300, card_count: 9 },
+  { code: "m10", name: "Magic 2010", set_type: "core", released_at: "2009-07-17", printed_size: 249, card_count: 1 },
+] });
 database.prepare("INSERT OR REPLACE INTO catalog_metadata (key, value) VALUES ('updated_at', ?)").run(new Date().toISOString());
 
 const webRoot = fileURLToPath(new URL("../../apps/web/dist", import.meta.url));

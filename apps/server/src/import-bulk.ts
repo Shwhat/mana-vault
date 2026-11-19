@@ -4,7 +4,7 @@ import { chain } from "stream-chain";
 import { parser } from "stream-json";
 import { streamArray } from "stream-json/streamers/stream-array.js";
 import { DatabaseSync } from "node:sqlite";
-import { cardInsertStatement } from "./database.js";
+import { cardExtrasStatement, cardInsertStatement } from "./database.js";
 
 export async function importBulkFile(
   dataPath: string,
@@ -12,6 +12,7 @@ export async function importBulkFile(
   onProgress?: (imported: number) => void,
 ): Promise<number> {
   const insertCard = cardInsertStatement(database);
+  const insertExtras = cardExtrasStatement(database);
   let imported = 0;
   const importValue = (value: unknown) => {
     const card = parsePrinting(value);
@@ -35,6 +36,7 @@ export async function importBulkFile(
       card.releasedAt,
       card.artist,
     );
+    insertExtras.run(card.finishes.join(","), card.promo ? 1 : 0, card.variation ? 1 : 0, card.id);
     imported += 1;
     if (imported % 25_000 === 0) onProgress?.(imported);
   };
@@ -118,6 +120,9 @@ interface Printing {
   imageUrl: string | null;
   releasedAt: string | null;
   artist: string | null;
+  finishes: string[];
+  promo: boolean;
+  variation: boolean;
 }
 
 function parsePrinting(value: unknown): Printing {
@@ -163,6 +168,9 @@ function parsePrinting(value: unknown): Printing {
     imageUrl: optionalString(imageUris ?? {}, "normal") ?? optionalString(faceImageUris ?? {}, "normal"),
     releasedAt: optionalString(record, "released_at"),
     artist: optionalString(record, "artist"),
+    finishes: Array.isArray(record.finishes) ? record.finishes.filter((finish): finish is string => typeof finish === "string") : [],
+    promo: record.promo === true,
+    variation: record.variation === true,
   };
 }
 

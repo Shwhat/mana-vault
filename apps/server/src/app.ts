@@ -2,12 +2,13 @@ import Fastify, { type FastifyInstance } from "fastify";
 import { randomUUID } from "node:crypto";
 import fastifyStatic from "@fastify/static";
 import { fileURLToPath } from "node:url";
-import { initializeDatabase, openDatabase, type CardRow } from "./database.js";
+import { assignUnowned, initializeDatabase, openDatabase, type CardRow } from "./database.js";
 import { importCollectionCsv } from "./collection-import.js";
 import { importDecklist } from "./deck-import.js";
 import { createBackup, inspectBackup, restoreBackup } from "./backup.js";
 import { parseCardQuery } from "./card-search.js";
 import { type CatalogUpdateStatus } from "./catalog-updater.js";
+import { access, createCollection, forgetItem, itemSharing, registerLibraryRoutes } from "./library.js";
 import {
   AuthStore, COOKIE_NAME, DEFAULT_ITERATIONS, GUARD_HEADER, Limiter, readCookie, SESSION_DAYS, sessionCookie,
   type User, validName, validPassword,
@@ -61,12 +62,18 @@ export async function buildApp(
   const nameLimiter = new Limiter(5, 5 * 60_000);
   const addressLimiter = new Limiter(options.addressAttemptLimit ?? 30, 15 * 60_000);
   app.decorateRequest("user", null);
+  // tests of the card and deck logic run without sign-in as one built-in account
+  const localUser = requireSignIn ? null : (auth.checkPassword("local", "local-test-account") ?? auth.addUser("local", "local-test-account"));
+  if (localUser) assignUnowned(database);
 
   app.addHook("onRequest", async (request, reply) => {
     reply.header("x-content-type-options", "nosniff");
     reply.header("x-frame-options", "DENY");
     reply.header("referrer-policy", "same-origin");
-    if (!requireSignIn) return;
+    if (!requireSignIn) {
+      request.user = localUser;
+      return;
+    }
     const path = request.url.split("?")[0] ?? "/";
     // Every request that changes something must carry the guard header. Browsers do not let other sites
     // add custom headers without a CORS preflight, which this server never allows.
@@ -118,6 +125,8 @@ export async function buildApp(
     }
     return reply.code(404).send({ error: "Not found" });
   });
+
+  registerLibraryRoutes(app, database);
 
   app.post<{ Params: { deckId: string }; Body: string }>("/api/decks/:deckId/import/preview", async (request, reply) => {
     if (typeof request.body !== "string" || !request.body.trim()) {
@@ -174,6 +183,11 @@ export async function buildApp(
     addressLimiter.hit(address(request));
     const user = auth.addUser(name, password);
     if (!user) return reply.code(409).send({ error: "That user name is taken." });
+    assignUnowned(database);
+    // every account starts with a collection, so Add to collection works at once
+    if (!database.prepare("SELECT 1 FROM collections WHERE owner_id = ?").get(user.id)) {
+      createCollection(database, user.id, { name: "Main collection", description: "", completion: "main", finish: "any", sets: [] });
+    }
     return startSession(request, reply, user);
   });
 
@@ -247,9 +261,9 @@ export async function buildApp(
     return reply.code(202).send({ status: "started", update: getCatalogUpdateStatus() });
   });
 
-  app.get("/api/backup", async (_request, reply) => {
+  app.get("/api/backup", async (request, reply) => {
     reply.header("content-disposition", 'attachment; filename="mana-vault-backup.json"');
-    return createBackup(database);
+    return createBackup(database, request.user!.id);
   });
 
   app.post<{ Body: string }>("/api/backup/validate", async (request, reply) => {
@@ -268,7 +282,7 @@ export async function buildApp(
       return reply.code(400).send({ error: "Choose a Mana Vault backup file" });
     }
     try {
-      restoreBackup(database, request.body);
+      restoreBackup(database, request.body, request.user!.id);
       return { status: "restored" };
     } catch (error) {
       return reply.code(400).send({ error: error instanceof Error ? error.message : "Could not restore backup" });
@@ -367,114 +381,91 @@ export async function buildApp(
     ).get(request.params.cardId);
     if (!row) return reply.code(404).send({ error: "Card printing not found" });
     const card = toCardRow(row);
-    const owned = database.prepare(
-      `SELECT COALESCE(SUM(CASE WHEN i.card_id = ? AND i.foil = 0 THEN i.quantity END), 0) AS regular,
+    const userId = request.user!.id;
+    const collections = database.prepare(
+      `SELECT col.id, COALESCE(m.display_name, col.name) AS name,
+              COALESCE(SUM(CASE WHEN i.card_id = ? AND i.foil = 0 THEN i.quantity END), 0) AS regular,
               COALESCE(SUM(CASE WHEN i.card_id = ? AND i.foil = 1 THEN i.quantity END), 0) AS foil,
               COALESCE(SUM(i.quantity), 0) AS all_printings
-       FROM collection_items i JOIN cards c ON c.id = i.card_id WHERE c.oracle_id = ?`,
-    ).get(card.id, card.id, card.oracle_id);
+       FROM collections col
+       LEFT JOIN members m ON m.kind = 'collection' AND m.item_id = col.id AND m.user_id = ?
+       JOIN collection_cards i ON i.collection_id = col.id
+       JOIN cards c ON c.id = i.card_id AND c.oracle_id = ?
+       WHERE col.owner_id = ? OR m.user_id IS NOT NULL
+       GROUP BY col.id ORDER BY col.created_at, col.rowid`,
+    ).all(card.id, card.id, userId, card.oracle_id, userId).map((row) => ({
+      id: String(row.id), name: String(row.name), regular: Number(row.regular), foil: Number(row.foil), allPrintings: Number(row.all_printings),
+    }));
     return {
       ...card,
       owned: {
-        regular: Number(owned?.regular ?? 0),
-        foil: Number(owned?.foil ?? 0),
-        allPrintings: Number(owned?.all_printings ?? 0),
+        regular: collections.reduce((sum, item) => sum + item.regular, 0),
+        foil: collections.reduce((sum, item) => sum + item.foil, 0),
+        allPrintings: collections.reduce((sum, item) => sum + item.allPrintings, 0),
+        collections,
       },
     };
   });
 
-  app.get("/api/collection", async () =>
-    database.prepare(
-      `SELECT c.id, c.name, c.set_code, c.set_name, c.collector_number, c.rarity, c.image_url,
-              i.quantity, i.foil
-       FROM collection_items i JOIN cards c ON c.id = i.card_id
-       ORDER BY c.name, c.set_code`,
-    ).all(),
-  );
-
-  app.post<{ Body: string }>("/api/collection/import/preview", async (request, reply) => {
+  app.post<{ Params: { collectionId: string }; Body: string }>("/api/collections/:collectionId/import/preview", async (request, reply) => {
     if (typeof request.body !== "string" || !request.body.trim()) {
       return reply.code(400).send({ error: "Upload a non-empty CSV file" });
     }
     try {
-      return importCollectionCsv(database, request.body, false);
+      return importCollectionCsv(database, request.body, false, request.params.collectionId);
     } catch (error) {
       return reply.code(400).send({ error: error instanceof Error ? error.message : "Could not preview collection CSV" });
     }
   });
 
-  app.post<{ Body: string }>("/api/collection/import", async (request, reply) => {
+  app.post<{ Params: { collectionId: string }; Body: string }>("/api/collections/:collectionId/import", async (request, reply) => {
     if (typeof request.body !== "string" || !request.body.trim()) {
       return reply.code(400).send({ error: "Upload a non-empty CSV file" });
     }
     try {
-      return importCollectionCsv(database, request.body);
+      return importCollectionCsv(database, request.body, true, request.params.collectionId);
     } catch (error) {
       return reply.code(400).send({ error: error instanceof Error ? error.message : "Could not import CSV" });
     }
   });
 
-  app.patch<{ Params: { cardId: string }; Body: { quantity?: number; foil?: boolean } }>(
-    "/api/collection/:cardId",
-    async (request, reply) => {
-      const { quantity, foil = false } = request.body ?? {};
-      if (typeof quantity !== "number" || !Number.isInteger(quantity) || quantity < 1 || quantity > 10000 || typeof foil !== "boolean") {
-        return reply.code(400).send({ error: "Provide a quantity from 1 to 10000 and a foil flag" });
-      }
-      const result = database.prepare(
-        "UPDATE collection_items SET quantity = ? WHERE card_id = ? AND foil = ?",
-      ).run(quantity, request.params.cardId, foil ? 1 : 0);
-      if (!result.changes) return reply.code(404).send({ error: "Collection entry not found" });
-      return { status: "updated" };
-    },
-  );
-
-  app.delete<{ Params: { cardId: string }; Querystring: { foil?: string } }>(
-    "/api/collection/:cardId",
-    async (request, reply) => {
-      const foil = request.query.foil ?? "false";
-      if (foil !== "true" && foil !== "false") return reply.code(400).send({ error: "Foil must be true or false" });
-      const result = database.prepare(
-        "DELETE FROM collection_items WHERE card_id = ? AND foil = ?",
-      ).run(request.params.cardId, foil === "true" ? 1 : 0);
-      if (!result.changes) return reply.code(404).send({ error: "Collection entry not found" });
-      return { status: "removed" };
-    },
-  );
-
-  app.post<{ Body: { cardId?: string; quantity?: number; foil?: boolean } }>(
-    "/api/collection",
-    async (request, reply) => {
-      const { cardId, quantity = 1, foil = false } = request.body ?? {};
-      if (!cardId || !Number.isInteger(quantity) || quantity < 1 || quantity > 10000 || typeof foil !== "boolean") {
-        return reply.code(400).send({ error: "Provide a cardId, a quantity from 1 to 10000, and a foil flag" });
-      }
-      const result = database.prepare(
-        `INSERT INTO collection_items (card_id, quantity, foil)
-         SELECT ?, ?, ? WHERE EXISTS (SELECT 1 FROM cards WHERE id = ?)
-         ON CONFLICT(card_id, foil) DO UPDATE SET quantity = quantity + excluded.quantity`,
-      ).run(cardId, quantity, foil ? 1 : 0, cardId);
-      if (result.changes === 0) {
-        return reply.code(404).send({ error: "Card printing not found" });
-      }
-      const entry = database.prepare(
-        `SELECT c.id, c.name, c.set_code, c.set_name, c.collector_number, c.rarity, c.image_url,
-                i.quantity, i.foil
-         FROM collection_items i JOIN cards c ON c.id = i.card_id
-         WHERE i.card_id = ? AND i.foil = ?`,
-      ).get(cardId, foil ? 1 : 0);
-      return reply.code(200).send(entry);
-    },
-  );
-
-  app.get("/api/decks", async () =>
-    database.prepare(
+  app.get("/api/decks", async (request) => {
+    const userId = request.user!.id;
+    return database.prepare(
       `SELECT d.id, d.name, d.format, d.mode, d.created_at, d.updated_at,
-              COALESCE(SUM(dc.quantity), 0) AS card_count
-       FROM decks d LEFT JOIN deck_cards dc ON dc.deck_id = d.id
-       GROUP BY d.id ORDER BY d.updated_at DESC, d.name`,
-    ).all(),
-  );
+              COALESCE((SELECT SUM(quantity) FROM deck_cards WHERE deck_id = d.id), 0) AS card_count
+       FROM decks d
+       WHERE d.owner_id = ? OR EXISTS (SELECT 1 FROM members m WHERE m.kind = 'deck' AND m.item_id = d.id AND m.user_id = ?)
+       ORDER BY d.updated_at DESC, d.name`,
+    ).all(userId, userId).map((deck) => {
+      const sharing = itemSharing(database, "deck", String(deck.id), userId);
+      return { ...deck, name: sharing.displayName ?? deck.name, realName: deck.name, ...sharing };
+    });
+  });
+
+  app.patch<{ Params: { deckId: string }; Body: { name?: unknown } }>("/api/decks/:deckId", async (request, reply) => {
+    const name = typeof request.body?.name === "string" ? request.body.name.trim() : "";
+    if (!name || name.length > 100) return reply.code(400).send({ error: "Deck name must be between 1 and 100 characters" });
+    database.prepare("UPDATE decks SET name = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(name, request.params.deckId);
+    return { status: "renamed", name };
+  });
+
+  app.delete<{ Params: { deckId: string } }>("/api/decks/:deckId", async (request, reply) => {
+    const id = request.params.deckId;
+    if (access(database, "deck", id, request.user!.id)?.role !== "owner") {
+      return reply.code(403).send({ error: "Only the owner can delete a deck. Use Leave shared deck instead." });
+    }
+    database.exec("BEGIN");
+    try {
+      forgetItem(database, "deck", id);
+      database.prepare("DELETE FROM decks WHERE id = ?").run(id);
+      database.exec("COMMIT");
+    } catch (error) {
+      database.exec("ROLLBACK");
+      throw error;
+    }
+    return { status: "deleted" };
+  });
 
   app.post<{ Body: { name?: string; format?: string; mode?: string } }>(
     "/api/decks",
@@ -490,7 +481,7 @@ export async function buildApp(
         return reply.code(400).send({ error: "Choose a supported deck format" });
       }
       const id = randomUUID();
-      database.prepare("INSERT INTO decks (id, name, format, mode) VALUES (?, ?, ?, ?)").run(id, name.trim(), format, mode);
+      database.prepare("INSERT INTO decks (id, name, format, mode, owner_id) VALUES (?, ?, ?, ?, ?)").run(id, name.trim(), format, mode, request.user!.id);
       return reply.code(201).send(database.prepare(
         `SELECT id, name, format, mode, created_at, updated_at FROM decks WHERE id = ?`,
       ).get(id));
@@ -511,7 +502,8 @@ export async function buildApp(
        )
        WHERE dc.deck_id = ? ORDER BY dc.zone, c.name`,
     ).all(request.params.deckId);
-    return { ...deck, cards };
+    const sharing = itemSharing(database, "deck", request.params.deckId, request.user!.id);
+    return { ...deck, ...sharing, name: sharing.displayName ?? deck.name, realName: deck.name, cards };
   });
 
   app.post<{ Params: { deckId: string }; Body: { cardId?: string; quantity?: number; zone?: string } }>(

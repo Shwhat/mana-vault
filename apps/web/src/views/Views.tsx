@@ -84,56 +84,6 @@ export function CardsView({ actions, onFilters }: { actions: Record<string, Acti
   );
 }
 
-export function CollectionView() {
-  const store = useApp();
-  const { visibleCollection, collection, selection } = store;
-  const total = (collection ?? []).reduce((sum, entry) => sum + entry.quantity, 0);
-  return (
-    <div className="view" id="view-collection">
-      <div id="pagetabs">
-        <span className="phname">My collection</span>
-        <label className="searchbox">
-          <Icon name="find" className="nicon" />
-          <input value={store.collectionFilter} onChange={(event) => store.setCollectionFilter(event.target.value)} placeholder="Filter by card or set name" aria-label="Filter collection" />
-        </label>
-        <span className="phpos">{visibleCollection.length} entries, {total} cards</span>
-      </div>
-      <div className="list" role="listbox" aria-label="Collection">
-        {collection === null && <div className="emptynote">Loading the collection</div>}
-        {collection !== null && collection.length === 0 && (
-          <div className="empty">
-            <Icon name="collection" />
-            <b>Nothing in your collection yet</b>
-            <span>Search the card database and add the printings you own, or import a collection CSV.</span>
-            <button type="button" className="btn primary" onClick={() => store.setView("cards")}>Search cards</button>
-          </div>
-        )}
-        {visibleCollection.map((entry) => {
-          const key = `${entry.id}:${entry.foil}`;
-          const active = selection?.view === "collection" && selection.key === key;
-          return (
-            <div key={key} data-key={key} role="option" aria-selected={active} className={active ? "row active" : "row"}
-              onClick={() => store.select({ view: "collection", key, printingId: entry.id })}>
-              <Thumb url={entry.image_url} />
-              <div className="rowmain">
-                <div className="rowtitle"><b>{entry.name}</b>{entry.foil ? <span className="badge foil">FOIL</span> : null}</div>
-                <div className="rowmeta">{entry.set_name} <span className="badge">{entry.set_code.toUpperCase()}</span> {entry.collector_number} <span className={`rar ${entry.rarity}`}>{capitalize(entry.rarity)}</span></div>
-              </div>
-              <Quantity
-                value={entry.quantity}
-                name={entry.name}
-                onChange={(quantity) => void store.setCollectionQuantity(entry, quantity)}
-              />
-              <button type="button" className="btn small icon-only" title={`Remove ${entry.name}`} aria-label={`Remove ${entry.name} from collection`}
-                onClick={(event) => { event.stopPropagation(); void store.setCollectionQuantity(entry, 0); }}><Icon name="del" /></button>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
 export function Quantity({ value, name, onChange, max }: { value: number; name: string; onChange: (value: number) => void; max?: number }) {
   return (
     <span className="qty" onClick={(event) => event.stopPropagation()}>
@@ -179,6 +129,8 @@ export function DeckView({ actions }: { actions: Record<string, Action> }) {
         <span className="phname">{deck.name}</span>
         <span className="phdesc">{capitalize(deck.format)}</span>
         <span className={deck.mode === "theme" ? "badge main" : "badge"}>{deck.mode === "theme" ? "Theme" : "Normal"}</span>
+        {deck.role === "member" && <span className="badge">Shared by {deck.owner?.name}</span>}
+        {deck.role === "owner" && (deck.sharedWith?.length ?? 0) > 0 && <span className="badge">Shared with {deck.sharedWith!.map((person) => person.name).join(", ")}</span>}
         <span className="phwhere">{deck.mode === "theme" ? "Each card keeps the exact printing you selected" : "Cards are tracked by name; any printing counts"}</span>
         <span className="phpos">{total} cards</span>
       </div>

@@ -7,9 +7,11 @@ import { pipeline } from "node:stream/promises";
 import { PassThrough, Readable, Transform } from "node:stream";
 import { DatabaseSync } from "node:sqlite";
 import { initializeDatabase } from "./database.js";
+import { saveSets } from "./sets.js";
 import { importBulkFile } from "./import-bulk.js";
 
 const metadataUrl = "https://api.scryfall.com/bulk-data";
+const setsUrl = "https://api.scryfall.com/sets";
 const userAgent = "mana-vault/0.0.0 (local card database importer)";
 
 interface BulkMetadata {
@@ -91,11 +93,21 @@ export async function importCardCatalog(
   const database = new DatabaseSync(databasePath);
   try {
     initializeDatabase(database);
-    return await importBulkFile(dataPath, database, (imported) => {
-      if (imported > 0 && imported % 25_000 === 0) {
-        console.log(`Imported ${imported.toLocaleString()} card printings...`);
+    const imported = await importBulkFile(dataPath, database, (count) => {
+      if (count > 0 && count % 25_000 === 0) {
+        console.log(`Imported ${count.toLocaleString()} card printings...`);
       }
     });
+    // The set list (names and printed sizes for set completion) is small; a failure keeps the previous list.
+    try {
+      const response = await (options.fetcher ?? fetch)(setsUrl, { headers: { "User-Agent": userAgent } });
+      if (!response.ok) throw new Error(`Scryfall sets request failed: ${response.status} ${response.statusText}`);
+      const saved = saveSets(database, await response.json());
+      console.log(`Saved ${saved.toLocaleString()} sets`);
+    } catch (error) {
+      console.warn(`Could not update the set list: ${error instanceof Error ? error.message : String(error)}`);
+    }
+    return imported;
   } finally {
     database.close();
     console.log(`Downloaded ${download.downloadedBytes.toLocaleString()} bytes of Scryfall bulk data (${download.format})`);
