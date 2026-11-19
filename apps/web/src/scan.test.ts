@@ -25,6 +25,8 @@ describe("scanner helpers", () => {
     const box = guideBox(390, 744);
     expect(box.width / box.height).toBeCloseTo(CARD_RATIO);
     expect(box.x).toBeCloseTo((390 - box.width) / 2);
+    // the outline stays clear of the button column at the right
+    expect(box.x + box.width).toBeLessThanOrEqual(390 - 64);
     // a 720 x 1280 portrait picture covering a 390 x 744 view is scaled by 0.58125 and cut at the sides
     const inVideo = guideInVideo(720, 1280, 390, 744);
     expect(inVideo.height).toBeCloseTo(box.height / 0.58125);

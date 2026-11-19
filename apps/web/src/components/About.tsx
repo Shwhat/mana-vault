@@ -1,6 +1,7 @@
 // ---------- About guide: Markdown pages bundled with each build ----------
 // The About guide is a set of Markdown files in src/about, bundled with each build. A file named
 // "NN-slug.md" becomes the page /about/slug, ordered by NN, titled by its first "# " heading.
+import { Picker } from "./Picker";
 import { APP_VERSION } from "../api";
 import { useApp } from "../store";
 
@@ -117,9 +118,8 @@ export function About() {
               <a key={page.slug} href={`/about/${page.slug}`} className={page === current ? "on" : ""} onClick={(event) => { event.preventDefault(); store.openAbout(page.slug); }}>{page.title}</a>
             ))}
           </nav>
-          <select className="abselect" aria-label="Guide page" value={current?.slug ?? ""} onChange={(event) => store.openAbout(event.target.value)}>
-            {aboutPages.map((page) => <option key={page.slug} value={page.slug}>{page.title}</option>)}
-          </select>
+          <Picker className="abselect" label="Guide page" value={current?.slug ?? ""} onChange={(slug) => store.openAbout(slug)}
+            options={aboutPages.map((page) => ({ value: page.slug, label: page.title }))} />
           <article className="abpage" onClick={onClick}>
             {current ? (
               <>

@@ -1,4 +1,5 @@
 // ---------- switcher: one searchable list for opening a collection or a deck ----------
+import { choices, Picker } from "./Picker";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Action } from "../actions";
 import { Icon } from "../icons";
@@ -121,9 +122,7 @@ function SwitcherList({ kind, items, currentId, anchor, actions, onClose }: {
               else if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); onClose(); }
             }} />
         </label>
-        <select aria-label="Sort the list" value={sort} onChange={(event) => setSort(event.target.value as SwitchSort)}>
-          {SORTS[kind].map(([value, text]) => <option key={value} value={value}>Sort: {text}</option>)}
-        </select>
+        <Picker label="Sort the list" prefix="Sort: " value={sort} onChange={(value) => setSort(value as SwitchSort)} options={choices(SORTS[kind])} />
       </div>
       <div className="swlist" role="listbox" aria-label={kind === "collection" ? "Collections" : "Decks"}>
         {shown.length === 0 && <p className="note pad">{items.length ? "Nothing matches" : kind === "collection" ? "No collections yet" : "No decks yet"}</p>}

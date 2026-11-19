@@ -265,7 +265,7 @@ export function createCollection(database: DatabaseSync, ownerId: number, input:
 }
 
 export const ENTRY_COLUMNS = `c.id, c.oracle_id, c.name, c.mana_cost, c.mana_value, c.type_line, c.set_code, c.set_name, c.collector_number, c.rarity,
-  c.image_url, c.colors, ${PRICE_COLUMNS}, i.quantity, i.foil, i.condition, i.language, i.proxy, i.trade,
+  c.image_url, c.colors, c.legalities, ${PRICE_COLUMNS}, i.quantity, i.foil, i.condition, i.language, i.proxy, i.trade,
   i.purchase_price, i.price_currency, i.added_at, i.misprint, i.altered, i.signed`;
 const KEY_WHERE = "card_id = ? AND foil = ? AND condition = ? AND language = ? AND proxy = ?";
 const KEY_CONFLICT = "ON CONFLICT(collection_id, card_id, foil, condition, language, proxy)";
@@ -278,7 +278,21 @@ const EXTRAS_MERGE = `purchase_price = COALESCE(purchase_price, excluded.purchas
 
 /** A collection row as the interface uses it: flags as true or false. */
 export function toEntry(row: Record<string, unknown>) {
-  return { ...row, proxy: Number(row.proxy) === 1, misprint: Number(row.misprint) === 1, altered: Number(row.altered) === 1, signed: Number(row.signed) === 1 };
+  const { legalities, ...rest } = row;
+  return {
+    ...rest, legal: legalFormats(legalities), proxy: Number(row.proxy) === 1, misprint: Number(row.misprint) === 1, altered: Number(row.altered) === 1,
+    signed: Number(row.signed) === 1,
+  };
+}
+
+/** The formats a card can be played in (legal or restricted), as one comma-separated text, for the Legal in filter. */
+export function legalFormats(value: unknown): string {
+  if (typeof value !== "string" || !value) return "";
+  try {
+    return Object.entries(JSON.parse(value) as Record<string, string>).filter(([, status]) => status === "legal" || status === "restricted").map(([format]) => format).join(",");
+  } catch {
+    return "";
+  }
 }
 
 type Item = CopyKey & { quantity: number; trade?: number; extras?: CopyExtras };
@@ -460,6 +474,14 @@ export function registerLibraryRoutes(app: FastifyInstance, database: DatabaseSy
   };
 
   app.get<{ Params: { collectionId: string } }>("/api/collections/:collectionId/cards", async (request) => entriesOf(request.params.collectionId));
+
+  // every row of every collection the account owns or shares, each with its collection; wishlists only when asked
+  app.get<{ Querystring: { wishlists?: string } }>("/api/library/cards", async (request) => {
+    const userId = userOf(request);
+    return listCollections(database, userId)
+      .filter((item) => request.query.wishlists === "1" || item.kind !== "wishlist")
+      .flatMap((item) => entriesOf(item.id).map((entry) => ({ ...entry, collection_id: item.id, collection_name: item.name })));
+  });
 
   app.post<{ Params: { collectionId: string }; Body: Record<string, unknown> }>(
     "/api/collections/:collectionId/cards",

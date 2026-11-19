@@ -26,6 +26,8 @@ export interface ManaVaultNative {
   takeLaunchOffer(): Promise<{ offer: string | null }>;
   /** Writes a file (base64) and opens the Android share sheet so it can be saved or sent. */
   saveFile(options: { name: string; mime: string; data: string }): Promise<void>;
+  /** Turns a back camera's light on or off from the phone itself, for cameras whose light the web view cannot reach. */
+  setTorch?(options: { on: boolean }): Promise<{ ok: boolean; reason?: string }>;
   /** Puts the app in the background (the Back button on the first screen). */
   minimize(): Promise<void>;
   appInfo(): Promise<{ version: string; android: string; device: string }>;

@@ -5,6 +5,8 @@ import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Rect;
+import android.hardware.camera2.CameraCharacteristics;
+import android.hardware.camera2.CameraManager;
 import android.net.Uri;
 import android.os.Build;
 import android.util.Base64;
@@ -216,6 +218,40 @@ public class ManaVaultPlugin extends Plugin {
         } catch (Exception error) {
             call.reject("The file could not be saved: " + error.getMessage());
         }
+    }
+
+    /**
+     * Turns the light of a back camera on or off, for phones whose camera in the web view does not offer the light.
+     * Resolves with ok false when no back camera has a light or the phone refuses while the camera is in use.
+     */
+    @PluginMethod
+    public void setTorch(PluginCall call) {
+        boolean on = Boolean.TRUE.equals(call.getBoolean("on", false));
+        JSObject result = new JSObject();
+        try {
+            CameraManager manager = (CameraManager) getContext().getSystemService(android.content.Context.CAMERA_SERVICE);
+            String chosen = null;
+            for (String id : manager.getCameraIdList()) {
+                CameraCharacteristics info = manager.getCameraCharacteristics(id);
+                Boolean flash = info.get(CameraCharacteristics.FLASH_INFO_AVAILABLE);
+                Integer facing = info.get(CameraCharacteristics.LENS_FACING);
+                if (Boolean.TRUE.equals(flash) && facing != null && facing == CameraCharacteristics.LENS_FACING_BACK) {
+                    chosen = id;
+                    break;
+                }
+            }
+            if (chosen == null) {
+                result.put("ok", false);
+                result.put("reason", "none");
+            } else {
+                manager.setTorchMode(chosen, on);
+                result.put("ok", true);
+            }
+        } catch (Exception error) {
+            result.put("ok", false);
+            result.put("reason", "busy");
+        }
+        call.resolve(result);
     }
 
     @PluginMethod

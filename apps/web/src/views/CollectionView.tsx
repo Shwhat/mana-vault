@@ -11,6 +11,7 @@ import {
   type CollectionLayout, type CollectionSort, type GridSize,
   type CollectionTab, type Facets, languageName, money,
 } from "../types";
+import { choices, Picker } from "../components/Picker";
 import { Switcher } from "../components/Switcher";
 import { StatsPanel } from "./StatsView";
 import { Quantity, Thumb } from "./Views";
@@ -164,9 +165,8 @@ function OptionsButton() {
       {open && (
         <div ref={box} className={store.phone ? "optpop phone" : "optpop"} style={style} role="dialog" aria-label="Collection options">
           <div className="prow"><label htmlFor="opt-sort">Sort</label>
-            <select id="opt-sort" value={store.prefs.collectionSort} onChange={(event) => store.setPrefs({ collectionSort: event.target.value as CollectionSort })}>
-              {SORTS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-            </select></div>
+            <Picker id="opt-sort" label="Sort" value={store.prefs.collectionSort} onChange={(value) => store.setPrefs({ collectionSort: value as CollectionSort })}
+              options={choices(SORTS)} /></div>
           <div className="prow"><label>Layout</label>
             <div className="seg" role="group" aria-label="Collection layout">
               {layouts.map(([value, label]) => (
@@ -183,11 +183,8 @@ function OptionsButton() {
               </div></div>
           )}
           <div className="prow"><label htmlFor="opt-deck">Decks</label>
-            <select id="opt-deck" aria-label="Filter by deck" value={store.facets.inDeck ?? ""} onChange={(event) => store.setFacet({ inDeck: (event.target.value || undefined) as Facets["inDeck"] })}>
-              <option value="">In decks or not</option>
-              <option value="yes">In a deck</option>
-              <option value="no">Not in a deck</option>
-            </select></div>
+            <Picker id="opt-deck" label="Filter by deck" value={store.facets.inDeck ?? ""} onChange={(value) => store.setFacet({ inDeck: (value || undefined) as Facets["inDeck"] })}
+              options={choices([["", "In decks or not"], ["yes", "In a deck"], ["no", "Not in a deck"]])} /></div>
           <label className="optcheck"><input type="checkbox" checked={!!store.facets.trade} onChange={() => store.setFacet({ trade: !store.facets.trade })} /> For trade only</label>
           <label className="optcheck"><input type="checkbox" checked={store.selectMode}
             onChange={() => { store.setSelectMode(!store.selectMode); if (store.selectMode) store.setChecked(new Set()); }} /> Select several cards</label>
@@ -455,18 +452,12 @@ function MissingTab({ current, actions }: { current: Collection; actions: Record
   return (
     <>
       <div className="filterbar">
-        <select aria-label="Filter missing cards by set" value={set} onChange={(event) => setSet(event.target.value)}>
-          <option value="">All linked sets</option>
-          {report.sets.map((item) => <option key={item.code} value={item.code}>{item.name}</option>)}
-        </select>
-        <select aria-label="Filter missing cards by rarity" value={rarity} onChange={(event) => setRarity(event.target.value)}>
-          <option value="">Any rarity</option>
-          {["common", "uncommon", "rare", "mythic", "special", "bonus"].map((value) => <option key={value} value={value}>{capitalize(value)}</option>)}
-        </select>
-        <select aria-label="Filter missing cards by color" value={color} onChange={(event) => setColor(event.target.value)}>
-          <option value="">Any color</option>
-          {[["W", "White"], ["U", "Blue"], ["B", "Black"], ["R", "Red"], ["G", "Green"], ["C", "Colorless"]].map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-        </select>
+        <Picker label="Filter missing cards by set" value={set} onChange={setSet}
+          options={[{ value: "", label: "All linked sets" }, ...report.sets.map((item) => ({ value: item.code, label: item.name }))]} />
+        <Picker label="Filter missing cards by rarity" value={rarity} onChange={setRarity}
+          options={[{ value: "", label: "Any rarity" }, ...["common", "uncommon", "rare", "mythic", "special", "bonus"].map((value) => ({ value, label: capitalize(value) }))]} />
+        <Picker label="Filter missing cards by color" value={color} onChange={setColor}
+          options={choices([["", "Any color"], ["W", "White"], ["U", "Blue"], ["B", "Black"], ["R", "Red"], ["G", "Green"], ["C", "Colorless"]])} />
         <span className="phpos">{shown.length} of {report.missing.length} missing</span>
         <button type="button" className="btn small" onClick={actions.exportMissing?.run}>Export...</button>
         {current.kind !== "wishlist" && <button type="button" className="btn small" onClick={actions["wishlist.missing"]?.run}>Add all to wishlist</button>}
