@@ -2,7 +2,8 @@ name: Android app
 
 # Pull requests and pushes to main build a debug APK (signed with the shared
 # debug key in apps/android/android/app) and keep it with the run as
-# mana-vault-X.Y.Z-debug. A version tag (vX.Y.Z) builds the signed release APK
+# mana-vault-X.Y.Z-debug. Pushes to main also replace the "debug" pre-release
+# with that APK. A version tag (vX.Y.Z) builds the signed release APK
 # and attaches it to the GitHub release.
 on:
   pull_request:
@@ -65,6 +66,16 @@ jobs:
         with:
           name: mana-vault-${{ env.VERSION }}-debug
           path: ${{ runner.temp }}/debug/*.apk
+
+      - name: Put the debug APK on the Debug build pre-release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete debug --cleanup-tag --yes || true
+          gh release create debug "$RUNNER_TEMP"/debug/*.apk --prerelease --target "$GITHUB_SHA" \
+            --title "Debug build $VERSION" \
+            --notes "Debug APK built from main at $GITHUB_SHA. Signed with the shared debug key, so it installs over the previous debug build. The app's update check ignores this pre-release."
 
       - name: Build and sign the release app
         if: startsWith(github.ref, 'refs/tags/v')
