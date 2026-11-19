@@ -44,6 +44,7 @@ function useKeyboard(store: Store, actions: Record<string, Action>) {
         else if (key === "y") { event.preventDefault(); run("redo"); }
         else if (key === "n") { event.preventDefault(); run("newDeck"); }
         else if (key === "o") { event.preventDefault(); run("openDeck"); }
+        else if (key === "a" && !typing && store.view === "collection") { event.preventDefault(); run("pickAll"); }
         return;
       }
       if (typing || event.altKey) return;
@@ -54,6 +55,10 @@ function useKeyboard(store: Store, actions: Record<string, Action>) {
         case "3": run("view.deck"); break;
         case "f": case "F": run("foil"); break;
         case "z": case "Z": run("zone.cycle"); break;
+        case "c": case "C": run("collection.target"); break;
+        case "Delete":
+          if (store.view === "collection" && store.checked.size) { event.preventDefault(); run("removePicked"); }
+          break;
         case "Enter":
           if (!store.selection) return;
           event.preventDefault();
@@ -63,7 +68,10 @@ function useKeyboard(store: Store, actions: Record<string, Action>) {
         case "ArrowUp": event.preventDefault(); store.moveSelection(-1); break;
         case "Escape":
           if (store.view === "about") store.closeAbout();
-          else store.select(null);
+          else {
+            store.select(null);
+            store.setChecked(new Set());
+          }
           break;
       }
     };

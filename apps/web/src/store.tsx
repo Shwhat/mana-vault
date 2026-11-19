@@ -3,9 +3,11 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { csvCell, downloadBlob, downloadText, pickFile, request, slugify } from "./api";
 import { confirmDialog, dialog } from "./components/Dialog";
 import { activatePanel, clone, type Layout, openPanel, type PanelId, PRESETS, type Workspace } from "./dock";
+import { entryKey, useLibraryState } from "./library-state";
 import { applyTheme, type Prefs, savePrefs } from "./prefs";
 import {
-  type BackupSummary, type Card, type CardDetail, type CatalogStatus, type CollectionEntry, type Deck, type DeckCard,
+  type BackupSummary, type Card, type CardDetail, type CatalogStatus, type Collection, type CollectionEntry, type CollectionTab,
+  type CompletionReport, type Deck, type DeckCard,
   type DeckDetail, type DeckMode, EMPTY_FILTERS, type Filters, type ImportReport, type User, type View, type Zone, capitalize,
 } from "./types";
 
@@ -33,6 +35,13 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
   const [searchError, setSearchError] = useState("");
   const [collection, setCollection] = useState<CollectionEntry[] | null>(null);
   const [collectionFilter, setCollectionFilter] = useState("");
+  const [collections, setCollections] = useState<Collection[] | null>(null);
+  const [collectionTab, setCollectionTab] = useState<CollectionTab>("cards");
+  const [completion, setCompletion] = useState<CompletionReport | null>(null);
+  // rows picked in the collection list; the last one clicked is also the selection
+  const [checked, setChecked] = useState<Set<string>>(() => new Set());
+  const anchor = useRef<string | null>(null);
+  const [selectMode, setSelectMode] = useState(false);
   const [decks, setDecks] = useState<Deck[]>([]);
   const [deck, setDeck] = useState<DeckDetail | null>(null);
   const [selection, setSelection] = useState<Selection>(null);
@@ -51,8 +60,8 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
   const flashTimer = useRef<number | undefined>(undefined);
   const catalogPoll = useRef<(() => void) | null>(null);
   const previousUpdate = useRef<CatalogStatus["update"] | null>(null);
-  const live = useRef({ deck, collection, selection });
-  live.current = { deck, collection, selection };
+  const live = useRef({ deck, collection, selection, prefs, collections, view, collectionTab, completion });
+  live.current = { deck, collection, selection, prefs, collections, view, collectionTab, completion };
 
   // ---------- preferences and layout ----------
   const setPrefs = useCallback((change: Partial<Prefs> | ((current: Prefs) => Partial<Prefs>)) => {
@@ -111,9 +120,46 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
   }, [lastView]);
 
   // ---------- loading ----------
-  const reloadCollection = useCallback(async () => {
+  const reloadCollections = useCallback(async (): Promise<Collection[]> => {
     try {
-      setCollection(await request<CollectionEntry[]>("/api/collection"));
+      const list = await request<Collection[]>("/api/collections");
+      setCollections(list);
+      // keep the open and target collections pointing at collections that still exist
+      const ids = new Set(list.map((item) => item.id));
+      const first = list[0]?.id ?? null;
+      const { openCollection, targetCollection } = live.current.prefs;
+      const change: Partial<Prefs> = {};
+      if (!openCollection || !ids.has(openCollection)) change.openCollection = first;
+      if (!targetCollection || !ids.has(targetCollection)) change.targetCollection = first;
+      if (Object.keys(change).length) setPrefs(change);
+      return list;
+    } catch (reason) {
+      fail(reason, "Could not load your collections.");
+      return live.current.collections ?? [];
+    }
+  }, [fail, setPrefs]);
+
+  const reloadCompletion = useCallback(async () => {
+    const id = live.current.prefs.openCollection;
+    if (!id) {
+      setCompletion(null);
+      return;
+    }
+    try {
+      setCompletion(await request<CompletionReport>(`/api/collections/${encodeURIComponent(id)}/completion`));
+    } catch (reason) {
+      fail(reason, "Could not load the set completion.");
+    }
+  }, [fail]);
+
+  const reloadCollection = useCallback(async () => {
+    const id = live.current.prefs.openCollection;
+    if (!id) {
+      setCollection([]);
+      return;
+    }
+    try {
+      setCollection(await request<CollectionEntry[]>(`/api/collections/${encodeURIComponent(id)}/cards`));
     } catch (reason) {
       fail(reason, "Could not load the collection.");
     }
@@ -178,8 +224,24 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
   }, []);
 
   useEffect(() => {
+    void reloadCollections();
+  }, [reloadCollections]);
+
+  // switching collections empties the list and the picked rows, then loads the new one
+  useEffect(() => {
+    setCollection(null);
+    setCompletion(null);
+    setChecked(new Set());
+    anchor.current = null;
+  }, [prefs.openCollection]);
+
+  useEffect(() => {
     if (view === "collection" && collection === null) void reloadCollection();
-  }, [view, collection, reloadCollection]);
+  }, [view, collection, reloadCollection, prefs.openCollection]);
+
+  useEffect(() => {
+    if (view === "collection" && collectionTab !== "cards") void reloadCompletion();
+  }, [view, collectionTab, prefs.openCollection, reloadCompletion]);
 
   // ---------- search ----------
   const setFilters = useCallback((change: Partial<Filters>) => setFiltersState((current) => ({ ...current, ...change })), []);
@@ -295,11 +357,13 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
   const refreshAfterChange = useCallback(async () => {
     await Promise.all([
       live.current.collection !== null ? reloadCollection() : Promise.resolve(),
+      live.current.completion !== null ? reloadCompletion() : Promise.resolve(),
+      reloadCollections(),
       reloadDeck(),
       reloadDecks(),
       reloadCardDetail(),
     ]);
-  }, [reloadCollection, reloadDeck, reloadDecks, reloadCardDetail]);
+  }, [reloadCollection, reloadCompletion, reloadCollections, reloadDeck, reloadDecks, reloadCardDetail]);
 
   /** Undo and redo run one at a time, in the order they were pressed. */
   const step = useCallback((direction: "undo" | "redo") => {
@@ -328,43 +392,60 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
   const redoStack = stacks.current.redo;
 
   // ---------- collection ----------
-  const writeCollection = useCallback(async (cardId: string, foil: boolean, from: number, to: number) => {
-    if (to === from) return;
-    const url = `/api/collection/${encodeURIComponent(cardId)}`;
-    if (to <= 0) await request(`${url}?foil=${foil ? "true" : "false"}`, { method: "DELETE" });
-    else if (from <= 0) await request("/api/collection", { method: "POST", body: JSON.stringify({ cardId, quantity: to, foil }) });
-    else await request(url, { method: "PATCH", body: JSON.stringify({ quantity: to, foil }) });
+  /** Sets exact counts in a collection; a count of 0 removes the entry. */
+  const setCounts = useCallback(async (collectionId: string, items: Array<{ cardId: string; foil: boolean; quantity: number }>) => {
+    if (!items.length) return;
+    await request(`/api/collections/${encodeURIComponent(collectionId)}/cards`, { method: "PUT", body: JSON.stringify({ items }) });
   }, []);
 
-  const addToCollection = useCallback(async (cardId: string, name: string) => {
-    const foil = prefs.foil;
+  const collectionName = useCallback((id: string | null) => live.current.collections?.find((item) => item.id === id)?.name ?? "the collection", []);
+
+  const addToCollection = useCallback(async (cardId: string, name: string, collectionId?: string, foilOverride?: boolean) => {
+    const target = collectionId ?? prefs.targetCollection;
+    if (!target) {
+      flash("Create a collection first (Collection menu, New collection)", "err");
+      return;
+    }
+    const foil = foilOverride ?? prefs.foil;
     try {
-      const entry = await request<CollectionEntry>("/api/collection", { method: "POST", body: JSON.stringify({ cardId, quantity: 1, foil }) });
+      const entry = await request<CollectionEntry>(`/api/collections/${encodeURIComponent(target)}/cards`, {
+        method: "POST", body: JSON.stringify({ cardId, quantity: 1, foil }),
+      });
       const after = entry.quantity;
-      const label = `Add ${name}${foil ? " (foil)" : ""}`;
-      pushUndo({ label, undo: () => writeCollection(cardId, foil, after, after - 1), redo: () => writeCollection(cardId, foil, after - 1, after) });
-      flash(`${name}${foil ? " (foil)" : ""} added to collection`);
+      const where = collectionName(target);
+      pushUndo({
+        label: `Add ${name}${foil ? " (foil)" : ""}`,
+        undo: () => setCounts(target, [{ cardId, foil, quantity: after - 1 }]),
+        redo: () => setCounts(target, [{ cardId, foil, quantity: after }]),
+      });
+      flash(`${name}${foil ? " (foil)" : ""} added to ${where}`);
       await refreshAfterChange();
     } catch (reason) {
       fail(reason, "Could not add the card.");
     }
-  }, [prefs.foil, pushUndo, writeCollection, flash, fail, refreshAfterChange]);
+  }, [prefs.foil, prefs.targetCollection, pushUndo, setCounts, collectionName, flash, fail, refreshAfterChange]);
 
   const setCollectionQuantity = useCallback(async (entry: CollectionEntry, quantity: number) => {
+    const target = live.current.prefs.openCollection;
+    if (!target) return;
     const foil = Boolean(entry.foil);
     const from = entry.quantity;
     const to = Math.max(0, Math.min(10000, quantity));
     if (from === to) return;
     try {
-      await writeCollection(entry.id, foil, from, to);
+      await setCounts(target, [{ cardId: entry.id, foil, quantity: to }]);
       const label = to === 0 ? `Remove ${entry.name}` : `${entry.name} quantity ${to}`;
-      pushUndo({ label, undo: () => writeCollection(entry.id, foil, to, from), redo: () => writeCollection(entry.id, foil, from, to) });
-      if (to === 0) flash(`${entry.name} removed from collection`);
+      pushUndo({
+        label,
+        undo: () => setCounts(target, [{ cardId: entry.id, foil, quantity: from }]),
+        redo: () => setCounts(target, [{ cardId: entry.id, foil, quantity: to }]),
+      });
+      if (to === 0) flash(`${entry.name} removed from ${collectionName(target)}`);
       await refreshAfterChange();
     } catch (reason) {
       fail(reason, "Could not update the collection.");
     }
-  }, [writeCollection, pushUndo, flash, fail, refreshAfterChange]);
+  }, [setCounts, collectionName, pushUndo, flash, fail, refreshAfterChange]);
 
   // ---------- decks ----------
   const writeDeck = useCallback(async (key: DeckKey, to: number) => {
@@ -461,10 +542,13 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
     if (report.unmatched.length) showPanel("review");
   }, [showPanel]);
 
-  const previewDialog = (title: string, fileName: string, report: ImportReport, onImport: () => Promise<void>) => {
-    dialog(title, [], async () => {
+  const previewDialog = (
+    title: string, fileName: string, report: ImportReport, onImport: (into: string) => Promise<void>,
+    into?: { label: string; value: string; options: Array<[string, string]> },
+  ) => {
+    dialog(title, into ? [["into", into.label, into.value, "select", into.options]] : [], async (values) => {
       if (report.matchedRows === 0) return false;
-      await onImport();
+      await onImport(String(values.into ?? ""));
     }, "Import matched rows", (
       <div className="dlgtext">
         <p><b>{fileName}</b></p>
@@ -483,43 +567,51 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
   };
 
   const importCollection = useCallback(async () => {
+    const list = live.current.collections ?? [];
+    if (!list.length) return flash("Create a collection first (Collection menu, New collection)", "err");
     const file = await pickFile(".csv,text/csv");
     if (!file) return;
     if (file.size > 5 * 1024 * 1024) return flash("The CSV file must be 5 MB or smaller", "err");
     try {
       const content = await file.text();
-      const report = await request<ImportReport>("/api/collection/import/preview", { method: "POST", headers: { "content-type": "text/csv" }, body: content });
+      const preferred = live.current.prefs.openCollection ?? list[0]!.id;
+      const report = await request<ImportReport>(`/api/collections/${encodeURIComponent(preferred)}/import/preview`, {
+        method: "POST", headers: { "content-type": "text/csv" }, body: content,
+      });
       showReview(`Collection import preview: ${file.name}`, report, false);
-      previewDialog("Import collection CSV", file.name, report, async () => {
+      previewDialog("Import collection CSV", file.name, report, async (into) => {
         try {
-          const result = await request<ImportReport>("/api/collection/import", { method: "POST", headers: { "content-type": "text/csv" }, body: content });
-          showReview(`Collection import: ${file.name}`, result, true);
-          flash(`Imported ${result.importedQuantity} cards from ${result.matchedRows} rows`);
+          const result = await request<ImportReport>(`/api/collections/${encodeURIComponent(into)}/import`, {
+            method: "POST", headers: { "content-type": "text/csv" }, body: content,
+          });
+          showReview(`Collection import into ${collectionName(into)}: ${file.name}`, result, true);
+          flash(`Imported ${result.importedQuantity} cards from ${result.matchedRows} rows into ${collectionName(into)}`);
           await refreshAfterChange();
-          if (live.current.collection === null) await reloadCollection();
         } catch (reason) {
           fail(reason, "Could not import the collection CSV.");
         }
-      });
+      }, { label: "Into collection", value: preferred, options: list.map((item) => [item.id, item.name]) });
     } catch (reason) {
       fail(reason, "Could not read the collection CSV.");
     }
-  }, [flash, fail, showReview, refreshAfterChange, reloadCollection]);
+  }, [flash, fail, showReview, refreshAfterChange, collectionName]);
 
   const exportCollection = useCallback(async () => {
     try {
-      const entries = await request<CollectionEntry[]>("/api/collection");
-      if (!entries.length) return flash("The collection is empty, so there is nothing to export", "err");
+      const id = live.current.prefs.openCollection;
+      if (!id) return flash("Create a collection first (Collection menu, New collection)", "err");
+      const entries = await request<CollectionEntry[]>(`/api/collections/${encodeURIComponent(id)}/cards`);
+      if (!entries.length) return flash(`${collectionName(id)} is empty, so there is nothing to export`, "err");
       const rows = [
         ["Count", "Tradelist Count", "Name", "Edition", "Condition", "Language", "Foil", "Tags", "Last Modified", "Collector Number", "Alter", "Proxy", "Purchase Price"],
         ...entries.map((entry) => [entry.quantity, 0, entry.name, entry.set_name, "", "", Boolean(entry.foil), "", "", entry.collector_number, "", "", ""]),
       ];
-      downloadText("mana-vault-collection.csv", rows.map((row) => row.map(csvCell).join(",")).join("\r\n"), "text/csv;charset=utf-8");
-      flash("Collection exported");
+      downloadText(`${slugify(collectionName(id))}.csv`, rows.map((row) => row.map(csvCell).join(",")).join("\r\n"), "text/csv;charset=utf-8");
+      flash(`${collectionName(id)} exported`);
     } catch (reason) {
       fail(reason, "Could not export the collection.");
     }
-  }, [flash, fail]);
+  }, [flash, fail, collectionName]);
 
   const downloadBackup = useCallback(async () => {
     try {
@@ -546,9 +638,10 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
       const summary = await request<BackupSummary>("/api/backup/validate", { method: "POST", headers, body: content });
       const ok = await confirmDialog("Restore backup", (
         <>
-          Replace the current collection and all {decks.length} decks with this backup from {new Date(summary.createdAt).toLocaleString()}?
-          It holds {summary.collectionEntryCount} collection entries, {summary.deckCount} decks with {summary.deckCardCount} deck cards,
-          and {summary.printingCount} card printings. The full card database is not changed. A restore cannot be undone.
+          Replace all of your own collections and decks with this backup from {new Date(summary.createdAt).toLocaleString()}?
+          It holds {summary.collectionCount} collections with {summary.collectionEntryCount} entries, {summary.deckCount} decks with {summary.deckCardCount} deck
+          cards, and {summary.printingCount} card printings. Collections and decks shared with you by others are not changed, and the full card database is
+          not changed. A restore cannot be undone.
         </>
       ), "Restore backup");
       if (!ok) return;
@@ -557,13 +650,14 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
       setDeck(null);
       setPrefs({ lastDeckId: null });
       setReview(null);
-      await Promise.all([reloadCollection(), reloadDecks()]);
+      setCollection(null);
+      await Promise.all([reloadCollections(), reloadDecks()]);
       catalogPoll.current?.();
       flash("Backup restored");
     } catch (reason) {
       fail(reason, "Could not restore the backup.");
     }
-  }, [decks.length, flash, fail, reloadCollection, reloadDecks, setPrefs, clearUndo]);
+  }, [flash, fail, reloadCollections, reloadDecks, setPrefs, clearUndo]);
 
   const importDeck = useCallback(async () => {
     const current = live.current.deck;
@@ -656,6 +750,18 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
     return term ? entries.filter((entry) => `${entry.name} ${entry.set_name} ${entry.set_code}`.toLowerCase().includes(term)) : entries;
   }, [collection, collectionFilter]);
 
+  const library = useLibraryState({
+    userId: user.id, live, flash, fail, setPrefs, pushUndo, clearUndo, setCounts, refreshAfterChange, reloadCollections, reloadDecks,
+    openDeck, closeDeck: () => { setDeck(null); setPrefs({ lastDeckId: null }); }, collectionName, checked, setChecked, visibleCollection,
+  });
+
+  /** Clicking a collection row: plain click picks it, Ctrl adds or removes it, Shift picks a range. */
+  const pickRow = useCallback((entry: CollectionEntry, modifiers: { ctrl: boolean; shift: boolean }) => {
+    const key = entryKey(entry);
+    library.pick(key, modifiers.shift ? "range" : modifiers.ctrl || selectMode ? "toggle" : "only");
+    select({ view: "collection", key, printingId: entry.id });
+  }, [library, select, selectMode]);
+
   const listItems = useCallback((): Array<NonNullable<Selection>> => {
     if (view === "cards") return cards.map((card) => ({ view: "cards", key: card.id, printingId: card.id }));
     if (view === "collection") return visibleCollection.map((entry) => ({ view: "collection", key: `${entry.id}:${entry.foil}`, printingId: entry.id }));
@@ -670,9 +776,10 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
     const next = items[Math.max(0, Math.min(items.length - 1, index < 0 ? 0 : index + step))];
     if (next) {
       select(next);
+      if (next.view === "collection") library.pick(next.key, "only");
       window.setTimeout(() => document.querySelector(`[data-key="${CSS.escape(next.key)}"]`)?.scrollIntoView({ block: "nearest" }), 0);
     }
-  }, [listItems, selection, select]);
+  }, [listItems, selection, select, library]);
 
   /** The selected row's printing and name, known at once without waiting for the card details to load. */
   const selectedCard = useMemo((): { id: string; name: string } | null => {
@@ -690,6 +797,8 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
     view, setView, lastView, aboutSlug, openAbout, closeAbout,
     filters, setFilters, filtersActive, cards, loading, searchError, searchInput,
     collection, visibleCollection, collectionFilter, setCollectionFilter, reloadCollection,
+    collections, reloadCollections, collectionName, collectionTab, setCollectionTab, completion, reloadCompletion,
+    checked, setChecked, pickRow, selectMode, setSelectMode, ...library,
     decks, deck, openDeck, reloadDecks, createDeck,
     selection, select, cardDetail, selectedCard, moveSelection,
     catalog, catalogRequestPending, updateCatalog,

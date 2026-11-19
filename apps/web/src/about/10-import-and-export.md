@@ -6,8 +6,9 @@ Mana Vault reads collection CSV files and decklists, and writes collection CSV, 
 
 1. Choose **Import collection CSV...** (File menu or Collection ribbon tab) and pick a .csv file of 5 MB or less.
 2. Mana Vault checks every row without changing anything and shows a preview: matched rows, the number of cards they hold, and up to eight skipped rows. All skipped rows are listed in the Import review panel.
-3. Choose **Import matched rows** to add them, or **Cancel**. Skipped rows are never imported.
-4. Imported cards are added to existing counts. Running the same import twice adds the cards twice. Imports cannot be undone.
+3. Choose the collection to import into with **Into collection** (the open collection by default).
+4. Choose **Import matched rows** to add them, or **Cancel**. Skipped rows are never imported.
+5. Imported cards are added to existing counts. Running the same import twice adds the cards twice. Imports cannot be undone.
 
 ### Collection CSV columns
 
@@ -30,7 +31,7 @@ The first line must hold column names. Column names are matched without regard t
 
 ## Exporting the collection
 
-**Export collection (Moxfield CSV)** downloads mana-vault-collection.csv with these columns, which Moxfield imports directly:
+**Export collection (Moxfield CSV)** downloads the open collection as collection-name.csv with these columns, which Moxfield imports directly:
 
 | Column | Value |
 |---|---|
@@ -41,6 +42,10 @@ The first line must hold column names. Column names are matched without regard t
 | Condition, Language, Tags, Last Modified, Alter, Proxy, Purchase Price | Empty |
 | Foil | true or false |
 | Collector Number | Collector number |
+
+## Exporting a missing list
+
+The missing cards of a collection linked to sets export as text or CSV; see [Set completion](/about/set-completion).
 
 ## Importing a decklist
 

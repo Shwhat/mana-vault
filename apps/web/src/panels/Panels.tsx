@@ -4,6 +4,7 @@ import type { Action } from "../actions";
 import { Icon } from "../icons";
 import { useApp, zoneLabel } from "../store";
 import { capitalize, FORMATS } from "../types";
+import { Meter } from "../views/CollectionView";
 import { NoDeck, Quantity, zoneGroups } from "../views/Views";
 
 export function FiltersPanel({ actions }: { actions: Record<string, Action> }) {
@@ -40,6 +41,41 @@ export function FiltersPanel({ actions }: { actions: Record<string, Action> }) {
   );
 }
 
+export function CollectionsPanel({ actions }: { actions: Record<string, Action> }) {
+  const store = useApp();
+  const list = store.collections ?? [];
+  return (
+    <div className="pbody flush">
+      <div className="navbar">
+        <span className="sub grow">{list.length} {list.length === 1 ? "collection" : "collections"}</span>
+        <button type="button" className="btn small" onClick={actions["collection.new"]?.run}>New...</button>
+      </div>
+      {store.collections !== null && list.length === 0 && <p className="note pad">No collections yet. Use New to create one, such as a binder or a set you are completing.</p>}
+      {list.map((item) => {
+        const target = store.prefs.targetCollection === item.id;
+        return (
+          <div key={item.id} className={store.prefs.openCollection === item.id ? "navitem colitem active" : "navitem colitem"} role="button"
+            onClick={() => { store.openCollection(item.id); store.setView("collection"); }}>
+            <span className="colline">
+              <span className="nl">{item.name}</span>
+              {item.role === "member" && <span className="badge" title={`Shared by ${item.owner.name}`}>Shared</span>}
+              {item.role === "owner" && item.sharedWith.length > 0 && <span className="badge" title={`Shared with ${item.sharedWith.map((person) => person.name).join(", ")}`}>Shared</span>}
+              <button type="button" className={target ? "tgt on" : "tgt"} title={target ? "Add to collection puts cards here" : "Make this the collection new cards go to"}
+                aria-label={target ? `${item.name} receives new cards` : `Add new cards to ${item.name}`} aria-pressed={target}
+                onClick={(event) => { event.stopPropagation(); store.setTargetCollection(item.id); }}>{target ? "Adds here" : "Add here"}</button>
+            </span>
+            <span className="colline sub">
+              <span className="cnt">{item.cardCount} cards</span>
+              {item.progress && <><Meter owned={item.progress.owned} total={item.progress.total} label={`${item.name} completion`} />
+                <span className="cnt">{item.progress.total ? Math.floor((item.progress.owned / item.progress.total) * 100) : 0}%</span></>}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export function DecksPanel({ actions }: { actions: Record<string, Action> }) {
   const store = useApp();
   const [term, setTerm] = useState("");
@@ -55,6 +91,7 @@ export function DecksPanel({ actions }: { actions: Record<string, Action> }) {
         <div key={deck.id} className={store.deck?.id === deck.id ? "navitem active" : "navitem"} role="button" onClick={() => void store.openDeck(deck.id)}
           onDoubleClick={() => store.setView("deck")}>
           <span className="nl">{deck.name}</span>
+          {(deck.role === "member" || (deck.sharedWith?.length ?? 0) > 0) && <span className="badge">Shared</span>}
           <span className={deck.mode === "theme" ? "badge main" : "badge"}>{deck.mode === "theme" ? "Theme" : "Normal"}</span>
           <span className="cnt">{deck.card_count ?? 0}</span>
         </div>
@@ -96,6 +133,11 @@ export function CardPanel({ actions }: { actions: Record<string, Action> }) {
         <h4>Owned</h4>
         <div className="prow"><label>This printing</label><span>{owned.regular} regular, {owned.foil} foil</span></div>
         <div className="prow"><label>All printings</label><span>{owned.allPrintings}</span></div>
+        {owned.collections.map((item) => (
+          <div className="prow" key={item.id}><label title={item.name}>{item.name}</label>
+            <span>{item.regular || item.foil ? `${item.regular} regular, ${item.foil} foil` : "Other printings only"}{item.allPrintings > item.regular + item.foil ? ` (${item.allPrintings} with other printings)` : ""}</span></div>
+        ))}
+        {!owned.collections.length && <p className="note">Not in any of your collections.</p>}
       </div>
     </div>
   );

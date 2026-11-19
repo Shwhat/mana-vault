@@ -101,8 +101,8 @@ button:focus-visible,[role=button]:focus-visible,a:focus-visible{outline:2px sol
 #dock-bottom{border-top:1px solid var(--line);flex-direction:row}
 .dcol{display:flex;flex-direction:column;min-width:0;min-height:0}
 .dgroup{display:flex;flex-direction:column;min-width:0;min-height:0;overflow:hidden}
-.dtabs{display:flex;flex-wrap:wrap;border-bottom:1px solid var(--line);background:var(--panel);flex:none}
-.dtabs .tab{flex:1 0 auto;padding:5px 8px;display:flex;align-items:center;justify-content:center;gap:5px;cursor:grab;white-space:nowrap;border-bottom:2px solid transparent;border-right:1px solid var(--line);color:var(--muted);touch-action:none}
+.dtabs{display:flex;flex-wrap:nowrap;overflow:hidden;border-bottom:1px solid var(--line);background:var(--panel);flex:none}
+.dtabs .tab{flex:1 1 auto;min-width:0;overflow:hidden;padding:5px 8px;display:flex;align-items:center;justify-content:center;gap:5px;cursor:grab;white-space:nowrap;border-bottom:2px solid transparent;border-right:1px solid var(--line);color:var(--muted);touch-action:none}
 .dtabs .tab:last-child{border-right:0}
 .dtabs .tab:hover{background:var(--line2);color:var(--text)}
 .dtabs .tab.active{background:var(--panel2);color:var(--text);border-bottom-color:var(--accent);font-weight:600}
@@ -366,3 +366,69 @@ dialog::backdrop{background:rgba(20,28,40,.35)}
 .phone .scanner-actions .grow{display:none}
 .phone .scanner-actions .primary{grid-column:1 / -1}
 @media (max-width:900px){.about{grid-template-columns:minmax(0,1fr)}.abtoc{display:none}.abselect{display:block}}
+
+/* ---------- collections (0.2.0) ---------- */
+.cbadge{display:inline-block;min-width:16px;margin-left:6px;padding:0 5px;border-radius:8px;background:#f59e0b;color:#3b2600;font-size:10.5px;font-weight:700;line-height:16px;text-align:center}
+.colhead{flex-wrap:nowrap}
+.colpick{font-weight:700;font-size:13px;max-width:240px;padding:2px 4px;border:1px solid var(--line);border-radius:3px;background:var(--panel2)}
+.colhead .seg{flex:none}
+.colhead .seg button{padding:3px 10px}
+.pickbar{display:flex;align-items:center;gap:6px;padding:4px 10px;background:var(--accent-soft);border-bottom:1px solid var(--on-line);color:var(--on-text);flex:none}
+.pickbar span{margin-right:auto}
+.rowcheck{flex:none;width:16px;height:16px;margin:0}
+.rowact.show{opacity:1}
+.filterbar{display:flex;align-items:center;gap:6px;padding:5px 10px;border-bottom:1px solid var(--line2);background:var(--panel);flex:none;flex-wrap:wrap}
+.filterbar select{padding:2px 4px;border:1px solid var(--line);border-radius:3px;background:var(--panel2)}
+.filterbar .phpos{margin-left:auto}
+.compwrap{padding:12px 14px 24px}
+.stattile{max-width:520px;padding:12px 14px;border:1px solid var(--line);border-radius:4px;background:var(--panel)}
+.stlabel{font-size:11.5px;color:var(--muted)}
+.stvalue{font-size:32px;font-weight:600;line-height:1.15;font-variant-numeric:tabular-nums}
+.stsub{color:var(--muted);margin-bottom:8px;font-variant-numeric:tabular-nums}
+.meter{display:block;height:8px;border-radius:4px;background:var(--accent-soft);overflow:hidden;min-width:60px}
+.meterfill{display:block;height:100%;border-radius:4px;background:var(--accent)}
+.rulesline{display:flex;gap:12px;align-items:center;margin:10px 0 12px;color:var(--muted);flex-wrap:wrap}
+.meterlist{display:flex;flex-direction:column;max-width:860px;border:1px solid var(--line2);border-radius:4px}
+.mrow{display:grid;grid-template-columns:minmax(160px,1.2fr) minmax(120px,2fr) 130px;gap:12px;align-items:center;padding:6px 10px;border-bottom:1px solid var(--line2)}
+.mrow:last-child{border-bottom:0}
+.mrow:hover:not(.mhead){background:var(--hover)}
+.mhead{background:var(--panel);font-size:11.5px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.4px}
+.mname{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mnum{text-align:right;font-variant-numeric:tabular-nums;color:var(--muted)}
+.mnum b{color:var(--text);margin-left:6px}
+.colitem{flex-direction:column;align-items:stretch;gap:2px;padding:5px 10px;white-space:normal}
+.colline{display:flex;align-items:center;gap:6px;min-width:0}
+.colline .meter{flex:1}
+.colline.sub{margin:0}
+.colline .cnt{margin-left:0}
+.tgt{margin-left:auto;border:1px solid var(--line);border-radius:8px;background:var(--panel2);color:var(--muted);font-size:10.5px;padding:0 6px;line-height:16px;cursor:pointer;flex:none}
+.tgt.on{background:var(--accent-soft);border-color:var(--on-line);color:var(--on-text);font-weight:600}
+.setpick{margin-top:8px}
+.chips{display:flex;flex-wrap:wrap;gap:4px;margin:6px 0}
+.chip{display:inline-flex;align-items:center;gap:4px;padding:1px 4px 1px 8px;border-radius:8px;background:var(--accent-soft);color:var(--on-text);font-size:11.5px}
+.chip button{border:0;background:none;color:inherit;cursor:pointer;font-size:13px;line-height:1;padding:0 2px}
+.setlist{max-height:200px;overflow:auto;border:1px solid var(--line);border-radius:4px;background:var(--panel2)}
+.setrow{display:flex;align-items:center;gap:8px;padding:3px 8px;cursor:pointer;white-space:nowrap}
+.setrow:hover{background:var(--hover)}
+.setrow.on{background:var(--accent-soft)}
+.inbox h4{margin:10px 0 4px;font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+.inbox .wsrow{gap:10px}
+.inbox .sub{margin:0}
+:root[data-theme=dark] .colpick,:root[data-theme=dark] .filterbar select,:root[data-theme=dark] .setlist,:root[data-theme=dark] .tgt{background:#1d2228}
+:root[data-theme=dark] .tgt.on{background:var(--accent-soft)}
+.phone .colhead{flex-wrap:wrap}
+.phone .colpick{flex:1 1 100%;max-width:none;min-height:40px;font-size:15px}
+.phone .colhead .seg{flex:1}
+.phone .colhead .seg button{min-height:38px}
+.phone .pickbar{flex-wrap:wrap}
+.phone .pickbar .btn{min-height:40px}
+.phone .rowcheck{width:22px;height:22px}
+.phone .mrow{grid-template-columns:1fr 110px;row-gap:4px}
+.phone .mrow > span:nth-child(2){grid-column:1 / -1;grid-row:2}
+.phone .mhead{display:none}
+.phone .filterbar select{min-height:38px;flex:1}
+.phone .tgt{line-height:28px;padding:0 10px}
+:root[data-theme=dark] .pbtn .ico svg{filter:none}
+.phone .colhead .seg{flex:1 1 100%}
+.phone .row .rowmain{flex:1 1 150px}
+.phone.picking .row .rowtitle b{white-space:normal}

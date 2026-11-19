@@ -61,7 +61,7 @@ export function MenuBar({ actions }: { actions: Record<string, Action> }) {
     setOpen({ name, x, y: rect.bottom, items });
   };
 
-  const account: MenuItem[] = ["password", "-", "signout"];
+  const account: MenuItem[] = ["inbox", "-", "password", "-", "signout"];
 
   return (
     <div id="menubar" ref={bar}>
@@ -95,6 +95,7 @@ export function MenuBar({ actions }: { actions: Record<string, Action> }) {
         }}
       >
         {store.user.name}
+        {store.offers.inbox.length > 0 && <span className="cbadge" title={`${store.offers.inbox.length} waiting in your Inbox`}>{store.offers.inbox.length}</span>}
       </div>
       {open && <DropDown open={open} actions={actions} onClose={() => setOpen(null)} />}
     </div>

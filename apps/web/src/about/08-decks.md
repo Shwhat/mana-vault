@@ -1,6 +1,6 @@
 # Decks
 
-A deck has a name, a format, a mode and cards in up to three zones. One deck is open at a time; Add to deck puts cards into it.
+A deck has a name, a format, a mode and cards in up to three zones. Decks belong to the account that made them; they can be shared or sent as described in [Sending and sharing](/about/sending-and-sharing). One deck is open at a time; Add to deck puts cards into it.
 
 ## Deck fields
 
@@ -37,6 +37,12 @@ The **target zone** decides where Add to deck puts a card. It starts at Main dec
 
 The last deck you opened opens again the next time you sign in.
 
+## Renaming and deleting decks
+
+- **Rename deck...** (Deck menu or Decks ribbon tab) changes the open deck's name, 1 to 100 characters. Renaming a shared deck changes it for both people.
+- **Delete deck...** asks "Delete name and its N cards?" and removes the deck. A deck you share warns that the other people will lose it too. Deleting cannot be undone, and it clears the undo history.
+- For a deck shared with you, the command is **Leave shared deck...**: the deck stays with its owner and leaves your list.
+
 ## Building a deck
 
 1. Select a card in the card search.
@@ -50,4 +56,4 @@ Press **3** (or **Deck**) to open it. The header shows the deck name, format, mo
 
 ## Undo
 
-Adding cards, changing counts, moving between zones and removing cards can be undone and redone. Creating a deck cannot be undone, and decks cannot be deleted in this version.
+Adding cards, changing counts, moving between zones and removing cards can be undone and redone. Creating, renaming and deleting decks cannot be undone.

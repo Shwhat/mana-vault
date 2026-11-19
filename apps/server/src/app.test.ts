@@ -5,13 +5,14 @@ import { cardInsertStatement, initializeDatabase } from "./database.js";
 
 async function setup() {
   const database = new DatabaseSync(":memory:");
-  const app = await buildApp(database, undefined, undefined, undefined, { requireSignIn: false });
+  const app = await buildApp(database, undefined, undefined, undefined, { requireSignIn: false, passwordIterations: 1000 });
   cardInsertStatement(database).run(
     "printing-1", "oracle-1", "Lightning Bolt", "{R}", 1, "Instant", "Lightning Bolt deals 3 damage to any target.",
     "R", "R", JSON.stringify({ commander: "legal", modern: "legal" }),
     "lea", "Limited Edition Alpha", "161", "common", null, "1993-08-05", "Chris Rush",
   );
-  return { app, database };
+  const col = (await app.inject({ method: "POST", url: "/api/collections", payload: { name: "Binder" } })).json().id as string;
+  return { app, database, col };
 }
 
 describe("API", () => {
@@ -34,7 +35,7 @@ describe("API", () => {
       lastImportedCount: null,
       lastError: null,
     };
-    const app = await buildApp(database, undefined, () => updateStatus, undefined, { requireSignIn: false });
+    const app = await buildApp(database, undefined, () => updateStatus, undefined, { requireSignIn: false, passwordIterations: 1000 });
     const response = await app.inject({ method: "GET", url: "/api/catalog/status" });
     expect(response.statusCode).toBe(200);
     expect(response.json().update).toEqual(updateStatus);
@@ -58,7 +59,7 @@ describe("API", () => {
       isUpdating = true;
       return true;
     });
-    const app = await buildApp(database, undefined, updateStatus, requestUpdate, { requireSignIn: false });
+    const app = await buildApp(database, undefined, updateStatus, requestUpdate, { requireSignIn: false, passwordIterations: 1000 });
     const started = await app.inject({ method: "POST", url: "/api/catalog/update", payload: {} });
     const duplicate = await app.inject({ method: "POST", url: "/api/catalog/update", payload: {} });
     expect(started.statusCode).toBe(202);
@@ -150,47 +151,47 @@ describe("API", () => {
   });
 
   it("adds collection quantities by printing and foil status", async () => {
-    const { app, database } = await setup();
+    const { app, database, col } = await setup();
     const first = await app.inject({
       method: "POST",
-      url: "/api/collection",
+      url: `/api/collections/${col}/cards`,
       payload: { cardId: "printing-1", quantity: 2 },
     });
     const second = await app.inject({
       method: "POST",
-      url: "/api/collection",
+      url: `/api/collections/${col}/cards`,
       payload: { cardId: "printing-1", quantity: 3 },
     });
     expect(first.statusCode).toBe(200);
     expect(second.json().quantity).toBe(5);
-    expect((await app.inject({ method: "GET", url: "/api/collection" })).json()).toHaveLength(1);
+    expect((await app.inject({ method: "GET", url: `/api/collections/${col}/cards` })).json()).toHaveLength(1);
     await app.close();
     database.close();
   });
 
   it("supports editing and removing collection entries", async () => {
-    const { app, database } = await setup();
+    const { app, database, col } = await setup();
     await app.inject({
       method: "POST",
-      url: "/api/collection",
+      url: `/api/collections/${col}/cards`,
       payload: { cardId: "printing-1", quantity: 2 },
     });
     const update = await app.inject({
-      method: "PATCH",
-      url: "/api/collection/printing-1",
-      payload: { quantity: 5 },
+      method: "PUT",
+      url: `/api/collections/${col}/cards`,
+      payload: { items: [{ cardId: "printing-1", foil: false, quantity: 5 }] },
     });
     expect(update.statusCode).toBe(200);
-    expect((await app.inject({ method: "GET", url: "/api/collection" })).json()[0].quantity).toBe(5);
-    const remove = await app.inject({ method: "DELETE", url: "/api/collection/printing-1" });
+    expect((await app.inject({ method: "GET", url: `/api/collections/${col}/cards` })).json()[0].quantity).toBe(5);
+    const remove = await app.inject({ method: "PUT", url: `/api/collections/${col}/cards`, payload: { items: [{ cardId: "printing-1", foil: false, quantity: 0 }] } });
     expect(remove.statusCode).toBe(200);
-    expect((await app.inject({ method: "GET", url: "/api/collection" })).json()).toHaveLength(0);
+    expect((await app.inject({ method: "GET", url: `/api/collections/${col}/cards` })).json()).toHaveLength(0);
     await app.close();
     database.close();
   });
 
   it("imports Moxfield and generic collection CSV by exact printing", async () => {
-    const { app, database } = await setup();
+    const { app, database, col } = await setup();
     const csv = [
       '"Count","Tradelist Count","Name","Edition","Condition","Language","Foil","Tags","Last Modified","Collector Number"',
       '"3","0","Lightning Bolt","Limited Edition Alpha","Near Mint","English","true","","","161"',
@@ -198,16 +199,16 @@ describe("API", () => {
     ].join("\r\n");
     const preview = await app.inject({
       method: "POST",
-      url: "/api/collection/import/preview",
+      url: `/api/collections/${col}/import/preview`,
       headers: { "content-type": "text/csv" },
       payload: csv,
     });
     expect(preview.statusCode).toBe(200);
     expect(preview.json()).toMatchObject({ matchedRows: 1, importedQuantity: 3 });
-    expect(database.prepare("SELECT COUNT(*) AS count FROM collection_items").get()?.count).toBe(0);
+    expect(database.prepare("SELECT COUNT(*) AS count FROM collection_cards").get()?.count).toBe(0);
     const imported = await app.inject({
       method: "POST",
-      url: "/api/collection/import",
+      url: `/api/collections/${col}/import`,
       headers: { "content-type": "text/csv" },
       payload: csv,
     });
@@ -217,17 +218,17 @@ describe("API", () => {
       importedQuantity: 3,
       unmatched: [{ row: 3, name: "Missing Card" }],
     });
-    const collection = await app.inject({ method: "GET", url: "/api/collection" });
+    const collection = await app.inject({ method: "GET", url: `/api/collections/${col}/cards` });
     expect(collection.json()[0]).toMatchObject({ name: "Lightning Bolt", quantity: 3, foil: 1 });
     await app.close();
     database.close();
   });
 
   it("rejects CSV without the expected name column", async () => {
-    const { app, database } = await setup();
+    const { app, database, col } = await setup();
     const result = await app.inject({
       method: "POST",
-      url: "/api/collection/import",
+      url: `/api/collections/${col}/import`,
       headers: { "content-type": "text/csv" },
       payload: '"Card","Count"\r\n"Lightning Bolt","2"',
     });
@@ -288,8 +289,8 @@ describe("API", () => {
   });
 
   it("backs up and restores collection, decks, and required card records", async () => {
-    const { app, database } = await setup();
-    await app.inject({ method: "POST", url: "/api/collection", payload: { cardId: "printing-1", quantity: 3 } });
+    const { app, database, col } = await setup();
+    await app.inject({ method: "POST", url: `/api/collections/${col}/cards`, payload: { cardId: "printing-1", quantity: 3 } });
     const deck = await app.inject({ method: "POST", url: "/api/decks", payload: { name: "Saved deck" } });
     await app.inject({
       method: "POST",
@@ -298,7 +299,7 @@ describe("API", () => {
     });
     const backup = await app.inject({ method: "GET", url: "/api/backup" });
     expect(backup.headers["content-disposition"]).toContain("mana-vault-backup.json");
-    await app.inject({ method: "DELETE", url: "/api/collection/printing-1" });
+    await app.inject({ method: "PUT", url: `/api/collections/${col}/cards`, payload: { items: [{ cardId: "printing-1", foil: false, quantity: 0 }] } });
     await app.inject({ method: "DELETE", url: `/api/decks/${deck.json().id}/cards/oracle-1` });
     const validation = await app.inject({
       method: "POST",
@@ -308,11 +309,12 @@ describe("API", () => {
     });
     expect(validation.statusCode).toBe(200);
     expect(validation.json()).toMatchObject({
+      collectionCount: 1,
       collectionEntryCount: 1,
       deckCount: 1,
       deckCardCount: 1,
     });
-    expect((await app.inject({ method: "GET", url: "/api/collection" })).json()).toHaveLength(0);
+    expect((await app.inject({ method: "GET", url: `/api/collections/${col}/cards` })).json()).toHaveLength(0);
     const restored = await app.inject({
       method: "POST",
       url: "/api/backup/restore",
@@ -320,19 +322,23 @@ describe("API", () => {
       payload: backup.body,
     });
     expect(restored.statusCode).toBe(200);
-    expect((await app.inject({ method: "GET", url: "/api/collection" })).json()[0].quantity).toBe(3);
-    expect((await app.inject({ method: "GET", url: `/api/decks/${deck.json().id}` })).json().cards[0].quantity).toBe(2);
+    // restored items get new ids
+    const [restoredCollection] = (await app.inject({ method: "GET", url: "/api/collections" })).json();
+    expect(restoredCollection).toMatchObject({ name: "Binder", entryCount: 1, cardCount: 3 });
+    const [restoredDeck] = (await app.inject({ method: "GET", url: "/api/decks" })).json();
+    expect((await app.inject({ method: "GET", url: `/api/decks/${restoredDeck.id}` })).json().cards[0].quantity).toBe(2);
+    expect((await app.inject({ method: "GET", url: `/api/decks/${deck.json().id}` })).statusCode).toBe(404);
     await app.close();
     database.close();
   });
 
   it("backs up and restores colorless cards", async () => {
-    const { app, database } = await setup();
+    const { app, database, col } = await setup();
     cardInsertStatement(database).run(
       "sol-ring", "oracle-sol", "Sol Ring", "{1}", 1, "Artifact", "{T}: Add {C}{C}.", "", "",
       JSON.stringify({ commander: "legal" }), "lea", "Limited Edition Alpha", "269", "uncommon", null, "1993-08-05", "Mark Tedin",
     );
-    await app.inject({ method: "POST", url: "/api/collection", payload: { cardId: "sol-ring", quantity: 1 } });
+    await app.inject({ method: "POST", url: `/api/collections/${col}/cards`, payload: { cardId: "sol-ring", quantity: 1 } });
     const backup = await app.inject({ method: "GET", url: "/api/backup" });
     const headers = { "content-type": "application/vnd.mana-vault.backup+json" };
     const validation = await app.inject({ method: "POST", url: "/api/backup/validate", headers, payload: backup.body });
@@ -428,15 +434,15 @@ describe("API", () => {
   });
 
   it("rejects malformed entries and unknown printings", async () => {
-    const { app, database } = await setup();
+    const { app, database, col } = await setup();
     const malformed = await app.inject({
       method: "POST",
-      url: "/api/collection",
+      url: `/api/collections/${col}/cards`,
       payload: { cardId: "printing-1", quantity: 0 },
     });
     const unknown = await app.inject({
       method: "POST",
-      url: "/api/collection",
+      url: `/api/collections/${col}/cards`,
       payload: { cardId: "unknown" },
     });
     expect(malformed.statusCode).toBe(400);

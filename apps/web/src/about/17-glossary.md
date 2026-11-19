@@ -5,7 +5,19 @@
 | Card | A card by name, such as Lightning Bolt, across all its printings |
 | Printing | One version of a card in one set, with its own set code, collector number, rarity and artwork |
 | Card database | The local catalog of every printing, downloaded from Scryfall |
-| Collection entry | One printing in one finish (regular or foil) that you own, with a count |
+| Collection | A named place for cards you own, such as a binder, with its own rules for set completion |
+| Collection entry | One printing in one finish (regular or foil) in a collection, with a count |
+| Target collection | The collection that Add to collection puts cards into |
+| Open collection | The collection shown in the collection view |
+| Linked set | A set whose completion a collection tracks |
+| Completion rule | Main set, Every printing or Each card name once; decides which cards a linked set needs |
+| Finish rule | Any finish, Regular only, Foil only or One of each; decides which finishes count |
+| Printed size | The number of numbered cards printed in a set, from Scryfall's set list |
+| Picked rows | Collection rows chosen for a bulk move or remove |
+| Owner | The account an item belongs to |
+| Offer | A collection or deck sent to another account, waiting in their Inbox |
+| Copy, Share, Transfer | The three ways to send: their own copy, one item you both edit, or moving it to them |
+| Inbox | The list of offers waiting for you and offers you sent |
 | Foil | The shiny finish of a printing. Regular and foil copies are counted separately |
 | Deck | A named list of cards with a format and a mode |
 | Normal mode | A deck mode that keeps cards by name, so any printing counts |
@@ -22,5 +34,5 @@
 | Ribbon | The tabs of buttons under the menu bar |
 | Contextual tab | A ribbon tab shown only when it applies; the amber Deck tab appears while a deck is open |
 | Import preview | The check of an import file that shows what would be added before anything changes |
-| Backup | A JSON file with the collection, decks and the card records they use |
+| Backup | A JSON file with one account's own collections, decks and the card records they use |
 | Session | A signed-in browser, kept for 30 days |

@@ -36,10 +36,10 @@ test("search, filters and adding to the collection with undo", async ({ page }) 
   await page.keyboard.press("ArrowDown");
   await expect(page.locator(".ident")).toHaveText("Dark Ritual");
   await page.keyboard.press("Enter");
-  await expect(status(page)).toHaveText("Dark Ritual added to collection");
+  await expect(status(page)).toHaveText("Dark Ritual added to Main collection");
   await page.keyboard.press("f");
   await page.keyboard.press("Enter");
-  await expect(status(page)).toHaveText("Dark Ritual (foil) added to collection");
+  await expect(status(page)).toHaveText("Dark Ritual (foil) added to Main collection");
   await page.keyboard.press("f");
   await expect(page.locator(".pgrp", { hasText: "Owned" })).toContainText(/This printing\s*\d+ regular, \d+ foil/);
 
@@ -122,9 +122,11 @@ test("collection CSV import shows a preview and the review panel", async ({ page
   });
   await expect(page.locator("dialog[open]")).toContainText("2 matched rows (5 cards) will be added. 1 rows will be skipped.");
   await page.getByRole("button", { name: "Import matched rows" }).click();
-  await expect(status(page)).toHaveText("Imported 5 cards from 2 rows");
+  await expect(status(page)).toHaveText("Imported 5 cards from 2 rows into Main collection");
   await expect(page.locator("dialog[open]")).toHaveCount(0);
   await expect(page.locator(".revhead")).toContainText("Imported: 2 matched rows (5 cards), 1 skipped");
+  await page.keyboard.press("2");
+  await expect(page.locator("#view-collection .row", { hasText: "Counterspell" }).locator(".badge.foil")).toBeVisible();
   await expect(page.locator(".dgbody .msg", { hasText: "Not A Real Card" })).toContainText("No card with this name exists in the local catalog");
 });
 
@@ -212,8 +214,11 @@ test("About guide opens, navigates and closes", async ({ page }) => {
   await expect(page.locator(".abpage h1")).toHaveText("Decks");
   await page.goto("/about/nope");
   await expect(page.locator(".abpage")).toContainText("Page not found");
-  await page.keyboard.press("Escape");
-  await expect(page.locator("#view-about")).toHaveCount(0);
+  // right after a page load the key handler attaches a moment after the first paint
+  await expect(async () => {
+    await page.keyboard.press("Escape");
+    await expect(page.locator("#view-about")).toHaveCount(0, { timeout: 500 });
+  }).toPass();
   await expect(page).toHaveURL(/\/$/);
 });
 
@@ -250,7 +255,7 @@ test.describe("phone layout", () => {
     await page.locator("#view-cards .row", { hasText: "Counterspell" }).click();
     await expect(page.locator(".sheet .ident")).toHaveText("Counterspell");
     await page.locator(".sheet").getByRole("button", { name: "Add to collection" }).click();
-    await expect(page.locator(".ptoast")).toHaveText("Counterspell added to collection");
+    await expect(page.locator(".ptoast")).toHaveText("Counterspell added to Main collection");
     await page.locator(".sheethead .btn").click();
     await page.locator(".ptab", { hasText: "Collection" }).click();
     await expect(page.locator("#view-collection .row", { hasText: "Counterspell" }).first()).toBeVisible();
@@ -261,5 +266,14 @@ test.describe("phone layout", () => {
     await expect(page.locator(".pmrow", { hasText: "Customize ribbon" })).toHaveCount(0);
     const box = await page.locator(".pmrow").first().boundingBox();
     expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
+    await page.locator(".sheethead .btn").click();
+    await page.locator(".ptab", { hasText: "Collection" }).click();
+    await page.getByRole("button", { name: "Select" }).click();
+    await page.locator("#view-collection .row", { hasText: "Counterspell" }).first().locator(".rowtitle").click();
+    await expect(page.locator(".pickbar")).toContainText("1 picked");
+    await expect(page.locator(".sheet")).toHaveCount(0);
+    await page.locator(".pickbar").getByRole("button", { name: "Remove..." }).click();
+    await page.getByRole("button", { name: "Remove", exact: true }).click();
+    await expect(page.locator(".ptoast")).toContainText("Removed Counterspell");
   });
 });

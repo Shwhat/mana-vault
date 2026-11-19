@@ -1,6 +1,6 @@
 # Mana Vault
 
-A self-hosted Magic: The Gathering collection and deck manager. Version 0.1.0.
+A self-hosted Magic: The Gathering collection and deck manager. Version 0.2.0.
 
 Mana Vault runs on your own server as one Docker container and is used from a desktop browser or a phone (installable as a home screen app). It keeps a local copy of the Scryfall card catalog, your collection and your decks in one SQLite database, behind a sign-in.
 
@@ -9,18 +9,22 @@ The full user guide is built into the app: Help menu, **About Mana Vault**. The 
 ## Features
 
 - Card search across every printing, with filter syntax (`t:dragon c:red mv>=4`, `o:draw`, `set:lea`, `r:rare`, `id:wubg`, `legal:commander`, negation with `-`) and a Filters panel.
-- Collection tracking per printing, regular and foil, with plus, minus and remove controls.
-- Decks in Normal mode (any printing counts) or Theme mode (exact printing kept), with main deck, sideboard and commander zones and a target zone for adding.
+- Any number of collections per account (binders, boxes, sets being completed), each copy in one place, with a target collection for adding (C cycles it).
+- Set completion: link a collection to any number of sets; count by main set, every printing or each card name once, and by any finish, regular only, foil only or one of each; Completion and Missing tabs with filters, add-from-list and text or CSV export of the missing list.
+- Bulk editing: pick rows with Ctrl+click, Shift+click, Ctrl+A or Select mode; remove or move them between collections in one undoable step.
+- Collection tracking per printing, regular and foil, with plus, minus, move and remove controls.
+- Decks in Normal mode (any printing counts) or Theme mode (exact printing kept), with main deck, sideboard and commander zones and a target zone for adding; rename and delete.
+- Collections and decks belong to their account. Send them to another account as a copy, a share (both edit) or a transfer; the receiver accepts from an Inbox as a new item or, for collections, merged into one of theirs.
 - Undo and redo for collection and deck edits (150 steps).
-- Collection CSV import (Moxfield and similar) and decklist import (text or CSV), each with a preview and an Import review panel for skipped rows.
+- Collection CSV import (Moxfield and similar) into a chosen collection, and decklist import (text or CSV), each with a preview and an Import review panel for skipped rows.
 - Exports: collection as Moxfield CSV, decks as text or CSV.
-- JSON backup and restore of the collection, decks and the card records they use.
-- Card database updates from Scryfall on demand or on a schedule.
+- JSON backup and restore of the signed-in account's own collections and decks and the card records they use.
+- Card database updates from Scryfall on demand or on a schedule, including the set list (printed sizes) and each printing's finishes.
 - Camera card scanner with in-browser text recognition.
 - Sign-in with accounts, password changes, 30-day sessions and protection against password guessing. New accounts can be turned off.
-- Desktop interface in the OpenSchem style: menu bar, customizable ribbon with a contextual Deck tab, dockable and floating panels (Filters, Decks, Card, Deck list, Import review), saved workspaces, status bar and light, dark or system theme.
+- Desktop interface in the OpenSchem style: menu bar, customizable ribbon with a contextual Deck tab, dockable and floating panels (Filters, Collections, Decks, Card, Deck list, Import review), saved workspaces, status bar and light, dark or system theme.
 - Phone layout with bottom tabs, full-screen sheets and 44 pixel touch targets.
-- Preferences (theme, foil, target zone, ribbon, panels, workspaces, last deck) saved per account on the server.
+- Preferences (theme, foil, target zone, target and open collection, ribbon, panels, workspaces, last deck) saved per account on the server.
 - Built-in About guide with release notes.
 
 ## Keyboard shortcuts
@@ -34,6 +38,10 @@ The full user guide is built into the app: Help menu, **About Mana Vault**. The 
 | Shift+Enter | Add the selected card to the open deck |
 | F | Switch Add as foil |
 | Z | Cycle the target zone |
+| C | Cycle the target collection |
+| Ctrl+A | Pick every row the collection filter shows |
+| Ctrl+click, Shift+click | Pick more rows, or a range |
+| Delete | Remove the picked collection rows |
 | Ctrl+Z, Ctrl+Y (or Ctrl+Shift+Z) | Undo, redo |
 | Ctrl+N, Ctrl+O | New deck, open deck |
 | Esc | Close the window, menu or About guide, or clear the selection |
@@ -68,7 +76,7 @@ A `302` redirect to `/login` means it is running.
 
 **4. In the Cloudflare Tunnel** (on its own LXC), add a public hostname that points to `http://SERVER_IP:3417`. No `cloudflared` or reverse proxy is needed in this stack. The session cookie is marked secure automatically for HTTPS requests through the tunnel.
 
-**5. In the browser**, open the address, choose **Create account**, then load the card catalog with **Database**, **Update card database**. When everyone who needs an account has one, set `MANAVAULT_SIGNUP=off` in Dockhand and redeploy.
+**5. In the browser**, open the address, choose **Create account**, then load the card catalog with **Database**, **Update card database**. When updating an existing install to 0.2.0, run Update card database once so set completion gets printed sizes and finishes. When everyone who needs an account has one, set `MANAVAULT_SIGNUP=off` in Dockhand and redeploy.
 
 ## Automatic updates
 
@@ -128,7 +136,7 @@ Then deploy as above. Rename `CARD_UPDATE_INTERVAL_HOURS` to `MANAVAULT_CARD_UPD
 
 Back up, and keep one copy off the Docker host:
 
-- `/opt/mana-vault/data` (the database, including accounts). For a consistent copy, stop the stack first, or copy while the app is idle.
+- `/opt/mana-vault/data` (the database, including all accounts, collections, decks and shares). For a consistent copy, stop the stack first, or copy while the app is idle.
 - The stack's environment values (in Dockhand, or `/opt/mana-vault/.env`).
 - `docker-compose.yml`.
 
@@ -138,7 +146,7 @@ Back up, and keep one copy off the Docker host:
 sudo tar -czf ~/mana-vault-backup-$(date +%Y%m%d).tar.gz -C /opt/mana-vault data
 ```
 
-The in-app **Download backup** (File menu) saves the collection and decks as JSON and can be restored from the app; it does not include accounts or the full card catalog. A Docker volume is not a backup.
+The in-app **Download backup** (File menu) saves the signed-in account's own collections and decks as JSON and can be restored from the app; it does not include other accounts or the full card catalog. A Docker volume is not a backup.
 
 To restore a server backup: stop the stack, extract the archive into `/opt/mana-vault`, run `sudo chown -R 65532:65532 /opt/mana-vault/data`, and start the stack.
 
@@ -181,8 +189,8 @@ The browser suite uses Playwright's Chromium (`npx playwright install chromium` 
 
 | Path | Contents |
 |---|---|
-| `apps/server/src` | Fastify server: API, sign-in (`auth.ts`), search, imports, backups, catalog updates |
-| `apps/web/src` | React interface: `store.tsx` (state), `actions.tsx` (every command), `ribbon.ts` (ribbon and menus as data), `dock.ts` (panel layout model), `components/`, `panels/`, `views/`, `about/` (guide pages), `style.css` |
+| `apps/server/src` | Fastify server: API, sign-in (`auth.ts`), collections, set completion and sending (`library.ts`), set list (`sets.ts`), search, imports, backups, catalog updates |
+| `apps/web/src` | React interface: `store.tsx` (state), `library-state.tsx` (collections, picking rows, decks admin, offers), `actions.tsx` (every command), `ribbon.ts` (ribbon and menus as data), `dock.ts` (panel layout model), `components/`, `panels/`, `views/`, `about/` (guide pages), `style.css` |
 | `apps/web/public` | Sign-in page, icons, manifest and service worker |
 | `tests/e2e` | Playwright browser tests and the sample-data test server |
 | `docs/HANDOFF.md` | Project handoff: rules, code map, open items |

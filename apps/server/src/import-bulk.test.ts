@@ -233,13 +233,14 @@ describe("Scryfall bulk importer", () => {
     initializeDatabase(database);
     try {
       await importBulkFile(dataPath, database);
-      database.prepare("INSERT INTO collection_items (card_id, quantity) VALUES ('printing-1', 4)").run();
+      database.prepare("INSERT INTO collections (id, name) VALUES ('col-1', 'Binder')").run();
+      database.prepare("INSERT INTO collection_cards (collection_id, card_id, quantity) VALUES ('col-1', 'printing-1', 4)").run();
       database.prepare("INSERT INTO decks (id, name, format, mode) VALUES ('deck-1', 'Saved', 'casual', 'normal')").run();
       database.prepare(
         "INSERT INTO deck_cards (deck_id, oracle_id, quantity, zone) VALUES ('deck-1', 'oracle-1', 2, 'main')",
       ).run();
       await importBulkFile(dataPath, database);
-      expect(database.prepare("SELECT quantity FROM collection_items WHERE card_id = 'printing-1'").get()?.quantity).toBe(4);
+      expect(database.prepare("SELECT quantity FROM collection_cards WHERE card_id = 'printing-1'").get()?.quantity).toBe(4);
       expect(database.prepare("SELECT COUNT(*) AS count FROM decks").get()?.count).toBe(1);
       expect(database.prepare("SELECT quantity FROM deck_cards WHERE deck_id = 'deck-1'").get()?.quantity).toBe(2);
     } finally {

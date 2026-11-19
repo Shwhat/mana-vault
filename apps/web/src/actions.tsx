@@ -3,6 +3,7 @@ import { useMemo } from "react";
 import { request } from "./api";
 import { customDialog, dialog } from "./components/Dialog";
 import { RibbonCustomize } from "./components/RibbonCustomize";
+import { collectionDialog, inboxDialog, moveDialog, renameDeckDialog, sendDialog, sharingDialog } from "./components/LibraryDialogs";
 import { isOpen, type PanelId, PANELS, PRESET_NAMES, removePanel } from "./dock";
 import { DEFAULT_RIBBON } from "./ribbon";
 import { type Store, useApp } from "./store";
@@ -30,6 +31,10 @@ export const SHORTCUTS: Array<[group: string, key: string, action: string]> = [
   ["Adding cards", "Shift+Enter", "addDeck"],
   ["Adding cards", "F", "foil"],
   ["Adding cards", "Z", "zone.cycle"],
+  ["Adding cards", "C", "collection.target"],
+  ["Collections", "Ctrl+A", "pickAll"],
+  ["Collections", "Ctrl+click, Shift+click", "Pick more rows, or a range of rows"],
+  ["Collections", "Delete", "removePicked"],
   ["Editing", "Ctrl+Z", "undo"],
   ["Editing", "Ctrl+Y", "redo"],
   ["Decks", "Ctrl+N", "newDeck"],
@@ -41,6 +46,14 @@ export function useActions(store: Store): Record<string, Action> {
   return useMemo(() => {
     const { prefs, deck } = store;
     const selected = store.selectedCard;
+    const open = store.collections?.find((item) => item.id === prefs.openCollection) ?? null;
+    const target = store.collections?.find((item) => item.id === prefs.targetCollection) ?? null;
+    const picked = store.checked.size;
+    const noCollection = () => store.flash("Create a collection first (Collection menu, New collection)", "err");
+    const showTab = (tab: "cards" | "completion" | "missing") => {
+      store.setView("collection");
+      store.setCollectionTab(tab);
+    };
     const setZone = (zone: Zone) => {
       store.setPrefs({ zone });
       store.flash(`New deck cards go to ${zone === "main" ? "the main deck" : `the ${zone}`}`);
@@ -62,7 +75,46 @@ export function useActions(store: Store): Record<string, Action> {
 
     const actions: Record<string, Action> = {
       "view.cards": { label: "Card search", short: "Cards", icon: "cards", key: "1", on: store.view === "cards", run: () => store.setView("cards") },
-      "view.collection": { label: "My collection", short: "Collection", icon: "collection", key: "2", on: store.view === "collection", run: () => store.setView("collection") },
+      "view.collection": { label: "Collection view", short: "Collection", icon: "collection", key: "2", on: store.view === "collection", run: () => store.setView("collection") },
+      "collection.new": { label: "New collection...", short: "New collection", icon: "newcol", run: () => collectionDialog(store) },
+      "collection.settings": {
+        label: "Collection settings...", short: "Settings", icon: "colsettings", disabled: !open,
+        run: () => (open ? collectionDialog(store, open) : noCollection()),
+      },
+      "collection.delete": {
+        label: open?.role === "member" ? "Leave shared collection..." : "Delete collection...", short: open?.role === "member" ? "Leave" : "Delete",
+        icon: "del", disabled: !open, run: () => (open ? void store.deleteCollection(open) : noCollection()),
+      },
+      "collection.target": {
+        label: "Cycle target collection", short: "Target", icon: "target", key: "C", disabled: !store.collections?.length,
+        run: store.cycleTargetCollection,
+      },
+      "collection.cards": { label: "Collection cards", short: "Cards", icon: "collection", on: store.view === "collection" && store.collectionTab === "cards", run: () => showTab("cards") },
+      "collection.completion": { label: "Set completion", short: "Completion", icon: "progress", on: store.view === "collection" && store.collectionTab === "completion", run: () => showTab("completion") },
+      "collection.missing": { label: "Missing cards", short: "Missing", icon: "missing", on: store.view === "collection" && store.collectionTab === "missing", run: () => showTab("missing") },
+      pickAll: {
+        label: "Select all rows", short: "Select all", icon: "selectall", key: "Ctrl+A", disabled: store.view !== "collection" || !store.visibleCollection.length,
+        run: store.pickAll,
+      },
+      removePicked: {
+        label: "Remove selected...", short: "Remove", icon: "del", key: "Delete", disabled: store.view !== "collection" || !picked,
+        run: () => void store.removePicked(),
+      },
+      movePicked: {
+        label: "Move selected...", short: "Move", icon: "move", disabled: store.view !== "collection" || !picked || (store.collections?.length ?? 0) < 2,
+        run: () => moveDialog(store, store.pickedEntries()),
+      },
+      exportMissingText: { label: "Export missing list (text)", short: "Missing text", icon: "txt", disabled: !open?.sets.length, run: () => void store.exportMissing("text") },
+      exportMissingCsv: { label: "Export missing list (CSV)", short: "Missing CSV", icon: "csv", disabled: !open?.sets.length, run: () => void store.exportMissing("csv") },
+      "collection.send": {
+        label: "Send collection...", short: "Send", icon: "send", disabled: !open,
+        run: () => (open ? void sendDialog(store, "collection", open) : noCollection()),
+      },
+      "collection.sharing": { label: "Collection sharing...", short: "Sharing", icon: "people", disabled: !open, run: () => sharingDialog(store, "collection") },
+      inbox: {
+        label: store.offers.inbox.length ? `Inbox (${store.offers.inbox.length})...` : "Inbox...", short: "Inbox", icon: "inbox",
+        run: () => inboxDialog(store),
+      },
       "view.deck": { label: "Deck view", short: "Deck", icon: "deck", key: "3", on: store.view === "deck", run: () => store.setView("deck") },
       find: {
         label: "Find card", short: "Find", icon: "find", key: "/",
@@ -82,7 +134,7 @@ export function useActions(store: Store): Record<string, Action> {
       },
       scan: { label: "Scan card...", short: "Scan card", icon: "scan", run: () => store.setScannerOpen(true) },
       addCollection: {
-        label: "Add to collection", short: "Add to collection", icon: "addcol", key: "Enter", disabled: !selected,
+        label: "Add to collection", short: "Add to collection", icon: "addcol", key: "Enter", disabled: !selected || !target,
         run: () => { if (selected) void store.addToCollection(selected.id, selected.name); else store.flash("Select a card first", "err"); },
       },
       addDeck: {
@@ -146,6 +198,13 @@ export function useActions(store: Store): Record<string, Action> {
           ], async (values) => { await store.openDeck(String(values.deck)); store.setView("deck"); }, "Open");
         },
       },
+      "deck.rename": { label: "Rename deck...", short: "Rename", icon: "rename", disabled: !deck, run: () => renameDeckDialog(store) },
+      "deck.delete": {
+        label: deck?.role === "member" ? "Leave shared deck..." : "Delete deck...", short: deck?.role === "member" ? "Leave" : "Delete",
+        icon: "del", disabled: !deck, run: () => void store.deleteDeck(),
+      },
+      "deck.send": { label: "Send deck...", short: "Send", icon: "send", disabled: !deck, run: () => (deck ? void sendDialog(store, "deck", deck) : store.flash("Open a deck first", "err")) },
+      "deck.sharing": { label: "Deck sharing...", short: "Sharing", icon: "people", disabled: !deck, run: () => sharingDialog(store, "deck") },
       importDeck: { label: "Import decklist...", short: "Import list", icon: "listin", disabled: !deck, run: () => void store.importDeck() },
       exportDeckText: { label: "Export deck (text)", short: "Text", icon: "txt", disabled: !deck, run: store.exportDeckText },
       exportDeckCsv: { label: "Export deck (CSV)", short: "CSV", icon: "csv", disabled: !deck, run: store.exportDeckCsv },
@@ -161,6 +220,7 @@ export function useActions(store: Store): Record<string, Action> {
       "theme.dark": theme("dark", "Dark theme", "theme"),
       "theme.system": theme("system", "System theme", "system"),
       "panel.filters": panelAction("filters"),
+      "panel.collections": panelAction("collections"),
       "panel.decks": panelAction("decks"),
       "panel.card": panelAction("card"),
       "panel.decklist": panelAction("decklist"),

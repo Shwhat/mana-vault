@@ -3,10 +3,11 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { Action } from "../actions";
 import { type PanelId } from "../dock";
 import { Icon } from "../icons";
-import { CardPanel, DeckListPanel, DecksPanel, FiltersPanel, ReviewPanel } from "../panels/Panels";
+import { CardPanel, CollectionsPanel, DeckListPanel, DecksPanel, FiltersPanel, ReviewPanel } from "../panels/Panels";
 import { MENUS } from "../ribbon";
 import { useApp } from "../store";
-import { CardsView, CollectionView, DeckView } from "../views/Views";
+import { CollectionView } from "../views/CollectionView";
+import { CardsView, DeckView } from "../views/Views";
 import { About } from "./About";
 import { Dock } from "./Dock";
 import { MenuBar } from "./MenuBar";
@@ -16,7 +17,7 @@ import { StatusBar } from "./StatusBar";
 function CenterView({ actions, onFilters }: { actions: Record<string, Action>; onFilters?: () => void }) {
   const store = useApp();
   if (store.view === "about") return <About />;
-  if (store.view === "collection") return <CollectionView />;
+  if (store.view === "collection") return <CollectionView actions={actions} />;
   if (store.view === "deck") return <DeckView actions={actions} />;
   return <CardsView actions={actions} onFilters={onFilters} />;
 }
@@ -25,6 +26,7 @@ export function DesktopShell({ actions }: { actions: Record<string, Action> }) {
   const renderPanel = (panel: PanelId): ReactNode => {
     switch (panel) {
       case "filters": return <FiltersPanel actions={actions} />;
+      case "collections": return <CollectionsPanel actions={actions} />;
       case "decks": return <DecksPanel actions={actions} />;
       case "card": return <CardPanel actions={actions} />;
       case "decklist": return <DeckListPanel actions={actions} />;
@@ -70,8 +72,9 @@ export function PhoneShell({ actions }: { actions: Record<string, Action> }) {
   // tapping a card opens its details
   useEffect(() => {
     const key = store.selection ? `${store.selection.view}:${store.selection.key}` : null;
-    if (key && key !== lastKey.current) setSheet("card");
+    if (key && key !== lastKey.current && !store.selectMode) setSheet("card");
     lastKey.current = key;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [store.selection]);
 
   const tab = (id: "cards" | "collection" | "deck", label: string, icon: string) => (
@@ -86,6 +89,7 @@ export function PhoneShell({ actions }: { actions: Record<string, Action> }) {
       <div id="pbar">
         <span className="brand" aria-hidden="true">M</span>
         <span className="ptitle">{store.view === "deck" && store.deck ? store.deck.name : "Mana Vault"}</span>
+        {store.offers.inbox.length > 0 && <button type="button" className="pbtn" onClick={actions.inbox?.run}>Inbox <span className="cbadge">{store.offers.inbox.length}</span></button>}
         {store.view === "deck" && <button type="button" className="pbtn" onClick={() => setSheet("decks")}>Decks</button>}
         <button type="button" className="pbtn" aria-label="Menu" onClick={() => setSheet("more")}><Icon name="menu" /></button>
       </div>
@@ -121,7 +125,7 @@ export function PhoneShell({ actions }: { actions: Record<string, Action> }) {
               </div>
             ))}
             <div className="navgroup">Account: {store.user.name}</div>
-            {(["password", "signout"] as const).map((item) => (
+            {(["inbox", "password", "signout"] as const).map((item) => (
               <button key={item} type="button" className="pmrow" onClick={() => { close(); actions[item]?.run(); }}>
                 <Icon name={actions[item]!.icon} /><span>{actions[item]!.label}</span>
               </button>

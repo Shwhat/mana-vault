@@ -1,11 +1,12 @@
 // ---------- docking model: areas hold columns, columns hold groups, groups hold panels as tabs ----------
 import type { View } from "./types";
 
-export type PanelId = "filters" | "decks" | "card" | "decklist" | "review";
+export type PanelId = "filters" | "collections" | "decks" | "card" | "decklist" | "review";
 export type AreaId = "left" | "right" | "bottom";
 
 export const PANELS: Record<PanelId, { title: string; icon: string }> = {
   filters: { title: "Filters", icon: "filters" },
+  collections: { title: "Collections", icon: "collection" },
   decks: { title: "Decks", icon: "deck" },
   card: { title: "Card", icon: "cards" },
   decklist: { title: "Deck list", icon: "zone" },
@@ -33,7 +34,7 @@ export const PRESETS: Record<string, () => Workspace> = {
   Search: () => ({
     view: "cards",
     layout: {
-      left: area(240, [column([group(["filters"])])]),
+      left: area(240, [column([group(["filters"], 1.2), group(["collections"], 1)])]),
       right: area(300, [column([group(["card"])])]),
       bottom: area(170),
       floating: [],
@@ -42,7 +43,7 @@ export const PRESETS: Record<string, () => Workspace> = {
   Collection: () => ({
     view: "collection",
     layout: {
-      left: area(220),
+      left: area(240, [column([group(["collections"])])]),
       right: area(300, [column([group(["card"])])]),
       bottom: area(170, [column([group(["review"])])]),
       floating: [],
@@ -51,7 +52,7 @@ export const PRESETS: Record<string, () => Workspace> = {
   "Deck building": () => ({
     view: "cards",
     layout: {
-      left: area(250, [column([group(["filters", "decks"])])]),
+      left: area(250, [column([group(["filters", "decks"], 1.2), group(["collections"], 1)])]),
       right: area(330, [column([group(["decklist"], 1.4), group(["card"], 1)])]),
       bottom: area(170),
       floating: [],
@@ -163,7 +164,7 @@ export function movePanel(layout: Layout, panel: PanelId, target: DropTarget): L
 /** Shows a closed panel in the area it normally lives in. */
 export function openPanel(layout: Layout, panel: PanelId): Layout {
   if (isOpen(layout, panel)) return activatePanel(layout, panel);
-  const home: AreaId = panel === "filters" || panel === "decks" ? "left" : panel === "review" ? "bottom" : "right";
+  const home: AreaId = panel === "filters" || panel === "decks" || panel === "collections" ? "left" : panel === "review" ? "bottom" : "right";
   const next = clone(layout);
   const first = next[home].columns[0]?.groups[0];
   if (first) {

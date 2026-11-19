@@ -1,6 +1,6 @@
 // ---------- preferences: saved per user on the server ----------
 import { request, APP_VERSION } from "./api";
-import { DEFAULT_WORKSPACE, PRESETS, type Layout, type Workspace, validLayout } from "./dock";
+import { DEFAULT_WORKSPACE, isOpen, openPanel, PRESETS, type Layout, type Workspace, validLayout } from "./dock";
 import type { RibbonTab } from "./ribbon";
 import type { Zone } from "./types";
 
@@ -16,6 +16,10 @@ export type Prefs = {
   workspace: string;
   workspaces: Record<string, Workspace>;
   lastDeckId: string | null;
+  /** The collection that Add to collection puts cards into. */
+  targetCollection: string | null;
+  /** The collection shown in the collection view. */
+  openCollection: string | null;
   appVersion: string;
 };
 
@@ -23,7 +27,7 @@ export function defaultPrefs(): Prefs {
   const preset = PRESETS[DEFAULT_WORKSPACE]!();
   return {
     theme: "light", foil: false, zone: "main", ribbon: null, ribbonTab: "home", layout: preset.layout,
-    workspace: DEFAULT_WORKSPACE, workspaces: {}, lastDeckId: null, appVersion: APP_VERSION,
+    workspace: DEFAULT_WORKSPACE, workspaces: {}, lastDeckId: null, targetCollection: null, openCollection: null, appVersion: APP_VERSION,
   };
 }
 
@@ -39,12 +43,17 @@ export function mergePrefs(saved: unknown): Prefs {
     zone: value.zone === "sideboard" || value.zone === "commander" ? value.zone : "main",
     ribbon: sameVersion && Array.isArray(value.ribbon) ? value.ribbon : null,
     ribbonTab: typeof value.ribbonTab === "string" ? value.ribbonTab : base.ribbonTab,
-    layout: validLayout(value.layout) ? value.layout : base.layout,
+    // a new version adds the panels it introduced (Collections in 0.2.0) to a saved layout
+    layout: validLayout(value.layout)
+      ? (sameVersion || isOpen(value.layout, "collections") ? value.layout : openPanel(value.layout, "collections"))
+      : base.layout,
     workspace: typeof value.workspace === "string" ? value.workspace : base.workspace,
     workspaces: value.workspaces && typeof value.workspaces === "object"
       ? Object.fromEntries(Object.entries(value.workspaces).filter(([, item]) => item && validLayout(item.layout)))
       : {},
     lastDeckId: typeof value.lastDeckId === "string" ? value.lastDeckId : null,
+    targetCollection: typeof value.targetCollection === "string" ? value.targetCollection : null,
+    openCollection: typeof value.openCollection === "string" ? value.openCollection : null,
     appVersion: APP_VERSION,
   };
 }
