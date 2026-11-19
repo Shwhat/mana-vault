@@ -13,7 +13,7 @@ Mana Vault is Devon's self-hosted Magic: The Gathering collection and deck manag
 - Do not commit or push until asked. Do not remind Devon about uncommitted work.
 - Never use em dashes anywhere (code, comments, docs, interface text). A static test enforces this.
 - Answer questions simply and directly, without extra unrequested actions.
-- Keep a task list while building, update the README feature list and keep the keyboard shortcut list current (README, About guide page 13, `SHORTCUTS` in `actions.tsx`).
+- Keep a task list while building, update the README feature list and keep the keyboard shortcut list current (README, About guide page 15, `SHORTCUTS` in `actions.tsx`).
 - Update this handoff (here and in the claude.ai manavault project, identical) with every build.
 - Raise the version in every place with each delivered build: `package.json`, `apps/server/package.json`, `apps/web/package.json` and `package-lock.json` (run `npm install --package-lock-only`). Patch for fixes, minor for features, major only when Devon says so. A static test checks they match.
 - Every pull request that changes what the app does, or the rules it follows, also updates the About guide: the affected pages, Capabilities, and a new entry in the release notes. It also raises the version. The version is shown in the guide.
@@ -35,7 +35,7 @@ Mana Vault is Devon's self-hosted Magic: The Gathering collection and deck manag
 - Scope: OpenSchem look and shell on the existing React + TypeScript + Vite and Node/Fastify/SQLite stack. Not a rewrite to plain JS or Go.
 - Desktop shell on wide screens; phone layout under 900 px (bottom tabs Cards, Collection, Decks, More; sheets; 44 px targets).
 - Sign-in follows the OpenSchem method: PBKDF2 hashes, HTTP-only cookie with automatic secure flag behind HTTPS, rate limits, safety header (`X-Mana-Vault: 1`) on every change, signup switch `MANAVAULT_SIGNUP`.
-- All accounts share one collection and one set of decks. Preferences are per account.
+- All accounts share one collection and one set of decks (replaced in 0.2.0 by per-account ownership). Preferences are per account.
 - Undo covers collection and deck card edits by sending the reverse change. Imports, restores, deck creation and catalog updates are not undoable.
 - Tests: server unit tests, static checks, and a Playwright browser suite.
 
