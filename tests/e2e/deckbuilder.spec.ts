@@ -3,7 +3,7 @@ import type { Page } from "@playwright/test";
 import { menu, signUp, status, switchTo, test, expect, choose, takePrinting } from "./fixtures";
 
 async function newDeck(page: Page, name: string, format = "commander") {
-  await page.keyboard.press("Control+n");
+  await menu(page, "Decks", "New deck...");
   await page.keyboard.type(name);
   await choose(page, page.locator("#f-format"), format);
   await page.keyboard.press("Enter");

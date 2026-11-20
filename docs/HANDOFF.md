@@ -257,7 +257,7 @@ Devon said "build all of it now" for the seven proposals without a question roun
 | `apps/web/src/icons.tsx` | `RI` inline SVG icon table (trade, stats, binder, edit, wish, copy, owned, usd, eur added) |
 | `apps/web/src/components/` | Ribbon (with TitleBar and DropDown), RibbonCustomize, Dock, StatusBar (PRICES toggle), Dialog, Shell (desktop and phone, Scan tab), About, CardScanner (camera with focus and torch, scanning loop and lock-on, last card strip, scanned list, edit and Add to dialogs) |
 | `apps/web/src/panels/Panels.tsx` | Filters, Collections (values, Wishlist badge), Decks, Card (prices, etched, wanted), Deck list, Import review panels |
-| `apps/web/src/about/` | About guide pages `01-overview.md` to `24-release-notes.md` (17 Administration added in 0.12.0) (09 Prices and statistics and 10 Wishlists and trading added in 0.3.0, 11 Proxies and the card maker in 0.9.0, 17 Android app in 0.5.0) |
+| `apps/web/src/about/` | About guide pages `01-overview.md` to `24-release-notes.md` (09 Prices and statistics and 10 Wishlists and trading added in 0.3.0, 11 Proxies and the card maker in 0.9.0, Android app in 0.5.0, 17 Administration in 0.12.0) |
 | `apps/web/src/static.test.ts` | Static checks: guide order and links, release note version, every label in the guide, versions equal, no em dashes |
 | `apps/web/public/login.html` | Self-contained sign-in page |
 | `apps/web/vite.config.ts` | Vite config, including the plugin that serves and bundles the OCR files under `/ocr` |
@@ -303,4 +303,4 @@ None known.
 
 ## Where work stopped
 
-0.1.0 to 0.12.0 are merged to main (0.12.0 in the pull request for branch `v0.12.0`). All checks pass (`PW_CHANNEL=chrome npm run test:all`). The debug APK for 0.12.0 comes from the `Android app` workflow on the merge to main (Debug build pre-release). Next: ask Devon the follow-ups listed under Next, then ask how to build purchase history before starting 0.13.0.
+0.1.0 to 0.12.0 are merged to main (0.12.0 in the pull request for branch `v0.12.0`). All checks pass (`PW_CHANNEL=chrome npm run test:all`: typecheck, 166 server tests, 31 web tests, 45 browser tests). The debug APK for 0.12.0 comes from the `Android app` workflow on the merge to main (Debug build pre-release). Next: ask Devon the follow-ups listed under Next, then ask how to build purchase history before starting 0.13.0.

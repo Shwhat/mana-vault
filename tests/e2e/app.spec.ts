@@ -147,7 +147,7 @@ test("collection CSV import shows the detected format, a preview and the review 
 
 test("decklist import into a deck", async ({ page }) => {
   await signUp(page);
-  await page.keyboard.press("Control+n");
+  await menu(page, "Decks", "New deck...");
   await expect(page.locator("#f-name")).toBeFocused();
   await page.keyboard.type("Imported");
   await page.keyboard.press("Enter");
