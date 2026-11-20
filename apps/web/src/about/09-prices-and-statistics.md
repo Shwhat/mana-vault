@@ -6,6 +6,10 @@ Mana Vault shows a price for each printing, the value of every collection and de
 
 Prices are part of the card database. Each update stores Scryfall's prices for every printing: a regular, foil and etched price in US dollars, and a regular and foil price in euros. Prices change only when the card database is updated, so they are as old as the last update shown in the status bar. A printing without a price shows "No price".
 
+## Price history
+
+Each card database update also saves the day's prices of every printing whose price changed since the last saved day, so the history grows only with changes. The **Price history** tab of the card page shows a line chart of the price over time for the printing shown, one line per finish (Regular, Foil, Etched) in the chosen currency. Moving over the chart shows the day and price under the pointer. **Show table** lists every saved day with each finish's price. A printing with no saved history shows "No price history yet. Prices are saved with each card database update."
+
 ## Currency
 
 **Prices** chooses the currency for every price and value on screen: US dollars or euros. The choice is kept for your account.

@@ -8,7 +8,11 @@ The full user guide is built into the app: Help tab, **About Mana Vault**. The p
 
 ## Features
 
-- Card search across every printing, with filter syntax (`t:dragon c:red mv>=4`, `o:draw`, `set:lea`, `r:rare`, `id:wubg`, `legal:commander`, `usd<1`, `eur>=20`, `is:custom`, negation with `-`), flavor name matching and a Filters panel. Results show as a grid of card pictures (the default), binder pages or a list, with prices and owned counts, and load as you scroll with the total in the count line.
+- Card search with one spot per card name (the newest regular printing, an N printings badge and owned counts by finish), or every printing with Show every printing in Options. Filter syntax (`t:dragon c:red mv>=4`, `o:draw`, `set:lea`, `r:rare`, `id:wubg`, `legal:commander`, `usd<1`, `eur>=20`, `is:custom`, `is:surgefoil`, `is:owned`, `art:cat`, `role:ramp`, `pow>=3`, `tou<2`, `year>=2020`, `a:` artist, `kw:` keyword, `frame:`, `border:`, `lang:`, negation with `-`), flavor name matching and a Filters panel. Results show as a grid of card pictures (the default), binder pages or a list, with prices and owned counts, and load as you scroll with the total in the count line.
+- Filters for what the art shows (Scryfall Art Tags such as cat, dog or bird) and a card's role (Oracle Tags such as ramp or removal), name, card text, creature type, keyword, artist, power, toughness and price ranges, finishes made in, foil type, frame, release years and owned or not owned.
+- Special foils (SURGE FOIL, GALAXY FOIL, TEXTURED FOIL and others) named on every card mark and in the printing chooser.
+- Collection Grid and Binder show one picture per printing with a line per finish (and per condition or language when they differ) giving count and price, and a Total line; the same in All collections, deck Grid and Stacks.
+- Price history: each card database update keeps the day's prices; the card page has a Price history chart and table.
 - The Filters panel filters whatever is open: card search, a collection, a deck or a search inside them, each with its own filters that stay when you switch collections or decks.
 - All collections: one list of every row in every collection, with each row's collection (wishlists optional).
 - The app's own choice lists on every screen, the same on desktop and phone.
@@ -27,7 +31,7 @@ The full user guide is built into the app: Help tab, **About Mana Vault**. The p
 - Exact-printing links: Edit as text and decklist imports link lines that name a set and number to free copies of exactly that printing and finish; Link owned copies fills every missing card the same way. Missing cards show Owned, link or Other version owned with Switch.
 - Upgrade wanted: mark a deck card with the version you want; it stays owned and is listed in the Ownership tab until a copy of that version is linked.
 - Remove asks how many copies to remove, with Reduce to 1 and Remove all; Reduce to 1 also works on picked cards.
-- Add buttons name the destination (+ collection name, + deck name) with a button per other finish; Target and Adding here marks in the panels and ADDING TO in the status bar show where cards go.
+- One Add to name button follows the selected collection or deck and opens the printing chooser with the shown printing selected (Enter takes it); a card with one printing and one finish is added at once. An Adding here mark in the panels and ADDING TO in the status bar show where cards go.
 - Right-click (long press) menus on collections and decks in the panels and switchers: open, rename, settings or format, send, export, delete or leave. The Decks panel groups decks by format with card counts and values.
 - Proxies: a print list kept on the server (a deck, its missing cards, a collection, picked rows, a pasted list, tokens, any card), with printing, count and faces per line; Letter, A4, Legal or custom paper, margins, card size, scale, gap, bleed, cut lines or corner marks and background, with a page preview; exports as a 300 DPI PDF, MakePlayingCards pictures with bleed, and an MPC Autofill card list. Printed cards can be added as proxies to a collection or deck.
 - Card maker: custom cards with a live preview, Mana Vault's own frames (every color, hybrids, gold, artifact, colorless, land, legendary), creature, planeswalker, saga, token and double-faced cards, uploaded or card art with move and zoom, and PNG export. Custom cards join the card database for every account, in custom sets with their own codes, and work like any other card.
@@ -46,10 +50,12 @@ The full user guide is built into the app: Help tab, **About Mana Vault**. The p
 - Import window: Mana Vault, Moxfield, ManaBox, Archidekt, Deckbox, TCGplayer or plain text, detected from the file and changeable, into a chosen or new collection, and decklist import (text or CSV), each with a preview and an Import review panel for skipped rows.
 - Export window: the whole collection, filtered cards, selected cards, missing cards or a deck, in any of the import formats.
 - JSON backup and restore of the signed-in account's own collections and decks, the card records they use, and the custom cards and sets made or used.
-- Card database updates from Scryfall on demand or on a schedule, including the set list (printed sizes), each printing's finishes, power and toughness, back face pictures, and rulings. A card whose record fails a check is skipped and listed instead of stopping the update.
+- Card database updates from Scryfall on demand or on a schedule, including the set list (printed sizes), each printing's finishes, power and toughness, back face pictures, rulings, Art and Oracle tags, the full Scryfall record of every card, and printings in unofficial languages such as Phyrexian, all kept offline.
+- Card pictures kept on the server: choose the sizes (small, normal, large, PNG, art crop, border crop) with an estimated download size each; downloads run in the background after each update, only for new or changed pictures, with pause and resume, a minimum free space and a picture folder that can be moved. The phone app uses the server's pictures. A card whose record fails a check is skipped and listed instead of stopping the update.
 - Card page: art, rules text, power and toughness, every version with its market price, and rulings (offline in the app too), with a card actions button.
 - Live camera card scanner: scans continuously, finds the exact printing from the set code and collector number (or the card name, with tolerance for reading mistakes), collects cards in a scanned list with edit, +1 and finish controls, and adds the list to a collection or deck as one undo step. Text recognition runs in the browser with files served by Mana Vault, so it works offline. Settings for quick mode, sounds, camera, proxies, a set filter (any number of sets, with chips on the camera screen and a Not in set warning), ignoring promos, preferring foil, total value and copies owned. A printing picker when more than one printing fits, a strip for finish, condition and language, and an Add to window that can create a new collection or deck. Phone Scan tab; desktop scanner window.
-- Sign-in with accounts, password changes, 30-day sessions and protection against password guessing. New accounts can be turned off.
+- Sign-in with accounts, password changes, sessions and protection against password guessing. Sign-up is open, by one-time invite code, or closed.
+- Administration for admins: first-run Setup, Accounts (create, reset password, turn off, make admin, sign out everywhere, delete or move collections to another account), Sign-up and invite codes, Card database, Pictures, Storage and backups (scheduled whole-server backups, download, restore), Devices, Security, Server (version, update check, uptime, Scryfall check, server name, log) and Activity. Environment variables lock their settings.
 - Desktop interface in the OpenSchem style: title bar, customizable ribbon (the only menu) with deck and collection commands added to their tabs when one is open, large, compact or icons-only buttons, right-click menus on rows, dockable and floating panels (Filters, Collections, Decks, Card, Deck list, Import review) that dock and snap together, panel tabs that wrap, saved workspaces, status bar and light, dark or system theme.
 - Phone layout with a Home screen, bottom tabs (Home, Search, Collection, Decks, Trade, Proxies, Scan), a nested top-right menu, long-press menus on rows, full-screen sheets and 44 pixel touch targets.
 - Preferences (theme, foil, target zone, where new cards go and the open collection, proxy sheet settings, currency, collection sort, layout and card size, switcher sorting and recently opened items, deck view, groups and sort, ribbon, panels, workspaces, last deck) saved per account on the server.
@@ -80,18 +86,18 @@ The full user guide is built into the app: Help tab, **About Mana Vault**. The p
 | Ctrl+Z, Ctrl+Y (or Ctrl+Shift+Z) | Undo, redo |
 | Ctrl+N, Ctrl+O | New deck, open deck |
 | Q | Go to Quick add in the open deck |
-| Esc | Close the window, menu or About guide, or clear the selection |
+| Esc | Close the window, menu, About guide or Administration, or clear the selection |
 
 ## Install with Dockhand
 
 Mana Vault is published as `ghcr.io/shwhat/mana-vault:latest` (amd64 and arm64) by GitHub Actions on every push to `main`. The GitHub package must be public, or Dockhand needs registry credentials for ghcr.io.
 
-**1. On the Docker host**, check the port is free (no output means free), then create the data folder for the container's user (UID 65532):
+**1. On the Docker host**, check the port is free (no output means free), then create the data and picture folders for the container's user (UID 65532). The picture folder can be on another drive; set `MANAVAULT_PICTURES_HOST` to it.
 
 ```bash
 sudo ss -ltnp | grep ':3417 '
-sudo mkdir -p /opt/mana-vault/data
-sudo chown -R 65532:65532 /opt/mana-vault/data
+sudo mkdir -p /opt/mana-vault/data /opt/mana-vault/pictures
+sudo chown -R 65532:65532 /opt/mana-vault/data /opt/mana-vault/pictures
 ```
 
 **2. In Dockhand**, add a Git stack:
@@ -112,7 +118,9 @@ A `302` redirect to `/login` means it is running.
 
 **4. In the Cloudflare Tunnel** (on its own LXC), add a public hostname that points to `http://SERVER_IP:3417`. No `cloudflared` or reverse proxy is needed in this stack. The session cookie is marked secure automatically for HTTPS requests through the tunnel.
 
-**5. In the browser**, open the address, choose **Create account**, then load the card catalog with **Database**, **Update card database**. When updating an existing install to 0.2.0, run Update card database once so set completion gets printed sizes and finishes. When everyone who needs an account has one, set `MANAVAULT_SIGNUP=off` in Dockhand and redeploy.
+**5. In the browser**, open the address and choose **Create account**. The first account is the admin, and Mana Vault opens Setup: download the card database, choose the picture sizes to keep and the picture folder. Every step can be skipped and changed later in **Administration** (account menu). Sign-up (open, invite codes or closed) is set in Administration, Sign-up.
+
+When updating from 0.11.0 or earlier: the oldest account becomes the admin, and Setup opens once for it. Remove `MANAVAULT_SIGNUP` and `MANAVAULT_CARD_UPDATE_INTERVAL_HOURS` from the stack's environment to manage them in Administration (a value set there locks the setting). Create the pictures folder above before redeploying. Run Update card database once so tags, special foils and price history are filled in.
 
 ## Automatic updates
 
@@ -123,14 +131,14 @@ In Dockhand, turn on automatic image updates for the `app` container with a sche
 **On the Docker host:**
 
 ```bash
-sudo mkdir -p /opt/mana-vault/data
+sudo mkdir -p /opt/mana-vault/data /opt/mana-vault/pictures
 cd /opt/mana-vault
 sudo curl -fsSLo docker-compose.yml https://raw.githubusercontent.com/Shwhat/mana-vault/main/docker-compose.yml
 sudo curl -fsSLo .env.example https://raw.githubusercontent.com/Shwhat/mana-vault/main/.env.example
 sudo cp .env.example .env
 sudo nano .env
 sudo chmod 600 .env
-sudo chown -R 65532:65532 /opt/mana-vault/data
+sudo chown -R 65532:65532 /opt/mana-vault/data /opt/mana-vault/pictures
 sudo docker compose config -q
 sudo docker compose pull
 sudo docker compose up -d
@@ -182,6 +190,8 @@ Back up, and keep one copy off the Docker host:
 sudo tar -czf ~/mana-vault-backup-$(date +%Y%m%d).tar.gz -C /opt/mana-vault data
 ```
 
+**Administration, Storage and backups** writes whole-server backups (every account, collection, deck, setting and the card database) on a schedule into `/opt/mana-vault/data/backups`, and restores them. Pictures are not included; they can be downloaded again.
+
 The in-app **Download backup** (File menu) saves the signed-in account's own collections and decks as JSON and can be restored from the app; it does not include other accounts or the full card catalog. A Docker volume is not a backup.
 
 To restore a server backup: stop the stack, extract the archive into `/opt/mana-vault`, run `sudo chown -R 65532:65532 /opt/mana-vault/data`, and start the stack.
@@ -192,9 +202,12 @@ To restore a server backup: stop the stack, extract the archive into `/opt/mana-
 |---|---|---|
 | `MANAVAULT_PORT` | `3417` | Host port the app is published on |
 | `MANAVAULT_DATA_DIR` | `/opt/mana-vault/data` | Host folder for the database, owned by 65532:65532 |
-| `MANAVAULT_SIGNUP` | `on` | `on` shows Create account; `off` turns new accounts off |
-| `MANAVAULT_SECURE_COOKIE` | `auto` | `auto` marks the session cookie secure for HTTPS requests, including through a proxy; `always` or `never` force it |
-| `MANAVAULT_CARD_UPDATE_INTERVAL_HOURS` | `168` | Hours between automatic Scryfall updates, 1 to 8760; `0` turns them off |
+| `MANAVAULT_PICTURES_HOST` | `/opt/mana-vault/pictures` | Host folder for downloaded card pictures, owned by 65532:65532 |
+| `MANAVAULT_PICTURES_DIR` | `/pictures` in Docker | Picture folder inside the container. Set by the compose file; it locks the folder in Administration |
+| `MANAVAULT_BACKUP_DIR` | empty (`backups` in the data folder) | Folder for whole-server backups; locks it in Administration |
+| `MANAVAULT_SIGNUP` | empty | `open`, `invite` or `closed` (`on` and `off` also work). Empty means it is set in Administration |
+| `MANAVAULT_SECURE_COOKIE` | empty (`auto`) | `auto` marks the session cookie secure for HTTPS requests, including through a proxy; `always` or `never` force it |
+| `MANAVAULT_CARD_UPDATE_INTERVAL_HOURS` | empty (168 in Administration) | Hours between automatic Scryfall updates, 1 to 8760; `0` turns them off. Empty means it is set in Administration |
 | `TZ` | `America/Los_Angeles` | Time zone for logs |
 
 The image sets `HOST`, `PORT` (3000 inside the container), `DATABASE_PATH`, `SCRYFALL_DATA_PATH` and `WEB_DIST_PATH`.

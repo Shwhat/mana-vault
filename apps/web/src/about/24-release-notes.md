@@ -2,6 +2,27 @@
 
 The installed version is shown at the top of this guide.
 
+## 0.12.0 (2026-11-20): Administration, full card data offline and card pictures on the server
+
+Before updating a Docker install: create the pictures folder on the Docker host (`sudo mkdir -p /opt/mana-vault/pictures` and `sudo chown -R 65532:65532 /opt/mana-vault/pictures`). Remove MANAVAULT_SIGNUP and MANAVAULT_CARD_UPDATE_INTERVAL_HOURS from the stack's environment to manage them in Administration. After updating, run Update card database once.
+
+- Admin role: the first account on a new server is the admin; on an updated server the oldest account is. Update card database is for admins.
+- Administration (account menu, admins only) with Accounts, Sign-up, Card database, Pictures, Storage and backups, Devices, Security, Server and Activity pages. Settings set by an environment variable are locked and show which one.
+- First-run Setup for the admin: the card database, picture sizes with estimated download sizes and free space, and the picture folder. Every step can be skipped.
+- Accounts: create accounts with a temporary password that must be changed at first sign-in, reset passwords, turn accounts off, make admins, sign out everywhere, and delete an account or move its collections and decks to another.
+- Sign-up is open, by one-time invite code, or closed. The sign-in page asks for the invite code and shows the minimum password length.
+- Whole-server backups on a schedule or at once, kept to the newest N, with download, delete and restore (from the list or a file).
+- Security settings: sign-in length, sign-in attempts and minimum password length. Server page: version and update check, uptime, Scryfall check, server name (shown in the title bar) and the server log. Activity lists sign-ins, failed sign-ins and admin changes.
+- Card pictures kept on the server: choose small, normal, large, PNG, art crop and border crop separately, each with an estimated size (Measure sizes checks a sample). Downloads run in the background after each update and fetch only new or changed pictures, with pause, resume, a minimum free space (10 GB by default) and progress in the status bar. The picture folder can be moved (copied, checked, then used). A missing folder never deletes or downloads anything again. The Android app uses the server's pictures. Docker gets a second volume for pictures.
+- Card search shows one result per card name with the newest regular printing, an N printings badge and owned counts by finish; Show every printing in Options brings back one result per printing.
+- One add button, Add to name, follows the collection or deck selected last and opens the printing chooser with the shown printing selected, so Enter takes it. A card with one printing and one finish is added at once. The Foil and Etched add buttons, Add as on the deck's Add tab and the Target mark are gone; Adding here is the only mark.
+- Collection Grid and Binder, All collections, and deck Grid show one picture per printing with a line per finish (and per condition or language) giving count and price, and a Total line. Deck Stacks show one picture per printing. Search results show owned counts by finish under the picture.
+- Special foils such as SURGE FOIL are named on finish marks and in the printing chooser, with a Foil type filter and `is:surgefoil` style search words.
+- New filters wherever the Filters panel works: Name, Card text, Creature type, Keyword, Artist, Art shows (Art Tags), Role (Oracle Tags), Power, Toughness, Price, Made in, Foil type, Frame, Released and Owned. New search words: `is:owned`, `is:foil`, `is:etched`, `is:fullart`, `is:borderless`, `is:showcase`, `is:extendedart`, `is:promo`, `art:`, `role:`, `pow`, `tou`, `year`, `a:`, `kw:`, `frame:`, `border:` and `lang:`.
+- Full Scryfall data kept offline: Art Tags and Oracle Tags, the full record of every card, treatments, and printings in unofficial languages such as Phyrexian, downloaded with each card database update.
+- Price history: each update saves the prices that changed, shown on the card page's Price history tab as a chart and a table.
+- Fixed: the About guide was squished on the desktop by its page list for narrow screens.
+
 ## 0.11.0 (2026-11-20): Card tracking between decks and collections
 
 - Edit as text and decklist imports link lines that name a set and collector number to free copies of exactly that printing and finish, the deck's own collection first. Lines without a set and number stay missing until a copy is linked. Add to deck links only copies of the exact printing and finish.

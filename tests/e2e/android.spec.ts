@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { expect, test, choose } from "./fixtures";
+import { expect, test, choose, takePrinting } from "./fixtures";
 
 const dist = join(__dirname, "../../apps/web/dist");
 
@@ -94,7 +94,8 @@ async function addFromSearch(page: Page, query: string, name: string) {
   await page.locator("#view-cards .row", { hasText: name }).first().click();
   await expect(page.locator(".cardpage h2")).toHaveText(name);
   await page.getByRole("button", { name: "Card actions" }).click();
-  await page.locator(".fabmenu .pmrow", { hasText: /^Add to Main collection$/ }).click();
+  await page.locator(".fabmenu .pmrow", { hasText: /^Add to Main collection\.\.\.$/ }).click();
+  await takePrinting(page);
   await expect(page.locator(".ptoast")).toHaveText(`${name} added to Main collection`);
   await page.getByRole("button", { name: "Back" }).click();
 }

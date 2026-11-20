@@ -39,9 +39,13 @@ input:focus { outline: 2px solid var(--acc); outline-offset: -1px; }
   <label for="pw">Password</label>
   <input id="pw" name="password" type="password" autocomplete="current-password" required>
   <div id="upx" class="hidden">
-    <div class="hint">At least 8 characters.</div>
+    <div class="hint" id="pwhint">At least 8 characters.</div>
     <label for="pw2">Repeat password</label>
     <input id="pw2" type="password" autocomplete="new-password">
+    <div id="invx" class="hidden">
+      <label for="invite">Invite code</label>
+      <input id="invite" autocapitalize="characters" autocomplete="off">
+    </div>
   </div>
   <button class="go" id="go">Sign in</button>
   <div id="msg" role="alert"></div>
@@ -58,14 +62,19 @@ function setMode(m) {
   $('msg').textContent = '';
 }
 document.querySelectorAll('#tabs button').forEach(b => b.onclick = () => setMode(b.dataset.t));
-fetch('/api/config').then(r => r.json()).then(c => { if (!c.signup) $('tabs').classList.add('hidden'); }).catch(() => {});
+fetch('/api/config').then(r => r.json()).then(c => {
+  if (!c.signup) $('tabs').classList.add('hidden');
+  if (c.signupMode === 'invite') $('invx').classList.remove('hidden');
+  if (c.minPasswordLength) $('pwhint').textContent = `At least ${c.minPasswordLength} characters.`;
+  if (c.serverName) document.title = `${c.serverName} - Mana Vault`;
+}).catch(() => {});
 $('f').onsubmit = async e => {
   e.preventDefault();
   const name = $('name').value.trim(), password = $('pw').value;
   if (mode === 'up' && password !== $('pw2').value) { $('msg').textContent = 'The passwords do not match.'; return; }
   $('go').disabled = true; $('msg').textContent = '';
   try {
-    const r = await fetch(mode === 'up' ? '/api/signup' : '/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Mana-Vault': '1' }, body: JSON.stringify({ name, password }) });
+    const r = await fetch(mode === 'up' ? '/api/signup' : '/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Mana-Vault': '1' }, body: JSON.stringify(mode === 'up' ? { name, password, invite: $('invite').value.trim() } : { name, password }) });
     if (r.ok) { location.href = '/'; return; }
     const j = await r.json().catch(() => ({}));
     $('msg').textContent = j.error || 'Something went wrong.';

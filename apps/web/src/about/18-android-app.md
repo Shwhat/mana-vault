@@ -48,7 +48,7 @@ The app always uses the phone layout described in [Screen layout](/about/screen-
 | Exports and backups | Open the Android share sheet, to save the file to the phone or send it to another app |
 | Imports and restores | Use the Android file picker |
 | Trades | Work online only: trades are saved on the server |
-| Card images | Load from Scryfall and are kept by the phone as they are viewed |
+| Card images | Load from the server (its saved pictures, or Scryfall's through it) and are kept by the phone as they are viewed |
 
 ## Without a connection
 

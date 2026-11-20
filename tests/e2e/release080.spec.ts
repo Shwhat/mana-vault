@@ -1,21 +1,26 @@
 // Browser tests for 0.8.0: search views, filters that follow the open view, All collections and the deck's Add tab.
-import { choose, menu, search, signUp, status, switchTo, test, expect } from "./fixtures";
+import { choose, menu, search, signUp, status, switchTo, test, expect, takePrinting } from "./fixtures";
 
 test("search shows pictures with owned counts, and the Filters panel filters the open view", async ({ page }) => {
   await signUp(page, "v8");
   await search(page, "Sol Ring");
   await page.locator("#view-cards .row", { hasText: "Sol Ring" }).first().dblclick();
+  await takePrinting(page);
   await expect(status(page)).toHaveText("Sol Ring added to Main collection");
   await expect(page.locator("#view-cards .row", { hasText: "Sol Ring" }).first().locator(".badge.own")).toHaveText("OWNED 1");
 
   await page.locator("#view-cards").getByRole("button", { name: /^Options/ }).click();
   await page.locator(".optpop").getByRole("button", { name: "Grid" }).click();
   await page.locator(".optpop").getByRole("button", { name: "Done" }).click();
-  await expect(page.locator('#view-cards .pocket[title^="Sol Ring,"]').first().locator(".pocketqty")).toHaveText("1");
+  // the owned count by finish is under the picture, not on it
+  const sol = page.locator("#view-cards .rescard", { has: page.locator('.pocket[title^="Sol Ring,"]') }).first();
+  await expect(sol.locator(".resowned")).toHaveText("Owned: Regular 1");
+  await expect(sol.locator(".pocketqty")).toHaveCount(0);
   await expect(page.locator("#view-cards .phpos")).toHaveText(/^\d+ results?/);
 
   await search(page, "Counterspell");
   await page.locator('#view-cards .pocket[title^="Counterspell,"]').first().dblclick();
+  await takePrinting(page);
   await expect(status(page)).toHaveText("Counterspell added to Main collection");
 
   // the Filters panel acts on the collection while it is open, and keeps its own filters
@@ -62,9 +67,11 @@ test("the deck's Add tab searches cards and adds them to a zone, counting what i
   await page.getByRole("textbox", { name: "Search cards to add" }).fill("Llanowar Elves");
   const result = page.locator("#view-deck .row", { hasText: "Llanowar Elves" }).first();
   await result.getByRole("button", { name: "Add Llanowar Elves to Main deck" }).click();
+  await takePrinting(page);
   await expect(status(page)).toHaveText("Llanowar Elves added to Elves");
   await expect(result.getByRole("button", { name: "Add Llanowar Elves to Main deck" }).locator(".cbadge")).toHaveText("1");
   await result.getByRole("button", { name: "Add Llanowar Elves to Sideboard" }).click();
+  await takePrinting(page);
   await expect(status(page)).toHaveText("Llanowar Elves added to Elves (sideboard)");
 
   await page.getByRole("tab", { name: "Cards", exact: true }).click();

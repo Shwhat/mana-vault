@@ -1,5 +1,5 @@
 import type { Browser, Page } from "@playwright/test";
-import { menu, signUp, status, test, expect, useWorkspace, switchTo, choose } from "./fixtures";
+import { menu, signUp, status, test, expect, useWorkspace, switchTo, choose, takePrinting } from "./fixtures";
 
 const rows = (page: Page) => page.locator("#view-collection .row");
 
@@ -22,6 +22,7 @@ async function addFromSearch(page: Page, names: string[]) {
   for (const name of names) {
     await page.locator("#view-cards .row", { hasText: name }).first().click();
     await page.keyboard.press("Enter");
+    await takePrinting(page);
     await expect(status(page)).toContainText(`${name} added to`);
   }
 }
@@ -31,7 +32,7 @@ test("a new account has a Main collection that receives cards", async ({ page })
   await expect(page.locator("#st-toggles")).toContainText("ADDING TO: MAIN COLLECTION");
   await addFromSearch(page, ["Sol Ring"]);
   await expect(status(page)).toHaveText("Sol Ring added to Main collection");
-  await expect(page.locator(".pgrp", { hasText: "Owned" })).toContainText("Main collection");
+  await expect(page.locator(".pgrp", { has: page.locator("h4", { hasText: /^Owned$/ }) })).toContainText("Main collection");
 });
 
 test("collections link sets, show completion and missing cards", async ({ page }) => {

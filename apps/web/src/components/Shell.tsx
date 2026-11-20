@@ -14,6 +14,7 @@ import { ProxiesView } from "../views/ProxiesView";
 import { CardsView } from "../views/Views";
 import { DeckView } from "../views/DeckView";
 import { About } from "./About";
+import { AdminView } from "../views/AdminView";
 import CardScanner from "./CardScanner";
 import { ContextMenuHost } from "./ContextMenu";
 import { Dock } from "./Dock";
@@ -26,6 +27,7 @@ function CenterView({ actions, onFilters }: { actions: Record<string, Action>; o
   const store = useApp();
   if (store.cardPage) return <CardPage actions={actions} />;
   if (store.view === "about") return <About />;
+  if (store.view === "admin") return <AdminView />;
   if (store.view === "home") return <HomeView actions={actions} />;
   if (store.view === "collection") return <CollectionView actions={actions} />;
   if (store.view === "deck") return <DeckView actions={actions} />;

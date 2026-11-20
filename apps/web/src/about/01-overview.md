@@ -4,18 +4,19 @@ Mana Vault is a self-hosted Magic: The Gathering collection and deck manager for
 
 | Area | What it holds |
 |---|---|
-| **Card search** | The full local card database: every printing, searchable by name, type, rules text, color, set, rarity, legality and mana value |
+| **Card search** | The full local card database: every card, with one result per card name, searchable by name, type, rules text, color, set, rarity, legality, mana value, what the art shows and the card's role |
 | **Collections** | The printings you own, kept in as many collections as you like (binders, boxes, sets you are completing), with finish, condition, language, prices and set completion. Wishlists hold the cards you want |
 | **Decks** | Your decks, built with Quick add, text editing, tags, views and format checks, with cards in the commander zone, main deck, sideboard or maybeboard, linked to the collection copies that fill them |
 | **Trade** | Saved trades: what you give and what you get with prices and a balance, completed in one step or sent to another account, wishlist matches and a public trade binder |
 | **Proxies** | A print list of proxies with sheet settings, a page preview and PDF and MakePlayingCards exports, and the card maker for custom cards that join the card database |
-| **Card database** | The local copy of the card catalog, with prices, that search, imports and decks match against |
+| **Card database** | The local copy of the card catalog, with prices, price history, tags, the full Scryfall records and, optionally, card pictures, that search, imports and decks match against |
+| **Administration** | Server settings for admins: accounts, sign-up, the card database, pictures, backups, devices, security and the server |
 
 Card search is where cards are found. From a search result a card is added to the collection or deck selected last. Imports use the same matching rules as search, and the camera scanner collects cards in a scanned list that is added to a collection or deck in one step. Collections and decks can be sent to other accounts as copies, shares or transfers.
 
 ## Principles
 
-1. **Your data stays on your server.** The collection, decks and accounts are stored in one database file in the server's data folder. Only card images and the card catalog download come from outside.
+1. **Your data stays on your server.** The collection, decks and accounts are stored in one database file in the server's data folder. The card catalog, with every card's full Scryfall record, and the card pictures you choose are downloaded and kept on the server, so they work without the internet.
 2. **Portable formats.** Collections import from and export to the CSV files of Moxfield, ManaBox, Archidekt, Deckbox and TCGplayer and plain text lists, and the whole library is a readable JSON backup.
 3. **Your library is yours.** Collections and decks belong to your account; others see them only when you send or share them.
 4. **Every change shows its result.** Lists redraw at once and a short confirmation appears in the status bar.
@@ -41,6 +42,7 @@ Card search is where cards are found. From a search result a card is added to th
 | [Scanning cards](/about/scanning-cards) | Scanning cards with the camera into a scanned list, and adding them to a collection or deck |
 | [Card database](/about/card-database) | Where card data comes from and how it is updated |
 | [Accounts and access](/about/accounts) | Sign-in, accounts, passwords, sessions and devices |
+| [Administration](/about/administration) | First-run setup, accounts, sign-up and invite codes, card database, pictures, server backups, devices, security, server and activity |
 | [Android app](/about/android-app) | Installing the app, signing in a phone, offline use and sync, scanning, notifications and updates |
 | [Storage and backups](/about/storage-and-backups) | What is stored, how to back up and restore |
 | [Settings and shortcuts](/about/settings-and-shortcuts) | Preferences, themes, undo and every keyboard shortcut |

@@ -21,6 +21,12 @@ export type Card = {
   prices?: Prices;
   /** The finishes the printing is made in, such as "nonfoil,foil" (0.11.0). */
   finishes?: string;
+  /** Scryfall's promo types, such as "surgefoil" (0.12.0). */
+  promo_types?: string;
+  /** The printed language when it is not English (0.12.0). */
+  lang?: string;
+  /** Grouped card search: how many printings matched (0.12.0). */
+  printings?: number;
 };
 
 export type Prices = { usd: number | null; usd_foil: number | null; usd_etched: number | null; eur: number | null; eur_foil: number | null };
@@ -43,7 +49,7 @@ export type CopyKey = { cardId: string; foil: FinishCode; condition: Condition; 
 export type CopyExtras = {
   purchase_price: number | null; price_currency: string | null; added_at: string | null; misprint: boolean; altered: boolean; signed: boolean;
 };
-export type CollectionEntry = Pick<Card, "id" | "name" | "set_code" | "set_name" | "collector_number" | "rarity" | "image_url" | "colors" | "mana_cost" | "mana_value" | "type_line" | "custom"> &
+export type CollectionEntry = Pick<Card, "id" | "name" | "set_code" | "set_name" | "collector_number" | "rarity" | "image_url" | "colors" | "mana_cost" | "mana_value" | "type_line" | "custom" | "promo_types"> &
   PriceFields & {
     oracle_id: string;
     quantity: number;
@@ -170,6 +176,8 @@ export type DeckCard = Pick<Card, "name" | "mana_cost" | "type_line" | "set_code
   finish?: FinishCode;
   /** The finishes the printing is made in, such as "nonfoil,foil". */
   finishes?: string;
+  /** Scryfall's promo types, such as "surgefoil" (0.12.0). */
+  promo_types?: string;
   entry_id: number;
   card_id: string;
   oracle_id: string;
@@ -227,9 +235,9 @@ export type BackupSummary = {
   deckCardCount: number;
 };
 
-export type User = { id: number; name: string };
+export type User = { id: number; name: string; admin?: boolean; mustChange?: boolean };
 
-export type View = "home" | "cards" | "collection" | "deck" | "trade" | "proxies" | "about";
+export type View = "home" | "cards" | "collection" | "deck" | "trade" | "proxies" | "about" | "admin";
 export type CollectionTab = "cards" | "completion" | "missing" | "stats";
 export type DeckTab = "cards" | "add" | "ownership" | "stats" | "playtest" | "description" | "history";
 export type DeckView = "list" | "text" | "stacks" | "grid";
@@ -268,6 +276,28 @@ export const LANGUAGES: Array<[string, string]> = [
   ["he", "Hebrew"], ["la", "Latin"], ["grc", "Ancient Greek"], ["ar", "Arabic"], ["sa", "Sanskrit"], ["ph", "Phyrexian"],
 ];
 export const FINISHES: Array<[FinishCode, string]> = [[0, "Regular"], [1, "Foil"], [2, "Etched"]];
+
+// Scryfall's promo types for special foils, with their names; any other promo type ending in "foil" is named from its word
+export const SPECIAL_FOILS: Record<string, string> = {
+  surgefoil: "Surge foil", galaxyfoil: "Galaxy foil", halofoil: "Halo foil", textured: "Textured foil", manafoil: "Mana foil",
+  raisedfoil: "Raised foil", rainbowfoil: "Rainbow foil", confettifoil: "Confetti foil", oilslick: "Oil slick foil", ripplefoil: "Ripple foil",
+  fracturefoil: "Fracture foil", doublerainbow: "Double rainbow foil", stepandcompleat: "Step-and-compleat foil", firstplacefoil: "First place foil",
+  neonink: "Neon ink foil", invisibleink: "Invisible ink foil", gilded: "Gilded foil", silverfoil: "Silver foil", dragonscalefoil: "Dragon scale foil",
+  singularityfoil: "Singularity foil", cosmicfoil: "Cosmic foil", ampersand: "Ampersand foil", embossed: "Embossed foil", headliner: "Headliner foil",
+};
+
+/** The special foil a printing is made in, such as "Surge foil", or null for a plain foil. */
+export function specialFoil(promoTypes: string | null | undefined): string | null {
+  for (const type of String(promoTypes ?? "").split(",").map((item) => item.trim()).filter(Boolean)) {
+    if (SPECIAL_FOILS[type]) return SPECIAL_FOILS[type]!;
+    if (type.endsWith("foil") && type.length > 4) return `${type[0]!.toUpperCase()}${type.slice(1, -4)} foil`;
+  }
+  return null;
+}
+
+/** A finish's name for a printing: Regular, Etched, Foil, or the special foil it is made in. */
+export const finishLabel = (finish: FinishCode | number | null | undefined, promoTypes?: string | null): string =>
+  (finish === 1 ? specialFoil(promoTypes) ?? "Foil" : finish === 2 ? "Etched" : "Regular");
 export const languageName = (code: string) => LANGUAGES.find(([id]) => id === code)?.[1] ?? code;
 export const conditionName = (code: string) => CONDITIONS.find(([id]) => id === code)?.[1] ?? code;
 export const COLOR_NAMES: Record<string, string> = { W: "White", U: "Blue", B: "Black", R: "Red", G: "Green", M: "Multicolor", C: "Colorless" };
@@ -308,8 +338,8 @@ export const copyKey = (entry: Pick<CollectionEntry, "id" | "foil" | "condition"
 export const sameCopy = (a: CopyKey, b: CopyKey) =>
   a.cardId === b.cardId && a.foil === b.foil && a.condition === b.condition && a.language === b.language && !!a.proxy === !!b.proxy;
 /** A short description of a copy beyond its printing, such as "Foil, Lightly played, Japanese". Regular, Near mint, English are left out. */
-export function copyLabel(entry: Pick<CollectionEntry, "foil" | "condition" | "language">): string {
-  return [entry.foil ? FINISHES[entry.foil]![1] : "", entry.condition !== "NM" ? conditionName(entry.condition) : "",
+export function copyLabel(entry: Pick<CollectionEntry, "foil" | "condition" | "language"> & { promo_types?: string }): string {
+  return [entry.foil ? finishLabel(entry.foil, entry.promo_types) : "", entry.condition !== "NM" ? conditionName(entry.condition) : "",
     entry.language !== "en" ? languageName(entry.language) : ""].filter(Boolean).join(", ");
 }
 /** The price of a copy row: proxies have none. */
@@ -324,9 +354,37 @@ export type Filters = {
   format: string;
   mvMin: string;
   mvMax: string;
+  // 0.12.0: filters answered by the card database (tags, artist, treatments...)
+  art: string;
+  role: string;
+  name: string;
+  text: string;
+  creature: string;
+  keyword: string;
+  powMin: string;
+  powMax: string;
+  touMin: string;
+  touMax: string;
+  priceMin: string;
+  priceMax: string;
+  /** "foil" or "etched": printings made in that finish. */
+  made: string;
+  /** "owned" or "notowned". */
+  owned: string;
+  artist: string;
+  yearMin: string;
+  yearMax: string;
+  /** fullart, borderless, showcase, extendedart or promo. */
+  frame: string;
+  /** A Scryfall promo type for special foils, such as surgefoil. */
+  foilType: string;
 };
 
-export const EMPTY_FILTERS: Filters = { query: "", type: "", set: "", color: "", rarity: "", format: "", mvMin: "", mvMax: "" };
+export const EMPTY_FILTERS: Filters = {
+  query: "", type: "", set: "", color: "", rarity: "", format: "", mvMin: "", mvMax: "",
+  art: "", role: "", name: "", text: "", creature: "", keyword: "", powMin: "", powMax: "", touMin: "", touMax: "",
+  priceMin: "", priceMax: "", made: "", owned: "", artist: "", yearMin: "", yearMax: "", frame: "", foilType: "",
+};
 
 export const ZONES: Array<{ id: Zone; label: string }> = [
   { id: "main", label: "Main deck" },

@@ -9,10 +9,13 @@ Everything Mana Vault stores is in one SQLite database file, mana-vault.sqlite, 
 - every account's collections, decks, shares and offers
 - accounts (with passwords stored only as salted hashes), sessions, phone device sign-ins (stored only as hashes) and per-account preferences
 - the ids of changes already received from phones, for 30 days, so a change sent twice is applied once
+- server settings, invite codes, the activity list, the full Scryfall record of every card, Art and Oracle tags and price history
 
 Each phone with the Android app also keeps a copy of its account's library and the card list, and any changes not yet sent (see [Android app](/about/android-app)). That copy is not a backup; it is replaced from the server at each sync.
 
-The data folder can also hold default-cards.json, the last downloaded card catalog file, while an update runs.
+The data folder can also hold default-cards.json, the last downloaded card catalog file, while an update runs, and the backups folder of whole-server backups.
+
+Card pictures downloaded to the server are kept in the picture folder: by default the pictures folder in the data folder, and in the Docker install /pictures inside the container (/opt/mana-vault/pictures on the Docker host by default). The picture folder holds a small marker file, .mana-vault-pictures, so Mana Vault never fills an empty mount point by mistake. See [Administration](/about/administration).
 
 ## In-app backup
 
@@ -62,7 +65,9 @@ A restore cannot be undone, and it clears the undo history. Backups made before 
 
 ## Server backups
 
-The in-app backup covers one account's collections and decks. To protect everything, including all accounts, back up on the Docker host:
+The in-app backup covers one account's collections and decks. To protect everything, including all accounts, an admin uses **Storage and backups** in Administration: scheduled whole-server backups, **Back up now**, download and restore (see [Administration](/about/administration)). Copy downloaded backups off the server.
+
+On the Docker host, back up:
 
 1. The data folder, /opt/mana-vault/data.
 2. The stack's environment values (in Dockhand, or the .env file).
@@ -70,4 +75,4 @@ The in-app backup covers one account's collections and decks. To protect everyth
 
 Keep one copy off the Docker host. A Docker volume is not a backup.
 
-To restore a server backup, stop the stack, put the saved files back in /opt/mana-vault/data (owned by 65532:65532), and start the stack again.
+Pictures do not need a backup; they download again. To restore a copy of the data folder, stop the stack, put the saved files back in /opt/mana-vault/data (owned by 65532:65532), and start the stack again.

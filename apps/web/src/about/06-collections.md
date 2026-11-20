@@ -25,25 +25,26 @@ A new account starts with an empty collection named **Main collection** that is 
 
 ## Where new cards go
 
-New cards go to the collection or deck **selected last**: the one clicked in the Collections panel, the Decks panel or a switcher. Only that one is highlighted. The panels mark both targets: the target collection and the open deck show **Target**, and the one Enter and + Add use shows **Adding here**. The status bar shows it as ADDING TO: name, or ADDING TO: DECK name; clicking it with a deck open switches between the deck and the target collection ("Adding to name").
+New cards go to the collection or deck **selected last**: the one clicked in the Collections panel, the Decks panel or a switcher. Only that one is highlighted and marked **Adding here** in its panel. The status bar shows it as ADDING TO: name, or ADDING TO: DECK name; clicking it with a deck open switches between the deck and the target collection ("Adding to name").
 
 - With a collection selected, **Add to collection** puts cards into it, the **target collection**.
 - With a deck selected, every add command (**Add to collection**, Enter, a double-click in card search, the Card panel and the scanner's **Add to**, which is filled in with the deck) adds the card to that deck in the target zone. A free collection copy is linked; when free copies are in more than one collection you choose one; with none the card is missing (see [Decks](/about/decks)). **Add as proxy** still adds a proxy copy to the target collection.
 - **Cycle target collection** (C), clicking ADDING TO in the status bar without a deck open, and **+ Add** in the collection view header choose a collection.
-- Add buttons name where the card goes: **+ collection name** always adds to the target collection and **+ deck name** to the open deck, whichever was selected last. The Card panel, card search results, the card page and right-click menus use them.
+- The add button names where the card goes: **+ name** (or **Add to name** in the Card panel) follows the collection or deck selected last. Card search results, the Card panel, the card page and right-click menus use it.
 - The choice is kept for your account. If the target collection is deleted, the first remaining collection becomes the target.
 - In the Missing tab, **+ Collection** adds the card to the open collection instead, in the finish that is missing.
 
 ## Adding cards
 
 1. Select a printing in the card search.
-2. Press Enter, choose **+ collection name** on the row, double-click the row, or use **Add to collection**. **Foil** or **Etched** beside the button adds that finish instead; only the finishes the printing is made in are offered. The right-click menu and the card page have **Add to collection name**, **Add to collection name as foil** and **as etched** in the same way.
-3. One copy is added to the target collection (or the deck selected last). If that collection already has the printing in the same finish, its count goes up by one.
-4. When a wishlist wants the card, its want goes down by one (see [Wishlists and trading](/about/wishlists-and-trading)).
+2. Press Enter, choose **+ collection name** under the card, double-click it, or use **Add to collection**. The right-click menu and the card page have **Add to collection name...**.
+3. The printing chooser opens titled "Add card name to collection name", with the printing shown selected and the finish set by Add as foil. Press Enter to take it, or pick another printing or finish (only the finishes a printing is made in are offered). A card made in only one printing and one finish skips the chooser.
+4. One copy is added to the target collection (or the deck selected last). If that collection already has the printing in the same finish, its count goes up by one.
+5. When a wishlist wants the card, its want goes down by one (see [Wishlists and trading](/about/wishlists-and-trading)).
 
 **Add as proxy** (right-click menu, card page) adds a proxy copy instead.
 
-**Add as foil** decides the finish of Enter, a double-click and the first add button. It is off by default and kept for your account. Switch it with **F**, FOIL in the status bar or the Home ribbon tab. With it on, the first button reads **+ name foil** and the other button **Regular**.
+**Add as foil** decides the finish the printing chooser starts on: foil when it is on and the printing is made in foil. It is off by default and kept for your account. Switch it with **F** or FOIL in the status bar.
 
 ## Collection entries
 
@@ -155,10 +156,12 @@ The Cards tab shows the rows in the current sort and filter in one of three layo
 | Layout | Shows |
 |---|---|
 | Grid | Card pictures that fill the width of the work area, as many in a row as fit (on a phone, 4, 3 or 2 in a row for Small, Medium and Large). More cards appear as you scroll, with no pages |
-| Binder | Pages of nine cards in three rows, like a binder sheet, as large as the work area allows |
+| Binder | Pages of nine printings in three rows, like a binder sheet, as large as the work area allows |
 | List | One row per entry, as described below |
 
-Each card picture shows its count, a FOIL or ETCHED badge, a PROXY badge, a TRADE badge, and the price of one copy. Click a card to select it, Ctrl+click or Shift+click to pick several, double-click to open Copy details, and right-click (or long press on a phone) for its menu.
+In Grid and Binder each printing has one picture, with no count, finish or price on it. Under the picture is one line per finish, and per condition, language or proxy when they differ, such as "Regular 2 $1.10" and "Foil 1 $4.00": the finish (special foils by name, such as Surge foil), the condition and language when not near mint English, Proxy, a T badge with the number for trade, the count and the price of one copy. A **Total** line follows with the count and value of every line.
+
+Click a line to select it, Ctrl+click or Shift+click to pick several, double-click a line to open Copy details, and right-click a line (or long press on a phone) for its menu. Clicking the picture selects the first line; right-clicking the picture opens the first line's menu. All collections uses the same layout. The List layout keeps one row per entry.
 
 In the Binder, **First**, **Previous page**, **Next page** and **Last**, or Page Up and Page Down, turn the pages. Type a page number in the page box and press Enter to go to that page.
 
@@ -201,7 +204,7 @@ The Card panel's Owned group shows, for the selected printing, the regular, foil
 
 ## Collections panel
 
-The Collections panel lists your collections, including those shared with you, with the number of cards, their value and, for collections linked to sets, a completion bar and percentage. One click on a collection opens it in the collection view and makes it where new cards go; it is highlighted until a deck is selected. The target collection shows **Target**, or **Adding here** while Enter and + Add use it. Right-click or long press a collection for its menu (see [Screen layout](/about/screen-layout)). A **Shared** badge marks collections shared with or by you, and a **Wishlist** badge marks wishlists.
+The Collections panel lists your collections, including those shared with you, with the number of cards, their value and, for collections linked to sets, a completion bar and percentage. One click on a collection opens it in the collection view and makes it where new cards go; it is highlighted until a deck is selected. The collection cards go to shows **Adding here** while it is selected. Right-click or long press a collection for its menu (see [Screen layout](/about/screen-layout)). A **Shared** badge marks collections shared with or by you, and a **Wishlist** badge marks wishlists.
 
 ## Undo
 

@@ -28,7 +28,7 @@ The **target zone** decides where Add to deck and Quick add put a card. It start
 ## Opening decks
 
 - **The deck switcher**: the button with the deck's name at the left of the deck view header (on a phone, at the top of the Decks tab). It opens a list of every deck with its cover card, commander, format and card count. Type to find a deck by name, commander or format; Up and Down move through the list, Enter opens the highlighted deck and Esc closes the list. **Sort** orders the list by Recently opened, Name, Date created, Card count, Format or Commander; the choice is kept for your account. **New deck...** is at the bottom of the list.
-- **Decks panel**: decks are grouped by format, each with its card count and value. One click on a deck opens it in the deck view and makes it where new cards go (see [Collections](/about/collections)). The open deck shows **Target**, or **Adding here** while Enter and + Add use it. Right-click or long press a deck for its menu: Open, Rename..., Deck format..., Send..., Export..., Delete or Leave.
+- **Decks panel**: decks are grouped by format, each with its card count and value. One click on a deck opens it in the deck view and makes it where new cards go (see [Collections](/about/collections)). The deck shows **Adding here** while it is where cards go. Right-click or long press a deck for its menu: Open, Rename..., Deck format..., Send..., Export..., Delete or Leave.
 - **Open deck...** (Ctrl+O) lists every deck with its format and card count.
 - **New deck...** (Ctrl+N) asks for the name and format. **Create deck** creates it and opens it.
 - **Add to...** in the scanner offers **New deck...** too (see [Scanning cards](/about/scanning-cards)).
@@ -80,7 +80,7 @@ With more than one card, the chooser starts with **How many to change** (all by 
 Every deck card has a finish: regular, foil or etched. A foil or etched card shows FOIL or ETCHED in every deck view (List, Text, Stacks and Grid), the Deck list panel and the Card panel, and the deck's value, statistics and the card's price use the price of that finish (or another finish of the printing when that one has no price). The finish is set by:
 
 - `*F*` (foil) or `*E*` (etched) after a line in Quick add, Edit as text and decklist imports. In Edit as text, a line without a mark makes the card regular, and **Edit as text** writes the marks for foil and etched cards.
-- **Add as foil** when cards go to the deck selected last, the **Foil** and **Etched** buttons beside an add button, and **Add as** in the Add tab.
+- The finish picked in the printing chooser when adding (it starts on foil while **Add as foil** is on).
 - **Change printing...**.
 - Linking a copy: the deck card takes the copy's finish.
 
@@ -124,18 +124,19 @@ The box at the top of the Add tab adds a card by typing it: a count and a name, 
 
 ### Adding from card search
 
-With a deck selected last in the Decks panel or the deck switcher, **Add to collection** (Enter or a double-click on a result) adds the card to that deck in the target zone, shown as ZONE in the status bar. The status bar shows ADDING TO: DECK name, and the deck is marked **Adding here** in the Decks panel. Selecting a collection, or clicking ADDING TO in the status bar, makes cards go to the collection again. The **+ deck name** buttons always add to the open deck.
+With a deck selected last in the Decks panel or the deck switcher, **Add to collection** (Enter or a double-click on a result) adds the card to that deck in the target zone, shown as ZONE in the status bar. The status bar shows ADDING TO: DECK name, and the deck is marked **Adding here** in the Decks panel. Selecting a collection, or clicking ADDING TO in the status bar, makes cards go to the collection again. Shift+Enter always adds to the open deck.
 
 ### The Add tab
 
 Below Quick add and **Edit as text...**, the Add tab searches the whole card database. Type in the header's **Search cards to add** box; the Filters panel filters the results (Filtering: Deck card search). Results use the card search layout and card size from **Options**.
 
-Each result has **+ Main**, **+ Side**, **+ Maybe** and **+ Commander**. A button with cards of that name already in the zone is highlighted and shows the count. **Add as** beside Quick add (Regular, Foil or Etched) sets the finish the buttons add in; a printing not made in that finish is added in its first finish. Double-click adds one copy to the target zone; the right-click menu holds Card page, Add to each zone and Add to wishlist. Copies are linked as described above.
+Each result has **+ Main**, **+ Side**, **+ Maybe** and **+ Commander**. A button with cards of that name already in the zone is highlighted and shows the count. Each opens the printing chooser with the shown printing selected, to pick the printing and finish; a card made in one printing and one finish is added at once. Double-click adds one copy to the target zone; the right-click menu holds Card page, Add to each zone and Add to wishlist. Copies are linked as described above.
 
 ### From the card search
 
 1. Select a card in the card search.
-2. Press Shift+Enter or choose **+ deck name**, or **Foil** or **Etched** beside it (or **Add to deck name** in the right-click menu). One copy goes into the target zone.
+2. Press Shift+Enter, or select the deck last and choose **+ deck name** (or **Add to deck name...** in the right-click menu).
+3. Pick the printing and finish in the printing chooser and press Enter. One copy goes into the target zone.
 
 ### Changing cards
 
@@ -193,8 +194,8 @@ The cards are shown under a heading for each zone (Commander, Main deck, Sideboa
 |---|---|
 | List | A row for each card: picture, name, mana cost, type, printing, a **Not legal** badge, its tags, the collections its copies are in, PROXY, Missing and + Wishlist, the price, the link button, the count controls, the zone list and a remove button |
 | Text | A compact line for each card: count, name, mana cost and price, in columns. Cards that break a rule are red; missing cards have an amber count |
-| Stacks | A column of overlapping card pictures for each group |
-| Grid | Card pictures in rows |
+| Stacks | A column of overlapping card pictures for each group, one picture per printing with its total count and finish badges |
+| Grid | Card pictures in rows, one per printing, with a line under each for every finish giving the count (or Missing and the number missing) and price, and a Total line |
 
 On the desktop, pointing at a card's name in the List or Text view shows a large picture of the card. Click a card to select it; on a phone, tapping opens its card page.
 

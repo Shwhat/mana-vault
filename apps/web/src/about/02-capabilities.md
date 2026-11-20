@@ -6,10 +6,13 @@ This page lists what Mana Vault does in the current version, followed by what is
 
 ### Card search
 
-- Search every printing in the local card database by name, type line and rules text.
-- Narrow results with filter syntax in the search box (type, color, color identity, rules text, set, rarity, mana value, legality) and with the Filters panel.
+- Search the local card database by name, type line and rules text, with one result per card name (the newest regular printing, an N printings badge and owned counts by finish summed over every printing), or one per printing with Show every printing.
+- Narrow results with filter syntax in the search box (type, color, color identity, rules text, set, rarity, mana value, legality, owned, finishes, treatments, special foils, art, role, power, toughness, year, artist, keyword, frame, border, language) and with the Filters panel.
+- Search by what the art shows (cat, dog, bird...) with Scryfall's Art Tags and by what a card does (ramp, removal...) with Oracle Tags, kept on the server.
+- Filter by name, card text, creature type, keyword, artist, power, toughness and price ranges, the finishes a printing is made in, foil type, frame, release years and owned or not owned, in card search, collections, decks and trades.
+- See special foils (Surge foil, Galaxy foil, Textured foil and others) named on every finish mark and in the printing chooser.
 - The Filters panel filters the open view: card search, the open collection or the open deck (its cards, or the cards to add). Each view keeps its own filters.
-- Show every result, sorted by name and then newest printing first, loading more while scrolling or turning binder pages, with the total in the count line.
+- Show every result, sorted by name, loading more while scrolling or turning binder pages, with the total in the count line.
 - Show results as a Grid or Binder of card pictures with prices and how many you own, or as a List. Each device type remembers its own choice. The deck's Add tab and the trade searches use the same views.
 - Click a result to select it, double-click to add it, right-click or long press for its menu.
 - Search by price with `usd` and `eur`, and find cards by their flavor names (such as a Godzilla series name).
@@ -20,8 +23,9 @@ This page lists what Mana Vault does in the current version, followed by what is
 ### Collections
 
 - Keep any number of collections per account, each with a name and description. Every account starts with a Main collection.
-- Add any printing as a regular, foil or etched copy with Enter, a double-click or the add buttons, which name where the card goes (+ collection name, + deck name) and offer each finish the printing is made in.
-- See where cards go: Target and Adding here marks in the Collections and Decks panels, and ADDING TO in the status bar, which switches between the open deck and the target collection. Cycle the collections with C.
+- Add any printing as a regular, foil or etched copy with Enter, a double-click or one add button that names where the card goes (+ name) and opens the printing chooser with the shown printing selected; a card with one printing and one finish is added at once.
+- See where cards go: an Adding here mark in the Collections and Decks panels, and ADDING TO in the status bar, which switches between the open deck and the target collection. Cycle the collections with C.
+- See one picture per printing in Grid and Binder, with a line under it for each finish (and each condition or language when they differ) giving its count and price, and a Total line with the count and value.
 - Change the printing or finish of all or some copies (such as one of two copies to the foil version), keeping their count, condition, language, trade marks and details, and choose whether the decks they fill change too or keep their version.
 - Right-click or long press a collection (panel or switcher) to open, rename, change settings, send, export, delete or leave it.
 - Record each copy's finish (regular, foil or etched), condition (Mint to Damaged) and language with Copy details.
@@ -115,7 +119,9 @@ This page lists what Mana Vault does in the current version, followed by what is
 
 ### Card database
 
-- Update the local card database from Scryfall on demand, and on a schedule when the server is set up for it, with prices, flavor names, power and toughness, and rulings.
+- Update the local card database from Scryfall on demand (admins) and on a schedule (168 hours by default), with prices, flavor names, power and toughness, rulings, Art and Oracle tags, special foils and treatments, the full record of every card, and printings in unofficial languages such as Phyrexian.
+- Keep a price history: the day's prices are saved with each update when they changed, shown as a chart and table on the card page.
+- Keep card pictures on the server in the sizes an admin chooses, each with an estimated download size, downloaded in the background after each update (only new or changed pictures) with pause, resume and a minimum free space, in a picture folder that can be moved.
 - Show the number of printings and the date of the last update in the status bar.
 - Skip a card whose record fails a check instead of stopping the update, and list the skipped cards.
 
@@ -137,10 +143,12 @@ This page lists what Mana Vault does in the current version, followed by what is
 
 - Download a backup of your own collections, decks and the card records they use, with the custom cards and sets you made or use.
 - Check a backup before restoring it, then replace your own collections and decks with it.
+- Admins: write whole-server backups on a schedule or at once, keep the newest ones, download them and restore any of them.
 
 ### Accounts
 
-- Sign in with a user name and password. New accounts can be turned off by the server owner.
+- Sign in with a user name and password. Sign-up is open, by one-time invite code, or closed.
+- Admins: first-run Setup, and Administration with Accounts, Sign-up, Card database, Pictures, Storage and backups, Devices, Security, Server and Activity. Settings set by environment variables are locked and say which variable sets them.
 - Change your password, which signs out your other devices and phones.
 - See the phones signed in to your account in Devices..., and remove any of them.
 - Keep theme, ribbon, panel layout, workspace, where new cards go, open collection and proxy sheet choices per account.
@@ -172,4 +180,5 @@ These are part of the release plan and are not available yet.
 
 | Version | Planned features |
 |---|---|
-| Later | Price history; a built-in demo collection; instant notifications; more than one server or account in the Android app; sharing files into the Android app |
+| 0.13.0 | Purchase history |
+| Later | Windows, Linux and other installs besides Docker; a built-in demo collection; instant notifications; more than one server or account in the Android app; sharing files into the Android app |

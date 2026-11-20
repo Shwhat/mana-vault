@@ -76,7 +76,7 @@ export const RIBBON_MENUS: Record<string, string[]> = {
 };
 
 /** The account menu at the top right (desktop and phone). */
-export const ACCOUNT_MENU = ["inbox", "password", "devices", "signout"];
+export const ACCOUNT_MENU = ["inbox", "password", "devices", "admin", "signout"];
 export const APP_MENU = ["app.sync", "app.notifications", "app.update"];
 
 /** Ribbon items that only make sense with the desktop panels and ribbon. */

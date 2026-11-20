@@ -9,6 +9,7 @@ export const COOKIE_NAME = "mana_vault_session";
 export const GUARD_HEADER = "x-mana-vault";
 
 export type User = { id: number; name: string };
+export type Account = User & { admin: boolean; mustChange: boolean };
 
 export function initializeAuthTables(database: DatabaseSync): void {
   database.exec(`
@@ -30,6 +31,16 @@ export function initializeAuthTables(database: DatabaseSync): void {
       prefs TEXT NOT NULL
     );
   `);
+  // 0.12.0: admins, disabled accounts, temporary passwords that must be changed, last sign-in
+  const columns = new Set(database.prepare("PRAGMA table_info(users)").all().map((column) => String(column.name)));
+  if (!columns.has("is_admin")) database.exec("ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0");
+  if (!columns.has("disabled")) database.exec("ALTER TABLE users ADD COLUMN disabled INTEGER NOT NULL DEFAULT 0");
+  if (!columns.has("must_change")) database.exec("ALTER TABLE users ADD COLUMN must_change INTEGER NOT NULL DEFAULT 0");
+  if (!columns.has("last_sign_in_at")) database.exec("ALTER TABLE users ADD COLUMN last_sign_in_at TEXT");
+  // a server always has an admin: the oldest account becomes one when none is
+  if (!database.prepare("SELECT 1 FROM users WHERE is_admin = 1").get()) {
+    database.exec("UPDATE users SET is_admin = 1 WHERE id = (SELECT id FROM users ORDER BY created_at, id LIMIT 1)");
+  }
 }
 
 function derive(password: string, salt: Buffer, iterations: number): Buffer {
@@ -43,7 +54,7 @@ export function tokenKey(token: string): string {
 
 const NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{2,31}$/;
 export const validName = (name: string) => NAME_PATTERN.test(name);
-export const validPassword = (password: string) => password.length >= 8 && password.length <= 200;
+export const validPassword = (password: string, minimum = 8) => password.length >= minimum && password.length <= 200;
 
 export class AuthStore {
   constructor(private readonly database: DatabaseSync, private readonly iterations = DEFAULT_ITERATIONS) {
@@ -58,8 +69,10 @@ export class AuthStore {
     if (this.database.prepare("SELECT 1 FROM users WHERE name = ?").get(name)) return null;
     const salt = randomBytes(16);
     const hash = derive(password, salt, this.iterations);
-    const result = this.database.prepare("INSERT INTO users (name, salt, hash, iterations) VALUES (?, ?, ?, ?)")
-      .run(name, salt.toString("hex"), hash.toString("hex"), this.iterations);
+    // the first account on a server is its admin
+    const admin = this.database.prepare("SELECT 1 FROM users WHERE is_admin = 1").get() ? 0 : 1;
+    const result = this.database.prepare("INSERT INTO users (name, salt, hash, iterations, is_admin) VALUES (?, ?, ?, ?, ?)")
+      .run(name, salt.toString("hex"), hash.toString("hex"), this.iterations, admin);
     return { id: Number(result.lastInsertRowid), name };
   }
 
@@ -74,17 +87,24 @@ export class AuthStore {
     return { id: Number(row.id), name: String(row.name) };
   }
 
-  setPassword(userId: number, password: string): void {
+  /** True when the account is turned off by an admin. */
+  disabled(userId: number): boolean {
+    return Number(this.database.prepare("SELECT disabled FROM users WHERE id = ?").get(userId)?.disabled ?? 0) === 1;
+  }
+
+  /** Sets a password; `temporary` makes the person choose a new one after signing in. */
+  setPassword(userId: number, password: string, temporary = false): void {
     const salt = randomBytes(16);
     const hash = derive(password, salt, this.iterations);
-    this.database.prepare("UPDATE users SET salt = ?, hash = ?, iterations = ? WHERE id = ?")
-      .run(salt.toString("hex"), hash.toString("hex"), this.iterations, userId);
+    this.database.prepare("UPDATE users SET salt = ?, hash = ?, iterations = ?, must_change = ? WHERE id = ?")
+      .run(salt.toString("hex"), hash.toString("hex"), this.iterations, temporary ? 1 : 0, userId);
     this.database.prepare("DELETE FROM sessions WHERE user_id = ?").run(userId);
   }
 
-  newSession(userId: number): string {
+  newSession(userId: number, days = SESSION_DAYS): string {
     const token = randomBytes(32).toString("hex");
-    const expires = Date.now() + SESSION_DAYS * 86_400_000;
+    const expires = Date.now() + days * 86_400_000;
+    this.database.prepare("UPDATE users SET last_sign_in_at = CURRENT_TIMESTAMP WHERE id = ?").run(userId);
     this.database.prepare("DELETE FROM sessions WHERE expires_at < ?").run(Date.now());
     this.database.prepare("INSERT INTO sessions (token_key, user_id, expires_at) VALUES (?, ?, ?)")
       .run(tokenKey(token), userId, expires);
@@ -93,9 +113,9 @@ export class AuthStore {
 
   session(token: string): User | null {
     const row = this.database.prepare(
-      `SELECT u.id, u.name, s.expires_at FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_key = ?`,
+      `SELECT u.id, u.name, u.disabled, s.expires_at FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_key = ?`,
     ).get(tokenKey(token));
-    if (!row || Number(row.expires_at) < Date.now()) return null;
+    if (!row || Number(row.expires_at) < Date.now() || Number(row.disabled) === 1) return null;
     return { id: Number(row.id), name: String(row.name) };
   }
 
@@ -123,7 +143,7 @@ export class AuthStore {
 // Limiter slows down password guessing: after `max` failures for a key, further tries wait until the window passes.
 export class Limiter {
   private readonly hits = new Map<string, number[]>();
-  constructor(private readonly max: number, private readonly windowMs: number) {}
+  constructor(public max: number, private readonly windowMs: number) {}
 
   private prune(key: string, now: number): number[] {
     const kept = (this.hits.get(key) ?? []).filter((time) => now - time <= this.windowMs);

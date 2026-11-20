@@ -5,10 +5,10 @@ import { apiUrl, isApp, saveBlob } from "./android/platform";
 
 /**
  * In the Android app pages come from the phone, so the server's own picture addresses (custom card pictures and set
- * symbols, such as /api/custom/cards/.../picture) are made full addresses on the server.
+ * symbols, such as /api/custom/cards/.../picture, and card pictures under /pictures/) are made full addresses on the server.
  */
 export function withServerPictures<T>(value: T): T {
-  if (typeof value === "string") return (value.startsWith("/api/custom/") ? apiUrl(value) : value) as T;
+  if (typeof value === "string") return (value.startsWith("/api/custom/") || value.startsWith("/pictures/") ? apiUrl(value) : value) as T;
   if (Array.isArray(value)) return value.map((item) => withServerPictures(item)) as T;
   if (value && typeof value === "object") {
     let changed = false;

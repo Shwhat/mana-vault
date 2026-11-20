@@ -2,7 +2,7 @@
 // right-click menus on collections and decks, the card maker and the print list.
 import { readFileSync } from "node:fs";
 import type { Page } from "@playwright/test";
-import { choose, search, signUp, status, test, expect } from "./fixtures";
+import { choose, search, signUp, status, test, expect, takePrinting } from "./fixtures";
 
 async function newDeck(page: Page, name: string, format = "commander") {
   await page.keyboard.press("Control+n");
@@ -47,9 +47,11 @@ test("finish marks, change printing of deck and collection cards, and undo", asy
   await page.locator(".navitem", { hasText: "Main collection" }).first().click();
   await search(page, "Counterspell");
   await page.locator("#view-cards .row", { hasText: "Counterspell" }).first().dblclick();
+  await takePrinting(page);
   await expect(status(page)).toHaveText("Counterspell added to Main collection");
   await search(page, "Lightning Bolt");
   await page.locator("#view-cards .row", { hasText: "Lightning Bolt" }).first().dblclick();
+  await takePrinting(page);
   await expect(status(page)).toHaveText("Lightning Bolt added to Main collection");
   await page.keyboard.press("Escape");
   await page.keyboard.press("2");
@@ -87,6 +89,7 @@ test("cards go to the collection or deck selected last, the Decks panel groups b
   await expect(page.locator(".colitem.active", { hasText: "Main collection" })).toHaveCount(0);
   await search(page, "Llanowar Elves");
   await page.locator("#view-cards .row", { hasText: "Llanowar Elves" }).first().dblclick();
+  await takePrinting(page);
   await expect(status(page)).toHaveText("Llanowar Elves added to Elves");
   await expect(decks.locator(".navitem", { hasText: "Elves" })).toContainText("1 cards, $60.00");
 
@@ -96,6 +99,7 @@ test("cards go to the collection or deck selected last, the Decks panel groups b
   await expect(decks.locator(".navitem.active")).toHaveCount(0);
   await search(page, "Sol Ring");
   await page.locator("#view-cards .row", { hasText: "Sol Ring" }).first().dblclick();
+  await takePrinting(page);
   await expect(status(page)).toHaveText("Sol Ring added to Main collection");
 
   // right-click renames collections and decks

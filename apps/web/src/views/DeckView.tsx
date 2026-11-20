@@ -7,7 +7,7 @@ import { rowMenu } from "../components/ContextMenu";
 import { formatDialog, tagsDialog } from "../components/DeckDialogs";
 import { linkDialog } from "../components/LibraryDialogs";
 import { choosePrinting } from "../components/PrintingDialog";
-import { finishesOfCard } from "../components/AddButtons";
+import { addCard } from "../components/AddButtons";
 import { FinishBadge, finishName, OwnedMarks, ownedVersions, removeCard, switchVersionDialog, linkExact, UpgradeBadge, wantedLabel } from "../components/CardMarks";
 import { Switcher } from "../components/Switcher";
 import { cardPrice, checkDeck, type Legality, MANA_COLORS, manaBalance, sections, shuffle, ZONE_ORDER } from "../deck-rules";
@@ -16,6 +16,7 @@ import { type Store, useApp, zoneLabel } from "../store";
 import {
   COLOR_NAMES, copyLabel, type DeckCard, type DeckChange, type DeckGroup, type DeckSort, type DeckTab, type DeckToken, type DeckView as DeckViewKind,
   formatName, money, ZONES, type Zone,
+  finishLabel,
 } from "../types";
 import { StatsPanel } from "./StatsView";
 import { NoDeck, OwnershipTab, Quantity, SearchOptions, Thumb } from "./Views";
@@ -23,7 +24,7 @@ import type { CardSearch, FoundCard } from "../card-search";
 import { CardResults, countLine, useViewSearch } from "../components/CardResults";
 import { OptionsButton, Segments } from "../components/Options";
 import { choices, type Choice, Picker } from "../components/Picker";
-import { filterCount, matchesFilters } from "../filters";
+import { filterCount, matchesFilters, useServerMatch } from "../filters";
 
 type Hover = { url: string; x: number; y: number } | null;
 type HoverProps = { onHover?: (url: string | null, event?: ReactMouseEvent) => void };
@@ -95,7 +96,7 @@ function ListRow({ card, flag, onHover }: { card: DeckCard; flag?: string } & Ho
       <Thumb url={card.image_url} />
       <div className="rowmain" {...hoverHandlers(card, onHover)}>
         <div className="rowtitle"><b>{card.name}</b>{card.custom && <span className="badge custom">Custom</span>}
-          <FinishBadge finish={card.finish} /><UpgradeBadge card={card} /><span className="mana">{card.mana_cost}</span><Flag text={flag} /></div>
+          <FinishBadge finish={card.finish} promoTypes={card.promo_types} /><UpgradeBadge card={card} /><span className="mana">{card.mana_cost}</span><Flag text={flag} /></div>
         <div className="rowsub">{card.type_line}</div>
         <div className="rowmeta">{card.set_name} <span className="badge">{card.set_code.toUpperCase()}</span> {card.collector_number}
           {card.want_card_id && <span className="muted">, wanted {wantedLabel(card)}</span>}</div>
@@ -149,28 +150,67 @@ function TextRow({ card, flag, onHover }: { card: DeckCard; flag?: string } & Ho
       title={flag} onClick={() => pick(store, card)} {...cardMenu(store, card)} {...hoverHandlers(card, onHover)}>
       <span className="tq">{card.quantity}</span>
       <span className="tn">{card.name}</span>
-      <FinishBadge finish={card.finish} className="tmark" /><UpgradeBadge card={card} className="tmark" />
+      <FinishBadge finish={card.finish} promoTypes={card.promo_types} className="tmark" /><UpgradeBadge card={card} className="tmark" />
       <span className="mana">{card.mana_cost}</span>
       <span className="tp">{money(price === null ? null : price * card.quantity, currency)}</span>
     </div>
   );
 }
 
-/** A card picture with its count, used by Stacks and Grid. */
-function Picture({ card, flag }: { card: DeckCard; flag?: string }) {
+/** Deck cards of the same printing together (a regular and a foil card of one printing), in the order shown. */
+function byPrinting(cards: DeckCard[]): DeckCard[][] {
+  const groups = new Map<string, DeckCard[]>();
+  for (const card of cards) {
+    const group = groups.get(card.card_id);
+    if (group) group.push(card);
+    else groups.set(card.card_id, [card]);
+  }
+  return [...groups.values()];
+}
+
+/**
+ * One picture for a printing in the deck. In Grid (`lines`) a line for each finish sits under it with the count, what
+ * is missing and the price, then the total; in Stacks, where pictures overlap, the picture carries the total and marks.
+ */
+function Picture({ cards, flag, lines = false }: { cards: DeckCard[]; flag?: string; lines?: boolean }) {
   const store = useApp();
+  const card = cards[0]!;
+  const currency = store.prefs.currency;
+  const active = cards.some((item) => isActive(store, item));
+  const total = cards.reduce((sum, item) => sum + item.quantity, 0);
+  const value = cards.reduce((sum, item) => sum + (cardPrice(item, currency) ?? 0) * item.quantity, 0);
+  const missing = cards.reduce((sum, item) => sum + (item.missing ?? 0), 0);
   return (
-    <div data-key={String(card.entry_id)} role="option" aria-selected={isActive(store, card)}
-      className={`dcard${isActive(store, card) ? " active" : ""}${flag ? " bad" : ""}`} title={flag ? `${card.name}: ${flag}` : card.name}
-      onClick={() => pick(store, card)} {...cardMenu(store, card)}>
-      {card.image_url ? <img src={card.image_url} alt={card.name} loading="lazy" draggable={false} /> : <span className="pocketname">{card.name}</span>}
-      {card.quantity > 1 && <span className="pocketqty">{card.quantity}</span>}
-      <span className="dmarks">
-        <FinishBadge finish={card.finish} />
-        <UpgradeBadge card={card} />
-        {(card.missing ?? 0) > 0 && <span className="badge miss">Missing</span>}
-        <OwnedMarks store={store} card={card} compact />
-      </span>
+    <div className={lines ? "stackcell dstack" : "dstack"}>
+      <div data-key={lines ? undefined : String(card.entry_id)} role={lines ? undefined : "option"} aria-selected={lines ? undefined : active}
+        className={`dcard${active ? " active" : ""}${flag ? " bad" : ""}`} title={flag ? `${card.name}: ${flag}` : card.name}
+        onClick={() => pick(store, card)} {...cardMenu(store, card)}>
+        {card.image_url ? <img src={card.image_url} alt={card.name} loading="lazy" draggable={false} /> : <span className="pocketname">{card.name}</span>}
+        {!lines && total > 1 && <span className="pocketqty">{total}</span>}
+        <span className="dmarks">
+          {!lines && cards.map((item) => <FinishBadge key={item.entry_id} finish={item.finish} promoTypes={item.promo_types} />)}
+          {cards.map((item) => <UpgradeBadge key={item.entry_id} card={item} />)}
+          {!lines && missing > 0 && <span className="badge miss">Missing</span>}
+          {cards.map((item) => <OwnedMarks key={item.entry_id} store={store} card={item} compact />)}
+        </span>
+      </div>
+      {lines && (
+        <div className="slines" role="group" aria-label={`${card.name} (${card.set_code.toUpperCase()}) ${card.collector_number}`}>
+          {cards.map((item) => {
+            const on = isActive(store, item);
+            const price = cardPrice(item, currency);
+            return (
+              <div key={item.entry_id} data-key={String(item.entry_id)} role="option" aria-selected={on} className={on ? "sline active" : "sline"}
+                onClick={(event) => { event.stopPropagation(); pick(store, item); }} {...cardMenu(store, item)}>
+                <span className="sl-name">{finishLabel(item.finish ?? 0, item.promo_types)}{(item.missing ?? 0) > 0 && <span className="badge miss">Missing {item.missing}</span>}</span>
+                <span className="sl-qty">{item.quantity}</span>
+                <span className="sl-price">{money(price, currency)}</span>
+              </div>
+            );
+          })}
+          <div className="sline total"><span className="sl-name">Total</span><span className="sl-qty">{total}</span><span className="sl-price">{money(value, currency)}</span></div>
+        </div>
+      )}
     </div>
   );
 }
@@ -191,7 +231,7 @@ function Board({ zone, cards, legality, onHover }: { zone: Zone; cards: DeckCard
           {list.map((section) => (
             <div className="stack" key={section.key}>
               {headed && <div className="grouphead">{section.label} <span className="cnt">{section.count}</span></div>}
-              <div className="stackcards">{section.cards.map((card) => <Picture key={card.entry_id} card={card} flag={flag(card)} />)}</div>
+              <div className="stackcards">{byPrinting(section.cards).map((cards) => <Picture key={cards[0]!.entry_id} cards={cards} flag={flag(cards[0]!)} />)}</div>
             </div>
           ))}
         </div>
@@ -199,7 +239,7 @@ function Board({ zone, cards, legality, onHover }: { zone: Zone; cards: DeckCard
       {view === "grid" && list.map((section) => (
         <div key={section.key}>
           {headed && <div className="grouphead">{section.label} <span className="cnt">{section.count}</span></div>}
-          <div className="dgrid">{section.cards.map((card) => <Picture key={card.entry_id} card={card} flag={flag(card)} />)}</div>
+          <div className="dgrid">{byPrinting(section.cards).map((cards) => <Picture key={cards[0]!.entry_id} cards={cards} flag={flag(cards[0]!)} lines />)}</div>
         </div>
       ))}
       {view === "text" && (
@@ -381,21 +421,13 @@ function AddTab({ actions, search }: { actions: Record<string, Action>; search: 
     return map;
   }, [deck.cards]);
   const inDeck = (card: FoundCard, zone: Zone) => counts.get(`${card.oracle_id ?? ""}:${zone}`) ?? 0;
-  // the finish the zone buttons add in; a printing not made in it is added in its first finish
-  const [finish, setFinish] = useState<"" | "foil" | "etched">(store.prefs.foil ? "foil" : "");
-  const finishFor = (card: FoundCard): "" | "foil" | "etched" => {
-    const offered = finishesOfCard(card);
-    const code = finish === "etched" ? 2 : finish === "foil" ? 1 : 0;
-    return finishName(offered.includes(code) ? code : offered[0]!);
-  };
-  const add = (card: FoundCard, zone: Zone) => void store.addToDeck(card.id, card.name, undefined, { zone, finish: finishFor(card) });
+  // the zone buttons add to that zone after the printing and finish are chosen
+  const add = (card: FoundCard, zone: Zone) => void addCard(store, card, "deck", zone);
   return (
     <>
       <div className="deckbar">
         <QuickAdd />
         <button type="button" className="btn small" onClick={actions["deck.editText"]?.run}>Edit as text...</button>
-        <Segments label="Add as" value={finish || "regular"} options={[["regular", "Regular"], ["foil", "Foil"], ["etched", "Etched"]]}
-          onChange={(value) => setFinish(value === "regular" ? "" : value)} />
       </div>
       <CardResults
         search={search} layout={store.searchLayout} size={store.prefs.searchSize} label="Cards to add" resetKey={store.filterSets.deckAdd}
@@ -575,7 +607,8 @@ export function DeckView({ actions }: { actions: Record<string, Action> }) {
   const { deck } = store;
   const legality = useMemo(() => checkDeck(deck?.format ?? "casual", deck?.cards ?? []), [deck?.format, deck?.cards]);
   const filters = store.filterSets.deck;
-  const shown = useMemo(() => (deck?.cards ?? []).filter((card) => matchesFilters(card, filters)), [deck?.cards, filters]);
+  const match = useServerMatch(filters, store.prefs.currency);
+  const shown = useMemo(() => (deck?.cards ?? []).filter((card) => matchesFilters(card, filters, match)), [deck?.cards, filters, match]);
   const search = useViewSearch(store.filterSets.deckAdd, !!deck && store.deckTab === "add");
   if (!deck) {
     return (

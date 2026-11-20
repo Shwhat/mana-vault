@@ -50,6 +50,12 @@ database.prepare("INSERT OR REPLACE INTO catalog_metadata (key, value) VALUES ('
 const webRoot = fileURLToPath(new URL("../../apps/web/dist", import.meta.url));
 // the test machine may not reach Scryfall: card pictures and mana symbols are never downloaded in the browser tests
 const fetcher = async () => { throw new Error("No internet in the browser tests"); };
-const app = await buildApp(database, webRoot, undefined, () => false, { passwordIterations: 1000, addressAttemptLimit: 10_000, version: "test", fetcher });
+const app = await buildApp(database, webRoot, undefined, () => false, {
+  passwordIterations: 1000, addressAttemptLimit: 10_000, version: "test", fetcher, pictureDownloads: false, settingsEnv: { forced: {}, locks: {} },
+});
+// the tests start as if Setup was finished; the Setup test turns it back on
+app.serverSettings.set({ setupDone: true });
+// the first account is the server's admin; the other tests sign up accounts that are not admins
+await app.inject({ method: "POST", url: "/api/signup", headers: { "x-mana-vault": "1" }, payload: { name: "admin", password: "correct horse" } });
 await app.listen({ port, host: "127.0.0.1" });
 console.log(`Mana Vault test server on http://127.0.0.1:${port}`);

@@ -40,6 +40,8 @@ export type Prefs = {
   allWishlists: boolean;
   /** Trade: the you give search looks in every collection, not only cards marked for trade. */
   tradeAllCards: boolean;
+  /** Card search shows every printing in its own spot instead of one spot per card (0.12.0). */
+  searchAllPrintings: boolean;
   /** How the collection and deck switchers sort their lists. */
   collectionSwitchSort: SwitchSort;
   deckSwitchSort: SwitchSort;
@@ -83,7 +85,7 @@ export function defaultPrefs(): Prefs {
     theme: "light", foil: false, zone: "main", ribbon: null, ribbonTab: "home", layout: preset.layout,
     workspace: DEFAULT_WORKSPACE, workspaces: {}, lastDeckId: null, targetCollection: null, addTo: "collection", openCollection: null,
     currency: "usd", collectionSort: "name", collectionLayout: "grid", collectionLayoutPhone: "grid", gridSize: "m",
-    searchLayout: "grid", searchLayoutPhone: "grid", searchSize: "m", allWishlists: false, tradeAllCards: false,
+    searchLayout: "grid", searchLayoutPhone: "grid", searchSize: "m", allWishlists: false, tradeAllCards: false, searchAllPrintings: false,
     collectionSwitchSort: "recent", deckSwitchSort: "recent", recent: {}, deckView: "list", deckGroup: "type", deckSort: "name",
     scanVibrate: true, scanFoil: false, scanCamera: "environment", scanQuick: false, scanSounds: true, scanSets: [], scanIgnorePromos: false,
     scanProxy: false, scanCondition: "NM", scanLanguage: "en", scanShowTotal: false, scanShowOwned: false, ribbonSize: "large",
@@ -126,6 +128,7 @@ export function mergePrefs(saved: unknown): Prefs {
     searchSize: value.searchSize === "s" || value.searchSize === "l" ? value.searchSize : "m",
     allWishlists: value.allWishlists === true,
     tradeAllCards: value.tradeAllCards === true,
+    searchAllPrintings: value.searchAllPrintings === true,
     collectionSwitchSort: switchSortOf(value.collectionSwitchSort, ["recent", "name", "created", "cards", "value"]),
     deckSwitchSort: switchSortOf(value.deckSwitchSort, ["recent", "name", "created", "cards", "format", "commander"]),
     recent: value.recent && typeof value.recent === "object"

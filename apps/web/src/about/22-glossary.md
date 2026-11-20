@@ -13,6 +13,16 @@
 | Collection | A named place for cards you own, such as a binder, with its own rules for set completion |
 | Collection entry | One printing in one finish, condition and language in a collection, with a count and a number for trade |
 | Finish | Regular, foil or etched. Etched is a foil-like finish printed on some cards; it counts as foil for set completion |
+| Special foil | A named kind of foil a printing is made in, such as Surge foil, Galaxy foil or Textured foil, shown in place of FOIL |
+| Admin | An account that can open Administration and change settings for the whole server. The first account is the admin |
+| Art Tags | Scryfall's tags for what a card's art shows, such as cat or forest; used by Art shows and `art:` |
+| Oracle Tags | Scryfall's tags for what a card does, such as ramp or removal; used by Role and `role:` |
+| Invite code | A one-time code from an admin that lets one person create an account when sign-up is by invite |
+| Picture folder | The folder on the server where downloaded card pictures are kept |
+| Server backup | A copy of the whole server's database (every account and the card database), written by Administration |
+| Price history | The prices saved with each card database update, for the days they changed |
+| Printings badge | The N printings mark on a card search result for a card with more than one printing |
+| Total line | The last line under a picture in Grid and Binder, with the count and value of every copy of that printing |
 | Condition | How worn a copy is: Mint, Near mint, Lightly played, Moderately played, Heavily played or Damaged |
 | Copy details | The window that changes an entry's finish, condition, language and number for trade |
 | Wishlist | A collection of cards you want. Its cards do not count as owned |
@@ -31,7 +41,7 @@
 | Switcher | The button with the open collection's or deck's name that opens a searchable list of the others |
 | Flavor name | Another name printed on some versions of a card, matched by search and imports |
 | Ownership | Which deck cards you own across your collections |
-| Target collection | The collection that Add to collection puts cards into, when a collection was selected last; marked Target in the Collections panel |
+| Target collection | The collection that Add to collection puts cards into, when a collection was selected last; marked Adding here in the Collections panel when it was |
 | Selected last | The collection or deck clicked last in its panel or switcher, where new cards go; it is the one highlighted |
 | Custom card | A card made in the card maker and saved to the card database for every account, marked Custom |
 | Custom set | A set made for custom cards, with its own code, name, release date and symbol |
@@ -56,7 +66,7 @@
 | Owned, link | The mark on a missing deck card when free copies of exactly its printing and finish are in your collections |
 | Other version owned | The mark on a missing deck card when free copies of another printing or finish of the card are in your collections |
 | Upgrade wanted | A mark on a deck card that is in the deck and owned, recording the better version wanted, such as a foil |
-| Adding here | The mark in the Collections or Decks panel on the collection or deck that Enter and + Add put cards into |
+| Adding here | The only mark in the Collections or Decks panel on where cards go: the collection or deck that Enter and the add button put cards into |
 | Reduce to 1 | Lowering a card with several copies to one copy, for copies added by accident |
 | Free copy | A copy in a collection that fills no deck card |
 | Proxy | A printed stand-in card, kept apart from real copies, with no value |

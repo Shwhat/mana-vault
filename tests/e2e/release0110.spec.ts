@@ -1,7 +1,7 @@
 // Browser tests for 0.11.0: exact links from Edit as text, finish badges in every deck view, Remove how many and
 // Reduce to 1, Upgrade wanted, decks that keep their version, Other version owned, Add buttons with finishes and the add target.
 import type { Page } from "@playwright/test";
-import { choose, search, signUp, status, test, expect } from "./fixtures";
+import { choose, search, signUp, status, test, expect, takePrinting } from "./fixtures";
 
 async function newDeck(page: Page, name: string, format = "modern") {
   await page.keyboard.press("Control+n");
@@ -11,6 +11,16 @@ async function newDeck(page: Page, name: string, format = "modern") {
   await expect(page.locator("#docname")).toHaveText(`Deck: ${name}`);
   await expect(page.locator("dialog[open]")).toHaveCount(0);
   await page.keyboard.press("3");
+}
+
+/** Adds the M10 Lightning Bolt to where cards go, choosing its finish in the printing chooser. */
+async function addM10Bolt(page: Page, foil: boolean) {
+  await search(page, "Lightning Bolt set:m10");
+  await page.locator("#view-cards .row", { hasText: "Lightning Bolt" }).first().getByRole("button", { name: /^Add Lightning Bolt to / }).click();
+  if (foil) {
+    await page.locator("dialog[open]").getByRole("button", { name: "Foil M10 146" }).click();
+    await expect(page.locator("dialog#dlg[open]")).toHaveCount(0);
+  } else await takePrinting(page);
 }
 
 async function rightClick(page: Page, target: ReturnType<Page["locator"]>, item: string) {
@@ -26,19 +36,23 @@ async function deckOptions(page: Page, step: () => Promise<void>) {
 
 test("Add buttons name the destination, add foil from search, and the status bar switches the add target", async ({ page }) => {
   await signUp(page, "v11add");
-  await search(page, "Lightning Bolt");
-  const m10 = page.locator("#view-cards .row", { hasText: "M10" }).first();
-  await m10.getByRole("button", { name: "Add Lightning Bolt to Main collection as foil" }).click();
+  await search(page, "Lightning Bolt set:m10");
+  // one button names where the card goes; no split or foil buttons
+  const result = page.locator("#view-cards .row", { hasText: "Lightning Bolt" }).first();
+  await expect(result.getByRole("button", { name: /^Add Lightning Bolt to / })).toHaveCount(1);
+  await expect(result.getByRole("button", { name: /as foil/ })).toHaveCount(0);
+  await addM10Bolt(page, true);
   await expect(status(page)).toHaveText("Lightning Bolt (foil) added to Main collection");
   await expect(page.locator(".navitem", { hasText: "Main collection" }).locator(".target-mark")).toHaveText("Adding here");
 
   await newDeck(page, "Burn");
   const decks = page.locator(".pbody", { has: page.getByRole("textbox", { name: "Find a deck" }) });
   await page.locator('.tab[data-panel="decks"]').click();
-  await expect(decks.locator(".navitem", { hasText: "Burn" }).locator(".target-mark")).toHaveText("Target");
+  // only one mark, on where cards go
+  await expect(decks.locator(".navitem", { hasText: "Burn" }).locator(".target-mark")).toHaveCount(0);
   await decks.locator(".navitem", { hasText: "Burn" }).click();
   await expect(page.locator("#st-target")).toHaveText("ADDING TO: DECK BURN");
-  await expect(page.locator(".navitem", { hasText: "Main collection" }).locator(".target-mark")).toHaveText("Target");
+  await expect(page.locator(".navitem", { hasText: "Main collection" }).locator(".target-mark")).toHaveCount(0);
   await expect(decks.locator(".navitem", { hasText: "Burn" }).locator(".target-mark")).toHaveText("Adding here");
   await page.locator("#st-target").click();
   await expect(page.locator("#st-target")).toHaveText("ADDING TO: MAIN COLLECTION");
@@ -47,10 +61,8 @@ test("Add buttons name the destination, add foil from search, and the status bar
 
 test("Edit as text links exact printings, finish badges show in every view, and Remove asks how many", async ({ page }) => {
   await signUp(page, "v11text");
-  await search(page, "Lightning Bolt");
-  const m10 = page.locator("#view-cards .row", { hasText: "M10" }).first();
   for (let index = 0; index < 2; index += 1) {
-    await m10.getByRole("button", { name: "Add Lightning Bolt to Main collection as foil" }).click();
+    await addM10Bolt(page, true);
     await expect(status(page)).toHaveText("Lightning Bolt (foil) added to Main collection");
   }
   await newDeck(page, "Burn");
@@ -68,10 +80,16 @@ test("Edit as text links exact printings, finish badges show in every view, and 
   // a line without a set stays missing although nothing is owned of it
   await expect(page.locator("#view-deck .row", { hasText: "Counterspell" }).locator(".badge.miss")).toHaveText("Missing");
 
-  for (const [view, selector] of [["Text", ".tline"], ["Grid", ".dgrid .dcard"], ["Stacks", ".stack .dcard"]] as const) {
+  for (const [view, selector] of [["Text", ".tline"], ["Stacks", ".stack .dcard"]] as const) {
     await deckOptions(page, () => page.getByRole("group", { name: "Show cards as" }).getByRole("button", { name: view }).click());
     await expect(page.locator(`#view-deck ${selector}`, { hasText: view === "Text" ? "Lightning Bolt" : "" }).locator(".badge.foil").first()).toHaveText("FOIL");
   }
+  // Grid: one picture per printing with a line per finish and a Total line
+  await deckOptions(page, () => page.getByRole("group", { name: "Show cards as" }).getByRole("button", { name: "Grid" }).click());
+  const lines = page.getByRole("group", { name: "Lightning Bolt (M10) 146" }).locator(".sline");
+  await expect(lines.first()).toContainText("Foil");
+  await expect(lines.first()).toContainText("Missing 1");
+  await expect(lines.last()).toContainText("Total3");
   await deckOptions(page, () => page.getByRole("group", { name: "Show cards as" }).getByRole("button", { name: "List" }).click());
 
   // Remove on three copies asks how many; Reduce to 1 keeps one
@@ -87,9 +105,7 @@ test("Edit as text links exact printings, finish badges show in every view, and 
 
 test("Upgrade wanted, part of a stack changing finish, and a deck that keeps its version", async ({ page }) => {
   await signUp(page, "v11upgrade");
-  await search(page, "Lightning Bolt");
-  const m10 = page.locator("#view-cards .row", { hasText: "M10" }).first();
-  await m10.getByRole("button", { name: "Add Lightning Bolt to Main collection", exact: true }).click();
+  await addM10Bolt(page, false);
   await expect(status(page)).toHaveText("Lightning Bolt added to Main collection");
   await newDeck(page, "Burn");
   await page.getByRole("tab", { name: "Add", exact: true }).click();

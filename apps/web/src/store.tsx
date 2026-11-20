@@ -9,6 +9,7 @@ import { useTradeState } from "./trade-state";
 import { useProxyState } from "./proxy-state";
 import { isApp } from "./android/platform";
 import { applyTheme, type Prefs, savePrefs } from "./prefs";
+import { forcePasswordChange } from "./views/AdminView";
 import {
   type BackupSummary, type Candidate, type Card, type CardDetail, type CatalogStatus, type Collection, type CollectionEntry, type CollectionTab,
   type CompletionReport, type CopyKey, type Deck, type DeckCard, type DeckTab, type Facets, type FinishCode, type Ownership, type PriceFields, type Stats,
@@ -19,7 +20,7 @@ import { candidateLabel } from "./components/LibraryDialogs";
 import { type Finish, parseQuickAdd } from "./deck-rules";
 import { usePhone } from "./narrow";
 import { useCardSearch } from "./card-search";
-import { emptyScopes, type FilterScope, filtersOn, matchesFilters } from "./filters";
+import { emptyScopes, type FilterScope, filtersOn, matchesFilters, useServerMatch } from "./filters";
 
 export type Selection = { view: "cards" | "collection" | "deck"; key: string; printingId: string } | null;
 export type Flash = { text: string; kind: "ok" | "err"; id: number } | null;
@@ -43,6 +44,8 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
     return PRESETS[initialPrefs.workspace]?.().view ?? initialPrefs.workspaces[initialPrefs.workspace]?.view ?? "cards";
   });
   const [lastView, setLastView] = useState<Exclude<View, "about">>("cards");
+  const [adminTab, setAdminTab] = useState("accounts");
+  const [adminReturn, setAdminReturn] = useState<View>("cards");
   const [aboutSlug, setAboutSlug] = useState(() => window.location.pathname.replace(/^\/about\/?/, ""));
   // each view keeps its own filters: card search, the open collection, the deck, the deck's Add tab and the two trade searches
   const [filterSets, setFilterSets] = useState<Record<FilterScope, Filters>>(emptyScopes);
@@ -100,6 +103,40 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
 
   useEffect(() => applyTheme(prefs.theme), [prefs.theme]);
 
+  // ---------- server: its name, first-run setup and picture downloads ----------
+  const [serverName, setServerName] = useState("");
+  const [pictureProgress, setPictureProgress] = useState<{ done: number; total: number; paused: boolean } | null>(null);
+  useEffect(() => {
+    void request<{ serverName?: string }>("/api/config").then((config) => setServerName(config.serverName ?? "")).catch(() => undefined);
+  }, []);
+  useEffect(() => {
+    if (user.mustChange) {
+      forcePasswordChange();
+      return;
+    }
+    if (!user.admin || isApp()) return;
+    void request<{ settings: { setupDone: boolean } }>("/api/admin/overview").then((overview) => {
+      if (!overview.settings.setupDone) {
+        setViewState((current) => {
+          if (current !== "admin" && current !== "about") setAdminReturn(current);
+          return "admin";
+        });
+        setAdminTab("setup");
+      }
+    }).catch(() => undefined);
+    let stopped = false;
+    const poll = () => {
+      void request<{ status: { running: boolean; paused: boolean; done: number; total: number } }>("/api/admin/pictures").then((summary) => {
+        if (stopped) return;
+        const status = summary.status;
+        setPictureProgress(status.running || (status.paused && status.total > status.done) ? { done: status.done, total: status.total, paused: status.paused } : null);
+      }).catch(() => undefined);
+    };
+    poll();
+    const timer = window.setInterval(poll, 15000);
+    return () => { stopped = true; window.clearInterval(timer); };
+  }, [user.admin, user.mustChange]);
+
   const setLayout = useCallback((layout: Layout) => setPrefs({ layout }), [setPrefs]);
   const showPanel = useCallback((panel: PanelId) => setPrefs((current) => ({ layout: openPanel(current.layout, panel) })), [setPrefs]);
   const focusPanel = useCallback((panel: PanelId) => setPrefs((current) => ({ layout: activatePanel(current.layout, panel) })), [setPrefs]);
@@ -134,6 +171,18 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
     setViewState(lastView);
     window.history.pushState(null, "", "/");
   }, [lastView]);
+
+  /** Administration replaces the work area; closing it goes back to where it was opened from. */
+  const openAdmin = useCallback((tab = "accounts") => {
+    setCardPage(null);
+    setViewState((current) => {
+      if (current !== "admin" && current !== "about") setAdminReturn(current);
+      return "admin";
+    });
+    setAdminTab(tab);
+    if (window.location.pathname.startsWith("/about")) window.history.pushState(null, "", "/");
+  }, []);
+  const closeAdmin = useCallback(() => setViewState(adminReturn), [adminReturn]);
 
   /** Going anywhere else closes the About guide, so it never hides what was opened. */
   const leaveAbout = useCallback(() => {
@@ -359,10 +408,11 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
   const setFilters = useCallback((change: Partial<Filters>) => setScopeFilters(change, "cards"), [setScopeFilters]);
   const clearFilters = useCallback((scope?: FilterScope) => setScopeFilters({ ...EMPTY_FILTERS }, scope), [setScopeFilters]);
   const filtersActive = filtersOn(scopeFilters);
-  const search = useCardSearch(filters, view === "cards");
+  const search = useCardSearch(filters, view === "cards", { group: !prefs.searchAllPrintings, currency: prefs.currency });
   // the owned counts of every open search: card search, the deck's Add tab and the trade searches register here
-  const ownedHooks = useRef(new Set<(id: string, change: number) => void>());
-  const ownedRef = useRef((id: string, change: number) => { for (const hook of ownedHooks.current) hook(id, change); });
+  type OwnedHook = (id: string, change: number, finish?: FinishCode, oracleId?: string | null) => void;
+  const ownedHooks = useRef(new Set<OwnedHook>());
+  const ownedRef = useRef<OwnedHook>((id, change, finish, oracleId) => { for (const hook of ownedHooks.current) hook(id, change, finish, oracleId); });
   useEffect(() => {
     const hook = search.owned;
     ownedHooks.current.add(hook);
@@ -529,7 +579,7 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
       const wishes = entry.wishlist ?? [];
       // the owned count on search results follows real copies added to a collection
       const owns = !proxy && live.current.collections?.find((item) => item.id === target)?.kind !== "wishlist";
-      const count = (change: number) => { if (owns) ownedRef.current(cardId, change); };
+      const count = (change: number) => { if (owns) ownedRef.current(cardId, change, code, entry.oracle_id); };
       count(1);
       pushUndo({
         label: `Add ${name}${finishText}${proxy ? " (proxy)" : ""}`,
@@ -1026,13 +1076,15 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
   }, [setPrefs, flash]);
 
   // ---------- selection helpers for the keyboard ----------
+  // filters only the card database can answer (art, roles, artist...) come back as the matching printings
+  const collectionMatch = useServerMatch(filterSets.collection, prefs.currency);
   const visibleCollection = useMemo(() => {
     const term = collectionFilter.trim().toLowerCase();
     const currency = prefs.currency;
     const panel = filterSets.collection;
     const shown = (collection ?? []).filter((entry) =>
       (!term || `${entry.name} ${entry.set_name} ${entry.set_code} ${entry.collection_name ?? ""}`.toLowerCase().includes(term)) &&
-      matchesFilters(entry, panel) &&
+      matchesFilters(entry, panel, collectionMatch) &&
       (!facets.rarity || entry.rarity === facets.rarity) &&
       (!facets.color || colorKey(entry.colors) === facets.color) &&
       (!facets.type || cardTypes(entry.type_line).includes(facets.type)) &&
@@ -1052,7 +1104,7 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
       set: (a, b) => a.set_name.localeCompare(b.set_name) || a.collector_number.localeCompare(b.collector_number, undefined, { numeric: true }) || byName(a, b),
     };
     return prefs.collectionSort === "name" ? shown : [...shown].sort(sorts[prefs.collectionSort]);
-  }, [collection, collectionFilter, facets, prefs.currency, prefs.collectionSort, filterSets.collection]);
+  }, [collection, collectionFilter, facets, prefs.currency, prefs.collectionSort, filterSets.collection, collectionMatch]);
 
   const setFacet = useCallback((change: Facets) => {
     setFacets((current) => {
@@ -1136,7 +1188,7 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
 
   return {
     user, prefs, setPrefs, setLayout, showPanel, focusPanel,
-    view, setView, lastView, aboutSlug, openAbout, closeAbout,
+    view, setView, lastView, aboutSlug, openAbout, closeAbout, adminTab, setAdminTab, openAdmin, closeAdmin, serverName, pictureProgress,
     filters, setFilters, filtersActive, cards, loading, searchError, searchInput, search,
     ownedHooks, filterSets, filterScope, scopeFilters, setScopeFilters, clearFilters, tradeSide, setTradeSide,
     collection, visibleCollection, collectionFilter, setCollectionFilter, reloadCollection, facets, setFacet, binderPage, setBinderPage,

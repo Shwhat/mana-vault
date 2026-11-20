@@ -1,4 +1,5 @@
 // ---------- proxies: the print list, full-size card pictures and mana symbols for printing and the card maker ----------
+import { localPicture } from "./pictures.js";
 import type { FastifyInstance } from "fastify";
 import type { DatabaseSync } from "node:sqlite";
 
@@ -153,6 +154,9 @@ export function registerProxyRoutes(app: FastifyInstance, database: DatabaseSync
     if (!url) return reply.code(404).send({ error: "This card has no picture" });
     const key = `${url}`;
     let picture = cache.get(key);
+    // a picture already downloaded to the picture folder is used without the internet
+    const local = picture ? null : localPicture(url);
+    if (local) picture = { bytes: local, type: size === "png" ? "image/png" : "image/jpeg" };
     if (!picture) {
       try {
         picture = await download(url);

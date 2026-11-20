@@ -7,7 +7,7 @@ import type { Collection, Deck, DeckDetail, PriceFields } from "./types";
 
 export type ScanCard = {
   id: string; oracle_id: string; name: string; set_code: string; set_name: string; collector_number: string;
-  rarity: string; image_url: string | null; finishes: string; released_at: string | null; promo?: number; variation?: number;
+  rarity: string; image_url: string | null; finishes: string; released_at: string | null; promo?: number; variation?: number; promo_types?: string;
 } & Partial<PriceFields>;
 export type ScanMatch = { card: ScanCard | null; score: number; by: "printing" | "name" | null; read: string };
 /** One row of the scanned list: a printing in one finish, condition and language, real or a proxy. */

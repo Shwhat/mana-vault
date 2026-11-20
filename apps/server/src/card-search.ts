@@ -8,7 +8,32 @@ const colors: Record<string, string> = {
 };
 const rarities = new Set(["common", "uncommon", "rare", "mythic", "special", "bonus"]);
 
-export function parseCardQuery(query: string): SearchClause[] {
+/** Tags (Art or Oracle) with a label, and every tag under them, as a SQL list of tag ids. */
+const tagIds = (kind: "art" | "oracle") => `(WITH RECURSIVE found(id) AS (
+    SELECT id FROM tags WHERE kind = '${kind}' AND (label = ? COLLATE NOCASE OR replace(label, '-', ' ') = ? COLLATE NOCASE)
+    UNION SELECT c.child_id FROM tag_children c JOIN found ON c.tag_id = found.id
+  ) SELECT id FROM found)`;
+
+const COMPARE = ["=", ":", ">", "<", ">=", "<="];
+const compare = (operator: string) => (operator === ":" ? "=" : operator);
+
+// is: words for printings: finishes, frames and the special foils Scryfall lists as promo types
+const IS_WORDS: Record<string, string> = {
+  custom: "custom = 1",
+  foil: "(',' || finishes || ',') LIKE '%,foil,%'",
+  nonfoil: "(',' || finishes || ',') LIKE '%,nonfoil,%'",
+  etched: "(',' || finishes || ',') LIKE '%,etched,%'",
+  fullart: "full_art = 1",
+  borderless: "border_color = 'borderless'",
+  showcase: "(',' || frame_effects || ',') LIKE '%,showcase,%'",
+  extendedart: "(',' || frame_effects || ',') LIKE '%,extendedart,%'",
+  promo: "promo = 1",
+  variation: "variation = 1",
+};
+
+export type SearchContext = { userId?: number };
+
+export function parseCardQuery(query: string, context: SearchContext = {}): SearchClause[] {
   const clauses: SearchClause[] = [];
   const tokens = query.match(/(?:[^\s"]+|"[^"]*")+/g) ?? [];
   for (const token of tokens) {
@@ -93,10 +118,67 @@ export function parseCardQuery(query: string): SearchClause[] {
       continue;
     }
 
-    if (key === "is") {
+    if (key === "is" || key === "not") {
       if (operator !== ":") throw new Error(`${rawKey} only supports the ":" operator`);
-      if (value.toLowerCase() !== "custom") throw new Error(`Unknown card kind "${value}". Use is:custom`);
-      clauses.push({ sql: `${negate}(custom = 1)`, values: [] });
+      const word = value.toLowerCase();
+      const flip = (key === "not") !== !!negative ? "NOT " : "";
+      if (word === "owned") {
+        if (!context.userId) throw new Error("is:owned needs a signed-in account");
+        // any printing of the card in the account's own or shared collections (not wishlists or proxies)
+        clauses.push({
+          sql: `${flip}(oracle_id IN (SELECT o.oracle_id FROM collection_cards cc JOIN cards o ON o.id = cc.card_id JOIN collections col ON col.id = cc.collection_id
+            LEFT JOIN members m ON m.kind = 'collection' AND m.item_id = col.id AND m.user_id = ?
+            WHERE col.kind = 'collection' AND cc.proxy = 0 AND (col.owner_id = ? OR m.user_id IS NOT NULL)))`,
+          values: [String(context.userId), String(context.userId)],
+        });
+        continue;
+      }
+      if (IS_WORDS[word]) {
+        clauses.push({ sql: `${flip}(${IS_WORDS[word]})`, values: [] });
+        continue;
+      }
+      // any Scryfall promo type, such as is:surgefoil, is:galaxyfoil, is:textured
+      if (/^[a-z0-9]{3,30}$/.test(word)) {
+        clauses.push({ sql: `${flip}((',' || promo_types || ',') LIKE ?)`, values: [`%,${word},%`] });
+        continue;
+      }
+      throw new Error(`Unknown card kind "${value}"`);
+    }
+
+    if (key === "art" || key === "atag" || key === "role" || key === "function" || key === "otag") {
+      if (operator !== ":") throw new Error(`${rawKey} only supports the ":" operator`);
+      const label = value.trim();
+      if (key === "art" || key === "atag") {
+        clauses.push({ sql: `${negate}(id IN (SELECT ci.card_id FROM card_illustrations ci JOIN tag_links l ON l.ref = ci.illustration_id WHERE l.tag_id IN ${tagIds("art")}))`, values: [label, label] });
+      } else {
+        clauses.push({ sql: `${negate}(oracle_id IN (SELECT l.ref FROM tag_links l WHERE l.tag_id IN ${tagIds("oracle")}))`, values: [label, label] });
+      }
+      continue;
+    }
+
+    if (key === "pow" || key === "power" || key === "tou" || key === "toughness") {
+      if (!COMPARE.includes(operator)) throw new Error(`${rawKey} needs a comparison operator`);
+      const amount = Number(value);
+      if (!Number.isFinite(amount)) throw new Error(`${rawKey} must be a number`);
+      const field = key.startsWith("p") ? "power" : "toughness";
+      clauses.push({ sql: `${negate}(${field} GLOB '[0-9]*' AND CAST(${field} AS REAL) ${compare(operator)} CAST(? AS REAL))`, values: [String(amount)] });
+      continue;
+    }
+
+    if (key === "year") {
+      if (!COMPARE.includes(operator)) throw new Error("year needs a comparison operator");
+      if (!/^\d{4}$/.test(value)) throw new Error("year must be four digits, such as 2019");
+      clauses.push({ sql: `${negate}(CAST(substr(released_at, 1, 4) AS INTEGER) ${compare(operator)} CAST(? AS INTEGER))`, values: [value] });
+      continue;
+    }
+
+    if (key === "a" || key === "artist" || key === "kw" || key === "keyword" || key === "frame" || key === "lang" || key === "border") {
+      if (operator !== ":") throw new Error(`${rawKey} only supports the ":" operator`);
+      if (key === "a" || key === "artist") clauses.push({ sql: `${negate}(artist LIKE ? ESCAPE '\\')`, values: [pattern(value)] });
+      else if (key === "kw" || key === "keyword") clauses.push({ sql: `${negate}((',' || lower(keywords) || ',') LIKE ?)`, values: [`%,${value.toLowerCase()},%`] });
+      else if (key === "frame") clauses.push({ sql: `${negate}(frame = ? OR (',' || frame_effects || ',') LIKE ?)`, values: [value.toLowerCase(), `%,${value.toLowerCase()},%`] });
+      else if (key === "border") clauses.push({ sql: `${negate}(border_color = ?)`, values: [value.toLowerCase()] });
+      else clauses.push({ sql: `${negate}(lang = ?)`, values: [value.toLowerCase()] });
       continue;
     }
 

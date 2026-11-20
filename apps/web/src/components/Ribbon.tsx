@@ -54,6 +54,7 @@ export function TitleBar({ actions }: { actions: Record<string, Action> }) {
     <div id="titlebar">
       <span className="brand" aria-hidden="true">M</span>
       <span className="apptitle">Mana Vault</span>
+      {store.serverName && <span className="servername">{store.serverName}</span>}
       <div id="docname">{store.deck ? `Deck: ${store.deck.name}` : ""}</div>
       <div
         id="acct"
@@ -64,7 +65,7 @@ export function TitleBar({ actions }: { actions: Record<string, Action> }) {
           event.stopPropagation();
           if (open) return setOpen(null);
           const rect = event.currentTarget.getBoundingClientRect();
-          setOpen({ id: "account", x: Math.max(4, rect.right - 230), y: rect.bottom, items: ACCOUNT_MENU });
+          setOpen({ id: "account", x: Math.max(4, rect.right - 230), y: rect.bottom, items: ACCOUNT_MENU.filter((id) => id !== "admin" || !!store.user.admin) });
         }}
       >
         {store.user.name}

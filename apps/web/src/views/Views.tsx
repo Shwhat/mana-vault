@@ -4,7 +4,7 @@ import type { FoundCard } from "../card-search";
 import { CardResults, countLine } from "../components/CardResults";
 import { LayoutRows, OptionsButton } from "../components/Options";
 import { linkDialog } from "../components/LibraryDialogs";
-import { AddButtons, addMenuItems } from "../components/AddButtons";
+import { AddButtons, addCard, addMenuItems } from "../components/AddButtons";
 import { finishWord, UpgradeBadge, wantedLabel } from "../components/CardMarks";
 import { Icon } from "../icons";
 import { sortDeck, type Store, useApp, zoneLabel } from "../store";
@@ -36,6 +36,8 @@ export function SearchOptions() {
   return (
     <OptionsButton title="Search options">
       <LayoutRows name="Search results" layout={store.searchLayout} size={store.prefs.searchSize} onLayout={store.setSearchLayout} onSize={(searchSize) => store.setPrefs({ searchSize })} />
+      <label className="check"><input type="checkbox" checked={store.prefs.searchAllPrintings}
+        onChange={(event) => store.setPrefs({ searchAllPrintings: event.target.checked })} /> Show every printing</label>
     </OptionsButton>
   );
 }
@@ -45,7 +47,8 @@ export function CardsView({ actions, onFilters }: { actions: Record<string, Acti
   const { filters, selection, deck, search } = store;
   const anyFilter = store.filtersActive;
   const catalogEmpty = store.catalog?.printingCount === 0;
-  const add = (card: FoundCard) => void store.addToCollection(card.id, card.name);
+  // Enter and a double-click add to where cards go, choosing the printing and finish first
+  const add = (card: FoundCard) => void addCard(store, card);
   return (
     <div className="view" id="view-cards">
       <div id="pagetabs">
