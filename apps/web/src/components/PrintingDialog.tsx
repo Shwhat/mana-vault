@@ -81,18 +81,40 @@ function PrintingList({ cardId, currentId, finish, currency, onPick }: {
   );
 }
 
+/** The "How many" box of the chooser, for a card with more than one copy. */
+function HowMany({ max, value, onChange }: { max: number; value: number; onChange: (value: number) => void }) {
+  return (
+    <label className="howmany">How many to change
+      <input type="number" min={1} max={max} value={value} aria-label="How many to change"
+        onChange={(event) => onChange(Math.max(1, Math.min(max, Math.floor(Number(event.target.value) || 1))))} />
+      <span className="muted">of {max}</span>
+    </label>
+  );
+}
+
 /**
  * Opens the printing chooser. `onPick` runs with the printing and finish chosen: another printing, or another finish of
  * the same printing (such as its foil version). Choosing the current printing in its current finish does nothing.
+ * With `quantity` above 1 the chooser asks how many of the copies change (all by default); the rest stay as they are.
  */
-export function choosePrinting(name: string, cardId: string, currentId: string, options: { finish?: FinishCode; currency: Currency },
-  onPick: (printing: Printing, finish: FinishCode) => void) {
+export function choosePrinting(name: string, cardId: string, currentId: string,
+  options: { finish?: FinishCode; currency: Currency; quantity?: number; title?: string; allowCurrent?: boolean },
+  onPick: (printing: Printing, finish: FinishCode, count: number) => void) {
   const current = options.finish ?? 0;
-  customDialog(`Change printing of ${name}`, (close) => (
-    <PrintingList cardId={cardId} currentId={currentId} finish={current} currency={options.currency}
-      onPick={(printing, finish) => {
-        close();
-        if (printing.id !== currentId || finish !== current) onPick(printing, finish);
-      }} />
-  ), 600, "Cancel");
+  const max = Math.max(1, options.quantity ?? 1);
+  let count = max;
+  function Body({ close }: { close: () => void }) {
+    const [value, setValue] = useState(max);
+    return (
+      <>
+        {max > 1 && <HowMany max={max} value={value} onChange={(next) => { setValue(next); count = next; }} />}
+        <PrintingList cardId={cardId} currentId={currentId} finish={current} currency={options.currency}
+          onPick={(printing, finish) => {
+            close();
+            if (options.allowCurrent || printing.id !== currentId || finish !== current) onPick(printing, finish, Math.min(max, count));
+          }} />
+      </>
+    );
+  }
+  customDialog(options.title ?? `Change printing of ${name}`, (close) => <Body close={close} />, 600, "Cancel");
 }

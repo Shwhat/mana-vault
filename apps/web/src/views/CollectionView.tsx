@@ -4,6 +4,7 @@ import type { Action } from "../actions";
 import { rowMenu } from "../components/ContextMenu";
 import { collectionDialog, copyDialog, moveDialog } from "../components/LibraryDialogs";
 import { choosePrinting } from "../components/PrintingDialog";
+import { FinishBadge, finishName, removeCard } from "../components/CardMarks";
 import { Icon } from "../icons";
 import { entryKey } from "../library-state";
 import { type Store, useApp } from "../store";
@@ -70,14 +71,15 @@ function entryMenu(store: Store, entry: CollectionEntry) {
   return rowMenu(store, entry.name, () => [
     { label: "Card page", run: () => store.setCardPage(entry.id) },
     { label: "Copy details...", run: () => copyDialog(store, entry) },
-    !store.allCollections || entry.collection_id ? { label: "Change printing...", run: () => choosePrinting(entry.name, entry.id, entry.id, { finish: entry.foil, currency: store.prefs.currency },
-      (printing, finish) => void store.changeCopyPrinting(entry, printing, finish)) } : null,
+    !store.allCollections || entry.collection_id ? { label: "Change printing...", run: () => choosePrinting(entry.name, entry.id, entry.id, { finish: entry.foil, currency: store.prefs.currency, quantity: entry.quantity },
+      (printing, finish, count) => void store.changeCopyPrinting(entry, printing, finish, count)) } : null,
     (store.collections?.length ?? 0) > 1 && { label: "Move...", run: () => moveDialog(store, [entry]) },
     !entry.proxy && { label: entry.trade >= entry.quantity ? "Unmark for trade" : "Mark for trade", run: () => void store.markTrade([entry], entry.trade < entry.quantity) },
     !entry.proxy && { label: "Add to trade (you give)", run: () => store.giveEntry(entry) },
-    !!store.deck && { label: `Add to ${store.deck.name}`, run: () => void store.addToDeck(entry.id, entry.name) },
+    !!store.deck && { label: `Add to ${store.deck.name}`, run: () => void store.addToDeck(entry.id, entry.name, undefined, { finish: finishName(entry.foil) }) },
     { label: "Add to print list", run: () => void store.addToPrintList([{ card: entry, count: entry.quantity }], entry.name) },
-    { label: "Remove", run: () => void store.setCollectionQuantity(entry, 0) },
+    entry.quantity > 1 && { label: "Reduce to 1", run: () => void store.setCollectionQuantity(entry, 1) },
+    { label: "Remove", run: () => removeCard(store, entry.name, entry.quantity, (left) => void store.setCollectionQuantity(entry, left)) },
   ]);
 }
 
@@ -201,7 +203,7 @@ function Pocket({ entry }: { entry: CollectionEntry }) {
       onClick={(event) => store.pickRow(entry, { ctrl: event.ctrlKey || event.metaKey, shift: event.shiftKey })}
       onDoubleClick={() => copyDialog(store, entry)} {...entryMenu(store, entry)}>
       {entry.image_url ? <img src={entry.image_url} alt={entry.name} loading="lazy" draggable={false} /> : <span className="pocketname">{entry.name}</span>}
-      {entry.foil > 0 && <span className="badge foil pocketfoil">{entry.foil === 2 ? "ETCHED" : "FOIL"}</span>}
+      <FinishBadge finish={entry.foil} className="pocketfoil" />
       {entry.proxy && <span className="badge proxy pocketproxy">PROXY</span>}
       <span className="pocketqty">{entry.quantity}</span>
       {entry.trade > 0 && <span className="badge trade pockettrade">TRADE {entry.trade}</span>}
@@ -296,12 +298,13 @@ function CardsTab({ actions }: { actions: Record<string, Action> }) {
     <>
       {collection !== null && collection.length > 0 && <ChipBar />}
       {(checked.size > 1 || selectMode) && (
-        <div className="pickbar" role="toolbar" aria-label="Picked rows">
+        <div className="pickbar" role="toolbar" aria-label="Picked cards">
           <span><b>{checked.size}</b> picked ({pickedCards} {pickedCards === 1 ? "card" : "cards"})</span>
           <button type="button" className="btn small" onClick={store.pickAll}>Select all</button>
           <button type="button" className="btn small" disabled={!checked.size || (store.collections?.length ?? 0) < 2} onClick={() => moveDialog(store, store.pickedEntries())}>Move...</button>
           <button type="button" className="btn small" disabled={!checked.size} onClick={() => void store.markTrade(store.pickedEntries(), true)}>For trade</button>
           <button type="button" className="btn small" disabled={!checked.size} onClick={() => void store.markTrade(store.pickedEntries(), false)}>Not for trade</button>
+          <button type="button" className="btn small" disabled={!checked.size} onClick={() => void store.reducePicked()}>Reduce to 1</button>
           <button type="button" className="btn small" disabled={!checked.size} onClick={() => void store.removePicked()}>Remove...</button>
           <button type="button" className="btn small" onClick={() => { store.setChecked(new Set()); store.setSelectMode(false); }}>Done</button>
         </div>
@@ -331,7 +334,7 @@ function CardsTab({ actions }: { actions: Record<string, Action> }) {
               {selectMode && <input type="checkbox" className="rowcheck" checked={active} readOnly aria-label={`Pick ${entry.name}`} />}
               <Thumb url={entry.image_url} />
               <div className="rowmain">
-                <div className="rowtitle"><b>{entry.name}</b>{entry.custom && <span className="badge custom">Custom</span>}{entry.foil ? <span className="badge foil">{entry.foil === 2 ? "ETCHED" : "FOIL"}</span> : null}
+                <div className="rowtitle"><b>{entry.name}</b>{entry.custom && <span className="badge custom">Custom</span>}<FinishBadge finish={entry.foil} />
                   {entry.proxy && <span className="badge proxy" title="A proxy: kept apart from real copies, with no value">PROXY</span>}
                   {entry.trade > 0 && <span className="badge trade" title={`${entry.trade} of ${entry.quantity} for trade`}>FOR TRADE {entry.trade}</span>}</div>
                 <Tags entry={entry} />
@@ -345,7 +348,7 @@ function CardsTab({ actions }: { actions: Record<string, Action> }) {
                 disabled={(store.collections?.length ?? 0) < 2}
                 onClick={(event) => { event.stopPropagation(); moveDialog(store, [entry]); }}><Icon name="move" /></button>
               <button type="button" className="btn small icon-only" title={`Remove ${entry.name}`} aria-label={`Remove ${entry.name} from collection`}
-                onClick={(event) => { event.stopPropagation(); void store.setCollectionQuantity(entry, 0); }}><Icon name="del" /></button>
+                onClick={(event) => { event.stopPropagation(); removeCard(store, entry.name, entry.quantity, (left) => void store.setCollectionQuantity(entry, left)); }}><Icon name="del" /></button>
             </div>
           );
         })}

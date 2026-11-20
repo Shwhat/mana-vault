@@ -4,7 +4,7 @@ import type { FastifyInstance, FastifyReply } from "fastify";
 import type { DatabaseSync } from "node:sqlite";
 import { listSets } from "./sets.js";
 import { type CopyExtras, type CopyKey, type Currency, NO_EXTRAS, PRICE_COLUMNS, priceSql, readCopyExtras, readCopyKey } from "./copies.js";
-import { alignDeckCard, collectionLinks, linkedCount, moveLinks, rowKey, trimLinks } from "./links.js";
+import { alignDeckCard, collectionLinks, dropLinks, linkedCount, moveLinks, rowKey, trimLinks } from "./links.js";
 import { finishOffered, readDeckFinish } from "./decks.js";
 
 export type Kind = "collection" | "deck";
@@ -575,6 +575,10 @@ export function registerLibraryRoutes(app: FastifyInstance, database: DatabaseSy
         for (const raised of changes.filter((change) => change.item.quantity > change.before && change.item.cardId === lowered.item.cardId)) {
           const count = Math.min(lowered.before - lowered.item.quantity, raised.item.quantity - raised.before);
           moveLinks(database, { collectionId: id, key: lowered.item }, { collectionId: id, key: raised.item }, count, lowered.before - lowered.linked);
+          // deck cards follow their copies to the new finish
+          for (const deckCard of database.prepare(`SELECT DISTINCT deck_card_id FROM deck_links WHERE collection_id = ? AND ${KEY_WHERE}`).all(id, ...keyValues(raised.item))) {
+            alignDeckCard(database, Number(deckCard.deck_card_id));
+          }
         }
         trimLinks(database, id, lowered.item);
       }
@@ -620,7 +624,9 @@ export function registerLibraryRoutes(app: FastifyInstance, database: DatabaseSy
       }
       // linked copies move last, so free copies change printing first
       const deckCards = database.prepare(`SELECT DISTINCT deck_card_id FROM deck_links WHERE collection_id = ? AND ${KEY_WHERE}`).all(id, ...keyValues(key));
-      moveLinks(database, { collectionId: id, key }, { collectionId: id, key: target }, count, Number(row.quantity) - linked);
+      // decks follow the copies, unless the person chose to keep the decks as they are: then the changed copies leave them
+      if (request.body?.decks === "keep") dropLinks(database, { collectionId: id, key }, count, Number(row.quantity) - linked);
+      else moveLinks(database, { collectionId: id, key }, { collectionId: id, key: target }, count, Number(row.quantity) - linked);
       if (count >= Number(row.quantity)) database.prepare(`DELETE FROM collection_cards WHERE collection_id = ? AND ${KEY_WHERE}`).run(id, ...keyValues(key));
       else {
         database.prepare(`UPDATE collection_cards SET quantity = quantity - ?, trade = MAX(0, MIN(quantity - ?, trade - ?)) WHERE collection_id = ? AND ${KEY_WHERE}`)

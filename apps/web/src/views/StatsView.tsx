@@ -90,7 +90,7 @@ export function StatsPanel({ stats, kind, onFacet, extra }: { stats: Stats | nul
     <div className="list statswrap">
       <div className="tilerow">
         <div className="stattile small"><div className="stlabel">Cards</div><div className="stvalue">{stats.cards.toLocaleString()}</div>
-          <div className="stsub">{stats.entries.toLocaleString()} {kind === "deck" ? "deck entries" : "rows"}</div></div>
+          <div className="stsub">{stats.entries.toLocaleString()} {kind === "deck" ? "deck entries" : "entries"}</div></div>
         <div className="stattile small"><div className="stlabel">Value ({currency.toUpperCase()})</div><div className="stvalue">{money(stats.value, currency)}</div>
           <div className="stsub">{stats.unpriced ? `${stats.unpriced.toLocaleString()} ${stats.unpriced === 1 ? "card has" : "cards have"} no price` : "Every card has a price"}</div></div>
         <div className="stattile small"><div className="stlabel">Average per card</div><div className="stvalue">{money(stats.average, currency)}</div>

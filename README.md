@@ -14,7 +14,7 @@ The full user guide is built into the app: Help tab, **About Mana Vault**. The p
 - The app's own choice lists on every screen, the same on desktop and phone.
 - Prices from Scryfall (USD regular, foil, etched; EUR regular, foil) stored with each card database update, shown in USD or EUR, with collection and deck values and sorting by price.
 - Statistics for collections and decks: stat tiles and bar charts for mana curve, color, type, rarity, finish and top sets; clicking a collection bar filters the list.
-- Copy details per collection row: finish (regular, foil, etched), condition, language, proxy, the number for trade, purchase price and currency, date added, misprint, altered and signed.
+- Copy details per collection entry: finish (regular, foil, etched), condition, language, proxy, the number for trade, purchase price and currency, date added, misprint, altered and signed.
 - Proxy copies: marked everywhere, worth nothing, left out of completion, value and statistics, and able to fill a deck slot.
 - Filter tags (click a set code or rarity), and three collection layouts: a grid of card pictures that loads more while scrolling (Small, Medium, Large), binder pages of nine cards sized to the window with a page box, or a list. Grid is the default; desktop and phone remember their own layout.
 - One switcher for collections and decks: a searchable list with sorting (recently opened, name, date created, card count, value, format, commander), details per row and keyboard control. An Options button holds sort, layout, card size, filters and Select.
@@ -22,20 +22,24 @@ The full user guide is built into the app: Help tab, **About Mana Vault**. The p
 - Deck ownership check: which cards you own across your collections, where they are, and the cost of the missing cards; export the missing cards as text.
 - Saved trades (Open, Done, Cancelled): You give searches your cards for trade, You get searches the card database, each line with its own count, finish, condition and an editable price, and a balance bar. Complete a trade in one undoable step (deck cards are flagged, wishlist wants go down), or send it to another account with counter-offers until one side accepts. Wishlist matches both ways, copy or CSV export, and a public trade binder link that needs no sign-in.
 - Any number of collections per account (binders, boxes, sets being completed), each copy in one place. New cards go to the collection or deck selected last in its panel or switcher (C cycles the collections). Every owned card is in a collection.
-- Change printing for collection copies and deck cards from the right-click menu, including switching to the foil or etched version; deck cards link free copies of the new printing in that finish.
-- Deck cards keep a finish (regular, foil, etched) shown on the row and used for prices, set by `*F*` and `*E*` marks, Add as foil or Change printing.
+- Change printing for collection copies and deck cards from the right-click menu, including switching to the foil or etched version, for all copies or only some (How many to change); deck cards link free copies of the new printing in that finish. Collection copies that fill a deck ask whether the deck changes too or keeps its version.
+- Deck cards keep a finish (regular, foil, etched), shown as FOIL or ETCHED in every deck view, the Deck list panel, the Card panel and trade lines, and used for prices, set by `*F*` and `*E*` marks, Add as foil, Add as, linked copies or Change printing. A regular and a foil card of one printing are separate deck cards.
+- Exact-printing links: Edit as text and decklist imports link lines that name a set and number to free copies of exactly that printing and finish; Link owned copies fills every missing card the same way. Missing cards show Owned, link or Other version owned with Switch.
+- Upgrade wanted: mark a deck card with the version you want; it stays owned and is listed in the Ownership tab until a copy of that version is linked.
+- Remove asks how many copies to remove, with Reduce to 1 and Remove all; Reduce to 1 also works on picked cards.
+- Add buttons name the destination (+ collection name, + deck name) with a button per other finish; Target and Adding here marks in the panels and ADDING TO in the status bar show where cards go.
 - Right-click (long press) menus on collections and decks in the panels and switchers: open, rename, settings or format, send, export, delete or leave. The Decks panel groups decks by format with card counts and values.
 - Proxies: a print list kept on the server (a deck, its missing cards, a collection, picked rows, a pasted list, tokens, any card), with printing, count and faces per line; Letter, A4, Legal or custom paper, margins, card size, scale, gap, bleed, cut lines or corner marks and background, with a page preview; exports as a 300 DPI PDF, MakePlayingCards pictures with bleed, and an MPC Autofill card list. Printed cards can be added as proxies to a collection or deck.
 - Card maker: custom cards with a live preview, Mana Vault's own frames (every color, hybrids, gold, artifact, colorless, land, legendary), creature, planeswalker, saga, token and double-faced cards, uploaded or card art with move and zoom, and PNG export. Custom cards join the card database for every account, in custom sets with their own codes, and work like any other card.
 - Set completion (off by default for new collections): link a collection to any number of sets; count by main set, every printing or each card name once, and by any finish, regular only, foil only or one of each; Completion and Missing tabs with filters, add-from-list and text or CSV export of the missing list.
-- Bulk editing: pick rows with Ctrl+click, Shift+click, Ctrl+A or Select mode; remove or move them between collections in one undoable step.
+- Bulk editing: pick cards with Ctrl+click, Shift+click, Ctrl+A or Select mode; remove, reduce to one copy or move them between collections in one undoable step.
 - Collection tracking per printing, regular and foil, with plus, minus, move and remove controls.
 - Deck import, Edit as text and Quick add read `*F*` and `*E*` finish marks, and find cards by set and number when the name does not match.
 - Decks keep the exact printing, with commander, main deck, sideboard and maybeboard zones and a target zone for adding; rename and delete.
 - Deck builder in the Moxfield style, with a header like the collection's (switcher, tabs, filter box, Options, count line) and an Add tab with a card search and + Main, + Side, + Maybe and + Commander buttons that show the count already in the deck: Quick add ("2 Sol Ring"), Edit as text with a check before applying, List, Text, Stacks and Grid views grouped by type, mana value, color, rarity or tag and sorted by name, mana value or price, tags on deck cards, hover previews and the tokens the deck makes.
 - Format checks for 21 formats: deck and sideboard size, copies, banned and not legal cards, and commander color identity.
 - Deck tabs for Playtest (opening hand, mulligan, draw, play), Description with a cover card, and History of every change; mana symbols against mana sources in deck statistics.
-- Linked deck cards: each deck card is linked to a copy in a collection (one deck per copy). Collection rows show their deck, deck rows show their collection, links follow moves, and unlinked cards show as missing with a + Wishlist button. Cards added straight to a deck go into the deck's own collection or a chosen one.
+- Linked deck cards: each deck card is linked to a copy in a collection (one deck per copy). Collection entries show their deck, deck cards show their collection, links follow moves, and unlinked cards show as missing with a + Wishlist button. Cards added straight to a deck go into the deck's own collection or a chosen one.
 - Wishlist want counts go down as copies are added.
 - Collections and decks belong to their account. Send them to another account as a copy, a share (both edit) or a transfer; the receiver accepts from an Inbox as a new item or, for collections, merged into one of theirs.
 - Undo and redo for collection and deck edits (150 steps).
@@ -70,7 +74,7 @@ The full user guide is built into the app: Help tab, **About Mana Vault**. The p
 | Page Up, Page Down | Previous or next binder page |
 | T | Add the selected collection row to the trade (you give) |
 | G | Add the selected card to the trade (you get) |
-| Ctrl+A | Pick every row the collection filter shows |
+| Ctrl+A | Pick every card the collection filter shows |
 | Ctrl+click, Shift+click | Pick more rows, or a range |
 | Delete | Remove the picked collection rows |
 | Ctrl+Z, Ctrl+Y (or Ctrl+Shift+Z) | Undo, redo |

@@ -25,24 +25,25 @@ A new account starts with an empty collection named **Main collection** that is 
 
 ## Where new cards go
 
-New cards go to the collection or deck **selected last**: the one clicked in the Collections panel, the Decks panel or a switcher. Only that one is highlighted; the other panel shows no selection. The status bar shows it as ADD TO: name, or ADD TO: DECK name.
+New cards go to the collection or deck **selected last**: the one clicked in the Collections panel, the Decks panel or a switcher. Only that one is highlighted. The panels mark both targets: the target collection and the open deck show **Target**, and the one Enter and + Add use shows **Adding here**. The status bar shows it as ADDING TO: name, or ADDING TO: DECK name; clicking it with a deck open switches between the deck and the target collection ("Adding to name").
 
 - With a collection selected, **Add to collection** puts cards into it, the **target collection**.
 - With a deck selected, every add command (**Add to collection**, Enter, a double-click in card search, the Card panel and the scanner's **Add to**, which is filled in with the deck) adds the card to that deck in the target zone. A free collection copy is linked; when free copies are in more than one collection you choose one; with none the card is missing (see [Decks](/about/decks)). **Add as proxy** still adds a proxy copy to the target collection.
-- **Cycle target collection** (C), clicking ADD TO in the status bar, and **+ Add** in the collection view header choose a collection.
+- **Cycle target collection** (C), clicking ADDING TO in the status bar without a deck open, and **+ Add** in the collection view header choose a collection.
+- Add buttons name where the card goes: **+ collection name** always adds to the target collection and **+ deck name** to the open deck, whichever was selected last. The Card panel, card search results, the card page and right-click menus use them.
 - The choice is kept for your account. If the target collection is deleted, the first remaining collection becomes the target.
 - In the Missing tab, **+ Collection** adds the card to the open collection instead, in the finish that is missing.
 
 ## Adding cards
 
 1. Select a printing in the card search.
-2. Press Enter, choose **+ Collection** on the row, double-click the row, or use **Add to collection**.
+2. Press Enter, choose **+ collection name** on the row, double-click the row, or use **Add to collection**. **Foil** or **Etched** beside the button adds that finish instead; only the finishes the printing is made in are offered. The right-click menu and the card page have **Add to collection name**, **Add to collection name as foil** and **as etched** in the same way.
 3. One copy is added to the target collection (or the deck selected last). If that collection already has the printing in the same finish, its count goes up by one.
 4. When a wishlist wants the card, its want goes down by one (see [Wishlists and trading](/about/wishlists-and-trading)).
 
 **Add as proxy** (right-click menu, card page) adds a proxy copy instead.
 
-**Add as foil** decides the finish. It is off by default and kept for your account. Switch it with **F**, FOIL in the status bar or the Home ribbon tab.
+**Add as foil** decides the finish of Enter, a double-click and the first add button. It is off by default and kept for your account. Switch it with **F**, FOIL in the status bar or the Home ribbon tab. With it on, the first button reads **+ name foil** and the other button **Regular**.
 
 ## Collection entries
 
@@ -80,7 +81,15 @@ Rows that are not regular, near mint or English show the difference after the se
 
 ## Change printing
 
-**Change printing...** in a row's right-click menu changes the printing of the row's copies, for a card that was added as the wrong printing, or their finish, such as switching to the foil version. Choose the printing and finish in the printing chooser. The copies keep their count, condition, language, proxy mark, number for trade and copy details. When the collection already has a row of the new printing with the same finish, condition, language and proxy, the rows are merged. Copies linked to decks stay linked, and the deck cards they fill change to the new printing too. The change can be undone, and the message reads "Card name is now (SET) number", followed by "foil" or "etched" for those finishes.
+**Change printing...** in an entry's right-click menu changes the printing of its copies, for a card that was added as the wrong printing, or their finish, such as switching to the foil version. Choose the printing and finish in the printing chooser. With more than one copy, **How many to change** (all by default) changes only that many; the rest stay, so two copies can become one regular and one foil. The copies keep their count, condition, language, proxy mark, number for trade and copy details. When the collection already has a row of the new printing with the same finish, condition, language and proxy, the rows are merged. Free copies change first. When copies linked to a deck change, Mana Vault asks "A copy that changes is in deck name. Change the deck too?":
+
+| Answer | What happens |
+|---|---|
+| **Yes, change the deck** | The copies stay linked and the deck cards they fill change to the new printing and finish too |
+| **No, show it as missing** | Only the copies change. The deck keeps its version, those deck cards show **Missing** and **Other version owned**, and the message ends with "decks kept their version" |
+| Cancel | Nothing changes |
+
+The change can be undone (undo changes the copies back; deck links removed by No are not put back), and the message reads "Card name is now (SET) number", followed by "foil" or "etched" for those finishes, or "N of M Card name changed to (SET) number" when only some copies change.
 
 ## The collection view
 
@@ -155,24 +164,26 @@ In the Binder, **First**, **Previous page**, **Next page** and **Last**, or Page
 
 ## List layout
 
-In the List layout, each row shows the card image, name, a FOIL or ETCHED badge, a PROXY badge, a FOR TRADE badge with the number for trade, set, set code, collector number, rarity, the condition and language when not near mint English, a green tag for each deck its copies fill (with ×N for more than one; clicking it opens the deck), the row's value (Proxy for proxies), the count with minus and plus buttons, and details, move and remove buttons. Copies in no deck are free.
+In the List layout, each entry shows the card image, name, a FOIL or ETCHED badge, a PROXY badge, a FOR TRADE badge with the number for trade, set, set code, collector number, rarity, the condition and language when not near mint English, a green tag for each deck its copies fill (with ×N for more than one; clicking it opens the deck), the row's value (Proxy for proxies), the count with minus and plus buttons, and details, move and remove buttons. Copies in no deck are free.
 
-## Picking several rows
+## Picking several cards
 
 | To | Do |
 |---|---|
-| Pick one row | Click it, or move to it with Up and Down |
-| Add or remove a row from the picked rows | Ctrl+click it (Cmd+click on a Mac), or tap it with **Select several cards** turned on |
-| Pick a range | Click the first row, then Shift+click the last |
-| Pick every row the filter box shows | Ctrl+A, **Select all rows**, or **Select all** in the picked bar |
-| Drop the picked rows | Esc, or **Done** in the picked bar |
+| Pick one card | Click it, or move to it with Up and Down |
+| Add or remove a card from the picked cards | Ctrl+click it (Cmd+click on a Mac), or tap it with **Select several cards** turned on |
+| Pick a range | Click the first card, then Shift+click the last |
+| Pick every card the filter box shows | Ctrl+A, **Select all cards**, or **Select all** in the picked bar |
+| Drop the picked cards | Esc, or **Done** in the picked bar |
 
-When more than one row is picked (or Select several cards is on), a bar above the list shows how many entries and cards are picked, with **Select all**, **Move...**, **For trade**, **Not for trade**, **Remove...** and **Done**. For trade and Not for trade work like Mark for trade and Unmark for trade; see [Wishlists and trading](/about/wishlists-and-trading). The status bar also shows the number picked.
+When more than one card is picked (or Select several cards is on), a bar above the list shows how many entries and cards are picked, with **Select all**, **Move...**, **For trade**, **Not for trade**, **Reduce to 1**, **Remove...** and **Done**. For trade and Not for trade work like Mark for trade and Unmark for trade; see [Wishlists and trading](/about/wishlists-and-trading). The status bar also shows the number picked.
 
 ## Removing cards
 
-- The remove button on a row, or minus at a count of 1, removes that entry at once.
-- **Remove selected...** (Delete key, Collection ribbon tab, or **Remove...** in the picked bar) asks first, for example "Remove 37 entries (112 cards) from Binder?", then removes every picked entry.
+- Minus at a count of 1 removes that entry at once.
+- The remove button on an entry, or **Remove** in its right-click menu, removes an entry with one copy at once. With more copies it asks **How many to remove** ("There are N copies."), with **Reduce to 1** and **Remove all**. Copies in no deck are removed first.
+- **Reduce to 1** (right-click menu of an entry with more than one copy, the Collection ribbon tab, or the picked bar) leaves one copy of each picked entry, for copies added by accident. It is one step that can be undone. With every picked entry at one copy it says "Each picked card has one copy already".
+- **Remove selected...** (Delete key, Collection ribbon tab, or **Remove...** in the picked bar) asks first, for example "Remove 37 entries (112 cards) from Binder?", with **Remove all** (every picked entry goes) and **Reduce to 1**.
 - To remove many cards of one kind, type in the filter box (for example a set name), press Ctrl+A, then Delete.
 
 ## Moving cards
@@ -190,7 +201,7 @@ The Card panel's Owned group shows, for the selected printing, the regular, foil
 
 ## Collections panel
 
-The Collections panel lists your collections, including those shared with you, with the number of cards, their value and, for collections linked to sets, a completion bar and percentage. One click on a collection opens it in the collection view and makes it where new cards go; it is highlighted until a deck is selected. Right-click or long press a collection for its menu (see [Screen layout](/about/screen-layout)). A **Shared** badge marks collections shared with or by you, and a **Wishlist** badge marks wishlists.
+The Collections panel lists your collections, including those shared with you, with the number of cards, their value and, for collections linked to sets, a completion bar and percentage. One click on a collection opens it in the collection view and makes it where new cards go; it is highlighted until a deck is selected. The target collection shows **Target**, or **Adding here** while Enter and + Add use it. Right-click or long press a collection for its menu (see [Screen layout](/about/screen-layout)). A **Shared** badge marks collections shared with or by you, and a **Wishlist** badge marks wishlists.
 
 ## Undo
 

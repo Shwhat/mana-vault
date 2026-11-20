@@ -28,7 +28,7 @@ async function addFromSearch(page: Page, names: string[]) {
 
 test("a new account has a Main collection that receives cards", async ({ page }) => {
   await signUp(page);
-  await expect(page.locator("#st-toggles")).toContainText("ADD TO: MAIN COLLECTION");
+  await expect(page.locator("#st-toggles")).toContainText("ADDING TO: MAIN COLLECTION");
   await addFromSearch(page, ["Sol Ring"]);
   await expect(status(page)).toHaveText("Sol Ring added to Main collection");
   await expect(page.locator(".pgrp", { hasText: "Owned" })).toContainText("Main collection");
@@ -44,7 +44,7 @@ test("collections link sets, show completion and missing cards", async ({ page }
   await expect(page.getByRole("textbox", { name: "Search cards" })).toBeFocused();
   await page.keyboard.press("Escape");
   await expect(page.getByRole("textbox", { name: "Search cards" })).not.toBeFocused();
-  await expect(page.locator("#st-toggles")).toContainText("ADD TO: ALPHA BINDER");
+  await expect(page.locator("#st-toggles")).toContainText("ADDING TO: ALPHA BINDER");
   await page.keyboard.press("c");
   await expect(status(page)).toHaveText("New cards go to Main collection");
   await page.keyboard.press("c");
@@ -98,7 +98,7 @@ test("rows can be picked in bulk, removed, restored and moved", async ({ page })
   await expect(page.locator(".pickbar")).toContainText("3 picked (3 cards)");
   await page.keyboard.press("Delete");
   await expect(page.locator("dialog[open]")).toContainText("Remove 3 entries (3 cards) from Main collection?");
-  await page.locator("dialog[open]").getByRole("button", { name: "Remove", exact: true }).click();
+  await page.locator("dialog[open]").getByRole("button", { name: "Remove all" }).click();
   await expect(status(page)).toHaveText("Removed 3 entries (3 cards) from Main collection");
   await expect(rows(page)).toHaveCount(1);
   await page.keyboard.press("Control+z");

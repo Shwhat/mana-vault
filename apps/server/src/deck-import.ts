@@ -1,6 +1,7 @@
 import { nameMatch } from "./collection-import.js";
 import { parse } from "csv-parse/sync";
 import type { DatabaseSync } from "node:sqlite";
+import { linkOwnedCopies } from "./decks.js";
 
 type Zone = "main" | "sideboard" | "commander" | "maybeboard";
 export type DeckImportRow = {
@@ -29,6 +30,7 @@ export function splitPrinting(raw: string): { name: string; set: string; number:
 export interface DeckImportResult {
   matchedRows: number;
   importedQuantity: number;
+  linked?: number;
   unmatched: Array<{ row: number; name: string; reason: string }>;
 }
 
@@ -109,6 +111,7 @@ export function importDecklist(
   _mode: "normal" | "theme",
   content: string,
   commit = true,
+  userId?: number,
 ): DeckImportResult {
   const rows = parseCsv(content) ?? parseText(content);
   if (!rows.length) throw new Error("Decklist has no card rows");
@@ -116,9 +119,10 @@ export function importDecklist(
 
   const find = printingFinder(database);
   const unmatched: DeckImportResult["unmatched"] = [];
-  const additions = new Map<string, { oracleId: string; printingId: string | null; quantity: number; zone: Zone; finish: number }>();
+  const additions = new Map<string, { oracleId: string; printingId: string | null; quantity: number; zone: Zone; finish: number; named: boolean }>();
   let matchedRows = 0;
   let importedQuantity = 0;
+  let linked = 0;
 
   rows.forEach((row, index) => {
     const sourceRow = row.sourceRow ?? index + 1;
@@ -144,14 +148,18 @@ export function importDecklist(
       return;
     }
     // every deck keeps a printing: the one named, or the newest printing of the card
-    const key = `${printing.oracle_id}\u0000${row.zone}\u0000${printing.id}`;
+    const finish = row.finish === "etched" ? 2 : row.finish === "foil" ? 1 : 0;
+    const key = `${printing.oracle_id}\u0000${row.zone}\u0000${printing.id}\u0000${finish}`;
     const addition = additions.get(key) ?? {
       oracleId: printing.oracle_id,
       printingId: printing.id as string | null,
       quantity: 0,
       zone: row.zone,
-      finish: row.finish === "etched" ? 2 : row.finish === "foil" ? 1 : 0,
+      finish,
+      named: false,
     };
+    // a line naming its set and collector number is linked to free copies of exactly that printing and finish
+    if (row.set && row.collectorNumber) addition.named = true;
     addition.quantity += row.quantity;
     additions.set(key, addition);
     matchedRows += 1;
@@ -165,7 +173,7 @@ export function importDecklist(
         const insert = addition.printingId
           ? database.prepare(
             `INSERT INTO deck_cards (deck_id, oracle_id, printing_id, quantity, zone, finish) VALUES (?, ?, ?, ?, ?, ?)
-             ON CONFLICT(deck_id, oracle_id, printing_id, zone) WHERE printing_id IS NOT NULL
+             ON CONFLICT(deck_id, oracle_id, printing_id, zone, finish) WHERE printing_id IS NOT NULL
              DO UPDATE SET quantity = quantity + excluded.quantity`,
           )
           : database.prepare(
@@ -176,13 +184,19 @@ export function importDecklist(
         insert.run(deckId, addition.oracleId, addition.printingId, addition.quantity, addition.zone, addition.finish);
       }
       if (additions.size) database.prepare("UPDATE decks SET updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(deckId);
+      if (userId !== undefined) {
+        const idOf = database.prepare("SELECT id FROM deck_cards WHERE deck_id = ? AND printing_id = ? AND zone = ? AND finish = ?");
+        const ids = new Set([...additions.values()].filter((item) => item.named && item.printingId)
+          .map((item) => Number(idOf.get(deckId, item.printingId, item.zone, item.finish)?.id ?? 0)));
+        linked = ids.size ? linkOwnedCopies(database, deckId, userId, ids) : 0;
+      }
       database.exec("COMMIT");
     } catch (error) {
       database.exec("ROLLBACK");
       throw error;
     }
   }
-  return { matchedRows, importedQuantity, unmatched };
+  return { matchedRows, importedQuantity, linked, unmatched };
 }
 
 /** Finds the printing for a name, with an optional set and collector number: the named printing, or the newest one. */

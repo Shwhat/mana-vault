@@ -19,6 +19,8 @@ export type Card = {
   artist?: string | null;
   flavor_name?: string | null;
   prices?: Prices;
+  /** The finishes the printing is made in, such as "nonfoil,foil" (0.11.0). */
+  finishes?: string;
 };
 
 export type Prices = { usd: number | null; usd_foil: number | null; usd_etched: number | null; eur: number | null; eur_foil: number | null };
@@ -175,8 +177,15 @@ export type DeckCard = Pick<Card, "name" | "mana_cost" | "type_line" | "set_code
   quantity: number;
   zone: Zone;
   links?: DeckLink[];
-  /** Cards of this row with no linked copy. */
+  /** Cards of this deck card with no linked copy. */
   missing?: number;
+  /** For a card with missing copies: free copies the account owns, of this version or another one (0.11.0). */
+  owned?: Candidate[];
+  /** Upgrade wanted: the version wanted instead of this one (0.11.0). */
+  want_card_id?: string | null;
+  want_finish?: FinishCode;
+  want_set_code?: string | null;
+  want_collector_number?: string | null;
 };
 
 /** A free copy that could fill a deck card. */

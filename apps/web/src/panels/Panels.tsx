@@ -10,6 +10,9 @@ import { SCOPE_NAMES } from "../filters";
 import { Meter } from "../views/CollectionView";
 import { NoDeck, Quantity, zoneGroups } from "../views/Views";
 import { cardMenu } from "../views/DeckView";
+import { FinishBadge, UpgradeBadge } from "../components/CardMarks";
+import { AddButtons } from "../components/AddButtons";
+import { entryKey } from "../library-state";
 
 /** The Filters panel: it filters the open view (card search, the collection, the deck or a search inside it); each keeps its own filters. */
 export function FiltersPanel({ actions }: { actions: Record<string, Action> }) {
@@ -63,6 +66,10 @@ export function CollectionsPanel({ actions }: { actions: Record<string, Action> 
             onClick={() => { store.openCollection(item.id); store.setView("collection"); }} {...collectionMenu(store, item)}>
             <span className="colline">
               <span className="nl">{item.name}</span>
+              {store.prefs.targetCollection === item.id && (
+                <span className={selected ? "target-mark strong" : "target-mark"} title={selected ? "Enter and + Add put cards here" : "+ Add to collection puts cards here"}>
+                  {selected ? "Adding here" : "Target"}</span>
+              )}
               {item.kind === "wishlist" && <span className="badge wish" title="Cards here are wanted, not owned">Wishlist</span>}
               {item.role === "member" && <span className="badge" title={`Shared by ${item.owner.name}`}>Shared</span>}
               {item.role === "owner" && item.sharedWith.length > 0 && <span className="badge" title={`Shared with ${item.sharedWith.map((person) => person.name).join(", ")}`}>Shared</span>}
@@ -112,6 +119,10 @@ export function DecksPanel({ actions }: { actions: Record<string, Action> }) {
                 onClick={() => void store.openDeck(deck.id).then(() => store.setView("deck"))} {...deckMenu(store, deck)}>
                 <span className="colline">
                   <span className="nl">{deck.name}</span>
+                  {store.deck?.id === deck.id && (
+                    <span className={selected ? "target-mark strong" : "target-mark"} title={selected ? "Enter and + Add put cards here" : "+ Add to deck puts cards here"}>
+                      {selected ? "Adding here" : "Target"}</span>
+                  )}
                   {(deck.role === "member" || (deck.sharedWith?.length ?? 0) > 0) && <span className="badge">Shared</span>}
                 </span>
                 <span className="colline sub">
@@ -135,14 +146,16 @@ export function CardPanel({ actions }: { actions: Record<string, Action> }) {
   const prices = card.prices;
   const copies = (item: Pick<OwnedIn, "regular" | "foil" | "etched">) =>
     [`${item.regular} regular`, `${item.foil} foil`, ...(item.etched ? [`${item.etched} etched`] : [])].join(", ");
+  // the deck card or collection copy selected, for its finish
+  const pickedDeckCard = store.selection?.view === "deck" ? store.deck?.cards.find((item) => String(item.entry_id) === store.selection!.key) : undefined;
+  const pickedEntry = store.selection?.view === "collection" ? store.collection?.find((item) => entryKey(item) === store.selection!.key) : undefined;
   return (
     <div className="pbody">
       {card.image_url && <img className="cardimg" src={card.image_url} alt={card.name} />}
-      <div className="ident">{card.name}</div>
+      <div className="ident">{card.name} <FinishBadge finish={pickedDeckCard?.finish ?? pickedEntry?.foil} />{pickedDeckCard && <UpgradeBadge card={pickedDeckCard} />}</div>
       <div className="sub">{card.type_line}</div>
       <div className="btnrow">
-        <button type="button" className="btn primary" onClick={actions.addCollection?.run}>Add to collection</button>
-        <button type="button" className="btn" disabled={!store.deck} onClick={actions.addDeck?.run}>Add to deck</button>
+        <AddButtons store={store} card={card} large />
         <button type="button" className="btn" onClick={actions["wishlist.add"]?.run}>Add to wishlist</button>
         <button type="button" className="btn" onClick={actions["trade.get"]?.run}>You get</button>
       </div>
@@ -214,6 +227,8 @@ export function DeckListPanel({ actions }: { actions: Record<string, Action> }) 
               <div key={key} className={active ? "dlrow active" : "dlrow"} onClick={() => store.select({ view: "deck", key, printingId: card.card_id })} {...cardMenu(store, card)}>
                 <span className="num">{card.quantity}</span>
                 <span className="nl">{card.name}</span>
+                <FinishBadge finish={card.finish} /><UpgradeBadge card={card} />
+                {(card.missing ?? 0) > 0 && <span className="badge miss" title={`${card.missing} missing`}>Missing</span>}
                 <Quantity value={card.quantity} name={card.name} max={100} onChange={(quantity) => void store.setDeckQuantity(card, quantity)} />
               </div>
             );
@@ -232,7 +247,7 @@ export function ReviewPanel() {
     <div className="pbody flush">
       <div className="revhead">
         <b>{review.title}</b>
-        <span className="sub">{review.done ? "Imported" : "Preview"}: {review.report.matchedRows} matched rows ({review.report.importedQuantity} cards), {review.report.unmatched.length} skipped</span>
+        <span className="sub">{review.done ? "Imported" : "Preview"}: {review.report.matchedRows} matched lines ({review.report.importedQuantity} cards), {review.report.unmatched.length} skipped</span>
         <button type="button" className="btn small" onClick={() => store.setReview(null)}>Clear</button>
       </div>
       {review.report.unmatched.length === 0 && <p className="note pad">Every row matched</p>}

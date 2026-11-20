@@ -132,6 +132,8 @@ A CSV file is read as a decklist when its first line has a Name or Card Name col
 | A given set and number must match a printing | No printing matched the supplied set and collector number |
 | The zone must be recognized | Zone must be Main, Sideboard, Commander or Maybeboard |
 
+Lines that name a set and collector number are linked to free copies of exactly that printing and finish in your collections, the deck's own collection first. Lines without a set and number stay missing until a copy is linked; see [Decks](/about/decks). A regular and a foil line of the same printing become two deck cards.
+
 ## Import review panel
 
 After a preview or an import, the Import review panel shows the file name, whether it was a preview or an import, the matched rows and cards, and every skipped row with its row number (line number for text files), card name and reason. **Clear** empties the panel. The panel opens automatically when rows were skipped.

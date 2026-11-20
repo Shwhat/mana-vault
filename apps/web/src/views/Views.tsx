@@ -4,6 +4,8 @@ import type { FoundCard } from "../card-search";
 import { CardResults, countLine } from "../components/CardResults";
 import { LayoutRows, OptionsButton } from "../components/Options";
 import { linkDialog } from "../components/LibraryDialogs";
+import { AddButtons, addMenuItems } from "../components/AddButtons";
+import { finishWord, UpgradeBadge, wantedLabel } from "../components/CardMarks";
 import { Icon } from "../icons";
 import { sortDeck, type Store, useApp, zoneLabel } from "../store";
 import { copyLabel, type DeckCard, type DeckTab, money, ZONES, type Zone } from "../types";
@@ -20,10 +22,9 @@ export function searchMenu(store: Store, card: FoundCard) {
   const wish = () => void store.addToWishlist([{ cardId: card.id, foil: store.prefs.foil ? 1 : 0, condition: "NM", language: "en", proxy: false, quantity: 1 }], card.name);
   return [
     { label: "Card page", run: () => store.setCardPage(card.id) },
-    { label: "Add to collection", run: () => void store.addToCollection(card.id, card.name) },
+    ...addMenuItems(store, card),
     { label: "Add as proxy", run: () => void store.addToCollection(card.id, card.name, undefined, undefined, true) },
     { label: "Add to wishlist", run: wish },
-    !!store.deck && { label: `Add to ${store.deck.name}`, run: () => void store.addToDeck(card.id, card.name) },
     { label: "Add to trade (you get)", run: () => void store.getCard(card.id) },
     { label: "Add to print list", run: () => void store.addToPrintList([{ card, count: 1 }], card.name) },
   ];
@@ -77,12 +78,11 @@ export function CardsView({ actions, onFilters }: { actions: Record<string, Acti
         onTag={(change) => store.setFilters(change)}
         buttons={(card) => (
           <>
-            <button type="button" className="btn small" title="Add to collection (Enter)" onClick={(event) => { event.stopPropagation(); add(card); }}>+ Collection</button>
+            <AddButtons store={store} card={card} />
             <button type="button" className="btn small" title="Add to wishlist (W)" onClick={(event) => {
               event.stopPropagation();
               void store.addToWishlist([{ cardId: card.id, foil: store.prefs.foil ? 1 : 0, condition: "NM", language: "en", proxy: false, quantity: 1 }], card.name);
             }}>+ Wishlist</button>
-            {deck && <button type="button" className="btn small" title="Add to deck (Shift+Enter)" onClick={(event) => { event.stopPropagation(); void store.addToDeck(card.id, card.name); }}>+ Deck</button>}
           </>
         )}
         empty={<>
@@ -133,6 +133,8 @@ export function OwnershipTab({ actions }: { actions: Record<string, Action> }) {
   if (!report) return <div className="emptynote">Checking which cards you own</div>;
   const currency = report.currency;
   const percent = report.needed ? Math.floor((report.owned / report.needed) * 1000) / 10 : 0;
+  // cards in the deck that are wanted in a better version
+  const upgrades = (store.deck?.cards ?? []).filter((card) => card.want_card_id);
   return (
     <div className="list compwrap">
       <div className="stattile">
@@ -146,7 +148,22 @@ export function OwnershipTab({ actions }: { actions: Record<string, Action> }) {
       <div className="rulesline">
         <button type="button" className="btn small" disabled={!report.missing} onClick={actions["deck.missingWishlist"]?.run}>Add missing to wishlist</button>
         <button type="button" className="btn small" disabled={!report.missing} onClick={actions["deck.exportMissing"]?.run}>Export missing</button>
+        <button type="button" className="btn small" disabled={!report.missing} onClick={actions["deck.linkOwned"]?.run}>Link owned copies</button>
       </div>
+      {upgrades.length > 0 && (
+        <div className="meterlist" role="table" aria-label="Upgrade wanted">
+          <div className="mrow orow mhead" role="row"><span role="columnheader">Upgrade wanted</span><span role="columnheader">In the deck</span>
+            <span role="columnheader">Wanted</span><span role="columnheader" className="mnum" /></div>
+          {upgrades.map((card) => (
+            <div className="mrow orow" role="row" key={card.entry_id} onClick={() => store.select({ view: "deck", key: String(card.entry_id), printingId: card.card_id })}>
+              <span role="cell" className="mname">{card.name}</span>
+              <span role="cell" className="sub">({card.set_code.toUpperCase()}) {card.collector_number}{card.finish ? ` ${finishWord(card.finish)}` : ""}</span>
+              <span role="cell" className="sub">{wantedLabel(card)}</span>
+              <span role="cell" className="mnum"><UpgradeBadge card={card} /></span>
+            </div>
+          ))}
+        </div>
+      )}
       <div className="meterlist" role="table" aria-label="Deck ownership">
         <div className="mrow orow mhead" role="row"><span role="columnheader">Card</span><span role="columnheader">Owned</span><span role="columnheader">Where</span>
           <span role="columnheader" className="mnum">To buy</span></div>

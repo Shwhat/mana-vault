@@ -189,7 +189,7 @@ export async function linkDialog(store: Store, card: DeckCard) {
 
 export function moveDialog(store: Store, entries: CollectionEntry[]) {
   const others = (store.collections ?? []).filter((item) => item.id !== store.prefs.openCollection);
-  if (!entries.length) return store.flash("Pick one or more rows first", "err");
+  if (!entries.length) return store.flash("Pick one or more cards first", "err");
   if (!others.length) return store.flash("Create another collection to move cards into", "err");
   const single = entries.length === 1 ? entries[0]! : null;
   dialog(single ? `Move ${single.name}` : `Move ${entries.length} entries`, [

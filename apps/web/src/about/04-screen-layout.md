@@ -71,17 +71,17 @@ All commands also lists commands that are not on the standard ribbon but can be 
 
 ## Right-click menus
 
-Right-clicking a card row, a collection or a deck opens a menu of what can be done with it. On a phone, a long press (half a second) opens the same menu; moving the finger cancels it.
+Right-clicking a card, a collection or a deck opens a menu of what can be done with it. On a phone, a long press (half a second) opens the same menu; moving the finger cancels it.
 
-| Row | Menu |
+| Item | Menu |
 |---|---|
-| Search result | Card page, Add to collection, Add as proxy, Add to wishlist, Add to the open deck, Add to trade (you get), Add to print list |
-| Collection row, grid card or binder pocket | Card page, Copy details..., Change printing..., Move..., Mark for trade or Unmark for trade, Add to trade (you give), Add to the open deck, Add to print list, Remove |
-| Deck card, in any view and in the Deck list panel | Card page, Change printing..., Link copies..., Tags..., Move to each other zone, Use as cover card, Add missing to wishlist (when cards are missing), Add to print list, Remove from deck |
+| Search result | Card page, Add to collection name (and as foil or as etched for each finish the printing is made in), Add to deck name (the same), Add as proxy, Add to wishlist, Add to trade (you get), Add to print list |
+| Collection entry, grid card or binder pocket | Card page, Copy details..., Change printing..., Move..., Mark for trade or Unmark for trade, Add to trade (you give), Add to the open deck, Add to print list, Reduce to 1 (more than one copy), Remove |
+| Deck card, in any view and in the Deck list panel | Card page, Change printing..., Link copies..., Link owned copies and Switch to the version owned... (for missing cards you own), Mark as upgrade wanted... or Change upgrade wanted... and Remove upgrade wanted mark, Tags..., Move to each other zone, Use as cover card, Add missing to wishlist (when cards are missing), Add to print list, Reduce to 1 (more than one copy), Remove from deck |
 | Collection, in the Collections panel or the collection switcher | Open, Rename..., Collection settings..., Send..., Export..., Delete (Leave for a collection shared with you). Rename, settings and Send are only for your own collections |
 | Deck, in the Decks panel or the deck switcher | Open, Rename..., Deck format..., Send..., Export..., Delete (Leave for a deck shared with you). Rename, format and Send are only for your own decks. Deck format and Export open the deck first |
 
-**Change printing...** opens the printing chooser: every printing of the card, newest first, with its picture, set, number and year, a button with the price for each finish the printing is made in (**Regular**, **Foil**, **Etched**), and a box to find a set, code or number. The current printing shows **Current** with its finish, and its finish button is highlighted. Choose a finish button to switch to that printing in that finish, such as the foil version of the current printing. Clicking a printing, or pressing Enter on it, chooses it in the finish in use (or its first finish when it is not made in that one).
+**Change printing...** opens the printing chooser: every printing of the card, newest first, with its picture, set, number and year, a button with the price for each finish the printing is made in (**Regular**, **Foil**, **Etched**), and a box to find a set, code or number. The current printing shows **Current** with its finish, and its finish button is highlighted. Choose a finish button to switch to that printing in that finish, such as the foil version of the current printing. Clicking a printing, or pressing Enter on it, chooses it in the finish in use (or its first finish when it is not made in that one). For a collection entry or deck card with more than one copy, **How many to change** at the top sets how many copies change (all by default). The same chooser, titled "Version wanted for card", picks the version for **Mark as upgrade wanted...**.
 
 Commands that can be used are shown in the normal text color.
 
@@ -109,7 +109,7 @@ The card page shows one card in full. It opens from **Card page** in a right-cli
 - Where you have it: each collection with its copies (and proxies), and each wishlist that wants it.
 - **Versions**: every printing of the card with set, number, rarity and year, and the market price for Normal, Foil and Etched where the printing exists in that finish. The card shown is first and highlighted; tapping another printing shows it.
 - **Rulings**: the official rulings for the card with their dates, or "No rulings".
-- A round actions button at the bottom right: Add to collection, Add as proxy, Add to wishlist, Add to the open deck, Add to trade (you get) and Scan cards.
+- A round actions button at the bottom right: Add to collection name and Add to deck name (each also as foil or as etched when the printing has those finishes), Add as proxy, Add to wishlist, Add to trade (you get) and Scan cards.
 
 ## Panels
 
@@ -118,8 +118,8 @@ The card page shows one card in full. It opens from **Card page** in a right-cli
 | Filters | Type, set code, color, rarity, legal format and mana value range filters for the open view (card search, collection, deck or a search inside them), with a Filtering line naming it, and **Clear filters** |
 | Collections | Your collections with card counts, values, completion bars and percentages, Wishlist and Shared badges, and **New...**. Click a collection to open it; it becomes where new cards go and is highlighted |
 | Decks | Every deck grouped by format (Commander, Standard and the other formats, Casual last, each heading with its number of decks), with its card count and value under its name and a Shared badge for shared decks, a box to find a deck by name or commander, and **New...**. Click a deck to open it; it becomes where new cards go and is highlighted |
-| Card | The selected card: image, name, type, **Add to collection**, **Add to deck**, **Add to wishlist**, **You get**, mana cost, mana value, rules text, set, number, rarity, artist, release date, flavor name, regular, foil and etched prices, copies owned of this printing (regular, foil and etched), of all printings and in each of your collections with the number for trade, and copies wanted in each wishlist |
-| Deck list | The open deck in compact form by zone, with plus and minus buttons, the deck card menu on right-click, and the Main, Sideboard, Commander and Maybeboard target zone switch |
+| Card | The selected card: image, name (with FOIL, ETCHED or Upgrade wanted for the selected copy or deck card), type, the add buttons **+ collection name** and **+ deck name** with a button for each other finish (the one Enter uses is blue), **Add to wishlist**, **You get**, mana cost, mana value, rules text, set, number, rarity, artist, release date, flavor name, regular, foil and etched prices, copies owned of this printing (regular, foil and etched), of all printings and in each of your collections with the number for trade, and copies wanted in each wishlist |
+| Deck list | The open deck in compact form by zone, with FOIL, ETCHED, Upgrade wanted and Missing marks, plus and minus buttons, the deck card menu on right-click, and the Main, Sideboard, Commander and Maybeboard target zone switch |
 | Import review | The rows skipped by the latest import or import preview, with row number, card name and reason, and **Clear** |
 
 ### Moving and arranging panels
@@ -155,11 +155,11 @@ A workspace is a saved panel layout and view. Three are built in:
 |---|---|
 | View name | The current view |
 | Count | Results, collection entries or deck cards in the current view |
-| Picked | Number of picked collection rows, when more than one |
+| Picked | Number of picked collection entries, when more than one |
 | Card database | Number of printings and the date of the last update; pointing at it shows the automatic update schedule |
 | Updating card database | Shown in amber while an update runs |
 | Last update failed | Shown in red after a failed update; click it to read the reason |
-| ADD TO | The target collection for Add to collection; click to cycle it |
+| ADDING TO | Where Enter, a double-click and + Add put cards: the target collection, or DECK name when a deck was selected last. With a deck open, click to switch between the deck and the target collection; without one, click to cycle the target collection |
 | FOIL | Click to switch Add as foil on or off (highlighted when on) |
 | PRICES | The currency for prices and values, USD or EUR; click to switch it |
 | ZONE | The target zone for Add to deck; click to cycle it |

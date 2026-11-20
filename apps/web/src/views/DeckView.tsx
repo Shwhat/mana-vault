@@ -7,6 +7,8 @@ import { rowMenu } from "../components/ContextMenu";
 import { formatDialog, tagsDialog } from "../components/DeckDialogs";
 import { linkDialog } from "../components/LibraryDialogs";
 import { choosePrinting } from "../components/PrintingDialog";
+import { finishesOfCard } from "../components/AddButtons";
+import { FinishBadge, finishName, OwnedMarks, ownedVersions, removeCard, switchVersionDialog, linkExact, UpgradeBadge, wantedLabel } from "../components/CardMarks";
 import { Switcher } from "../components/Switcher";
 import { cardPrice, checkDeck, type Legality, MANA_COLORS, manaBalance, sections, shuffle, ZONE_ORDER } from "../deck-rules";
 import { Icon } from "../icons";
@@ -34,20 +36,32 @@ const ZONE_CHOICES: Choice[] = ZONES.map((zone) => ({ value: zone.id, label: zon
 /** The commands for one deck card: right-click on the desktop, a long press on a phone. Also used by the Deck list panel. */
 export function cardMenu(store: Store, card: DeckCard) {
   const missing = card.missing ?? 0;
+  const { exact, other } = ownedVersions(card);
+  const remove = (left: number) => void store.setDeckQuantity(card, left);
   return rowMenu(store, card.name, () => [
     { label: "Card page", run: () => store.setCardPage(card.card_id) },
-    { label: "Change printing...", run: () => choosePrinting(card.name, card.card_id, card.card_id, { finish: card.finish ?? 0, currency: store.prefs.currency },
-      (printing, finish) => void store.changeDeckPrinting(card, printing, finish)) },
+    { label: "Change printing...", run: () => choosePrinting(card.name, card.card_id, card.card_id, { finish: card.finish ?? 0, currency: store.prefs.currency, quantity: card.quantity },
+      (printing, finish, count) => void store.changeDeckPrinting(card, printing, finish, undefined, count)) },
     card.zone !== "maybeboard" && { label: "Link copies...", run: () => void linkDialog(store, card) },
+    missing > 0 && exact.length > 0 && { label: "Link owned copies", run: () => linkExact(store, card) },
+    missing > 0 && other.length > 0 && { label: "Switch to the version owned...", run: () => switchVersionDialog(store, card) },
+    {
+      label: card.want_card_id ? "Change upgrade wanted..." : "Mark as upgrade wanted...",
+      run: () => choosePrinting(card.name, card.card_id, card.want_card_id ?? card.card_id, {
+        finish: card.want_card_id ? card.want_finish ?? 0 : card.finish ?? 0, currency: store.prefs.currency, title: `Version wanted for ${card.name}`, allowCurrent: true,
+      }, (printing, finish) => void store.markUpgrade(card, printing, finish)),
+    },
+    !!card.want_card_id && { label: "Remove upgrade wanted mark", run: () => void store.markUpgrade(card, null) },
     { label: "Tags...", run: () => tagsDialog(store, card) },
     ...ZONES.filter((zone) => zone.id !== card.zone).map((zone) => ({ label: `Move to ${zone.label}`, run: () => void store.moveDeckCard(card, zone.id) })),
     store.deck?.cover_card_id !== card.card_id && { label: "Use as cover card", run: () => void store.updateDeckInfo({ coverCardId: card.card_id }, `${card.name} is the cover card`) },
     missing > 0 && {
       label: "Add missing to wishlist",
-      run: () => void store.addToWishlist([{ cardId: card.card_id, foil: 0, condition: "NM", language: "en", proxy: false, quantity: missing }], card.name),
+      run: () => void store.addToWishlist([{ cardId: card.card_id, foil: card.finish ?? 0, condition: "NM", language: "en", proxy: false, quantity: missing }], card.name),
     },
     { label: "Add to print list", run: () => void store.addToPrintList([{ card: { ...card, id: card.card_id }, count: card.quantity }], card.name) },
-    { label: "Remove from deck", run: () => void store.setDeckQuantity(card, 0) },
+    card.quantity > 1 && { label: "Reduce to 1", run: () => remove(1) },
+    { label: "Remove from deck", run: () => removeCard(store, card.name, card.quantity, remove) },
   ]);
 }
 
@@ -81,9 +95,10 @@ function ListRow({ card, flag, onHover }: { card: DeckCard; flag?: string } & Ho
       <Thumb url={card.image_url} />
       <div className="rowmain" {...hoverHandlers(card, onHover)}>
         <div className="rowtitle"><b>{card.name}</b>{card.custom && <span className="badge custom">Custom</span>}
-          {!!card.finish && <span className="badge foil">{card.finish === 2 ? "ETCHED" : "FOIL"}</span>}<span className="mana">{card.mana_cost}</span><Flag text={flag} /></div>
+          <FinishBadge finish={card.finish} /><UpgradeBadge card={card} /><span className="mana">{card.mana_cost}</span><Flag text={flag} /></div>
         <div className="rowsub">{card.type_line}</div>
-        <div className="rowmeta">{card.set_name} <span className="badge">{card.set_code.toUpperCase()}</span> {card.collector_number}</div>
+        <div className="rowmeta">{card.set_name} <span className="badge">{card.set_code.toUpperCase()}</span> {card.collector_number}
+          {card.want_card_id && <span className="muted">, wanted {wantedLabel(card)}</span>}</div>
         <div className="rowtags">
           {(card.tags ?? []).map((tag) => (
             <button key={tag} type="button" className="tag badge dtag" title={`Group by tag (${tag})`}
@@ -101,9 +116,10 @@ function ListRow({ card, flag, onHover }: { card: DeckCard; flag?: string } & Ho
             <button type="button" className="tag badge wish" title={`Add ${missing} ${card.name} to your wishlist`}
               onClick={(event) => {
                 event.stopPropagation();
-                void store.addToWishlist([{ cardId: card.card_id, foil: 0, condition: "NM", language: "en", proxy: false, quantity: missing }], card.name);
+                void store.addToWishlist([{ cardId: card.card_id, foil: card.finish ?? 0, condition: "NM", language: "en", proxy: false, quantity: missing }], card.name);
               }}>+ Wishlist</button>
           )}
+          <OwnedMarks store={store} card={card} />
         </div>
       </div>
       <span className="price">{money(price === null ? null : price * card.quantity, currency)}</span>
@@ -117,7 +133,7 @@ function ListRow({ card, flag, onHover }: { card: DeckCard; flag?: string } & Ho
           onChange={(value) => void store.moveDeckCard(card, value as Zone)} options={ZONE_CHOICES} />
       </span>
       <button type="button" className="btn small icon-only" title={`Remove ${card.name}`} aria-label={`Remove ${card.name} from deck`}
-        onClick={(event) => { event.stopPropagation(); void store.setDeckQuantity(card, 0); }}><Icon name="del" /></button>
+        onClick={(event) => { event.stopPropagation(); removeCard(store, card.name, card.quantity, (left) => void store.setDeckQuantity(card, left)); }}><Icon name="del" /></button>
     </div>
   );
 }
@@ -133,6 +149,7 @@ function TextRow({ card, flag, onHover }: { card: DeckCard; flag?: string } & Ho
       title={flag} onClick={() => pick(store, card)} {...cardMenu(store, card)} {...hoverHandlers(card, onHover)}>
       <span className="tq">{card.quantity}</span>
       <span className="tn">{card.name}</span>
+      <FinishBadge finish={card.finish} className="tmark" /><UpgradeBadge card={card} className="tmark" />
       <span className="mana">{card.mana_cost}</span>
       <span className="tp">{money(price === null ? null : price * card.quantity, currency)}</span>
     </div>
@@ -148,7 +165,12 @@ function Picture({ card, flag }: { card: DeckCard; flag?: string }) {
       onClick={() => pick(store, card)} {...cardMenu(store, card)}>
       {card.image_url ? <img src={card.image_url} alt={card.name} loading="lazy" draggable={false} /> : <span className="pocketname">{card.name}</span>}
       {card.quantity > 1 && <span className="pocketqty">{card.quantity}</span>}
-      {(card.missing ?? 0) > 0 && <span className="badge miss dmiss">Missing</span>}
+      <span className="dmarks">
+        <FinishBadge finish={card.finish} />
+        <UpgradeBadge card={card} />
+        {(card.missing ?? 0) > 0 && <span className="badge miss">Missing</span>}
+        <OwnedMarks store={store} card={card} compact />
+      </span>
     </div>
   );
 }
@@ -359,12 +381,21 @@ function AddTab({ actions, search }: { actions: Record<string, Action>; search: 
     return map;
   }, [deck.cards]);
   const inDeck = (card: FoundCard, zone: Zone) => counts.get(`${card.oracle_id ?? ""}:${zone}`) ?? 0;
-  const add = (card: FoundCard, zone: Zone) => void store.addToDeck(card.id, card.name, undefined, { zone });
+  // the finish the zone buttons add in; a printing not made in it is added in its first finish
+  const [finish, setFinish] = useState<"" | "foil" | "etched">(store.prefs.foil ? "foil" : "");
+  const finishFor = (card: FoundCard): "" | "foil" | "etched" => {
+    const offered = finishesOfCard(card);
+    const code = finish === "etched" ? 2 : finish === "foil" ? 1 : 0;
+    return finishName(offered.includes(code) ? code : offered[0]!);
+  };
+  const add = (card: FoundCard, zone: Zone) => void store.addToDeck(card.id, card.name, undefined, { zone, finish: finishFor(card) });
   return (
     <>
       <div className="deckbar">
         <QuickAdd />
         <button type="button" className="btn small" onClick={actions["deck.editText"]?.run}>Edit as text...</button>
+        <Segments label="Add as" value={finish || "regular"} options={[["regular", "Regular"], ["foil", "Foil"], ["etched", "Etched"]]}
+          onChange={(value) => setFinish(value === "regular" ? "" : value)} />
       </div>
       <CardResults
         search={search} layout={store.searchLayout} size={store.prefs.searchSize} label="Cards to add" resetKey={store.filterSets.deckAdd}

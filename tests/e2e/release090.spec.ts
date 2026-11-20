@@ -83,7 +83,7 @@ test("cards go to the collection or deck selected last, the Decks panel groups b
 
   // selecting a deck makes it the target, and no collection is highlighted
   await decks.locator(".navitem", { hasText: "Elves" }).click();
-  await expect(page.locator("#st-target")).toHaveText("ADD TO: DECK ELVES");
+  await expect(page.locator("#st-target")).toHaveText("ADDING TO: DECK ELVES");
   await expect(page.locator(".colitem.active", { hasText: "Main collection" })).toHaveCount(0);
   await search(page, "Llanowar Elves");
   await page.locator("#view-cards .row", { hasText: "Llanowar Elves" }).first().dblclick();
@@ -92,7 +92,7 @@ test("cards go to the collection or deck selected last, the Decks panel groups b
 
   // selecting a collection makes it the target again
   await page.locator(".navitem", { hasText: "Main collection" }).first().click();
-  await expect(page.locator("#st-target")).toHaveText("ADD TO: MAIN COLLECTION");
+  await expect(page.locator("#st-target")).toHaveText("ADDING TO: MAIN COLLECTION");
   await expect(decks.locator(".navitem.active")).toHaveCount(0);
   await search(page, "Sol Ring");
   await page.locator("#view-cards .row", { hasText: "Sol Ring" }).first().dblclick();

@@ -1,4 +1,5 @@
 // ---------- card page: the card's art, text, versions with prices, rulings and what you own ----------
+import { addMenuItems } from "../components/AddButtons";
 import { useEffect, useState } from "react";
 import type { Action } from "../actions";
 import { request } from "../api";
@@ -49,10 +50,9 @@ export function CardPage({ actions }: { actions: Record<string, Action> }) {
   const rows = [...versions].sort((a, b) => (a.id === card.id ? -1 : b.id === card.id ? 1 : 0));
   const owned = card.owned;
   const fab: Array<[string, () => void]> = [
-    ["Add to collection", () => void store.addToCollection(card.id, card.name)],
+    ...addMenuItems(store, card).map((item): [string, () => void] => [item.label, item.run]),
     ["Add as proxy", () => void store.addToCollection(card.id, card.name, undefined, undefined, true)],
     ["Add to wishlist", () => void store.addToWishlist([{ cardId: card.id, foil: store.prefs.foil ? 1 : 0, condition: "NM", language: "en", proxy: false, quantity: 1 }], card.name)],
-    ...(store.deck ? [[`Add to ${store.deck.name}`, () => void store.addToDeck(card.id, card.name)] as [string, () => void]] : []),
     ["Add to trade (you get)", () => void store.getCard(card.id)],
   ];
   return (

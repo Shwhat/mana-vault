@@ -20,7 +20,7 @@ type BackupCopy = {
 };
 type BackupLink = {
   deck_id: string; printing_id: string; zone: string; collection_id: string; card_id: string; foil: number; condition: string; language: string;
-  proxy: number; quantity: number;
+  proxy: number; quantity: number; deck_finish?: number;
 };
 
 /** A custom set (0.9.0), with its symbol as base64. */
@@ -45,7 +45,7 @@ export interface ManaVaultBackup {
     description?: string; cover_card_id?: string | null;
   }>;
   /** tags (0.7.0) holds the deck card's tags, one per line. */
-  deckCards: Array<{ deck_id: string; oracle_id: string; printing_id: string | null; quantity: number; zone: string; tags?: string; finish?: number }>;
+  deckCards: Array<{ deck_id: string; oracle_id: string; printing_id: string | null; quantity: number; zone: string; tags?: string; finish?: number; want_card_id?: string | null; want_finish?: number }>;
   /** Version 4: the collection copies that fill each deck card. */
   deckLinks: BackupLink[];
   /** Version 5: the custom sets and custom cards the account made or uses. */
@@ -120,11 +120,11 @@ export function createBackup(database: DatabaseSync, userId: number): ManaVaultB
       "SELECT id, name, format, mode, collection_id, created_at, updated_at, description, cover_card_id FROM decks WHERE owner_id = ? ORDER BY id",
     ).all(userId) as ManaVaultBackup["decks"],
     deckCards: database.prepare(
-      `SELECT deck_id, oracle_id, printing_id, quantity, zone, tags, finish FROM deck_cards
+      `SELECT deck_id, oracle_id, printing_id, quantity, zone, tags, finish, want_card_id, want_finish FROM deck_cards
        WHERE deck_id IN (SELECT id FROM decks WHERE owner_id = ?) ORDER BY deck_id, zone, oracle_id`,
     ).all(userId) as ManaVaultBackup["deckCards"],
     deckLinks: database.prepare(
-      `SELECT dc.deck_id, dc.printing_id, dc.zone, l.collection_id, l.card_id, l.foil, l.condition, l.language, l.proxy, l.quantity
+      `SELECT dc.deck_id, dc.printing_id, dc.zone, dc.finish AS deck_finish, l.collection_id, l.card_id, l.foil, l.condition, l.language, l.proxy, l.quantity
        FROM deck_links l JOIN deck_cards dc ON dc.id = l.deck_card_id JOIN decks d ON d.id = dc.deck_id JOIN collections col ON col.id = l.collection_id
        WHERE d.owner_id = ? AND col.owner_id = ? AND dc.printing_id IS NOT NULL ORDER BY l.id`,
     ).all(userId, userId) as BackupLink[],
@@ -217,23 +217,28 @@ export function restoreBackup(database: DatabaseSync, source: string, userId: nu
     // a deck card without a printing (Normal decks before 0.6.0) takes the newest printing of the card
     const newest = database.prepare("SELECT id FROM cards WHERE oracle_id = ? ORDER BY released_at IS NULL, released_at DESC, promo, variation LIMIT 1");
     const insertDeckCard = database.prepare(
-      `INSERT INTO deck_cards (deck_id, oracle_id, printing_id, quantity, zone) VALUES (?, ?, ?, ?, ?)
-       ON CONFLICT(deck_id, oracle_id, printing_id, zone) WHERE printing_id IS NOT NULL DO UPDATE SET quantity = quantity + excluded.quantity`,
+      `INSERT INTO deck_cards (deck_id, oracle_id, printing_id, quantity, zone, finish) VALUES (?, ?, ?, ?, ?, ?)
+       ON CONFLICT(deck_id, oracle_id, printing_id, zone, finish) WHERE printing_id IS NOT NULL DO UPDATE SET quantity = quantity + excluded.quantity`,
     );
+    const where = "WHERE deck_id = ? AND printing_id = ? AND zone = ? AND finish = ?";
     for (const card of backup.deckCards) {
       const printing = card.printing_id ?? (newest.get(card.oracle_id)?.id as string | undefined) ?? null;
+      const finish = card.finish === 1 || card.finish === 2 ? card.finish : 0;
+      const deckId = deckIds.get(card.deck_id)!;
       if (printing) {
-        insertDeckCard.run(deckIds.get(card.deck_id)!, card.oracle_id, printing, card.quantity, card.zone);
-        if (card.finish === 1 || card.finish === 2) {
-          database.prepare("UPDATE deck_cards SET finish = ? WHERE deck_id = ? AND printing_id = ? AND zone = ?").run(card.finish, deckIds.get(card.deck_id)!, printing, card.zone);
-        }
+        insertDeckCard.run(deckId, card.oracle_id, printing, card.quantity, card.zone, finish);
         if (typeof card.tags === "string" && card.tags) {
-          database.prepare("UPDATE deck_cards SET tags = ? WHERE deck_id = ? AND printing_id = ? AND zone = ?").run(card.tags.slice(0, 600), deckIds.get(card.deck_id)!, printing, card.zone);
+          database.prepare(`UPDATE deck_cards SET tags = ? ${where}`).run(card.tags.slice(0, 600), deckId, printing, card.zone, finish);
+        }
+        if (typeof card.want_card_id === "string" && database.prepare("SELECT 1 FROM cards WHERE id = ?").get(card.want_card_id)) {
+          database.prepare(`UPDATE deck_cards SET want_card_id = ?, want_finish = ? ${where}`)
+            .run(card.want_card_id, card.want_finish === 1 || card.want_finish === 2 ? card.want_finish : 0, deckId, printing, card.zone, finish);
         }
       }
-      else database.prepare("INSERT INTO deck_cards (deck_id, oracle_id, printing_id, quantity, zone) VALUES (?, ?, NULL, ?, ?)").run(deckIds.get(card.deck_id)!, card.oracle_id, card.quantity, card.zone);
+      else database.prepare("INSERT INTO deck_cards (deck_id, oracle_id, printing_id, quantity, zone) VALUES (?, ?, NULL, ?, ?)").run(deckId, card.oracle_id, card.quantity, card.zone);
     }
-    const deckCardOf = database.prepare("SELECT id FROM deck_cards WHERE deck_id = ? AND printing_id = ? AND zone = ?");
+    // backups before 0.11.0 do not name the deck card's finish: the first deck card of the printing in the zone is used
+    const deckCardOf = database.prepare("SELECT id FROM deck_cards WHERE deck_id = ? AND printing_id = ? AND zone = ? ORDER BY finish = ? DESC, id LIMIT 1");
     const insertLink = database.prepare(
       `INSERT INTO deck_links (deck_card_id, collection_id, card_id, foil, condition, language, proxy, quantity) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(deck_card_id, collection_id, card_id, foil, condition, language, proxy) DO UPDATE SET quantity = quantity + excluded.quantity`,
@@ -241,7 +246,7 @@ export function restoreBackup(database: DatabaseSync, source: string, userId: nu
     for (const link of backup.deckLinks) {
       const deckId = deckIds.get(link.deck_id);
       const collectionId = collectionIds.get(link.collection_id);
-      const card = deckId ? deckCardOf.get(deckId, link.printing_id, link.zone) : undefined;
+      const card = deckId ? deckCardOf.get(deckId, link.printing_id, link.zone, link.deck_finish ?? link.foil) : undefined;
       if (card && collectionId) insertLink.run(Number(card.id), collectionId, link.card_id, link.foil, link.condition, link.language, link.proxy, link.quantity);
     }
     database.exec("COMMIT");

@@ -184,7 +184,7 @@ export async function buildApp(
     const deck = database.prepare("SELECT id, mode FROM decks WHERE id = ?").get(request.params.deckId);
     if (!deck) return reply.code(404).send({ error: "Deck not found" });
     try {
-      const result = importDecklist(database, request.params.deckId, deck.mode as "normal" | "theme", request.body);
+      const result = importDecklist(database, request.params.deckId, deck.mode as "normal" | "theme", request.body, true, request.user!.id);
       if (result.importedQuantity) logDeck(database, request.params.deckId, String(request.user?.name ?? ""), `Imported ${result.importedQuantity} cards`);
       return result;
     } catch (error) {
@@ -523,7 +523,7 @@ export async function buildApp(
 }
 
 function toCardRow(row: Record<string, unknown>): CardRow & {
-  flavor_name: string | null; power: string | null; toughness: string | null; prices: Record<string, number | null>; custom?: boolean;
+  flavor_name: string | null; power: string | null; toughness: string | null; prices: Record<string, number | null>; custom?: boolean; finishes?: string;
 } {
   const required = (key: string): string => {
     const value = row[key];
@@ -558,6 +558,8 @@ function toCardRow(row: Record<string, unknown>): CardRow & {
     toughness: typeof row.toughness === "string" ? row.toughness : null,
     // a card made in the card maker
     ...(Number(row.custom ?? 0) === 1 ? { custom: true } : {}),
+    // the finishes the printing is made in, such as "nonfoil,foil"
+    ...(typeof row.finishes === "string" ? { finishes: row.finishes } : {}),
     prices: {
       usd: price(row.price_usd), usd_foil: price(row.price_usd_foil), usd_etched: price(row.price_usd_etched),
       eur: price(row.price_eur), eur_foil: price(row.price_eur_foil),
@@ -566,4 +568,4 @@ function toCardRow(row: Record<string, unknown>): CardRow & {
 }
 
 const price = (value: unknown) => (typeof value === "number" ? value : null);
-const CARD_PRICE_COLUMNS = "flavor_name, power, toughness, price_usd, price_usd_foil, price_usd_etched, price_eur, price_eur_foil, custom";
+const CARD_PRICE_COLUMNS = "flavor_name, power, toughness, price_usd, price_usd_foil, price_usd_etched, price_eur, price_eur_foil, custom, finishes";

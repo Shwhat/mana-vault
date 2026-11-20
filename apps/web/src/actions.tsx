@@ -47,7 +47,7 @@ export const SHORTCUTS: Array<[group: string, key: string, action: string]> = [
   ["Adding cards", "C", "collection.target"],
   ["Adding cards", "W", "wishlist.add"],
   ["Collections", "Ctrl+A", "pickAll"],
-  ["Collections", "Ctrl+click, Shift+click", "Pick more rows, or a range of rows"],
+  ["Collections", "Ctrl+click, Shift+click", "Pick more cards, or a range of cards"],
   ["Collections", "Delete", "removePicked"],
   ["Collections", "E", "copy.details"],
   ["Collections", "B", "collection.binder"],
@@ -120,6 +120,10 @@ export function useActions(store: Store): Record<string, Action> {
         label: allTrade ? "Unmark for trade" : "Mark for trade", short: "For trade", icon: "trade", on: allTrade, disabled: !markable.length,
         run: () => void store.markTrade(markable, !allTrade),
       },
+      "deck.linkOwned": {
+        label: "Link owned copies", short: "Link owned", icon: "link", disabled: !deck,
+        run: () => void store.linkOwnedCopies(),
+      },
       "deck.link": {
         label: "Link copies...", short: "Link copies", icon: "link", disabled: !deckCard,
         run: () => (deckCard ? void linkDialog(store, deckCard) : store.flash("Select a card in the deck first", "err")),
@@ -156,12 +160,16 @@ export function useActions(store: Store): Record<string, Action> {
       "collection.completion": { label: "Set completion", short: "Completion", icon: "progress", on: store.view === "collection" && store.collectionTab === "completion", run: () => showTab("completion") },
       "collection.missing": { label: "Missing cards", short: "Missing", icon: "missing", on: store.view === "collection" && store.collectionTab === "missing", run: () => showTab("missing") },
       pickAll: {
-        label: "Select all rows", short: "Select all", icon: "selectall", key: "Ctrl+A", disabled: store.view !== "collection" || !store.visibleCollection.length,
+        label: "Select all cards", short: "Select all", icon: "selectall", key: "Ctrl+A", disabled: store.view !== "collection" || !store.visibleCollection.length,
         run: store.pickAll,
       },
       removePicked: {
         label: "Remove selected...", short: "Remove", icon: "del", key: "Delete", disabled: store.view !== "collection" || !picked,
         run: () => void store.removePicked(),
+      },
+      reducePicked: {
+        label: "Reduce to 1", short: "Reduce to 1", icon: "del", disabled: store.view !== "collection" || !picked,
+        run: () => void store.reducePicked(),
       },
       movePicked: {
         label: "Move selected...", short: "Move", icon: "move", disabled: store.view !== "collection" || !picked || (store.collections?.length ?? 0) < 2,

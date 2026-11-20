@@ -65,7 +65,7 @@ function addFromCollectionDialog(store: Store) {
 function addSelected(store: Store) {
   const picked = (store.collection ?? []).filter((entry) => store.checked.has(entryKey(entry)));
   if (!picked.length) return store.flash("Pick cards in a collection first (Select several cards in Options, or Ctrl+click)", "err");
-  void store.addToPrintList(picked.map((entry) => ({ card: entry, count: entry.quantity })), `${picked.length} selected ${picked.length === 1 ? "row" : "rows"}`);
+  void store.addToPrintList(picked.map((entry) => ({ card: entry, count: entry.quantity })), `${picked.length} selected ${picked.length === 1 ? "card" : "cards"}`);
 }
 
 /** Pasted lines in the deck list format: "4 Lightning Bolt", "1 Sol Ring (C21) 263", with *F* and *E* marks. */

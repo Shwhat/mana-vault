@@ -20,28 +20,29 @@ This page lists what Mana Vault does in the current version, followed by what is
 ### Collections
 
 - Keep any number of collections per account, each with a name and description. Every account starts with a Main collection.
-- Add any printing as a regular or foil copy with Enter or a double-click to the collection or deck selected last in the Collections panel, the Decks panel or a switcher, and cycle the collections with C.
-- Change the printing or finish of copies (such as to the foil version), keeping their count, condition, language, trade marks, details and deck links.
+- Add any printing as a regular, foil or etched copy with Enter, a double-click or the add buttons, which name where the card goes (+ collection name, + deck name) and offer each finish the printing is made in.
+- See where cards go: Target and Adding here marks in the Collections and Decks panels, and ADDING TO in the status bar, which switches between the open deck and the target collection. Cycle the collections with C.
+- Change the printing or finish of all or some copies (such as one of two copies to the foil version), keeping their count, condition, language, trade marks and details, and choose whether the decks they fill change too or keep their version.
 - Right-click or long press a collection (panel or switcher) to open, rename, change settings, send, export, delete or leave it.
 - Record each copy's finish (regular, foil or etched), condition (Mint to Damaged) and language with Copy details.
-- Show each row's value, and each collection's total value, in US dollars or euros.
-- Sort rows by name, price, quantity, or set and number.
-- Narrow the list with filter tags by clicking a set code or rarity on a row, or a bar in Statistics.
+- Show each entry's value, and each collection's total value, in US dollars or euros.
+- Sort entries by name, price, quantity, or set and number.
+- Narrow the list with filter tags by clicking a set code or rarity on an entry, or a bar in Statistics.
 - Show a collection as a grid of card pictures that loads more while scrolling (Small, Medium or Large), as binder pages of nine cards with a page box, or as a list. Each device type remembers its own layout.
 - Open collections from a switcher with search, five sort orders and the keyboard.
-- All collections, the first entry of the switcher, lists every row of every collection with its collection, wishlists included when chosen in Options. Edits act on each row's own collection.
+- All collections, the first entry of the switcher, lists every entry of every collection with its collection, wishlists included when chosen in Options. Edits act on each entry's own collection.
 - Filters, tags and the filter box stay when another collection opens.
 - Show statistics: mana curve, colors, types, rarity, finish, top sets by value, average and median prices.
-- Change counts with plus and minus buttons, and remove entries.
-- Pick many rows with Ctrl+click, Shift+click, Ctrl+A or Select mode, then remove or move them in one step.
+- Change counts with plus and minus buttons, remove a chosen number of copies, Reduce to 1, or remove entries.
+- Pick many cards with Ctrl+click, Shift+click, Ctrl+A or Select mode, then remove, reduce to one copy or move them in one step.
 - Move copies between collections.
 - Filter a collection by card or set name.
 - Track completion, or choose None for bulk collections (the default for new collections).
 - Keep proxies apart from real copies: marked everywhere, with no value, out of set completion.
-- Record purchase price and currency, date added, and misprint, altered and signed marks with each row.
-- Show on each row the decks its copies fill, and filter rows by In a deck or Not in a deck.
+- Record purchase price and currency, date added, and misprint, altered and signed marks with each entry.
+- Show on each entry the decks its copies fill, and filter entries by In a deck or Not in a deck.
 - Import from Mana Vault, Moxfield, ManaBox, Archidekt, Deckbox and TCGplayer CSV files and plain text lists, with the format detected from the file and changeable, into an existing or a new collection, with a preview before anything is added.
-- Export the whole collection, the filtered rows, the picked rows or the missing cards in any of those formats.
+- Export the whole collection, the filtered cards, the picked cards or the missing cards in any of those formats.
 
 ### Wishlists and trading
 
@@ -68,8 +69,11 @@ This page lists what Mana Vault does in the current version, followed by what is
 
 - Create decks with a name and one of 21 formats; every deck keeps the printing of each card.
 - Open decks from a switcher with search, six sort orders, cover card, commander, format and card count.
-- Change the printing or finish of a deck card: free copies of the new printing in that finish are linked, from the collection you choose when several have them.
-- Keep a finish for every deck card (regular, foil or etched), shown on its row and used for its price, set by `*F*` and `*E*` marks, Add as foil and Change printing.
+- Change the printing or finish of all or some of a deck card's cards: free copies of the new printing in that finish are linked, from the collection you choose when several have them.
+- Keep a finish for every deck card (regular, foil or etched), shown as FOIL or ETCHED in every deck view, the Deck list panel and the Card panel, used for its price, set by `*F*` and `*E*` marks, Add as foil, Add as, linked copies and Change printing. A regular and a foil card of the same printing are separate deck cards.
+- Link lines of Edit as text and decklist imports that name a set and number to free copies of exactly that printing and finish; lines without them stay missing until linked. Link owned copies fills every missing card from exact copies.
+- Show on a missing deck card when you own it (Owned, link) or another version of it (Other version owned, with Switch).
+- Mark a deck card Upgrade wanted with the version you want; it stays owned and is listed in the Ownership tab.
 - Right-click or long press a deck (panel or switcher) to open, rename, change the format, send, export, delete or leave it, and a card in the Deck list panel for the deck card menu.
 - The Decks panel groups decks by format with each deck's card count and value.
 - Add cards by typing them (Quick add, such as 2 Sol Ring), from the Add tab's card search with + Main, + Side, + Maybe and + Commander (each showing how many are already in the deck), from card search or from the scanner.
@@ -80,9 +84,9 @@ This page lists what Mana Vault does in the current version, followed by what is
 - Keep a maybeboard of cards being considered, list the tokens the deck makes, and point at a card name for a large picture.
 - Playtest: shuffle, draw opening hands, mulligan, draw and play cards.
 - Write a description with headings, lists and links, choose a cover card, and see the history of every change.
-- Link each deck card to the copy in a collection that fills it: one deck per copy, chosen when a card is free in more than one collection, changeable later, following the copy when it moves, and missing when it is removed.
+- Link each deck card to the copy in a collection that fills it: one deck per copy, chosen when a card is free in more than one collection, changeable later, following the copy when it moves or changes printing (or keeping its version when you choose), and missing when it is removed.
 - Rename and delete decks.
-- Add cards to the commander zone, main deck, sideboard or maybeboard, change counts, move cards between zones and remove cards.
+- Add cards to the commander zone, main deck, sideboard or maybeboard, change counts, move cards between zones, remove a chosen number of copies or Reduce to 1, and remove cards.
 - Import decklists as text (Moxfield, Arena and MTGO style, with `*F*` foil and `*E*` etched marks) or CSV, with a preview. A line whose name does not match is found by its set and collector number.
 - Export decks as text or CSV.
 - Check which deck cards have a linked copy, where they are, and what the missing cards cost.
@@ -91,7 +95,7 @@ This page lists what Mana Vault does in the current version, followed by what is
 
 ### Proxies and custom cards
 
-- Keep a print list on the server: add a deck, its missing cards, a collection, picked rows, a pasted list, the tokens of the listed cards, or any card from a search.
+- Keep a print list on the server: add a deck, its missing cards, a collection, picked cards, a pasted list, the tokens of the listed cards, or any card from a search.
 - Choose each line's printing, count and faces (front, back or both for two-faced cards).
 - Set the paper (Letter, A4, Legal or custom), margins, card size, scale, gap, bleed, cutting guides and background, with a live page preview.
 - Export a PDF at 300 DPI, pictures for MakePlayingCards with bleed, and a card list for MPC Autofill with custom cards as pictures.
