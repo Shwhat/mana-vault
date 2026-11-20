@@ -94,7 +94,7 @@ async function addFromSearch(page: Page, query: string, name: string) {
   await page.locator("#view-cards .row", { hasText: name }).first().click();
   await expect(page.locator(".cardpage h2")).toHaveText(name);
   await page.getByRole("button", { name: "Card actions" }).click();
-  await page.locator(".fabmenu .pmrow", { hasText: "Add to collection" }).click();
+  await page.locator(".fabmenu .pmrow", { hasText: /^Add to Main collection$/ }).click();
   await expect(page.locator(".ptoast")).toHaveText(`${name} added to Main collection`);
   await page.getByRole("button", { name: "Back" }).click();
 }

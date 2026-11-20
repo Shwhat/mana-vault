@@ -75,7 +75,7 @@ The trade has two columns, **You give** and **You get**. Each column lists its l
 
 The Filters panel filters the search you last used; the Filters line says which. When no trade is open, adding a card starts a new trade.
 
-Each line shows the picture, name, set, number and the collection it comes from (You give), and has:
+Each line shows the picture, name (with FOIL or ETCHED for those finishes), set, number and the collection it comes from (You give), and has:
 
 | Control | Use |
 |---|---|

@@ -89,7 +89,7 @@ The desktop and phones each remember their own layout. The deck's Add tab and bo
 | Grid, Binder | The card picture, its price, and in the top corner how many copies of the printing you own; the buttons are under the picture (in Binder, under the selected one) |
 | List | The image, name, mana cost, type line, set, set code, collector number, rarity, price and an OWNED badge with your copies. Clicking the set code fills the Set code filter; clicking the rarity sets the Rarity filter |
 
-The buttons are **+ Collection**, **+ Wishlist** and, while a deck is open, **+ Deck**. Owned counts are real copies in your collections and collections shared with you, not wishlists or proxies.
+The buttons name where the card goes: **+ collection name** (the target collection) and, while a deck is open, **+ deck name**, each followed by a button for every other finish the printing is made in (**Foil**, **Etched**, or **Regular** while Add as foil is on), then **+ Wishlist**. Owned counts are real copies in your collections and collections shared with you, not wishlists or proxies.
 
 ## The selected card
 
@@ -97,8 +97,10 @@ Click a result (or move to it with Up and Down) to select it. The Card panel sho
 
 | Action | Keys and buttons |
 |---|---|
-| Add one copy to the collection | Enter, **+ Collection**, double-click, **Add to collection** in the right-click menu |
-| Add one copy to the open deck, in the target zone | Shift+Enter, **+ Deck**, **Add to deck** |
+| Add one copy to where cards go (shown as ADDING TO in the status bar) | Enter, double-click |
+| Add one copy to the target collection | **+ collection name**, **Add to collection name** in the right-click menu |
+| Add one foil or etched copy | **Foil** or **Etched** beside an add button, **Add to name as foil** or **as etched** in the right-click menu |
+| Add one copy to the open deck, in the target zone | Shift+Enter, **+ deck name**, **Add to deck name** |
 | Add one copy to the wishlist | W, **+ Wishlist**, **Add to wishlist** |
 | Add one copy to what you get in the open trade | G, **Add to trade (you get)** in the right-click menu |
 | Open the card page | **Card page** in the right-click menu; a tap on a phone |

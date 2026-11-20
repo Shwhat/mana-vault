@@ -27,7 +27,7 @@ type UndoEntry = { label: string; undo: () => Promise<void>; redo: () => Promise
 export type Review = { title: string; report: ImportReport; done: boolean } | null;
 /** A right-click or long-press menu: where it opens and its commands. */
 export type ContextMenu = { x: number; y: number; title: string; items: Array<{ label: string; run: () => void }> } | null;
-type DeckKey = { deckId: string; oracle_id: string; printing_id: string | null; card_id: string; zone: Zone };
+type DeckKey = { deckId: string; oracle_id: string; printing_id: string | null; card_id: string; zone: Zone; finish: FinishCode };
 
 const UNDO_LIMIT = 150;
 
@@ -505,10 +505,12 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
   }, [setCounts]);
 
   const addToDeckRef = useRef<(cardId: string, name: string, chosen?: Candidate | null, options?: { quantity?: number; zone?: Zone; finish?: Finish }) => Promise<void>>(async () => {});
-  const addToCollection = useCallback(async (cardId: string, name: string, collectionId?: string, foilOverride?: boolean, proxy = false) => {
+  const addToCollection = useCallback(async (cardId: string, name: string, collectionId?: string, foilOverride?: boolean | FinishCode, proxy = false) => {
+    // a finish code (0 regular, 1 foil, 2 etched) or true for foil; without one, Add as foil decides
+    const code: FinishCode = foilOverride === undefined ? (live.current.prefs.foil ? 1 : 0) : foilOverride === true ? 1 : foilOverride === false ? 0 : foilOverride;
     // with a deck selected last, the add commands put cards into that deck
     if (!collectionId && !proxy && live.current.prefs.addTo === "deck" && live.current.deck) {
-      await addToDeckRef.current(cardId, name, undefined, { zone: live.current.prefs.zone, finish: (foilOverride ?? live.current.prefs.foil) ? "foil" : "" });
+      await addToDeckRef.current(cardId, name, undefined, { zone: live.current.prefs.zone, finish: code === 2 ? "etched" : code === 1 ? "foil" : "" });
       return;
     }
     const target = collectionId ?? prefs.targetCollection;
@@ -516,8 +518,8 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
       flash("Create a collection first", "err");
       return;
     }
-    const foil = foilOverride ?? prefs.foil;
-    const key = { cardId, foil: (foil ? 1 : 0) as FinishCode, condition: "NM" as const, language: "en", proxy };
+    const key = { cardId, foil: code, condition: "NM" as const, language: "en", proxy };
+    const finishText = code === 2 ? " (etched)" : code === 1 ? " (foil)" : "";
     try {
       const entry = await request<CollectionEntry & { wishlist?: WishChange[] }>(`/api/collections/${encodeURIComponent(target)}/cards`, {
         method: "POST", body: JSON.stringify({ ...key, quantity: 1 }),
@@ -530,11 +532,11 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
       const count = (change: number) => { if (owns) ownedRef.current(cardId, change); };
       count(1);
       pushUndo({
-        label: `Add ${name}${foil ? " (foil)" : ""}${proxy ? " (proxy)" : ""}`,
+        label: `Add ${name}${finishText}${proxy ? " (proxy)" : ""}`,
         undo: async () => { await setCounts(target, [{ ...key, quantity: after - 1 }]); await restoreWishes(wishes, "before"); count(-1); },
         redo: async () => { await setCounts(target, [{ ...key, quantity: after }]); await restoreWishes(wishes, "after"); count(1); },
       });
-      flash(`${name}${foil ? " (foil)" : ""}${proxy ? " (proxy)" : ""} added to ${where}`);
+      flash(`${name}${finishText}${proxy ? " (proxy)" : ""} added to ${where}`);
       await refreshAfterChange();
     } catch (reason) {
       fail(reason, "Could not add the card.");
@@ -566,7 +568,7 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
   // ---------- decks ----------
   const writeDeck = useCallback(async (key: DeckKey, to: number) => {
     const detail = await loadDeck(key.deckId);
-    const entry = detail.cards.find((card) => card.oracle_id === key.oracle_id && card.printing_id === key.printing_id && card.zone === key.zone);
+    const entry = detail.cards.find((card) => card.oracle_id === key.oracle_id && card.printing_id === key.printing_id && card.zone === key.zone && (card.finish ?? 0) === key.finish);
     const base = `/api/decks/${encodeURIComponent(key.deckId)}/cards`;
     if (entry) {
       if (entry.quantity === to) return;
@@ -574,15 +576,15 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
         method: "PATCH", body: JSON.stringify({ quantity: Math.max(0, to), zone: entry.zone }),
       });
     } else if (to > 0) {
-      await request(base, { method: "POST", body: JSON.stringify({ cardId: key.card_id, quantity: to, zone: key.zone }) });
+      await request(base, { method: "POST", body: JSON.stringify({ cardId: key.card_id, quantity: to, zone: key.zone, finish: key.finish }) });
     }
   }, [loadDeck]);
 
   /** Brings a deck back to an earlier state: card counts first, then the copies linked to each card. Used by undo and redo. */
   const restoreDeck = useCallback(async (_from: DeckDetail, to: DeckDetail) => {
     const now = await loadDeck(to.id);
-    const same = (a: DeckCard, b: DeckCard) => a.card_id === b.card_id && a.zone === b.zone;
-    const key = (card: DeckCard): DeckKey => ({ deckId: to.id, oracle_id: card.oracle_id, printing_id: card.printing_id, card_id: card.card_id, zone: card.zone });
+    const same = (a: DeckCard, b: DeckCard) => a.card_id === b.card_id && a.zone === b.zone && (a.finish ?? 0) === (b.finish ?? 0);
+    const key = (card: DeckCard): DeckKey => ({ deckId: to.id, oracle_id: card.oracle_id, printing_id: card.printing_id, card_id: card.card_id, zone: card.zone, finish: card.finish ?? 0 });
     for (const card of now.cards) if (!to.cards.some((other) => same(card, other))) await writeDeck(key(card), 0);
     for (const card of to.cards) await writeDeck(key(card), card.quantity);
     const settled = await loadDeck(to.id);
@@ -596,11 +598,16 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
       if (JSON.stringify(entry.tags ?? []) !== JSON.stringify(card.tags ?? [])) {
         await request(`/api/decks/${encodeURIComponent(to.id)}/entries/${entry.entry_id}/tags`, { method: "PUT", body: JSON.stringify({ tags: card.tags ?? [] }) });
       }
+      if ((entry.want_card_id ?? null) !== (card.want_card_id ?? null) || (entry.want_finish ?? 0) !== (card.want_finish ?? 0)) {
+        await request(`/api/decks/${encodeURIComponent(to.id)}/entries/${entry.entry_id}/upgrade`, {
+          method: "PUT", body: JSON.stringify({ cardId: card.want_card_id ?? null, finish: card.want_finish ?? 0 }),
+        });
+      }
     }
   }, [loadDeck, writeDeck]);
 
   const keyOf = (detail: DeckDetail, card: DeckCard, zone: Zone = card.zone): DeckKey => ({
-    deckId: detail.id, oracle_id: card.oracle_id, printing_id: card.printing_id, card_id: card.card_id, zone,
+    deckId: detail.id, oracle_id: card.oracle_id, printing_id: card.printing_id, card_id: card.card_id, zone, finish: card.finish ?? 0,
   });
 
   /** Free copies of a card in the account's collections that could fill a deck card. */
@@ -626,9 +633,8 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
     if (chosen === undefined) {
       try {
         const finishCode = options?.finish === "etched" ? 2 : options?.finish === "foil" ? 1 : 0;
-        // copies in the finish the list asked for come first
-        const candidates = (await loadCandidates(cardId))
-          .sort((a, b) => Number(b.foil === finishCode) - Number(a.foil === finishCode));
+        // only copies of exactly this printing and finish fill the new cards; without them the cards are missing
+        const candidates = (await loadCandidates(cardId)).filter((item) => item.cardId === cardId && item.foil === finishCode);
         const places = new Set(candidates.map((item) => item.collectionId));
         if (places.size > 1) {
           dialog(`Add ${name} to ${current.name}`, [
@@ -680,14 +686,58 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadDeck, pushUndo, collectionName, flash, fail, refreshAfterChange]);
 
+  /** Links free copies of the exact printing and finish to every card the open deck is missing, as one undo step. */
+  const linkOwnedCopies = useCallback(async () => {
+    const current = live.current.deck;
+    if (!current) return;
+    try {
+      const before = await loadDeck(current.id);
+      const { linked } = await request<{ linked: number }>(`/api/decks/${encodeURIComponent(current.id)}/link-owned`, { method: "POST" });
+      if (!linked) {
+        flash("No free copies of the missing cards' exact printings are in your collections", "err");
+        return;
+      }
+      const after = await loadDeck(current.id);
+      pushUndo({ label: `Link owned copies to ${current.name}`, undo: () => restoreDeck(after, before), redo: () => restoreDeck(before, after) });
+      flash(`${linked} owned ${linked === 1 ? "copy" : "copies"} linked to ${current.name}`);
+      await refreshAfterChange();
+    } catch (reason) {
+      fail(reason, "Could not link the owned copies.");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadDeck, pushUndo, flash, fail, refreshAfterChange]);
+
+  /** Marks a deck card Upgrade wanted with the version wanted, or removes the mark (null). */
+  const markUpgrade = useCallback(async (card: DeckCard, wanted: { id: string; set_code: string; collector_number: string } | null, finish: FinishCode = 0) => {
+    const current = live.current.deck;
+    if (!current) return;
+    const send = (cardId: string | null, code: FinishCode) => request(`/api/decks/${encodeURIComponent(current.id)}/entries/${card.entry_id}/upgrade`, {
+      method: "PUT", body: JSON.stringify({ cardId, finish: code }),
+    });
+    try {
+      await send(wanted?.id ?? null, finish);
+      const was: [string | null, FinishCode] = [card.want_card_id ?? null, card.want_finish ?? 0];
+      pushUndo({
+        label: wanted ? `Mark ${card.name} as upgrade wanted` : `Remove the upgrade wanted mark of ${card.name}`,
+        undo: async () => { await send(was[0], was[1]); }, redo: async () => { await send(wanted?.id ?? null, finish); },
+      });
+      const finishWord = finish === 2 ? " etched" : finish === 1 ? " foil" : "";
+      flash(wanted ? `${card.name} marked Upgrade wanted: (${wanted.set_code.toUpperCase()}) ${wanted.collector_number}${finishWord}` : `${card.name} is no longer marked Upgrade wanted`);
+      await refreshAfterChange();
+    } catch (reason) {
+      fail(reason, "Could not change the upgrade wanted mark.");
+    }
+  }, [pushUndo, flash, fail, refreshAfterChange]);
+
   /**
    * Changes the printing of a deck card. Free copies of the new printing are linked: from the one collection that has
    * them, or the collection the person picks when several do. Without free copies the card is missing.
    */
   const changeDeckPrinting = useCallback(async (card: DeckCard, to: { id: string; set_code: string; collector_number: string }, finish: FinishCode = card.finish ?? 0,
-    collectionId?: string) => {
+    collectionId?: string, count: number = card.quantity) => {
     const current = live.current.deck;
     if (!current || (to.id === card.card_id && finish === (card.finish ?? 0))) return;
+    const changing = Math.max(1, Math.min(card.quantity, count));
     let candidates: Candidate[] = [];
     if (card.zone !== "maybeboard") {
       try {
@@ -704,12 +754,12 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
           const free = candidates.filter((item) => item.collectionId === id).reduce((sum, item) => sum + item.free, 0);
           return [id, `${name} (${free} free)`];
         }), ["", "None (missing)"]]],
-      ], async (values) => { await changeDeckPrinting(card, to, finish, String(values.place)); }, "Change");
+      ], async (values) => { await changeDeckPrinting(card, to, finish, String(values.place), changing); }, "Change");
       return;
     }
     const place = collectionId ?? places[0]?.[0] ?? "";
     const links: Array<CopyKey & { collectionId: string; quantity: number }> = [];
-    let wanted = card.quantity;
+    let wanted = changing;
     for (const item of candidates.filter((candidate) => candidate.collectionId === place)) {
       if (wanted <= 0) break;
       const take = Math.min(wanted, item.free);
@@ -719,13 +769,14 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
     try {
       const before = await loadDeck(current.id);
       const result = await request<{ linked: number }>(`/api/decks/${encodeURIComponent(current.id)}/entries/${card.entry_id}/printing`, {
-        method: "PUT", body: JSON.stringify({ cardId: to.id, links, finish }),
+        method: "PUT", body: JSON.stringify({ cardId: to.id, links, finish, quantity: changing }),
       });
       const after = await loadDeck(current.id);
       pushUndo({ label: `Change printing of ${card.name}`, undo: () => restoreDeck(after, before), redo: () => restoreDeck(before, after) });
-      const missing = card.zone === "maybeboard" ? 0 : card.quantity - result.linked;
+      const missing = card.zone === "maybeboard" ? 0 : changing - result.linked;
       const finishWord = finish === 2 ? " etched" : finish === 1 ? " foil" : "";
-      flash(`${card.name} is now (${to.set_code.toUpperCase()}) ${to.collector_number}${finishWord}${result.linked ? `, linked from ${collectionName(place)}` : ""}${missing > 0 ? `, ${missing} missing` : ""}`);
+      const part = changing < card.quantity ? `${changing} of ${card.quantity} ` : "";
+      flash(`${part ? `${part}${card.name} changed to` : `${card.name} is now`} (${to.set_code.toUpperCase()}) ${to.collector_number}${finishWord}${result.linked ? `, linked from ${collectionName(place)}` : ""}${missing > 0 ? `, ${missing} missing` : ""}`);
       await refreshAfterChange();
     } catch (reason) {
       fail(reason, "Could not change the printing.");
@@ -786,14 +837,17 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
     if (from === to) return;
     const key = keyOf(current, card);
     try {
+      // undo brings back the copies that were linked as well as the count
+      const before = await loadDeck(current.id);
       await writeDeck(key, to);
-      pushUndo({ label: to === 0 ? `Remove ${card.name}` : `${card.name} quantity ${to}`, undo: () => writeDeck(key, from), redo: () => writeDeck(key, to) });
+      const after = await loadDeck(current.id);
+      pushUndo({ label: to === 0 ? `Remove ${card.name}` : `${card.name} quantity ${to}`, undo: () => restoreDeck(after, before), redo: () => restoreDeck(before, after) });
       if (to === 0) flash(`${card.name} removed from ${current.name}`);
       await refreshAfterChange();
     } catch (reason) {
       fail(reason, "Could not update the deck.");
     }
-  }, [writeDeck, pushUndo, flash, fail, refreshAfterChange]);
+  }, [writeDeck, loadDeck, restoreDeck, pushUndo, flash, fail, refreshAfterChange]);
 
   const moveDeckCard = useCallback(async (card: DeckCard, zone: Zone) => {
     const current = live.current.deck;
@@ -876,12 +930,12 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
     if (!current) return;
     try {
       const before = await loadDeck(current.id);
-      const report = await request<{ added: number; removed: number; changed: number }>(`/api/decks/${encodeURIComponent(current.id)}/replace`, {
+      const report = await request<{ added: number; removed: number; changed: number; linked?: number }>(`/api/decks/${encodeURIComponent(current.id)}/replace`, {
         method: "POST", body: JSON.stringify({ text }),
       });
       const after = await loadDeck(current.id);
       pushUndo({ label: `Edit ${current.name} as text`, undo: () => restoreDeck(after, before), redo: () => restoreDeck(before, after) });
-      flash(`${current.name} updated: ${report.added} added, ${report.changed} changed, ${report.removed} removed`);
+      flash(`${current.name} updated: ${report.added} added, ${report.changed} changed, ${report.removed} removed${report.linked ? `, ${report.linked} linked to owned copies` : ""}`);
       await refreshAfterChange();
     } catch (reason) {
       fail(reason, "Could not apply the deck list.");
@@ -1098,7 +1152,7 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
     review, setReview,
     flashMsg, flash, fail,
     undoStack, redoStack, undo, redo,
-    addToCollection, setCollectionQuantity, addToDeck, setDeckQuantity, moveDeckCard,
+    addToCollection, setCollectionQuantity, addToDeck, setDeckQuantity, moveDeckCard, linkOwnedCopies, markUpgrade,
     showReview, downloadBackup, restoreBackup, loadCandidates, setDeckLinks, restoreDeck, loadDeck, restoreWishes,
     applyWorkspace, saveWorkspace, deleteWorkspace,
     scannerOpen, setScannerOpen, ...scan, cardPage, setCardPage: showCardPage, contextMenu, setContextMenu, openCollection,

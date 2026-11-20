@@ -101,8 +101,6 @@ export function initializeDatabase(database: DatabaseSync): void {
   database.exec(`
     CREATE UNIQUE INDEX IF NOT EXISTS deck_cards_normal_unique
       ON deck_cards(deck_id, oracle_id, zone) WHERE printing_id IS NULL;
-    CREATE UNIQUE INDEX IF NOT EXISTS deck_cards_theme_unique
-      ON deck_cards(deck_id, oracle_id, printing_id, zone) WHERE printing_id IS NOT NULL;
   `);
   database.exec(`
     CREATE TABLE IF NOT EXISTS catalog_metadata (
@@ -385,7 +383,6 @@ function upgradeDeckBuilder(database: DatabaseSync): void {
       DROP TABLE deck_cards;
       ALTER TABLE deck_cards_v7 RENAME TO deck_cards;
       CREATE UNIQUE INDEX IF NOT EXISTS deck_cards_normal_unique ON deck_cards(deck_id, oracle_id, zone) WHERE printing_id IS NULL;
-      CREATE UNIQUE INDEX IF NOT EXISTS deck_cards_theme_unique ON deck_cards(deck_id, oracle_id, printing_id, zone) WHERE printing_id IS NOT NULL;
     `);
   }
   const deckColumns = new Set(
@@ -418,6 +415,14 @@ function initializeCustomTables(database: DatabaseSync): void {
   // the finish a deck card is played in: 0 regular, 1 foil, 2 etched (0.10.0)
   const deckCardColumns = new Set((database.prepare("PRAGMA table_info(deck_cards)").all() as Array<{ name: string }>).map((column) => column.name));
   if (!deckCardColumns.has("finish")) database.exec("ALTER TABLE deck_cards ADD COLUMN finish INTEGER NOT NULL DEFAULT 0");
+  // the version a deck card is wanted in when it is marked Upgrade wanted (0.11.0)
+  if (!deckCardColumns.has("want_card_id")) database.exec("ALTER TABLE deck_cards ADD COLUMN want_card_id TEXT");
+  if (!deckCardColumns.has("want_finish")) database.exec("ALTER TABLE deck_cards ADD COLUMN want_finish INTEGER NOT NULL DEFAULT 0");
+  // a deck card is a printing in a finish and a zone (0.11.0): the same printing can be in a deck once regular and once foil
+  database.exec(`
+    DROP INDEX IF EXISTS deck_cards_theme_unique;
+    CREATE UNIQUE INDEX IF NOT EXISTS deck_cards_finish_unique ON deck_cards(deck_id, oracle_id, printing_id, zone, finish) WHERE printing_id IS NOT NULL;
+  `);
   // the picture of a two-faced card's back face, for printing proxies (0.9.0)
   if (!cardColumns.has("back_image_url")) database.exec("ALTER TABLE cards ADD COLUMN back_image_url TEXT");
   database.exec(`

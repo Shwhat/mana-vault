@@ -2,7 +2,7 @@
 import type { FastifyInstance } from "fastify";
 import type { DatabaseSync } from "node:sqlite";
 import { parseText, printingFinder } from "./deck-import.js";
-import { logDeck, ZONES } from "./decks.js";
+import { linkOwnedCopies, logDeck, ZONES } from "./decks.js";
 import { capDeckCardLinks, touchDeckCollections } from "./links.js";
 
 const ZONE_NAMES: Record<string, string> = { main: "main deck", sideboard: "sideboard", commander: "commander", maybeboard: "maybeboard" };
@@ -34,13 +34,13 @@ export function readTags(value: unknown): string[] | null {
 }
 
 type Wanted = { oracleId: string; printingId: string; quantity: number; zone: string; name: string; named: boolean; finish: number };
-export type ReplaceReport = { added: number; removed: number; changed: number; unmatched: Array<{ row: number; name: string; reason: string }> };
+export type ReplaceReport = { added: number; removed: number; changed: number; linked?: number; unmatched: Array<{ row: number; name: string; reason: string }> };
 
 /**
  * Makes a deck match a decklist. Cards listed without a set keep the printing they already have in the deck. Cards
  * that stay keep their linked copies and tags (links above the new count are removed).
  */
-export function replaceDeck(database: DatabaseSync, deckId: string, text: string, userName: string, commit = true): ReplaceReport {
+export function replaceDeck(database: DatabaseSync, deckId: string, text: string, userName: string, commit = true, userId?: number): ReplaceReport {
   const rows = parseText(text);
   if (rows.length > 1000) throw new Error("A deck list can have at most 1,000 lines");
   const find = printingFinder(database);
@@ -71,9 +71,9 @@ export function replaceDeck(database: DatabaseSync, deckId: string, text: string
     // a line without a set keeps the printing already in the deck
     const kept = named ? null : current.find((card) => card.oracleId === found.oracle_id && card.zone === row.zone && card.printingId);
     const printingId = kept?.printingId ?? found.id;
-    const key = `${found.oracle_id}\u0000${printingId}\u0000${row.zone}`;
     // a line's finish marks (*F*, *E*) set the deck card's finish; a line without one is regular
     const finish = row.finish === "etched" ? 2 : row.finish === "foil" ? 1 : 0;
+    const key = `${found.oracle_id}\u0000${printingId}\u0000${row.zone}\u0000${finish}`;
     const item = wanted.get(key) ?? { oracleId: found.oracle_id, printingId, quantity: 0, zone: row.zone, name: found.name, named, finish };
     item.quantity = Math.min(100, item.quantity + row.quantity);
     wanted.set(key, item);
@@ -81,8 +81,37 @@ export function replaceDeck(database: DatabaseSync, deckId: string, text: string
   const report: ReplaceReport = { added: 0, removed: 0, changed: 0, unmatched };
   const changes: string[] = [];
   const plan: Array<() => void> = [];
+  const keyOf = (card: { oracleId: string; printingId: string | null; zone: string; finish: number }) =>
+    `${card.oracleId}\u0000${card.printingId}\u0000${card.zone}\u0000${card.finish}`;
+  const matches = new Map<number, Wanted>();
   for (const card of current) {
-    const item = wanted.get(`${card.oracleId}\u0000${card.printingId}\u0000${card.zone}`);
+    const item = wanted.get(keyOf(card));
+    if (!item) continue;
+    matches.set(card.id, item);
+    wanted.delete(keyOf(card));
+  }
+  // a card whose line changed only its finish mark keeps its tags; its links to copies of the old finish go
+  for (const card of current) {
+    if (matches.has(card.id)) continue;
+    const entry = [...wanted.entries()].find(([, item]) => item.oracleId === card.oracleId && item.printingId === card.printingId && item.zone === card.zone);
+    if (!entry) continue;
+    const [key, item] = entry;
+    wanted.delete(key);
+    matches.set(card.id, item);
+    report.changed += 1;
+    changes.push(`${card.name} (${ZONE_NAMES[card.zone]}) is now ${item.finish === 2 ? "etched" : item.finish === 1 ? "foil" : "regular"}`);
+    plan.push(() => {
+      touchDeckCollections(database, deckId, card.id);
+      database.prepare("DELETE FROM deck_links WHERE deck_card_id = ?").run(card.id);
+      database.prepare("UPDATE deck_cards SET finish = ? WHERE id = ?").run(item.finish, card.id);
+    });
+    if (item.quantity !== card.quantity) {
+      changes.push(`${item.quantity > card.quantity ? "+" : "-"}${Math.abs(item.quantity - card.quantity)} ${card.name} (${ZONE_NAMES[card.zone]})`);
+      plan.push(() => { database.prepare("UPDATE deck_cards SET quantity = ? WHERE id = ?").run(item.quantity, card.id); });
+    }
+  }
+  for (const card of current) {
+    const item = matches.get(card.id);
     if (!item) {
       report.removed += 1;
       changes.push(`-${card.quantity} ${card.name} (${ZONE_NAMES[card.zone]})`);
@@ -92,14 +121,9 @@ export function replaceDeck(database: DatabaseSync, deckId: string, text: string
       });
       continue;
     }
-    wanted.delete(`${card.oracleId}\u0000${card.printingId}\u0000${card.zone}`);
-    if (item.finish !== card.finish) {
-      report.changed += 1;
-      changes.push(`${card.name} (${ZONE_NAMES[card.zone]}) is now ${item.finish === 2 ? "etched" : item.finish === 1 ? "foil" : "regular"}`);
-      plan.push(() => { database.prepare("UPDATE deck_cards SET finish = ? WHERE id = ?").run(item.finish, card.id); });
-    }
+    if (item.finish !== card.finish) continue;
     if (item.quantity !== card.quantity) {
-      if (item.finish === card.finish) report.changed += 1;
+      report.changed += 1;
       changes.push(`${item.quantity > card.quantity ? "+" : "-"}${Math.abs(item.quantity - card.quantity)} ${card.name} (${ZONE_NAMES[card.zone]})`);
       plan.push(() => {
         touchDeckCollections(database, deckId, card.id);
@@ -116,9 +140,17 @@ export function replaceDeck(database: DatabaseSync, deckId: string, text: string
         .run(deckId, item.oracleId, item.printingId, item.quantity, item.zone, item.finish);
     });
   }
-  if (commit && plan.length) {
+  // lines that name a set and number are linked to free copies of exactly that printing and finish; other lines stay missing
+  const named = [...matches.values(), ...wanted.values()].filter((item) => item.named);
+  if (commit && (plan.length || (userId !== undefined && named.length))) {
     transaction(database, () => {
       for (const step of plan) step();
+      if (userId !== undefined && named.length) {
+        const idOf = database.prepare("SELECT id FROM deck_cards WHERE deck_id = ? AND printing_id = ? AND zone = ? AND finish = ?");
+        const ids = new Set(named.map((item) => Number(idOf.get(deckId, item.printingId, item.zone, item.finish)?.id ?? 0)));
+        report.linked = linkOwnedCopies(database, deckId, userId, ids);
+      }
+      if (!plan.length) return;
       database.prepare("UPDATE decks SET updated_at = strftime('%Y-%m-%d %H:%M:%f', 'now') WHERE id = ?").run(deckId);
       const summary = changes.length > 6 ? `${changes.slice(0, 6).join(", ")} and ${changes.length - 6} more` : changes.join(", ");
       logDeck(database, deckId, userName, `Edited as text: ${summary}`);
@@ -156,7 +188,7 @@ export function registerDeckBuilderRoutes(app: FastifyInstance, database: Databa
     const text = request.body?.text;
     if (typeof text !== "string" || text.length > 200_000) return reply.code(400).send({ error: "Send the deck list as text" });
     try {
-      return replaceDeck(database, request.params.deckId, text, nameOf(request), request.query.preview !== "1");
+      return replaceDeck(database, request.params.deckId, text, nameOf(request), request.query.preview !== "1", request.user!.id);
     } catch (error) {
       return reply.code(400).send({ error: error instanceof Error ? error.message : "Could not apply the deck list" });
     }

@@ -233,13 +233,14 @@ async function applyLocally(method: string, url: string, body: Record<string, un
     const quantity = Number(body.quantity ?? 1);
     const zone = (typeof body.zone === "string" ? body.zone : "main") as DeckCard["zone"];
     const printing = card.id;
-    let existing = detail.cards.find((entry) => entry.oracle_id === card.oracle_id && entry.zone === zone && entry.printing_id === printing);
+    const finish = (body.finish === 2 || body.finish === "etched" ? 2 : body.finish === 1 || body.finish === true || body.finish === "foil" ? 1 : 0) as FinishCode;
+    let existing = detail.cards.find((entry) => entry.oracle_id === card.oracle_id && entry.zone === zone && entry.printing_id === printing && (entry.finish ?? 0) === finish);
     if (existing) existing.quantity += quantity;
     else {
       existing = {
         entry_id: -Date.now() - Math.floor(Math.random() * 1000), card_id: card.id, oracle_id: card.oracle_id, printing_id: printing, quantity, zone,
         name: card.name, mana_cost: card.mana_cost, type_line: card.type_line, set_code: card.set_code, set_name: card.set_name,
-        collector_number: card.collector_number, image_url: card.image_url, links: [],
+        collector_number: card.collector_number, image_url: card.image_url, links: [], finish,
       };
       detail.cards.push(existing);
     }

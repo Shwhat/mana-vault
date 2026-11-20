@@ -54,6 +54,30 @@ export function confirmDialog(title: string, question: ReactNode, okLabel = "OK"
   });
 }
 
+/** Asks a question with several answers as buttons. Resolves with the answer chosen, or null when the person cancels. */
+export function choiceDialog<T extends string>(title: string, question: ReactNode, choices: Array<[T, string, boolean?]>): Promise<T | null> {
+  return new Promise((resolve) => {
+    let answered = false;
+    customDialog(title, (close) => (
+      <>
+        <p className="dlgq">{question}</p>
+        <div className="choicerow">
+          {choices.map(([value, label, primary]) => (
+            <button key={value} type="button" className={primary ? "btn primary" : "btn"} autoFocus={primary}
+              onClick={() => { answered = true; close(); resolve(value); }}>{label}</button>
+          ))}
+        </div>
+      </>
+    ), 460, "Cancel");
+    const watch = window.setInterval(() => {
+      if (!document.querySelector("dialog#dlg[open]")) {
+        window.clearInterval(watch);
+        if (!answered) resolve(null);
+      }
+    }, 150);
+  });
+}
+
 export const isDialogOpen = () => !!document.querySelector("dialog#dlg[open]");
 
 export function closeDialog() {

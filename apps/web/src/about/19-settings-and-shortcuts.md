@@ -9,8 +9,8 @@ Preferences are saved for your account on the server and follow you to every bro
 | Theme | Light, Dark, System | Light | Theme list on the View ribbon tab, phone Menu |
 | Add as foil | On, Off | Off | FOIL in the status bar, F |
 | Target zone | Main deck, Sideboard, Commander, Maybeboard | Main deck | Zone list beside Quick add on the deck's Add tab, Target zone list on the Decks ribbon tab, Deck list panel, ZONE in the status bar, Z |
-| Where new cards go | The collection or deck selected last | Your first collection | Clicking a collection or deck in its panel or switcher, ADD TO in the status bar, + Add in the collection view, C |
-| Target collection | Any of your collections | Your first collection | Collections panel, collection switcher, ADD TO in the status bar, + Add in the collection view, C |
+| Where new cards go | The collection or deck selected last | Your first collection | Clicking a collection or deck in its panel or switcher, ADDING TO in the status bar, + Add in the collection view, C |
+| Target collection | Any of your collections | Your first collection | Collections panel, collection switcher, ADDING TO in the status bar, + Add in the collection view, C |
 | Open collection | Any of your collections, or All collections | Your first collection | Collection switcher, Collections panel |
 | Search layout, desktop and phone | Grid, Binder, List | Grid | Options in card search, the deck's Add tab and the trade view; each device type remembers its own |
 | Search card size | Small, Medium, Large | Medium | Options in card search (Grid layout) |
@@ -91,8 +91,8 @@ Shortcuts work when no text box, menu or window has focus, except the Ctrl short
 
 | Key | Action |
 |---|---|
-| Ctrl+A | Select all rows (the rows the filter box shows) |
-| Ctrl+click, Shift+click | Pick more rows, or a range of rows |
+| Ctrl+A | Select all cards (the cards the filter box shows) |
+| Ctrl+click, Shift+click | Pick more cards, or a range of cards |
 | Delete | Remove selected... |
 | E | Copy details... |
 | B | Binder layout (switch between binder and grid) |

@@ -54,9 +54,16 @@ export function StatusBar({ actions }: { actions: Record<string, Action> }) {
         </span>
       )}
       <span id="st-toggles">
-        <span id="st-target" className="pt on-plain" role="button" title="The collection or deck selected last, where Add to collection puts cards (C cycles the collections)"
-          onClick={actions["collection.target"]?.run}>
-          ADD TO: {deckTarget ? `DECK ${deckTarget.name.toUpperCase()}` : target ? target.name.toUpperCase() : "NO COLLECTION"}
+        <span id="st-target" className="pt on-plain addingto" role="button"
+          title={store.deck ? "Where Enter and + Add put cards. Click to switch between the open deck and the target collection (C cycles the collections)"
+            : "Where Enter and + Add put cards (C cycles the collections)"}
+          onClick={() => {
+            if (!store.deck) return actions["collection.target"]?.run();
+            const next = store.prefs.addTo === "deck" ? "collection" : "deck";
+            store.setPrefs({ addTo: next });
+            store.flash(`Adding to ${next === "deck" ? store.deck.name : target?.name ?? "the target collection"}`);
+          }}>
+          ADDING TO: {deckTarget ? `DECK ${deckTarget.name.toUpperCase()}` : target ? target.name.toUpperCase() : "NO COLLECTION"}
         </span>
         <span className={`pt${store.prefs.foil ? " on" : ""}`} role="button" title={actions.foil?.label} onClick={actions.foil?.run}>FOIL</span>
         <span className="pt on-plain" role="button" title="Currency for prices and values (click to switch)"

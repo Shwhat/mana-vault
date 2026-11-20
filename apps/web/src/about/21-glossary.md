@@ -11,10 +11,10 @@
 | Sync | Sending changes made on a phone to the server, then updating the phone's copy |
 | Waiting change | A change made on a phone and not yet sent to the server |
 | Collection | A named place for cards you own, such as a binder, with its own rules for set completion |
-| Collection entry | One printing in one finish, condition and language in a collection, with a count and a number for trade; also called a row |
+| Collection entry | One printing in one finish, condition and language in a collection, with a count and a number for trade |
 | Finish | Regular, foil or etched. Etched is a foil-like finish printed on some cards; it counts as foil for set completion |
 | Condition | How worn a copy is: Mint, Near mint, Lightly played, Moderately played, Heavily played or Damaged |
-| Copy details | The window that changes a row's finish, condition, language and number for trade |
+| Copy details | The window that changes an entry's finish, condition, language and number for trade |
 | Wishlist | A collection of cards you want. Its cards do not count as owned |
 | Trade list | Every copy marked for trade in the collections you own |
 | Trade | A saved list of what you give and what you get, with a name and a status: Open, Done or Cancelled |
@@ -31,7 +31,7 @@
 | Switcher | The button with the open collection's or deck's name that opens a searchable list of the others |
 | Flavor name | Another name printed on some versions of a card, matched by search and imports |
 | Ownership | Which deck cards you own across your collections |
-| Target collection | The collection that Add to collection puts cards into, when a collection was selected last |
+| Target collection | The collection that Add to collection puts cards into, when a collection was selected last; marked Target in the Collections panel |
 | Selected last | The collection or deck clicked last in its panel or switcher, where new cards go; it is the one highlighted |
 | Custom card | A card made in the card maker and saved to the card database for every account, marked Custom |
 | Custom set | A set made for custom cards, with its own code, name, release date and symbol |
@@ -53,6 +53,11 @@
 | Deck | A named list of printings with a format, linked to the collection copies that fill them |
 | Link | The tie between a deck card and the copy in a collection that fills it. A copy fills one deck card at a time |
 | Missing | A deck card with no linked copy |
+| Owned, link | The mark on a missing deck card when free copies of exactly its printing and finish are in your collections |
+| Other version owned | The mark on a missing deck card when free copies of another printing or finish of the card are in your collections |
+| Upgrade wanted | A mark on a deck card that is in the deck and owned, recording the better version wanted, such as a foil |
+| Adding here | The mark in the Collections or Decks panel on the collection or deck that Enter and + Add put cards into |
+| Reduce to 1 | Lowering a card with several copies to one copy, for copies added by accident |
 | Free copy | A copy in a collection that fills no deck card |
 | Proxy | A printed stand-in card, kept apart from real copies, with no value |
 | Want | The number of copies a wishlist row asks for; it goes down as copies are added to collections |

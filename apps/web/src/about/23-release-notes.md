@@ -2,6 +2,21 @@
 
 The installed version is shown at the top of this guide.
 
+## 0.11.0 (2026-11-20): Card tracking between decks and collections
+
+- Edit as text and decklist imports link lines that name a set and collector number to free copies of exactly that printing and finish, the deck's own collection first. Lines without a set and number stay missing until a copy is linked. Add to deck links only copies of the exact printing and finish.
+- Link owned copies (Decks ribbon tab, Ownership tab, right-click menu) links exact copies to every missing card.
+- A missing deck card shows **Owned, link** when you own free copies of its version, or **Other version owned** with **Switch** when you own another printing or finish, in every deck view.
+- The deck follows the copy: linking a copy of another printing or finish moves those cards to the copy's printing and finish. A regular and a foil card of the same printing are separate deck cards.
+- Changing the printing or finish of collection copies that fill a deck asks whether the deck changes too. No keeps the deck's version, and those cards show as missing with Other version owned.
+- Change printing asks **How many to change** for a card with more than one copy, so part of a stack can switch, such as one of two copies to foil, without removing anything. This works for collection entries and deck cards.
+- Upgrade wanted: mark a deck card with the version you want instead. The card stays owned, shows an Upgrade wanted badge, is listed in the Ownership tab, and loses the mark when a copy of the wanted version is linked. Backups keep it.
+- FOIL and ETCHED show in every deck view (List, Text, Stacks, Grid), the Deck list panel, the Card panel and trade lines, from one shared badge.
+- Remove on a card with more than one copy asks how many to remove, with **Reduce to 1** and **Remove all**. Reduce to 1 is also in the right-click menus, the Collection ribbon tab and the picked bar, and Remove selected... offers it.
+- Add buttons name where the card goes (+ collection name, + deck name) and have a button for each other finish the printing is made in, in card search, the Card panel, the card page and right-click menus. The deck's Add tab has **Add as** (Regular, Foil, Etched).
+- The Collections and Decks panels mark the target collection and the open deck with **Target**, and the one Enter uses with **Adding here**. The status bar reads ADDING TO; with a deck open, clicking it switches between the deck and the target collection.
+- Messages and the guide say cards and entries instead of rows; import messages count lines.
+
 ## 0.10.0 (2026-11-19): Foil versions in Change printing, and a finish for deck cards
 
 - The printing chooser has a button for each finish a printing is made in (Regular, Foil, Etched) with its price. Choosing one switches to that printing in that finish, so a card can switch to its foil version.

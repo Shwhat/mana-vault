@@ -57,6 +57,7 @@ test("search, filters and adding to the collection with undo", async ({ page }) 
   await expect(regular.locator(".qn")).toHaveText(String(start + 1));
   // undoing an add that brings a count to zero removes the entry
   await regular.getByRole("button", { name: /Remove Dark Ritual from collection/ }).click();
+  await page.locator("dialog[open]").getByRole("button", { name: "Remove all" }).click();
   await expect(regular).toHaveCount(0);
   await page.keyboard.press("Control+z");
   await expect(status(page)).toHaveText("Undone: Remove Dark Ritual");
@@ -102,6 +103,7 @@ test("deck building with zones, moves and undo", async ({ page }) => {
   await page.keyboard.press("Control+z");
   await expect(page.locator("#view-deck .boardhead")).toHaveText(["Main deck 2", "Sideboard 1"]);
   await page.locator("#view-deck .row").first().getByRole("button", { name: /Remove Lightning Bolt from deck/ }).click();
+  await page.locator("dialog[open]").getByRole("button", { name: "Remove all" }).click();
   await expect(page.locator("#view-deck .boardhead")).toHaveText(["Sideboard 1"]);
   await page.keyboard.press("Control+z");
   await expect(page.locator("#view-deck .boardhead")).toHaveText(["Main deck 2", "Sideboard 1"]);
@@ -125,12 +127,12 @@ test("collection CSV import shows the detected format, a preview and the review 
     mimeType: "text/csv",
     buffer: Buffer.from("Count,Name,Edition,Foil\n2,Sol Ring,lea,\n1,Not A Real Card,,\n3,Counterspell,,foil\n"),
   });
-  await expect(page.locator("dialog[open]")).toContainText("2 rows (5 cards) match. 1 rows are skipped.");
+  await expect(page.locator("dialog[open]")).toContainText("2 lines (5 cards) match. 1 lines are skipped.");
   await expect(page.locator("#io-format")).toContainText("Detected: Moxfield CSV");
   await page.locator("dialog[open]").getByRole("button", { name: "Import", exact: true }).click();
-  await expect(status(page)).toHaveText("Imported 5 cards from 2 rows into Main collection");
+  await expect(status(page)).toHaveText("Imported 5 cards from 2 lines into Main collection");
   await expect(page.locator("dialog[open]")).toHaveCount(0);
-  await expect(page.locator(".revhead")).toContainText("Imported: 2 matched rows (5 cards), 1 skipped");
+  await expect(page.locator(".revhead")).toContainText("Imported: 2 matched lines (5 cards), 1 skipped");
   await page.keyboard.press("2");
   await expect(page.locator("#view-collection .row", { hasText: "Counterspell" }).locator(".badge.foil")).toBeVisible();
   await expect(page.locator(".dgbody .msg", { hasText: "Not A Real Card" })).toContainText("No card with this name exists in the card database");
@@ -151,9 +153,9 @@ test("decklist import into a deck", async ({ page }) => {
     name: "deck.txt", mimeType: "text/plain",
     buffer: Buffer.from("Commander\n1 Atraxa, Praetors' Voice\n\nDeck\n1 Sol Ring\n4 Llanowar Elves\nSideboard\n2 Swords to Plowshares\n"),
   });
-  await expect(page.locator("dialog[open]")).toContainText("4 rows (8 cards) match");
+  await expect(page.locator("dialog[open]")).toContainText("4 lines (8 cards) match");
   await page.locator("dialog[open]").getByRole("button", { name: "Import", exact: true }).click();
-  await expect(status(page)).toHaveText("Imported 8 cards from 4 rows into Imported");
+  await expect(status(page)).toHaveText("Imported 8 cards from 4 lines into Imported");
   await expect(page.locator("dialog[open]")).toHaveCount(0);
   await page.keyboard.press("3");
   await expect(page.locator("#view-deck .boardhead")).toHaveText(["Commander 1", "Main deck 5", "Sideboard 2"]);
@@ -283,7 +285,7 @@ test.describe("phone layout", () => {
     await page.locator("#view-cards .row", { hasText: "Counterspell" }).click();
     await expect(page.locator(".cardpage h2")).toHaveText("Counterspell");
     await page.getByRole("button", { name: "Card actions" }).click();
-    await page.locator(".fabmenu .pmrow", { hasText: "Add to collection" }).click();
+    await page.locator(".fabmenu .pmrow", { hasText: /^Add to Main collection$/ }).click();
     await expect(page.locator(".ptoast")).toHaveText("Counterspell added to Main collection");
     await page.getByRole("button", { name: "Back" }).click();
     await expect(page.locator(".cardpage")).toHaveCount(0);
@@ -312,7 +314,7 @@ test.describe("phone layout", () => {
     await expect(page.locator(".pickbar")).toContainText("1 picked");
     await expect(page.locator(".sheet")).toHaveCount(0);
     await page.locator(".pickbar").getByRole("button", { name: "Remove..." }).click();
-    await page.locator("dialog[open]").getByRole("button", { name: "Remove", exact: true }).click();
+    await page.locator("dialog[open]").getByRole("button", { name: "Remove all" }).click();
     await expect(page.locator(".ptoast")).toContainText("Removed Counterspell");
   });
 });

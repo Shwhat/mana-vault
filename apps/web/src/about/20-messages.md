@@ -72,6 +72,14 @@ Messages appear at the right end of the status bar (on the phone, in a banner ab
 | Card name deleted | Deleting a custom card |
 | Copy made, not saved yet | Duplicate in the card maker |
 | Card database updated with N printings, N skipped | An update that skipped cards whose record failed a check |
+| Deck name updated: N added, N changed, N removed, N linked to owned copies | Edit as text, with the copies linked to lines that name a printing |
+| N owned copies linked to deck name | Link owned copies |
+| Card name marked Upgrade wanted: (SET) number | Mark as upgrade wanted |
+| Card name is no longer marked Upgrade wanted | Remove upgrade wanted mark |
+| N of M Card name changed to (SET) number | Change printing for some of a card's copies |
+| Card name is now (SET) number, decks kept their version | Change printing of copies in a deck, answered No, show it as missing |
+| Card name reduced to 1 copy, N entries reduced to 1 copy each | Reduce to 1 |
+| Adding to name | Clicking ADDING TO in the status bar |
 
 ## Problems shown by Mana Vault
 
@@ -95,7 +103,7 @@ Messages appear at the right end of the status bar (on the phone, in a banner ab
 | Collection name is empty, so there is nothing to export | Export collection with no entries | Add cards first |
 | Create a collection first | Adding, importing or exporting with no collection | Create a collection |
 | Enter a collection name | New collection or Collection settings with an empty name | Type a name |
-| Pick one or more rows first | Remove selected or Move selected with no rows picked | Pick rows |
+| Pick one or more cards first | Remove selected or Move selected with no cards picked | Pick cards |
 | Create another collection to move cards into | Move with only one collection | Create a second collection |
 | Enter a whole number from 1 to N | Move with a copy count outside the entry's copies | Enter a valid count |
 | Nothing was moved | The copies were already gone, for example removed by someone sharing the collection | Check the collection |
@@ -132,6 +140,10 @@ Messages appear at the right end of the status bar (on the phone, in a banner ab
 | A set symbol can be up to 512 KB | Choosing a larger set symbol | Use a smaller picture |
 | The art of that card could not be downloaded | Art of a card... when the server cannot reach Scryfall | Try again later, or upload art |
 | Other accounts have this card in a collection, deck or trade, so it cannot be deleted | Deleting a custom card others use | Ask them to remove it first |
+| Each picked card has one copy already | Reduce to 1 when no picked entry has more than one copy | Pick entries with more copies |
+| Enter a number from 1 to N | How many to remove, or Link copies, with a number outside the copies there are | Enter a number in range |
+| No free copies of the missing cards' exact printings are in your collections | Link owned copies with nothing to link | Add the copies, or use Other version owned |
+| No other version of card is free in your collections | Switch to the version owned with no free copy of another version | Add a copy first |
 | Could not copy to the clipboard | The browser refused clipboard access | Allow clipboard access for the site, or use a secure (HTTPS) address |
 | Could not action. | The action failed and the server gave no reason, often because the server could not be reached | Check the connection and try again |
 
@@ -162,6 +174,9 @@ Messages appear at the right end of the status bar (on the phone, in a banner ab
 | Decklist can contain at most 5,000 rows per import | The decklist is too long |
 | Deck not found, Deck card not found, Collection entry not found, Card printing not found | The item was removed, for example by another person or a restore; reload the page |
 | Deck name must be between 1 and 100 characters | The deck name is empty or too long |
+| The deck already has this version. Choose the version you want instead. | Mark as upgrade wanted with the version already in the deck |
+| Linked copies must be of the new version | Change printing with copies of another printing or finish |
+| Quantity must be a whole number of at least 1 | How many to change is not a whole number |
 | Collection names must be 1 to 100 characters, Descriptions can be up to 500 characters | A collection field is too long or empty |
 | These sets are not in the card database: CODES | A linked set has no printings; update the card database |
 | Collection not found | The collection was deleted, or is no longer shared with you; reload the page |

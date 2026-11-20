@@ -10,6 +10,7 @@ import { matchesFilters } from "../filters";
 import { Icon } from "../icons";
 import { entryKey } from "../library-state";
 import { useApp } from "../store";
+import { FinishBadge } from "../components/CardMarks";
 import { lineEach, sideTotal, type Trade, type TradeLine, type TradeMatch, type TradeSide } from "../trade-state";
 import { CONDITIONS, type CollectionEntry, FINISHES, money, priceOf } from "../types";
 import { Quantity, SearchOptions, Thumb } from "./Views";
@@ -69,7 +70,7 @@ function LineRow({ trade, line, editable }: { trade: Trade; line: TradeLine; edi
     <div className={`row tline2${line.price !== null ? " edited" : ""}`} data-key={`${line.side}:${line.cardId}`}>
       <Thumb url={line.image_url} />
       <div className="rowmain">
-        <div className="rowtitle"><b>{line.name}</b></div>
+        <div className="rowtitle"><b>{line.name}</b><FinishBadge finish={line.foil} /></div>
         <div className="rowmeta">{line.set_name} <span className="badge">{line.set_code.toUpperCase()}</span> {line.collector_number}
           {line.collectionName && <span className="sub"> from {line.collectionName}</span>}</div>
         <div className="tlctl">
@@ -203,7 +204,7 @@ function Matches() {
     <div className="row" key={`${side}:${match.user.id}:${match.cardId}:${match.foil}:${match.condition}:${match.language}:${match.collectionId ?? ""}`}>
       <Thumb url={match.image_url} />
       <div className="rowmain">
-        <div className="rowtitle"><b>{match.name}</b>{match.foil > 0 && <span className="badge foil">{match.foil === 2 ? "ETCHED" : "FOIL"}</span>}</div>
+        <div className="rowtitle"><b>{match.name}</b><FinishBadge finish={match.foil} /></div>
         <div className="rowmeta">{match.set_name} <span className="badge">{match.set_code.toUpperCase()}</span> {match.collector_number}
           <span className="sub"> {side === "get" ? `${match.user.name} has ${match.quantity}` : `${match.user.name} wants ${match.quantity}`}</span></div>
       </div>

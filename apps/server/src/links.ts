@@ -47,6 +47,24 @@ export function addLink(database: DatabaseSync, deckCardId: number, link: Link):
 }
 
 /**
+ * Removes the links of `count` copies of a row that change printing while their decks keep theirs. `keepFree` copies of
+ * the row are free and change first, so only the rest lose their links. The deck cards become missing.
+ */
+export function dropLinks(database: DatabaseSync, from: { collectionId: string; key: CopyKey }, count: number, keepFree: number): void {
+  let dropping = Math.max(0, count - keepFree);
+  if (dropping <= 0) return;
+  touchCollection(database, from.collectionId);
+  const links = database.prepare(`SELECT id, quantity FROM deck_links WHERE collection_id = ? AND ${KEY} ORDER BY id DESC`).all(from.collectionId, ...keyValues(from.key));
+  for (const link of links) {
+    if (dropping <= 0) break;
+    const take = Math.min(dropping, Number(link.quantity));
+    if (take === Number(link.quantity)) database.prepare("DELETE FROM deck_links WHERE id = ?").run(Number(link.id));
+    else database.prepare("UPDATE deck_links SET quantity = quantity - ? WHERE id = ?").run(take, Number(link.id));
+    dropping -= take;
+  }
+}
+
+/**
  * Moves `count` linked copies of a row to another row: the links follow the copies.
  * `keepFree` copies of the source stay free first, so moving copies that are in no deck leaves the links alone.
  */
@@ -136,19 +154,21 @@ export function touchDeckCollections(database: DatabaseSync, deckId: string, dec
 export function alignDeckCard(database: DatabaseSync, deckCardId: number): void {
   const card = database.prepare("SELECT id, deck_id, oracle_id, printing_id, quantity, zone, finish FROM deck_cards WHERE id = ?").get(deckCardId);
   if (!card) return;
-  const strays = database.prepare("SELECT id, card_id, quantity FROM deck_links WHERE deck_card_id = ? AND card_id != ? ORDER BY id")
-    .all(deckCardId, card.printing_id as string | null);
+  const finish = Number(card.finish ?? 0);
+  const strays = database.prepare("SELECT id, card_id, foil, quantity FROM deck_links WHERE deck_card_id = ? AND (card_id != ? OR foil != ?) ORDER BY id")
+    .all(deckCardId, card.printing_id as string | null, finish);
   if (!strays.length) return;
-  const kept = Number(database.prepare("SELECT COALESCE(SUM(quantity), 0) AS n FROM deck_links WHERE deck_card_id = ? AND card_id = ?")
-    .get(deckCardId, card.printing_id as string | null)?.n ?? 0);
+  const kept = Number(database.prepare("SELECT COALESCE(SUM(quantity), 0) AS n FROM deck_links WHERE deck_card_id = ? AND card_id = ? AND foil = ?")
+    .get(deckCardId, card.printing_id as string | null, finish)?.n ?? 0);
   let remaining = Number(card.quantity);
   for (const link of strays) {
     const take = Math.min(Number(link.quantity), remaining);
-    const other = database.prepare("SELECT id FROM deck_cards WHERE deck_id = ? AND printing_id = ? AND zone = ? AND id != ?")
-      .get(String(card.deck_id), String(link.card_id), String(card.zone), deckCardId);
+    const other = database.prepare("SELECT id FROM deck_cards WHERE deck_id = ? AND printing_id = ? AND zone = ? AND finish = ? AND id != ?")
+      .get(String(card.deck_id), String(link.card_id), String(card.zone), Number(link.foil), deckCardId);
     if (take >= remaining && kept === 0 && !other) {
-      // every card moved: the deck card itself takes the new printing
-      database.prepare("UPDATE deck_cards SET printing_id = ? WHERE id = ?").run(String(link.card_id), deckCardId);
+      // every card moved: the deck card itself takes the new printing and finish
+      database.prepare("UPDATE deck_cards SET printing_id = ?, finish = ? WHERE id = ?").run(String(link.card_id), Number(link.foil), deckCardId);
+      database.prepare("UPDATE deck_cards SET want_card_id = NULL, want_finish = 0 WHERE id = ? AND want_card_id = printing_id AND want_finish = finish").run(deckCardId);
       alignDeckCard(database, deckCardId);
       return;
     }
@@ -158,7 +178,7 @@ export function alignDeckCard(database: DatabaseSync, deckCardId: number): void 
       database.prepare("UPDATE deck_cards SET quantity = quantity + ? WHERE id = ?").run(take, target);
     } else {
       database.prepare("INSERT INTO deck_cards (deck_id, oracle_id, printing_id, quantity, zone, finish) VALUES (?, ?, ?, ?, ?, ?)")
-        .run(String(card.deck_id), String(card.oracle_id), String(link.card_id), take, String(card.zone), Number(card.finish ?? 0));
+        .run(String(card.deck_id), String(card.oracle_id), String(link.card_id), take, String(card.zone), Number(link.foil));
       target = Number(database.prepare("SELECT last_insert_rowid() AS id").get()!.id);
     }
     database.prepare("UPDATE deck_links SET deck_card_id = ? WHERE id = ?").run(target, Number(link.id));

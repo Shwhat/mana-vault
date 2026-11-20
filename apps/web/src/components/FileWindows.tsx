@@ -73,7 +73,7 @@ function ImportWindow({ initial }: { initial: ImportKind }) {
       const result = await request<ImportReport>(url, { method: "POST", headers: { "content-type": "text/csv" }, body: file.text });
       const where = kind === "deck" ? store.deck?.name ?? "the deck" : store.collectionName(target);
       store.showReview(`Import into ${where}: ${file.name}`, result, true);
-      store.flash(`Imported ${result.importedQuantity} cards from ${result.matchedRows} rows into ${where}`);
+      store.flash(`Imported ${result.importedQuantity} cards from ${result.matchedRows} lines into ${where}`);
       closeDialog();
       await store.refreshAfterChange();
     } catch (reason) {
@@ -115,7 +115,7 @@ function ImportWindow({ initial }: { initial: ImportKind }) {
       {error && <p className="note err">{error}</p>}
       {report && (
         <div className="dlgtext">
-          <p>{report.matchedRows} rows ({report.importedQuantity} cards) match. {report.unmatched.length} rows are skipped.</p>
+          <p>{report.matchedRows} lines ({report.importedQuantity} cards) match. {report.unmatched.length} lines are skipped.</p>
           {report.unmatched.length > 0 && (
             <div className="msglist">
               {report.unmatched.slice(0, 8).map((item) => (
@@ -154,8 +154,8 @@ function ExportWindow({ initial, collectionId }: { initial: ExportWhat; collecti
   const choices = useMemo(() => {
     const list: Array<[ExportWhat, string, boolean]> = [
       ["collection", open ? `Whole collection: ${open.name}` : "Whole collection", !!open],
-      ["filtered", `Filtered cards (${filtered} rows)`, !!open && filtered > 0 && filtered !== (store.collection?.length ?? 0)],
-      ["selected", `Selected cards (${picked} rows)`, picked > 0 && !other],
+      ["filtered", `Filtered cards (${filtered} shown)`, !!open && filtered > 0 && filtered !== (store.collection?.length ?? 0)],
+      ["selected", `Selected cards (${picked} picked)`, picked > 0 && !other],
       ["missing", "Missing cards", !!open && open.completion !== "none" && open.sets.length > 0],
       ["deck", store.deck ? `Deck: ${store.deck.name}` : "Deck", !!store.deck && !other],
     ];
@@ -191,7 +191,7 @@ function ExportWindow({ initial, collectionId }: { initial: ExportWhat; collecti
       if (!rows.length) return setError("There is nothing to export");
       const file = exportText(rows, format);
       downloadText(`${slugify(name)}.${file.extension}`, file.text, file.type);
-      store.flash(`${rows.length} rows exported`);
+      store.flash(`${rows.length} cards exported`);
       closeDialog();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Could not export.");

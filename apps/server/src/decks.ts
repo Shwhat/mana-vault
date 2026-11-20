@@ -49,16 +49,60 @@ function freeCopies(database: DatabaseSync, collectionId: string, key: CopyKey, 
   return row ? Math.max(0, Number(row.quantity) - Number(row.linked)) : 0;
 }
 
-/** Finds or makes the deck card for a printing in a zone, and adds `quantity` to it. Returns its id. */
-function addDeckCard(database: DatabaseSync, deckId: string, cardId: string, quantity: number, zone: string, finish = 0): number {
+/** Finds or makes the deck card for a printing in a finish and zone, and adds `quantity` to it. Returns its id. */
+export function addDeckCard(database: DatabaseSync, deckId: string, cardId: string, quantity: number, zone: string, finish = 0): number {
   const card = database.prepare("SELECT oracle_id FROM cards WHERE id = ?").get(cardId);
   if (!card) throw new Error("Card printing not found");
-  // a card already in the zone keeps its finish
   database.prepare(
     `INSERT INTO deck_cards (deck_id, oracle_id, printing_id, quantity, zone, finish) VALUES (?, ?, ?, ?, ?, ?)
-     ON CONFLICT(deck_id, oracle_id, printing_id, zone) WHERE printing_id IS NOT NULL DO UPDATE SET quantity = quantity + excluded.quantity`,
+     ON CONFLICT(deck_id, oracle_id, printing_id, zone, finish) WHERE printing_id IS NOT NULL DO UPDATE SET quantity = quantity + excluded.quantity`,
   ).run(deckId, String(card.oracle_id), cardId, quantity, zone, finish);
-  return Number(database.prepare("SELECT id FROM deck_cards WHERE deck_id = ? AND printing_id = ? AND zone = ?").get(deckId, cardId, zone)!.id);
+  return Number(database.prepare("SELECT id FROM deck_cards WHERE deck_id = ? AND printing_id = ? AND zone = ? AND finish = ?").get(deckId, cardId, zone, finish)!.id);
+}
+
+/** Removes the Upgrade wanted mark of a deck card that is now the version wanted. */
+function clearWantIfMet(database: DatabaseSync, deckCardId: number): void {
+  database.prepare("UPDATE deck_cards SET want_card_id = NULL, want_finish = 0 WHERE id = ? AND want_card_id = printing_id AND want_finish = finish").run(deckCardId);
+}
+
+/**
+ * Moves `count` cards of a deck card to another printing and finish in the same zone, joining a deck card that is already
+ * there. With `keepLinks`, links go with the cards when the whole deck card moves; otherwise the moved cards have no links.
+ * The Upgrade wanted mark goes with the cards. Returns the id of the deck card that holds the moved cards.
+ */
+export function moveDeckCards(database: DatabaseSync, deckId: string, deckCardId: number, count: number, cardId: string, finish: number, keepLinks: boolean): number {
+  const card = database.prepare("SELECT id, quantity, zone, want_card_id, want_finish FROM deck_cards WHERE id = ?").get(deckCardId);
+  if (!card) throw new Error("Deck card not found");
+  const quantity = Number(card.quantity);
+  const take = Math.min(count, quantity);
+  const other = database.prepare("SELECT id, want_card_id FROM deck_cards WHERE deck_id = ? AND printing_id = ? AND zone = ? AND finish = ? AND id != ?")
+    .get(deckId, cardId, String(card.zone), finish, deckCardId);
+  let target: number;
+  if (take >= quantity) {
+    if (!keepLinks) database.prepare("DELETE FROM deck_links WHERE deck_card_id = ?").run(deckCardId);
+    if (other) {
+      target = Number(other.id);
+      database.prepare("UPDATE deck_cards SET quantity = MIN(100, quantity + ?) WHERE id = ?").run(take, target);
+      moveCardLinks(database, deckCardId, target);
+      if (!other.want_card_id && card.want_card_id) {
+        database.prepare("UPDATE deck_cards SET want_card_id = ?, want_finish = ? WHERE id = ?").run(String(card.want_card_id), Number(card.want_finish ?? 0), target);
+      }
+      database.prepare("DELETE FROM deck_cards WHERE id = ?").run(deckCardId);
+      capDeckCardLinks(database, target);
+    } else {
+      target = deckCardId;
+      database.prepare("UPDATE deck_cards SET printing_id = ?, finish = ? WHERE id = ?").run(cardId, finish, deckCardId);
+    }
+  } else {
+    database.prepare("UPDATE deck_cards SET quantity = quantity - ? WHERE id = ?").run(take, deckCardId);
+    capDeckCardLinks(database, deckCardId);
+    target = addDeckCard(database, deckId, cardId, take, String(card.zone), finish);
+    if (card.want_card_id) {
+      database.prepare("UPDATE deck_cards SET want_card_id = ?, want_finish = ? WHERE id = ? AND want_card_id IS NULL").run(String(card.want_card_id), Number(card.want_finish ?? 0), target);
+    }
+  }
+  clearWantIfMet(database, target);
+  return target;
 }
 
 /** A deck card's finish: 0 regular, 1 foil, 2 etched; also "foil" and "etched", or true for foil. */
@@ -104,8 +148,8 @@ function readLinks(value: unknown): LinkInput[] | string {
 }
 
 /**
- * Links copies to a deck card. A copy of another printing moves those deck cards to that printing, so the deck shows
- * what is really in it. Each link takes no more copies than are free. Returns how many copies were linked.
+ * Links copies to a deck card. The deck card follows the copies: cards filled by a copy of another printing or finish move
+ * to a deck card of that printing and finish. Each link takes no more copies than are free. Returns how many were linked.
  */
 function linkCopies(database: DatabaseSync, deckId: string, deckCardId: number, links: LinkInput[], userId: number): number {
   let linked = 0;
@@ -119,28 +163,62 @@ function linkCopies(database: DatabaseSync, deckId: string, deckCardId: number, 
     const take = Math.min(link.quantity, freeCopies(database, link.collectionId, link), Number(card.quantity));
     if (take <= 0) continue;
     let target = deckCardId;
-    if (card.printing_id !== link.cardId) {
-      // move `take` deck cards to the copy's printing
-      if (take >= Number(card.quantity)) {
-        const other = database.prepare("SELECT id FROM deck_cards WHERE deck_id = ? AND printing_id = ? AND zone = ? AND id != ?").get(deckId, link.cardId, String(card.zone), deckCardId);
-        if (other) {
-          database.prepare("UPDATE deck_cards SET quantity = quantity + ? WHERE id = ?").run(take, Number(other.id));
-          moveCardLinks(database, deckCardId, Number(other.id));
-          database.prepare("DELETE FROM deck_cards WHERE id = ?").run(deckCardId);
-          target = Number(other.id);
-        } else {
-          database.prepare("UPDATE deck_cards SET printing_id = ? WHERE id = ?").run(link.cardId, deckCardId);
-        }
-      } else {
-        database.prepare("UPDATE deck_cards SET quantity = quantity - ? WHERE id = ?").run(take, deckCardId);
-        capDeckCardLinks(database, deckCardId);
-        target = addDeckCard(database, deckId, link.cardId, take, String(card.zone), Number(card.finish ?? 0));
-      }
+    if (card.printing_id !== link.cardId || Number(card.finish ?? 0) !== link.foil) {
+      target = moveDeckCards(database, deckId, deckCardId, take, link.cardId, link.foil, true);
     }
     addLink(database, target, { ...link, quantity: take });
     capDeckCardLinks(database, target);
+    clearWantIfMet(database, target);
     linked += take;
     deckCardId = target;
+  }
+  return linked;
+}
+
+/** Free copies of a card (every printing and finish) in the account's collections, that could fill a deck card. */
+export function freeVersions(database: DatabaseSync, userId: number, oracleId: string, exceptDeckCard: number, preferCard = "", preferCollection = "") {
+  return database.prepare(
+    `SELECT i.collection_id, COALESCE(m.display_name, col.name) AS collection_name, i.card_id, c.set_code, c.set_name, c.collector_number, c.image_url,
+            i.foil, i.condition, i.language, i.proxy, i.quantity,
+            (SELECT COALESCE(SUM(l.quantity), 0) FROM deck_links l WHERE l.collection_id = i.collection_id AND l.card_id = i.card_id AND l.foil = i.foil
+               AND l.condition = i.condition AND l.language = i.language AND l.proxy = i.proxy AND l.deck_card_id != ?) AS linked
+     FROM collection_cards i JOIN cards c ON c.id = i.card_id JOIN collections col ON col.id = i.collection_id
+     LEFT JOIN members m ON m.kind = 'collection' AND m.item_id = col.id AND m.user_id = ?
+     WHERE c.oracle_id = ? AND col.kind = 'collection' AND (col.owner_id = ? OR m.user_id IS NOT NULL)
+     ORDER BY i.card_id = ? DESC, col.id = ? DESC, i.proxy, col.created_at, col.rowid`,
+  ).all(exceptDeckCard, userId, oracleId, userId, preferCard, preferCollection).map((row) => ({
+    collectionId: String(row.collection_id), collectionName: String(row.collection_name), cardId: String(row.card_id), set_code: String(row.set_code),
+    set_name: String(row.set_name), collector_number: String(row.collector_number), image_url: row.image_url as string | null,
+    foil: Number(row.foil) as CopyKey["foil"], condition: String(row.condition) as CopyKey["condition"], language: String(row.language), proxy: Number(row.proxy) === 1,
+    quantity: Number(row.quantity), free: Math.max(0, Number(row.quantity) - Number(row.linked)),
+  })).filter((row) => row.free > 0);
+}
+
+/**
+ * Links free copies of the exact printing and finish to every deck card that is missing cards (not the maybeboard). The
+ * deck's own collection is used first, then the account's other collections. Returns how many copies were linked.
+ */
+export function linkOwnedCopies(database: DatabaseSync, deckId: string, userId: number, only?: Set<number>): number {
+  const deck = database.prepare("SELECT collection_id FROM decks WHERE id = ?").get(deckId);
+  if (!deck) return 0;
+  const preferred = String(deck.collection_id ?? "");
+  let linked = 0;
+  const cards = database.prepare(
+    `SELECT dc.id, dc.oracle_id, dc.printing_id, dc.finish, dc.quantity - COALESCE((SELECT SUM(l.quantity) FROM deck_links l WHERE l.deck_card_id = dc.id), 0) AS missing
+     FROM deck_cards dc WHERE dc.deck_id = ? AND dc.zone != 'maybeboard' AND dc.printing_id IS NOT NULL ORDER BY dc.id`,
+  ).all(deckId);
+  for (const card of cards) {
+    let missing = Number(card.missing);
+    if (missing <= 0 || (only && !only.has(Number(card.id)))) continue;
+    const exact = freeVersions(database, userId, String(card.oracle_id), -1, String(card.printing_id), preferred)
+      .filter((copy) => copy.cardId === card.printing_id && copy.foil === Number(card.finish ?? 0));
+    for (const copy of exact) {
+      if (missing <= 0) break;
+      const take = Math.min(missing, copy.free);
+      addLink(database, Number(card.id), { ...copy, quantity: take });
+      missing -= take;
+      linked += take;
+    }
   }
   return linked;
 }
@@ -258,16 +336,20 @@ export function registerDeckRoutes(app: FastifyInstance, database: DatabaseSync)
       `SELECT dc.id AS entry_id, c.id AS card_id, dc.oracle_id, dc.printing_id, dc.quantity, dc.zone, dc.finish, dc.tags, c.name, c.mana_cost,
               c.type_line, c.set_code, c.set_name, c.collector_number, c.image_url, c.mana_value, c.rarity, c.colors, c.color_identity,
               c.oracle_text, c.legalities, c.produced_mana, c.tokens, c.power, c.toughness,
-              c.price_usd, c.price_usd_foil, c.price_usd_etched, c.price_eur, c.price_eur_foil, c.custom, c.finishes
-       FROM deck_cards dc JOIN cards c ON c.id = COALESCE(
+              c.price_usd, c.price_usd_foil, c.price_usd_etched, c.price_eur, c.price_eur_foil, c.custom, c.finishes,
+              dc.want_card_id, dc.want_finish, w.set_code AS want_set_code, w.collector_number AS want_collector_number
+       FROM deck_cards dc LEFT JOIN cards w ON w.id = dc.want_card_id JOIN cards c ON c.id = COALESCE(
          dc.printing_id, (SELECT p.id FROM cards p WHERE p.oracle_id = dc.oracle_id ORDER BY p.released_at DESC LIMIT 1))
        WHERE dc.deck_id = ? ORDER BY dc.zone, c.name`,
     ).all(request.params.deckId).map((card) => {
       const list = links.get(Number(card.entry_id)) ?? [];
       const parse = (text: unknown, fallback: unknown) => { try { return text ? JSON.parse(String(text)) : fallback; } catch { return fallback; } };
+      const missing = card.zone === "maybeboard" ? 0 : Math.max(0, Number(card.quantity) - list.reduce((sum, link) => sum + link.quantity, 0));
+      // for a card with missing copies: free copies the account owns, the exact version first ("Owned") or other versions
+      const owned = missing > 0 ? freeVersions(database, userOf(request), String(card.oracle_id), -1, String(card.card_id), String(deck.collection_id ?? "")).slice(0, 12) : [];
       return {
         ...card, custom: Number(card.custom ?? 0) === 1, tags: String(card.tags ?? "").split("\n").filter(Boolean), legalities: parse(card.legalities, {}), tokens: parse(card.tokens, []),
-        links: list, missing: card.zone === "maybeboard" ? 0 : Math.max(0, Number(card.quantity) - list.reduce((sum, link) => sum + link.quantity, 0)),
+        want_card_id: card.want_card_id ?? null, want_finish: Number(card.want_finish ?? 0), links: list, missing, owned,
       };
     });
     return { ...deck, cards };
@@ -324,8 +406,8 @@ export function registerDeckRoutes(app: FastifyInstance, database: DatabaseSync)
     }
   });
 
-  // changes the printing of a deck card: links to the old printing go, the copies sent are linked, the rest is missing
-  app.put<{ Params: { deckId: string; entryId: string }; Body: { cardId?: unknown; links?: unknown; finish?: unknown } }>(
+  // changes the printing or finish of a deck card, or of `quantity` of its cards: links to the old version go, the copies sent are linked, the rest is missing
+  app.put<{ Params: { deckId: string; entryId: string }; Body: { cardId?: unknown; links?: unknown; finish?: unknown; quantity?: unknown } }>(
     "/api/decks/:deckId/entries/:entryId/printing",
     async (request, reply) => {
       const deckId = request.params.deckId;
@@ -338,32 +420,23 @@ export function registerDeckRoutes(app: FastifyInstance, database: DatabaseSync)
       if (!printing) return reply.code(404).send({ error: "Card printing not found" });
       if (printing.oracle_id !== card.oracle_id) return reply.code(400).send({ error: "Choose a printing of the same card" });
       if (!finishOffered(String(printing.finishes ?? ""), finish)) return reply.code(400).send({ error: "That printing is not made in that finish" });
+      const asked = request.body?.quantity === undefined ? Number(card.quantity) : Number(request.body.quantity);
+      if (!Number.isInteger(asked) || asked < 1) return reply.code(400).send({ error: "Quantity must be a whole number of at least 1" });
+      const count = Math.min(asked, Number(card.quantity));
       const links = request.body?.links === undefined ? [] : readLinks(request.body.links);
       if (typeof links === "string") return reply.code(400).send({ error: links });
-      if (links.some((link) => link.cardId !== cardId)) return reply.code(400).send({ error: "Linked copies must be of the new printing" });
+      if (links.some((link) => link.cardId !== cardId || link.foil !== finish)) return reply.code(400).send({ error: "Linked copies must be of the new version" });
+      if (cardId === card.printing_id && finish === Number(card.finish ?? 0)) return { status: "unchanged", entryId, linked: 0 };
       try {
         const result = transaction(database, () => {
           touchDeckCollections(database, deckId, entryId);
-          database.prepare("DELETE FROM deck_links WHERE deck_card_id = ?").run(entryId);
-          let target = entryId;
-          if (card.printing_id !== cardId) {
-            const other = database.prepare("SELECT id FROM deck_cards WHERE deck_id = ? AND printing_id = ? AND zone = ? AND id != ?")
-              .get(deckId, cardId, String(card.zone), entryId);
-            if (other) {
-              // the deck already has this printing in the zone: the cards join it
-              database.prepare("UPDATE deck_cards SET quantity = MIN(100, quantity + ?) WHERE id = ?").run(Number(card.quantity), Number(other.id));
-              database.prepare("DELETE FROM deck_cards WHERE id = ?").run(entryId);
-              target = Number(other.id);
-            } else {
-              database.prepare("UPDATE deck_cards SET printing_id = ? WHERE id = ?").run(cardId, entryId);
-            }
-          }
-          database.prepare("UPDATE deck_cards SET finish = ? WHERE id = ?").run(finish, target);
-          const linked = links.length ? linkCopies(database, deckId, target, links, userOf(request)) : 0;
+          const target = moveDeckCards(database, deckId, entryId, count, cardId, finish, false);
+          const linked = links.length ? linkCopies(database, deckId, target, links.map((link) => ({ ...link, quantity: Math.min(link.quantity, count) })), userOf(request)) : 0;
           touchDeck(database, deckId);
           const finishWord = finish === 2 ? " etched" : finish === 1 ? " foil" : "";
+          const part = count < Number(card.quantity) ? `${count} of ${Number(card.quantity)} ` : "";
           logDeck(database, deckId, nameOf(request),
-            `${String(printing.name)} printing changed to (${String(printing.set_code).toUpperCase()}) ${String(printing.collector_number)}${finishWord}`);
+            `${part}${String(printing.name)} printing changed to (${String(printing.set_code).toUpperCase()}) ${String(printing.collector_number)}${finishWord}`);
           return { entryId: target, linked };
         });
         return { status: "changed", ...result };
@@ -375,26 +448,52 @@ export function registerDeckRoutes(app: FastifyInstance, database: DatabaseSync)
 
   // copies of a card in the account's collections that could fill a deck card: every printing, with how many are free
   app.get<{ Params: { deckId: string }; Querystring: { cardId?: string; entryId?: string } }>("/api/decks/:deckId/candidates", async (request, reply) => {
-    const userId = userOf(request);
     const cardId = String(request.query.cardId ?? "");
     const oracle = database.prepare("SELECT oracle_id FROM cards WHERE id = ?").get(cardId);
     if (!oracle) return reply.code(404).send({ error: "Card printing not found" });
     const entryId = request.query.entryId ? Number(request.query.entryId) : -1;
-    return database.prepare(
-      `SELECT i.collection_id, COALESCE(m.display_name, col.name) AS collection_name, i.card_id, c.set_code, c.set_name, c.collector_number, c.image_url,
-              i.foil, i.condition, i.language, i.proxy, i.quantity,
-              (SELECT COALESCE(SUM(l.quantity), 0) FROM deck_links l WHERE l.collection_id = i.collection_id AND l.card_id = i.card_id AND l.foil = i.foil
-                 AND l.condition = i.condition AND l.language = i.language AND l.proxy = i.proxy AND l.deck_card_id != ?) AS linked
-       FROM collection_cards i JOIN cards c ON c.id = i.card_id JOIN collections col ON col.id = i.collection_id
-       LEFT JOIN members m ON m.kind = 'collection' AND m.item_id = col.id AND m.user_id = ?
-       WHERE c.oracle_id = ? AND col.kind = 'collection' AND (col.owner_id = ? OR m.user_id IS NOT NULL)
-       ORDER BY i.card_id = ? DESC, i.proxy, col.created_at, col.rowid`,
-    ).all(entryId, userId, String(oracle.oracle_id), userId, cardId).map((row) => ({
-      collectionId: String(row.collection_id), collectionName: String(row.collection_name), cardId: String(row.card_id), set_code: String(row.set_code),
-      set_name: String(row.set_name), collector_number: String(row.collector_number), image_url: row.image_url,
-      foil: Number(row.foil), condition: String(row.condition), language: String(row.language), proxy: Number(row.proxy) === 1,
-      quantity: Number(row.quantity), free: Math.max(0, Number(row.quantity) - Number(row.linked)),
-    })).filter((row) => row.free > 0);
+    const deck = database.prepare("SELECT collection_id FROM decks WHERE id = ?").get(request.params.deckId);
+    return freeVersions(database, userOf(request), String(oracle.oracle_id), entryId, cardId, String(deck?.collection_id ?? ""));
+  });
+
+  // links free copies of the exact printing and finish to every card the deck is missing
+  app.post<{ Params: { deckId: string } }>("/api/decks/:deckId/link-owned", async (request) => {
+    const linked = transaction(database, () => {
+      const count = linkOwnedCopies(database, request.params.deckId, userOf(request));
+      if (count) {
+        touchDeck(database, request.params.deckId);
+        logDeck(database, request.params.deckId, nameOf(request), `Linked ${count} owned ${count === 1 ? "copy" : "copies"}`);
+      }
+      return count;
+    });
+    return { status: "linked", linked };
+  });
+
+  // marks a deck card Upgrade wanted with the version wanted, or removes the mark (cardId null)
+  app.put<{ Params: { deckId: string; entryId: string }; Body: { cardId?: unknown; finish?: unknown } }>("/api/decks/:deckId/entries/:entryId/upgrade", async (request, reply) => {
+    const entryId = Number(request.params.entryId);
+    const card = database.prepare("SELECT dc.id, dc.oracle_id, dc.printing_id, dc.finish, c.name FROM deck_cards dc JOIN cards c ON c.id = dc.printing_id WHERE dc.id = ? AND dc.deck_id = ?")
+      .get(entryId, request.params.deckId);
+    if (!card) return reply.code(404).send({ error: "Deck card not found" });
+    const cardId = request.body?.cardId;
+    if (cardId === null) {
+      database.prepare("UPDATE deck_cards SET want_card_id = NULL, want_finish = 0 WHERE id = ?").run(entryId);
+      touchDeck(database, request.params.deckId);
+      logDeck(database, request.params.deckId, nameOf(request), `${String(card.name)} no longer marked Upgrade wanted`);
+      return { status: "saved" };
+    }
+    const finish = readDeckFinish(request.body?.finish);
+    const wanted = typeof cardId === "string" ? database.prepare("SELECT oracle_id, set_code, collector_number, finishes FROM cards WHERE id = ?").get(cardId) : undefined;
+    if (!wanted) return reply.code(404).send({ error: "Card printing not found" });
+    if (wanted.oracle_id !== card.oracle_id) return reply.code(400).send({ error: "Choose a printing of the same card" });
+    if (!finishOffered(String(wanted.finishes ?? ""), finish)) return reply.code(400).send({ error: "That printing is not made in that finish" });
+    if (cardId === card.printing_id && finish === Number(card.finish ?? 0)) return reply.code(400).send({ error: "The deck already has this version. Choose the version you want instead." });
+    database.prepare("UPDATE deck_cards SET want_card_id = ?, want_finish = ? WHERE id = ?").run(cardId as string, finish, entryId);
+    touchDeck(database, request.params.deckId);
+    const finishWord = finish === 2 ? " etched" : finish === 1 ? " foil" : "";
+    logDeck(database, request.params.deckId, nameOf(request),
+      `${String(card.name)} marked Upgrade wanted: (${String(wanted.set_code).toUpperCase()}) ${String(wanted.collector_number)}${finishWord}`);
+    return { status: "saved" };
   });
 
   app.patch<{ Params: { deckId: string; oracleId: string }; Querystring: { zone?: string; entryId?: string }; Body: { quantity?: number; zone?: string } }>(
@@ -407,8 +506,8 @@ export function registerDeckRoutes(app: FastifyInstance, database: DatabaseSync)
         return reply.code(400).send({ error: "Provide a quantity from 0 to 100 and valid deck zones" });
       }
       const existing = request.query.entryId
-        ? database.prepare("SELECT id, oracle_id, printing_id, quantity, zone FROM deck_cards WHERE deck_id = ? AND id = ?").get(request.params.deckId, Number(request.query.entryId))
-        : database.prepare("SELECT id, oracle_id, printing_id, quantity, zone FROM deck_cards WHERE deck_id = ? AND oracle_id = ? AND zone = ? LIMIT 1")
+        ? database.prepare("SELECT id, oracle_id, printing_id, quantity, zone, finish FROM deck_cards WHERE deck_id = ? AND id = ?").get(request.params.deckId, Number(request.query.entryId))
+        : database.prepare("SELECT id, oracle_id, printing_id, quantity, zone, finish FROM deck_cards WHERE deck_id = ? AND oracle_id = ? AND zone = ? LIMIT 1")
           .get(request.params.deckId, request.params.oracleId, currentZone);
       if (!existing) return reply.code(404).send({ error: "Deck card not found" });
       const id = Number(existing.id);
@@ -425,8 +524,8 @@ export function registerDeckRoutes(app: FastifyInstance, database: DatabaseSync)
           database.prepare("UPDATE deck_cards SET quantity = ? WHERE id = ?").run(quantity, id);
           capDeckCardLinks(database, id);
         } else {
-          const target = database.prepare("SELECT id FROM deck_cards WHERE deck_id = ? AND oracle_id = ? AND zone = ? AND printing_id IS ?")
-            .get(request.params.deckId, String(existing.oracle_id), nextZone, existing.printing_id as string | null);
+          const target = database.prepare("SELECT id FROM deck_cards WHERE deck_id = ? AND oracle_id = ? AND zone = ? AND printing_id IS ? AND finish = ?")
+            .get(request.params.deckId, String(existing.oracle_id), nextZone, existing.printing_id as string | null, Number(existing.finish ?? 0));
           if (target) {
             // the links go with the cards to the other zone
             database.prepare("UPDATE deck_cards SET quantity = quantity + ? WHERE id = ?").run(quantity, Number(target.id));

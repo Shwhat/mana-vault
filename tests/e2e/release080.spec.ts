@@ -55,6 +55,7 @@ test("the deck's Add tab searches cards and adds them to a zone, counting what i
   await choose(page, page.locator("#f-format"), "casual");
   await page.keyboard.press("Enter");
   await expect(page.locator("#docname")).toHaveText("Deck: Elves");
+  await expect(page.locator("dialog[open]")).toHaveCount(0);
   await page.keyboard.press("3");
   await page.getByRole("tab", { name: "Add", exact: true }).click();
   await expect(page.locator(".fltscope")).toHaveText("Filtering: Deck card search");

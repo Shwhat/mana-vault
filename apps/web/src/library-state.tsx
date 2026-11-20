@@ -1,7 +1,7 @@
 // ---------- library state: collections, row picking, bulk edits, decks admin and offers ----------
 import { useCallback, useEffect, useRef, useState, type MutableRefObject } from "react";
 import { csvCell, downloadText, request, slugify } from "./api";
-import { confirmDialog } from "./components/Dialog";
+import { choiceDialog, confirmDialog } from "./components/Dialog";
 import type { Prefs } from "./prefs";
 import {
   type Collection, type CollectionEntry, type CollectionKind, type CompletionReport, type CompletionRule, type CopyExtras, type CopyKey, copyKey, copyLabel,
@@ -166,16 +166,23 @@ export function useLibraryState(deps: LibraryDeps) {
     return (live.current.collection ?? []).filter((entry) => checked.has(entryKey(entry)));
   }, [live]);
 
+  // removePicked offers Reduce to 1, which is made after it
+  const reduceRef = useRef<(entries: CollectionEntry[]) => Promise<void>>(async () => undefined);
+
   const removePicked = useCallback(async () => {
     const entries = pickedEntries();
     const groups = byCollection(entries, live.current.prefs.openCollection);
-    if (!groups.size || !entries.length) return flash("Pick one or more rows first", "err");
+    if (!groups.size || !entries.length) return flash("Pick one or more cards first", "err");
     const cards = entries.reduce((sum, entry) => sum + entry.quantity, 0);
     const name = groups.size === 1 ? collectionName([...groups.keys()][0]!) : `${groups.size} collections`;
     const label = entries.length === 1 ? copyLabel(entries[0]!) : "";
     const what = entries.length === 1 ? `${entries[0]!.name}${label ? ` (${label.toLowerCase()})` : ""} (${cards} ${cards === 1 ? "card" : "cards"})` : `${entries.length} entries (${cards} cards)`;
-    const ok = await confirmDialog("Remove cards", <>Remove {what} from {name}?</>, "Remove");
-    if (!ok) return;
+    // several copies of a card can also be lowered to one instead of removed
+    const answer = await choiceDialog("Remove cards", <>Remove {what} from {name}?</>, [
+      ["all", "Remove all", true], ...(entries.some((entry) => entry.quantity > 1) ? [["one", "Reduce to 1"] as ["one", string]] : []),
+    ]);
+    if (!answer) return;
+    if (answer === "one") return reduceRef.current(entries);
     const steps = [...groups].map(([target, rows]) => {
       const before: Counts = rows.map((entry) => ({ ...copyKey(entry), quantity: entry.quantity, trade: entry.trade }));
       return { target, before, after: before.map((item) => ({ ...item, quantity: 0 })) };
@@ -256,30 +263,72 @@ export function useLibraryState(deps: LibraryDeps) {
   }, [live, setCounts, pushUndo, flash, fail, refreshAfterChange]);
 
   /** Changes the printing of a row's copies (a card added as the wrong printing). Deck links stay with the copies. */
-  const changeCopyPrinting = useCallback(async (entry: CollectionEntry, to: { id: string; set_code: string; collector_number: string }, finish: FinishCode = entry.foil) => {
+  /**
+   * Changes the printing or finish of `count` copies (all by default). When some of the changed copies are in decks, the
+   * person chooses whether the decks change too, or keep their version and show those cards as missing.
+   */
+  const changeCopyPrinting = useCallback(async (entry: CollectionEntry, to: { id: string; set_code: string; collector_number: string }, finish: FinishCode = entry.foil,
+    count = entry.quantity) => {
     const target = entry.collection_id ?? live.current.prefs.openCollection;
     if (!target || target === ALL_COLLECTIONS || (to.id === entry.id && finish === entry.foil)) return;
-    const move = async (from: CopyKey, cardId: string, toFinish: FinishCode, quantity?: number) => request<{ moved: number }>(
+    const changing = Math.max(1, Math.min(entry.quantity, count));
+    const inDecks = (entry.decks ?? []).reduce((sum, deck) => sum + deck.quantity, 0);
+    const free = entry.quantity - inDecks;
+    let decks: "follow" | "keep" = "follow";
+    if (changing > free && inDecks > 0) {
+      const names = (entry.decks ?? []).map((deck) => deck.name).join(", ");
+      const answer = await choiceDialog("Change printing", <>{changing - Math.max(0, free) === 1 ? "A copy that changes is" : `${changing - Math.max(0, free)} copies that change are`} in {names}. Change the {entry.decks!.length === 1 ? "deck" : "decks"} too?</>, [
+        ["follow", `Yes, change the ${entry.decks!.length === 1 ? "deck" : "decks"}`, true],
+        ["keep", "No, show it as missing"],
+      ]);
+      if (!answer) return;
+      decks = answer;
+    }
+    const move = async (from: CopyKey, cardId: string, toFinish: FinishCode, quantity?: number, how: "follow" | "keep" = "follow") => request<{ moved: number }>(
       `/api/collections/${encodeURIComponent(target)}/printing`,
-      { method: "POST", body: JSON.stringify({ ...from, to: cardId, toFinish, ...(quantity ? { quantity } : {}) }) },
+      { method: "POST", body: JSON.stringify({ ...from, to: cardId, toFinish, decks: how, ...(quantity ? { quantity } : {}) }) },
     );
     try {
       const from = copyKey(entry);
-      const { moved } = await move(from, to.id, finish);
+      const { moved } = await move(from, to.id, finish, changing, decks);
       const next: CopyKey = { ...from, cardId: to.id, foil: finish };
       pushUndo({
         label: `Change printing of ${entry.name}`,
         undo: async () => { await move(next, entry.id, entry.foil, moved); },
-        redo: async () => { await move(from, to.id, finish, moved); },
+        redo: async () => { await move(from, to.id, finish, moved, decks); },
       });
       depsRef.current.setChecked(new Set());
       const finishWord = finish === 2 ? " etched" : finish === 1 ? " foil" : "";
-      flash(`${entry.name} is now (${to.set_code.toUpperCase()}) ${to.collector_number}${finishWord}`);
+      const part = moved < entry.quantity ? `${moved} of ${entry.quantity} ` : "";
+      flash(`${part ? `${part}${entry.name} changed to` : `${entry.name} is now`} (${to.set_code.toUpperCase()}) ${to.collector_number}${finishWord}${decks === "keep" ? ", decks kept their version" : ""}`);
       await refreshAfterChange();
     } catch (reason) {
       fail(reason, "Could not change the printing.");
     }
   }, [live, pushUndo, flash, fail, refreshAfterChange]);
+
+  /** Lowers each picked entry to one copy, as one undo step. */
+  const reducePicked = useCallback(async (given?: CollectionEntry[]) => {
+    const entries = (given ?? pickedEntries()).filter((entry) => entry.quantity > 1);
+    const groups = byCollection(entries, live.current.prefs.openCollection);
+    if (!groups.size || !entries.length) return flash("Each picked card has one copy already", "err");
+    const steps = [...groups].map(([target, rows]) => {
+      const before: Counts = rows.map((entry) => ({ ...copyKey(entry), quantity: entry.quantity, trade: entry.trade }));
+      return { target, before, after: before.map((item) => ({ ...item, quantity: 1, trade: Math.min(1, item.trade ?? 0) })) };
+    });
+    const run = async (which: "before" | "after") => { for (const step of steps) await setCounts(step.target, step[which]); };
+    const what = entries.length === 1 ? entries[0]!.name : `${entries.length} entries`;
+    try {
+      await run("after");
+      pushUndo({ label: `Reduce ${what} to 1`, undo: () => run("before"), redo: () => run("after") });
+      flash(`${what} reduced to 1 copy${entries.length === 1 ? "" : " each"}`);
+      await refreshAfterChange();
+    } catch (reason) {
+      fail(reason, "Could not reduce the cards.");
+    }
+  }, [live, pickedEntries, setCounts, pushUndo, flash, fail, refreshAfterChange]);
+
+  reduceRef.current = async (entries) => { await reducePicked(entries); };
 
   /** Marks every copy of the given rows for trade, or clears their marks. */
   const markTrade = useCallback(async (entries: CollectionEntry[], on: boolean) => {
@@ -507,7 +556,7 @@ export function useLibraryState(deps: LibraryDeps) {
   return {
     offers, reloadOffers, users, loadUsers,
     createCollection, saveCollection, openCollection, setTargetCollection, cycleTargetCollection, deleteCollection,
-    pick, pickAll, pickedEntries, removePicked, moveEntries, exportMissing, editCopy, changeCopyPrinting, markTrade,
+    pick, pickAll, pickedEntries, removePicked, reducePicked, moveEntries, exportMissing, editCopy, changeCopyPrinting, markTrade,
     wishlist, addToWishlist, addMissingToWishlist, addDeckMissingToWishlist, exportDeckMissing,
     renameDeck, deleteDeck, send, accept, decline, cancelOffer, stopSharing,
   };

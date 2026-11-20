@@ -28,7 +28,7 @@ The **target zone** decides where Add to deck and Quick add put a card. It start
 ## Opening decks
 
 - **The deck switcher**: the button with the deck's name at the left of the deck view header (on a phone, at the top of the Decks tab). It opens a list of every deck with its cover card, commander, format and card count. Type to find a deck by name, commander or format; Up and Down move through the list, Enter opens the highlighted deck and Esc closes the list. **Sort** orders the list by Recently opened, Name, Date created, Card count, Format or Commander; the choice is kept for your account. **New deck...** is at the bottom of the list.
-- **Decks panel**: decks are grouped by format, each with its card count and value. One click on a deck opens it in the deck view and makes it where new cards go (see [Collections](/about/collections)). Right-click or long press a deck for its menu: Open, Rename..., Deck format..., Send..., Export..., Delete or Leave.
+- **Decks panel**: decks are grouped by format, each with its card count and value. One click on a deck opens it in the deck view and makes it where new cards go (see [Collections](/about/collections)). The open deck shows **Target**, or **Adding here** while Enter and + Add use it. Right-click or long press a deck for its menu: Open, Rename..., Deck format..., Send..., Export..., Delete or Leave.
 - **Open deck...** (Ctrl+O) lists every deck with its format and card count.
 - **New deck...** (Ctrl+N) asks for the name and format. **Create deck** creates it and opens it.
 - **Add to...** in the scanner offers **New deck...** too (see [Scanning cards](/about/scanning-cards)).
@@ -49,12 +49,14 @@ Every card you own is in a collection. Putting a card in a deck does not take it
 |---|---|
 | One deck per copy | A copy fills one deck card at a time. When a second deck needs the same card and no other copy is free, that card is missing in the second deck |
 | Cards you do not own | A deck can hold cards with no linked copy. They show **Missing** with a **+ Wishlist** button |
-| Choosing the copy | Add to deck links a free copy at once when the card is free in one collection. When it is free in more than one collection, Mana Vault asks which copy to use (or None, missing). **Link copies...** changes it later |
+| Choosing the copy | Add to deck links a free copy of exactly the printing and finish added, at once when it is free in one collection. When it is free in more than one collection, Mana Vault asks which copy to use (or None, missing). Copies of other printings or finishes are never linked on their own. **Link copies...** changes it later |
+| Edit as text and imports | Lines with a set and collector number are linked to free copies of exactly that printing and finish, the deck's own collection first. Lines without a set and number stay missing until a copy is linked |
 | Maybeboard | Cards added to the maybeboard are not linked to copies |
-| Another printing | Linking a copy of another printing changes those deck cards to the copy's printing, so the deck shows the cards it really holds |
+| The deck follows the copy | Linking a copy of another printing or finish changes those deck cards to the copy's printing and finish, so the deck shows the cards it really holds. The same printing can be in a zone twice, once regular and once foil |
 | Moving a copy | Moving a linked copy to another collection keeps the link: the deck card then shows the new collection. Copies in no deck move first |
 | Removing a copy | Removing a linked copy from its collection makes the deck card missing |
-| Changing copy details | Changing a linked copy's finish, condition, language or proxy keeps the link |
+| Changing copy details | Changing a linked copy's condition, language or proxy keeps the link. Changing its finish keeps the link and the deck card takes the new finish |
+| Changing a copy's printing | When a copy linked to a deck changes printing or finish, Mana Vault asks "A copy that changes is in deck name. Change the deck too?" **Yes, change the deck** moves the deck card with the copy. **No, show it as missing** changes only the copy; the deck card keeps its version and shows **Missing** with **Other version owned** |
 | Proxies | A proxy can fill a deck card. It is marked **PROXY** on the deck card |
 | Wishlists | Wishlist cards are not owned and cannot fill a deck card |
 | Sending | A deck sent as a copy or a transfer arrives without links; the receiver links it to their own collections |
@@ -71,17 +73,38 @@ Scanned cards added to a deck are new physical cards, so they go into a collecti
 2. Free copies of the new printing in the chosen finish in your collections are linked, up to the card's count. When free copies are in more than one collection, Mana Vault asks which collection's copies to link (or None, missing).
 3. Cards without a copy show as missing. Maybeboard cards are not linked.
 
-When the deck already has the new printing in the same zone, the cards join it. The change is written to the deck's history and can be undone. The message reads "Card name is now (SET) number" (with "foil" or "etched" for those finishes), with where copies were linked from and how many are missing. A printing can only be chosen in a finish it is made in.
+With more than one card, the chooser starts with **How many to change** (all by default). Only that many cards change; the rest stay as they are, so two copies can become one regular and one foil card without removing either. When the deck already has the new printing and finish in the same zone, the cards join it. The change is written to the deck's history and can be undone. The message reads "Card name is now (SET) number" (with "foil" or "etched" for those finishes), or "N of M Card name changed to (SET) number" when only some cards change, with where copies were linked from and how many are missing. A printing can only be chosen in a finish it is made in.
 
 ### Finish
 
-Every deck card has a finish: regular, foil or etched. A foil or etched card shows FOIL or ETCHED on its row, and the deck's value, statistics and the card's price use the price of that finish (or another finish of the printing when that one has no price). The finish is set by:
+Every deck card has a finish: regular, foil or etched. A foil or etched card shows FOIL or ETCHED in every deck view (List, Text, Stacks and Grid), the Deck list panel and the Card panel, and the deck's value, statistics and the card's price use the price of that finish (or another finish of the printing when that one has no price). The finish is set by:
 
 - `*F*` (foil) or `*E*` (etched) after a line in Quick add, Edit as text and decklist imports. In Edit as text, a line without a mark makes the card regular, and **Edit as text** writes the marks for foil and etched cards.
-- **Add as foil** when cards go to the deck selected last.
+- **Add as foil** when cards go to the deck selected last, the **Foil** and **Etched** buttons beside an add button, and **Add as** in the Add tab.
 - **Change printing...**.
+- Linking a copy: the deck card takes the copy's finish.
 
-A card added to a zone that already has the same printing keeps that card's finish. The finish is kept in backups and when a deck is sent as a copy.
+A regular and a foil card of the same printing are two deck cards. The finish is kept in backups and when a deck is sent as a copy.
+
+### Owned, link and Other version owned
+
+A deck card with missing copies shows what you own of it, in every deck view:
+
+| Mark | Meaning | Click |
+|---|---|---|
+| **Owned, link** | Free copies of exactly this printing and finish are in your collections | Links them, from one collection, up to the number missing (also **Link owned copies** in the right-click menu) |
+| **Other version owned** | Free copies of another printing or finish are in your collections | Lists them with their collection and how many are free. **Switch** changes the missing cards to that version and links the copies (also **Switch to the version owned...** in the right-click menu) |
+
+**Link owned copies** (Decks ribbon tab, or the Ownership tab) links free copies of the exact printing and finish to every missing card in the deck at once, the deck's own collection first. The message reads "N owned copies linked to deck name", or "No free copies of the missing cards' exact printings are in your collections".
+
+### Upgrade wanted
+
+A card in the deck that you want in a better version, such as a foil or an older printing, can be marked **Upgrade wanted**. The card stays in the deck and counts as owned; the mark only records the version you are looking for.
+
+1. Right-click the card and choose **Mark as upgrade wanted...**.
+2. Choose the version wanted in the printing chooser, with its finish.
+
+The card shows an **Upgrade wanted** badge (the wanted version in its tooltip), and the List view adds "wanted (SET) number". The Ownership tab lists every card marked Upgrade wanted with its version in the deck and the version wanted. **Change upgrade wanted...** chooses another version, and **Remove upgrade wanted mark** removes it. When a copy of the wanted version is linked to the card, the mark goes by itself. Choosing the version the deck already has gives "The deck already has this version. Choose the version you want instead." The mark is kept in backups and the deck's history.
 
 ### Link copies
 
@@ -101,22 +124,23 @@ The box at the top of the Add tab adds a card by typing it: a count and a name, 
 
 ### Adding from card search
 
-With a deck selected last in the Decks panel or the deck switcher, **Add to collection** (Enter, a double-click on a result, or the Card panel) adds the card to that deck in the target zone, shown as ZONE in the status bar. The status bar shows ADD TO: DECK name. Selecting a collection makes cards go to that collection again.
+With a deck selected last in the Decks panel or the deck switcher, **Add to collection** (Enter or a double-click on a result) adds the card to that deck in the target zone, shown as ZONE in the status bar. The status bar shows ADDING TO: DECK name, and the deck is marked **Adding here** in the Decks panel. Selecting a collection, or clicking ADDING TO in the status bar, makes cards go to the collection again. The **+ deck name** buttons always add to the open deck.
 
 ### The Add tab
 
 Below Quick add and **Edit as text...**, the Add tab searches the whole card database. Type in the header's **Search cards to add** box; the Filters panel filters the results (Filtering: Deck card search). Results use the card search layout and card size from **Options**.
 
-Each result has **+ Main**, **+ Side**, **+ Maybe** and **+ Commander**. A button with cards of that name already in the zone is highlighted and shows the count. Double-click adds one copy to the target zone; the right-click menu holds Card page, Add to each zone and Add to wishlist. Copies are linked as described above.
+Each result has **+ Main**, **+ Side**, **+ Maybe** and **+ Commander**. A button with cards of that name already in the zone is highlighted and shows the count. **Add as** beside Quick add (Regular, Foil or Etched) sets the finish the buttons add in; a printing not made in that finish is added in its first finish. Double-click adds one copy to the target zone; the right-click menu holds Card page, Add to each zone and Add to wishlist. Copies are linked as described above.
 
 ### From the card search
 
 1. Select a card in the card search.
-2. Press Shift+Enter or choose **+ Deck** (or **Add to deck**). One copy goes into the target zone.
+2. Press Shift+Enter or choose **+ deck name**, or **Foil** or **Etched** beside it (or **Add to deck name** in the right-click menu). One copy goes into the target zone.
 
 ### Changing cards
 
-- Change counts with the minus and plus buttons in the List view or the Deck list panel. Each row holds 1 to 100 copies. Minus at 1, or the remove button, removes the row. Lowering a count removes links beyond the new count.
+- Change counts with the minus and plus buttons in the List view or the Deck list panel. Each deck card holds 1 to 100 copies. Minus at 1 removes the card. Lowering a count removes links beyond the new count.
+- The remove button, or **Remove from deck** in the right-click menu, removes a card with one copy at once. With more copies it asks how many to remove ("There are N copies."), with **Reduce to 1** and **Remove all**. **Reduce to 1** is also in the right-click menu of a card with more than one copy.
 - The zone list on each row, or **Move to** in the right-click menu, moves all its copies to another zone, with their links. When the same printing is already in that zone, the counts are added together.
 
 ### Edit as text
@@ -127,7 +151,9 @@ Each result has **+ Main**, **+ Side**, **+ Maybe** and **+ Commander**. A butto
 2. **Check** shows how many cards would be added, changed and removed, and lists the lines that did not match with their line number and the reason.
 3. **Apply** makes the deck match the text, as one step that can be undone.
 
-Lines without a set keep the printing the card already has in the deck. Cards that stay keep their linked copies and tags. Cards that are not in the text are removed, and so are cards whose line did not match.
+Lines without a set keep the printing the card already has in the deck. Cards that stay keep their linked copies and tags. Cards that are not in the text are removed, and so are cards whose line did not match. A card whose line only changes its finish mark keeps its tags; its links to copies of the old finish go.
+
+Lines with a set and collector number are linked to free copies of exactly that printing and finish (see the table above); the message ends with "N linked to owned copies". Lines without a set and number stay missing until a copy is linked.
 
 ### Tags
 
@@ -220,6 +246,7 @@ The Ownership tab counts the deck cards that have a linked copy. Maybeboard card
 The price of a missing card is the price of its printing in the regular finish (foil when the printing only comes in foil). Click a row to see the card in the Card panel.
 
 - **Add missing to wishlist** (or **Add missing deck cards to wishlist**) adds the missing copies to your wishlist in one step that can be undone; see [Wishlists and trading](/about/wishlists-and-trading).
+- **Link owned copies** links free copies of the exact printing and finish to every missing card.
 - **Export missing** (or **Export missing deck cards (text)**) downloads deck-name-missing.txt with one line per card, such as `2 Lightning Bolt (M10) 146`.
 
 | Message | Cause |
@@ -227,6 +254,7 @@ The price of a missing card is the price of its printing in the regular finish (
 | You own every card in deck name | Add missing to wishlist or Export missing with nothing missing |
 | Missing cards exported (N cards) | Export missing finished |
 | No free copy of card is in your collections | Link copies for a card with no free copy |
+| No other version of card is free in your collections | Switch to the version owned when no other version is free |
 | A linked copy must be the same card | A link to a copy of a different card |
 | Wishlist cards are not owned, so they cannot fill a deck | A link to a copy in a wishlist |
 
