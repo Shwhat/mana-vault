@@ -33,7 +33,7 @@ export function readTags(value: unknown): string[] | null {
   return tags;
 }
 
-type Wanted = { oracleId: string; printingId: string; quantity: number; zone: string; name: string; named: boolean };
+type Wanted = { oracleId: string; printingId: string; quantity: number; zone: string; name: string; named: boolean; finish: number };
 export type ReplaceReport = { added: number; removed: number; changed: number; unmatched: Array<{ row: number; name: string; reason: string }> };
 
 /**
@@ -45,10 +45,10 @@ export function replaceDeck(database: DatabaseSync, deckId: string, text: string
   if (rows.length > 1000) throw new Error("A deck list can have at most 1,000 lines");
   const find = printingFinder(database);
   const current = database.prepare(
-    "SELECT dc.id, dc.oracle_id, dc.printing_id, dc.quantity, dc.zone, c.name FROM deck_cards dc LEFT JOIN cards c ON c.id = dc.printing_id WHERE dc.deck_id = ?",
+    "SELECT dc.id, dc.oracle_id, dc.printing_id, dc.quantity, dc.zone, dc.finish, c.name FROM deck_cards dc LEFT JOIN cards c ON c.id = dc.printing_id WHERE dc.deck_id = ?",
   ).all(deckId).map((row) => ({
     id: Number(row.id), oracleId: String(row.oracle_id), printingId: row.printing_id === null ? null : String(row.printing_id),
-    quantity: Number(row.quantity), zone: String(row.zone), name: String(row.name ?? ""),
+    quantity: Number(row.quantity), zone: String(row.zone), name: String(row.name ?? ""), finish: Number(row.finish ?? 0),
   }));
   const unmatched: ReplaceReport["unmatched"] = [];
   const wanted = new Map<string, Wanted>();
@@ -72,7 +72,9 @@ export function replaceDeck(database: DatabaseSync, deckId: string, text: string
     const kept = named ? null : current.find((card) => card.oracleId === found.oracle_id && card.zone === row.zone && card.printingId);
     const printingId = kept?.printingId ?? found.id;
     const key = `${found.oracle_id}\u0000${printingId}\u0000${row.zone}`;
-    const item = wanted.get(key) ?? { oracleId: found.oracle_id, printingId, quantity: 0, zone: row.zone, name: found.name, named };
+    // a line's finish marks (*F*, *E*) set the deck card's finish; a line without one is regular
+    const finish = row.finish === "etched" ? 2 : row.finish === "foil" ? 1 : 0;
+    const item = wanted.get(key) ?? { oracleId: found.oracle_id, printingId, quantity: 0, zone: row.zone, name: found.name, named, finish };
     item.quantity = Math.min(100, item.quantity + row.quantity);
     wanted.set(key, item);
   }
@@ -91,8 +93,13 @@ export function replaceDeck(database: DatabaseSync, deckId: string, text: string
       continue;
     }
     wanted.delete(`${card.oracleId}\u0000${card.printingId}\u0000${card.zone}`);
-    if (item.quantity !== card.quantity) {
+    if (item.finish !== card.finish) {
       report.changed += 1;
+      changes.push(`${card.name} (${ZONE_NAMES[card.zone]}) is now ${item.finish === 2 ? "etched" : item.finish === 1 ? "foil" : "regular"}`);
+      plan.push(() => { database.prepare("UPDATE deck_cards SET finish = ? WHERE id = ?").run(item.finish, card.id); });
+    }
+    if (item.quantity !== card.quantity) {
+      if (item.finish === card.finish) report.changed += 1;
       changes.push(`${item.quantity > card.quantity ? "+" : "-"}${Math.abs(item.quantity - card.quantity)} ${card.name} (${ZONE_NAMES[card.zone]})`);
       plan.push(() => {
         touchDeckCollections(database, deckId, card.id);
@@ -105,8 +112,8 @@ export function replaceDeck(database: DatabaseSync, deckId: string, text: string
     report.added += 1;
     changes.push(`+${item.quantity} ${item.name} (${ZONE_NAMES[item.zone]})`);
     plan.push(() => {
-      database.prepare("INSERT INTO deck_cards (deck_id, oracle_id, printing_id, quantity, zone) VALUES (?, ?, ?, ?, ?)")
-        .run(deckId, item.oracleId, item.printingId, item.quantity, item.zone);
+      database.prepare("INSERT INTO deck_cards (deck_id, oracle_id, printing_id, quantity, zone, finish) VALUES (?, ?, ?, ?, ?, ?)")
+        .run(deckId, item.oracleId, item.printingId, item.quantity, item.zone, item.finish);
     });
   }
   if (commit && plan.length) {

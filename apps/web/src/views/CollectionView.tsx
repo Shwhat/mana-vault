@@ -71,7 +71,7 @@ function entryMenu(store: Store, entry: CollectionEntry) {
     { label: "Card page", run: () => store.setCardPage(entry.id) },
     { label: "Copy details...", run: () => copyDialog(store, entry) },
     !store.allCollections || entry.collection_id ? { label: "Change printing...", run: () => choosePrinting(entry.name, entry.id, entry.id, { finish: entry.foil, currency: store.prefs.currency },
-      (printing) => void store.changeCopyPrinting(entry, printing)) } : null,
+      (printing, finish) => void store.changeCopyPrinting(entry, printing, finish)) } : null,
     (store.collections?.length ?? 0) > 1 && { label: "Move...", run: () => moveDialog(store, [entry]) },
     !entry.proxy && { label: entry.trade >= entry.quantity ? "Unmark for trade" : "Mark for trade", run: () => void store.markTrade([entry], entry.trade < entry.quantity) },
     !entry.proxy && { label: "Add to trade (you give)", run: () => store.giveEntry(entry) },

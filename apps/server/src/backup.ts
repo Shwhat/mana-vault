@@ -45,7 +45,7 @@ export interface ManaVaultBackup {
     description?: string; cover_card_id?: string | null;
   }>;
   /** tags (0.7.0) holds the deck card's tags, one per line. */
-  deckCards: Array<{ deck_id: string; oracle_id: string; printing_id: string | null; quantity: number; zone: string; tags?: string }>;
+  deckCards: Array<{ deck_id: string; oracle_id: string; printing_id: string | null; quantity: number; zone: string; tags?: string; finish?: number }>;
   /** Version 4: the collection copies that fill each deck card. */
   deckLinks: BackupLink[];
   /** Version 5: the custom sets and custom cards the account made or uses. */
@@ -120,7 +120,7 @@ export function createBackup(database: DatabaseSync, userId: number): ManaVaultB
       "SELECT id, name, format, mode, collection_id, created_at, updated_at, description, cover_card_id FROM decks WHERE owner_id = ? ORDER BY id",
     ).all(userId) as ManaVaultBackup["decks"],
     deckCards: database.prepare(
-      `SELECT deck_id, oracle_id, printing_id, quantity, zone, tags FROM deck_cards
+      `SELECT deck_id, oracle_id, printing_id, quantity, zone, tags, finish FROM deck_cards
        WHERE deck_id IN (SELECT id FROM decks WHERE owner_id = ?) ORDER BY deck_id, zone, oracle_id`,
     ).all(userId) as ManaVaultBackup["deckCards"],
     deckLinks: database.prepare(
@@ -224,6 +224,9 @@ export function restoreBackup(database: DatabaseSync, source: string, userId: nu
       const printing = card.printing_id ?? (newest.get(card.oracle_id)?.id as string | undefined) ?? null;
       if (printing) {
         insertDeckCard.run(deckIds.get(card.deck_id)!, card.oracle_id, printing, card.quantity, card.zone);
+        if (card.finish === 1 || card.finish === 2) {
+          database.prepare("UPDATE deck_cards SET finish = ? WHERE deck_id = ? AND printing_id = ? AND zone = ?").run(card.finish, deckIds.get(card.deck_id)!, printing, card.zone);
+        }
         if (typeof card.tags === "string" && card.tags) {
           database.prepare("UPDATE deck_cards SET tags = ? WHERE deck_id = ? AND printing_id = ? AND zone = ?").run(card.tags.slice(0, 600), deckIds.get(card.deck_id)!, printing, card.zone);
         }

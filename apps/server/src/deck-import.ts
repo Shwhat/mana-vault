@@ -116,7 +116,7 @@ export function importDecklist(
 
   const find = printingFinder(database);
   const unmatched: DeckImportResult["unmatched"] = [];
-  const additions = new Map<string, { oracleId: string; printingId: string | null; quantity: number; zone: Zone }>();
+  const additions = new Map<string, { oracleId: string; printingId: string | null; quantity: number; zone: Zone; finish: number }>();
   let matchedRows = 0;
   let importedQuantity = 0;
 
@@ -150,6 +150,7 @@ export function importDecklist(
       printingId: printing.id as string | null,
       quantity: 0,
       zone: row.zone,
+      finish: row.finish === "etched" ? 2 : row.finish === "foil" ? 1 : 0,
     };
     addition.quantity += row.quantity;
     additions.set(key, addition);
@@ -163,16 +164,16 @@ export function importDecklist(
       for (const addition of additions.values()) {
         const insert = addition.printingId
           ? database.prepare(
-            `INSERT INTO deck_cards (deck_id, oracle_id, printing_id, quantity, zone) VALUES (?, ?, ?, ?, ?)
+            `INSERT INTO deck_cards (deck_id, oracle_id, printing_id, quantity, zone, finish) VALUES (?, ?, ?, ?, ?, ?)
              ON CONFLICT(deck_id, oracle_id, printing_id, zone) WHERE printing_id IS NOT NULL
              DO UPDATE SET quantity = quantity + excluded.quantity`,
           )
           : database.prepare(
-            `INSERT INTO deck_cards (deck_id, oracle_id, printing_id, quantity, zone) VALUES (?, ?, ?, ?, ?)
+            `INSERT INTO deck_cards (deck_id, oracle_id, printing_id, quantity, zone, finish) VALUES (?, ?, ?, ?, ?, ?)
              ON CONFLICT(deck_id, oracle_id, zone) WHERE printing_id IS NULL
              DO UPDATE SET quantity = quantity + excluded.quantity`,
           );
-        insert.run(deckId, addition.oracleId, addition.printingId, addition.quantity, addition.zone);
+        insert.run(deckId, addition.oracleId, addition.printingId, addition.quantity, addition.zone, addition.finish);
       }
       if (additions.size) database.prepare("UPDATE decks SET updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(deckId);
       database.exec("COMMIT");

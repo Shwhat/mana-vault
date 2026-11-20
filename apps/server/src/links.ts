@@ -134,7 +134,7 @@ export function touchDeckCollections(database: DatabaseSync, deckId: string, dec
  * card of the new printing in the same zone (joining one that is already there).
  */
 export function alignDeckCard(database: DatabaseSync, deckCardId: number): void {
-  const card = database.prepare("SELECT id, deck_id, oracle_id, printing_id, quantity, zone FROM deck_cards WHERE id = ?").get(deckCardId);
+  const card = database.prepare("SELECT id, deck_id, oracle_id, printing_id, quantity, zone, finish FROM deck_cards WHERE id = ?").get(deckCardId);
   if (!card) return;
   const strays = database.prepare("SELECT id, card_id, quantity FROM deck_links WHERE deck_card_id = ? AND card_id != ? ORDER BY id")
     .all(deckCardId, card.printing_id as string | null);
@@ -157,8 +157,8 @@ export function alignDeckCard(database: DatabaseSync, deckCardId: number): void 
       target = Number(other.id);
       database.prepare("UPDATE deck_cards SET quantity = quantity + ? WHERE id = ?").run(take, target);
     } else {
-      database.prepare("INSERT INTO deck_cards (deck_id, oracle_id, printing_id, quantity, zone) VALUES (?, ?, ?, ?, ?)")
-        .run(String(card.deck_id), String(card.oracle_id), String(link.card_id), take, String(card.zone));
+      database.prepare("INSERT INTO deck_cards (deck_id, oracle_id, printing_id, quantity, zone, finish) VALUES (?, ?, ?, ?, ?, ?)")
+        .run(String(card.deck_id), String(card.oracle_id), String(link.card_id), take, String(card.zone), Number(card.finish ?? 0));
       target = Number(database.prepare("SELECT last_insert_rowid() AS id").get()!.id);
     }
     database.prepare("UPDATE deck_links SET deck_card_id = ? WHERE id = ?").run(target, Number(link.id));

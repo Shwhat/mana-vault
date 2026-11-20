@@ -116,12 +116,17 @@ const anyFinishPrice = (currency: Currency, card = "c") => (currency === "eur"
   ? `COALESCE(${card}.price_eur, ${card}.price_eur_foil)`
   : `COALESCE(${card}.price_usd, ${card}.price_usd_foil, ${card}.price_usd_etched)`);
 
+/** The price of a deck card's printing in the deck card's finish (dc.finish), falling back to the other finishes. */
+const deckFinishPrice = (currency: Currency) => (currency === "eur"
+  ? "(CASE dc.finish WHEN 0 THEN COALESCE(c.price_eur, c.price_eur_foil) ELSE COALESCE(c.price_eur_foil, c.price_eur) END)"
+  : "(CASE dc.finish WHEN 1 THEN COALESCE(c.price_usd_foil, c.price_usd, c.price_usd_etched) WHEN 2 THEN COALESCE(c.price_usd_etched, c.price_usd_foil, c.price_usd) ELSE COALESCE(c.price_usd, c.price_usd_foil, c.price_usd_etched) END)");
+
 /** Deck cards with the printing shown for them. Normal decks are priced at the cheapest printing of each card. */
 function deckRows(database: DatabaseSync, deckId: string, currency: Currency) {
   return database.prepare(
-    `SELECT dc.id AS entry_id, dc.oracle_id, dc.printing_id, dc.quantity, dc.zone, c.id AS card_id, c.name, c.rarity, c.colors, c.type_line,
+    `SELECT dc.id AS entry_id, dc.oracle_id, dc.printing_id, dc.quantity, dc.zone, dc.finish, c.id AS card_id, c.name, c.rarity, c.colors, c.type_line,
             c.mana_value, c.set_code, c.set_name,
-            CASE WHEN dc.printing_id IS NOT NULL THEN ${anyFinishPrice(currency)}
+            CASE WHEN dc.printing_id IS NOT NULL THEN ${deckFinishPrice(currency)}
                  ELSE (SELECT MIN(${anyFinishPrice(currency, "p")}) FROM cards p WHERE p.oracle_id = dc.oracle_id) END AS price
      FROM deck_cards dc JOIN cards c ON c.id = COALESCE(
        dc.printing_id, (SELECT p.id FROM cards p WHERE p.oracle_id = dc.oracle_id ORDER BY p.released_at DESC LIMIT 1))
@@ -131,7 +136,7 @@ function deckRows(database: DatabaseSync, deckId: string, currency: Currency) {
     entry_id: Number(row.entry_id), oracle_id: String(row.oracle_id), printing_id: row.printing_id === null ? null : String(row.printing_id),
     card_id: String(row.card_id), quantity: Number(row.quantity), zone: String(row.zone), name: String(row.name), rarity: String(row.rarity),
     colors: String(row.colors), type_line: String(row.type_line), mana_value: typeof row.mana_value === "number" ? row.mana_value : null,
-    set_code: String(row.set_code), set_name: String(row.set_name), foil: 0, price: typeof row.price === "number" ? row.price : null,
+    set_code: String(row.set_code), set_name: String(row.set_name), foil: Number(row.finish ?? 0), price: typeof row.price === "number" ? row.price : null,
   }));
 }
 

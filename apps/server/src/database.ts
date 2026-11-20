@@ -415,6 +415,9 @@ function upgradeDeckBuilder(database: DatabaseSync): void {
 function initializeCustomTables(database: DatabaseSync): void {
   const cardColumns = new Set((database.prepare("PRAGMA table_info(cards)").all() as Array<{ name: string }>).map((column) => column.name));
   if (!cardColumns.has("custom")) database.exec("ALTER TABLE cards ADD COLUMN custom INTEGER NOT NULL DEFAULT 0");
+  // the finish a deck card is played in: 0 regular, 1 foil, 2 etched (0.10.0)
+  const deckCardColumns = new Set((database.prepare("PRAGMA table_info(deck_cards)").all() as Array<{ name: string }>).map((column) => column.name));
+  if (!deckCardColumns.has("finish")) database.exec("ALTER TABLE deck_cards ADD COLUMN finish INTEGER NOT NULL DEFAULT 0");
   // the picture of a two-faced card's back face, for printing proxies (0.9.0)
   if (!cardColumns.has("back_image_url")) database.exec("ALTER TABLE cards ADD COLUMN back_image_url TEXT");
   database.exec(`

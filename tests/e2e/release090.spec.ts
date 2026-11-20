@@ -29,6 +29,8 @@ test("finish marks, change printing of deck and collection cards, and undo", asy
   await page.getByRole("tab", { name: "Cards", exact: true }).click();
   const deckRow = page.locator("#view-deck .row", { hasText: "Lightning Bolt" }).first();
   await expect(deckRow).toContainText("M10");
+  // the *F* mark makes the deck card foil
+  await expect(deckRow.locator(".badge.foil")).toHaveText("FOIL");
 
   // the deck card takes another printing; without copies of it the card is missing
   await rightClick(page, deckRow, "Change printing...");
@@ -36,7 +38,7 @@ test("finish marks, change printing of deck and collection cards, and undo", asy
   await page.getByRole("textbox", { name: "Find a printing" }).fill("alpha");
   await expect(page.locator(".printrow")).toHaveCount(1);
   await page.locator(".printrow").first().click();
-  await expect(status(page)).toHaveText("Lightning Bolt is now (LEA) 161, 1 missing");
+  await expect(status(page)).toHaveText("Lightning Bolt is now (LEA) 161 foil, 1 missing");
   await expect(page.locator("#view-deck .row", { hasText: "Lightning Bolt" }).first()).toContainText("LEA");
   await page.keyboard.press("Control+z");
   await expect(page.locator("#view-deck .row", { hasText: "Lightning Bolt" }).first()).toContainText("M10");
@@ -59,6 +61,15 @@ test("finish marks, change printing of deck and collection cards, and undo", asy
   await expect(page.locator("#view-collection .row", { hasText: "Lightning Bolt" }).first()).toContainText("LEA");
   await page.keyboard.press("Control+z");
   await expect(page.locator("#view-collection .row", { hasText: "Lightning Bolt" }).first()).toContainText("M10");
+
+  // the same printing in foil: the copies become foil
+  await rightClick(page, page.locator("#view-collection .row", { hasText: "Lightning Bolt" }).first(), "Change printing...");
+  await expect(page.locator(".printrow", { hasText: "Magic 2010" })).toContainText("Current: regular");
+  await page.getByRole("button", { name: "Foil M10 146" }).click();
+  await expect(status(page)).toHaveText("Lightning Bolt is now (M10) 146 foil");
+  await expect(page.locator("#view-collection .row", { hasText: "Lightning Bolt" }).first().locator(".badge.foil")).toHaveText("FOIL");
+  await page.keyboard.press("Control+z");
+  await expect(page.locator("#view-collection .row", { hasText: "Lightning Bolt" }).first().locator(".badge.foil")).toHaveCount(0);
 });
 
 test("cards go to the collection or deck selected last, the Decks panel groups by format, and right-click renames", async ({ page }) => {

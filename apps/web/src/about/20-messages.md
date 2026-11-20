@@ -60,7 +60,7 @@ Messages appear at the right end of the status bar (on the phone, in a banner ab
 | Trade summary copied | Copy trade summary |
 | Trade cleared | Clear trade |
 | Binder layout, or List layout | Switching the collection layout |
-| Card name is now (SET) number (with ", linked from collection name" and ", N missing" for a deck card) | Change printing |
+| Card name is now (SET) number (with "foil" or "etched" for those finishes, and ", linked from collection name" and ", N missing" for a deck card) | Change printing |
 | Collection name saved | Rename... in a collection's menu |
 | N cards added to the print list, or name added to the print list | Adding to the print list |
 | PDF with N cards on N pages saved | Export PDF |
@@ -120,6 +120,7 @@ Messages appear at the right end of the status bar (on the phone, in a banner ab
 | Choose a printing of the same card | Change printing with a printing of another card | Choose a printing from the list |
 | These copies are not in the collection | Change printing of a row someone else removed | Reload the collection |
 | Linked copies must be of the new printing | Change printing with copies of another printing | Try again |
+| That printing is not made in that finish | Change printing to a finish the printing does not have | Choose one of its finish buttons |
 | There are no cards to add | Adding nothing to the print list | |
 | Add cards to the print list first | Export or Add tokens with an empty print list | Add cards |
 | The listed cards make no tokens that are not already listed | Add tokens with nothing new to add | |

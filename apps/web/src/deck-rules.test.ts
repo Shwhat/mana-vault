@@ -80,8 +80,9 @@ describe("deck rules", () => {
   });
 
   it("writes the deck as text and reads quick add lines", () => {
-    const text = deckText([card("Ring", { zone: "main", set_code: "c21", collector_number: "263" }), card("King", { zone: "commander", set_code: "m10", collector_number: "1" })]);
-    expect(text).toBe("Commander\n1 King (M10) 1\n\nDeck\n1 Ring (C21) 263");
+    const text = deckText([card("Ring", { zone: "main", set_code: "c21", collector_number: "263" }), card("King", { zone: "commander", set_code: "m10", collector_number: "1" }),
+      card("Bolt", { zone: "main", set_code: "m10", collector_number: "146", finish: 1 })]);
+    expect(text).toBe("Commander\n1 King (M10) 1\n\nDeck\n1 Bolt (M10) 146 *F*\n1 Ring (C21) 263");
     expect(parseQuickAdd("2 Sol Ring")).toEqual({ quantity: 2, name: "Sol Ring", set: "", number: "", finish: "" });
     expect(parseQuickAdd("3x Bolt (M10) 146")).toEqual({ quantity: 3, name: "Bolt", set: "M10", number: "146", finish: "" });
     expect(parseQuickAdd("Forest")).toEqual({ quantity: 1, name: "Forest", set: "", number: "", finish: "" });

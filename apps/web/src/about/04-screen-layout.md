@@ -81,7 +81,7 @@ Right-clicking a card row, a collection or a deck opens a menu of what can be do
 | Collection, in the Collections panel or the collection switcher | Open, Rename..., Collection settings..., Send..., Export..., Delete (Leave for a collection shared with you). Rename, settings and Send are only for your own collections |
 | Deck, in the Decks panel or the deck switcher | Open, Rename..., Deck format..., Send..., Export..., Delete (Leave for a deck shared with you). Rename, format and Send are only for your own decks. Deck format and Export open the deck first |
 
-**Change printing...** opens the printing chooser: every printing of the card, newest first, with its picture, set, number, year, finishes and price, a box to find a set, code or number, and the current printing marked **Current**. Click or press Enter on a printing to choose it.
+**Change printing...** opens the printing chooser: every printing of the card, newest first, with its picture, set, number and year, a button with the price for each finish the printing is made in (**Regular**, **Foil**, **Etched**), and a box to find a set, code or number. The current printing shows **Current** with its finish, and its finish button is highlighted. Choose a finish button to switch to that printing in that finish, such as the foil version of the current printing. Clicking a printing, or pressing Enter on it, chooses it in the finish in use (or its first finish when it is not made in that one).
 
 Commands that can be used are shown in the normal text color.
 
