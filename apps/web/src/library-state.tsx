@@ -5,7 +5,7 @@ import { confirmDialog } from "./components/Dialog";
 import type { Prefs } from "./prefs";
 import {
   type Collection, type CollectionEntry, type CollectionKind, type CompletionReport, type CompletionRule, type CopyExtras, type CopyKey, copyKey, copyLabel,
-  ALL_COLLECTIONS, type Currency, type DeckDetail, type FinishCode, type FinishRule, type Offer, type Ownership, type Person, sameCopy,
+  ALL_COLLECTIONS, type Currency, type Deck, type DeckDetail, type FinishCode, type FinishRule, type Offer, type Ownership, type Person, sameCopy,
 } from "./types";
 
 export type Counts = Array<CopyKey & { quantity: number; trade?: number; purchasePrice?: number | null; priceCurrency?: string | null; addedAt?: string | null;
@@ -88,7 +88,7 @@ export function useLibraryState(deps: LibraryDeps) {
   const openCollection = useCallback((id: string) => setPrefs({ openCollection: id }), [setPrefs]);
 
   const setTargetCollection = useCallback((id: string) => {
-    setPrefs({ targetCollection: id });
+    setPrefs({ targetCollection: id, addTo: "collection" });
     flash(`New cards go to ${collectionName(id)}`);
   }, [setPrefs, flash, collectionName]);
 
@@ -255,6 +255,31 @@ export function useLibraryState(deps: LibraryDeps) {
     }
   }, [live, setCounts, pushUndo, flash, fail, refreshAfterChange]);
 
+  /** Changes the printing of a row's copies (a card added as the wrong printing). Deck links stay with the copies. */
+  const changeCopyPrinting = useCallback(async (entry: CollectionEntry, to: { id: string; set_code: string; collector_number: string }) => {
+    const target = entry.collection_id ?? live.current.prefs.openCollection;
+    if (!target || target === ALL_COLLECTIONS || to.id === entry.id) return;
+    const move = async (from: CopyKey, cardId: string, quantity?: number) => request<{ moved: number }>(
+      `/api/collections/${encodeURIComponent(target)}/printing`,
+      { method: "POST", body: JSON.stringify({ ...from, to: cardId, ...(quantity ? { quantity } : {}) }) },
+    );
+    try {
+      const from = copyKey(entry);
+      const { moved } = await move(from, to.id);
+      const next = { ...from, cardId: to.id };
+      pushUndo({
+        label: `Change printing of ${entry.name}`,
+        undo: async () => { await move(next, entry.id, moved); },
+        redo: async () => { await move(from, to.id, moved); },
+      });
+      depsRef.current.setChecked(new Set());
+      flash(`${entry.name} is now (${to.set_code.toUpperCase()}) ${to.collector_number}`);
+      await refreshAfterChange();
+    } catch (reason) {
+      fail(reason, "Could not change the printing.");
+    }
+  }, [live, pushUndo, flash, fail, refreshAfterChange]);
+
   /** Marks every copy of the given rows for trade, or clears their marks. */
   const markTrade = useCallback(async (entries: CollectionEntry[], on: boolean) => {
     const changed = entries.filter((entry) => !entry.proxy && (on ? entry.trade < entry.quantity : entry.trade > 0));
@@ -385,19 +410,22 @@ export function useLibraryState(deps: LibraryDeps) {
   }, [live, flash, fail, collectionName]);
 
   // ---------- decks ----------
-  const renameDeck = useCallback(async (name: string) => {
-    const deck = live.current.deck;
-    if (!deck) return;
-    await request(`/api/decks/${encodeURIComponent(deck.id)}`, { method: "PATCH", body: JSON.stringify({ name }) });
-    await depsRef.current.openDeck(deck.id, true);
+  /** Renames the open deck, or the deck given (from its right-click menu). */
+  const renameDeck = useCallback(async (name: string, deckId?: string) => {
+    const id = deckId ?? live.current.deck?.id;
+    if (!id) return;
+    await request(`/api/decks/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify({ name }) });
+    if (live.current.deck?.id === id) await depsRef.current.openDeck(id, true);
     await reloadDecks();
     flash(`Deck renamed to ${name}`);
   }, [live, reloadDecks, flash]);
 
-  const deleteDeck = useCallback(async () => {
-    const deck = live.current.deck;
+  /** Deletes (or leaves) the open deck, or the deck given (from its right-click menu). */
+  const deleteDeck = useCallback(async (given?: Deck) => {
+    const deck = given ?? live.current.deck;
     if (!deck) return flash("Open a deck first", "err");
-    const total = deck.cards.reduce((sum, card) => sum + card.quantity, 0);
+    const open = live.current.deck;
+    const total = open && open.id === deck.id ? open.cards.reduce((sum, card) => sum + card.quantity, 0) : deck.card_count ?? 0;
     if (deck.role === "member") {
       const ok = await confirmDialog("Leave shared deck", <>Stop using {deck.name}? It stays with {deck.owner?.name}, who shared it with you.</>, "Leave");
       if (!ok) return;
@@ -419,7 +447,7 @@ export function useLibraryState(deps: LibraryDeps) {
       flash(`${deck.name} deleted`);
     }
     clearUndo();
-    depsRef.current.closeDeck();
+    if (!open || open.id === deck.id) depsRef.current.closeDeck();
     await reloadDecks();
   }, [live, clearUndo, reloadDecks, flash, fail]);
 
@@ -478,7 +506,7 @@ export function useLibraryState(deps: LibraryDeps) {
   return {
     offers, reloadOffers, users, loadUsers,
     createCollection, saveCollection, openCollection, setTargetCollection, cycleTargetCollection, deleteCollection,
-    pick, pickAll, pickedEntries, removePicked, moveEntries, exportMissing, editCopy, markTrade,
+    pick, pickAll, pickedEntries, removePicked, moveEntries, exportMissing, editCopy, changeCopyPrinting, markTrade,
     wishlist, addToWishlist, addMissingToWishlist, addDeckMissingToWishlist, exportDeckMissing,
     renameDeck, deleteDeck, send, accept, decline, cancelOffer, stopSharing,
   };

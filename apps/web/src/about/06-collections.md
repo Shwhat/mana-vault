@@ -23,19 +23,21 @@ A new account starts with an empty collection named **Main collection** that is 
 4. **Collection settings...** changes any field of the open collection. Changing the rules or the linked sets never changes the cards in the collection.
 5. **Delete collection...** asks "Delete name and its N cards?" and removes the collection and its cards. A collection shared with other people warns that they will lose it too. Deleting cannot be undone, and it clears the undo history.
 
-## The target collection
+## Where new cards go
 
-**Add to collection** always puts cards into the **target collection**. The status bar shows it as ADD TO: name.
+New cards go to the collection or deck **selected last**: the one clicked in the Collections panel, the Decks panel or a switcher. Only that one is highlighted; the other panel shows no selection. The status bar shows it as ADD TO: name, or ADD TO: DECK name.
 
-- Change it with **Cycle target collection** (C), by clicking ADD TO in the status bar, with **Add here** on a row of the Collections panel, or with **+ Add** in the collection view header.
-- The target is kept for your account. If it is deleted, the first remaining collection becomes the target.
+- With a collection selected, **Add to collection** puts cards into it, the **target collection**.
+- With a deck selected, every add command (**Add to collection**, Enter, a double-click in card search, the Card panel and the scanner's **Add to**, which is filled in with the deck) adds the card to that deck in the target zone. A free collection copy is linked; when free copies are in more than one collection you choose one; with none the card is missing (see [Decks](/about/decks)). **Add as proxy** still adds a proxy copy to the target collection.
+- **Cycle target collection** (C), clicking ADD TO in the status bar, and **+ Add** in the collection view header choose a collection.
+- The choice is kept for your account. If the target collection is deleted, the first remaining collection becomes the target.
 - In the Missing tab, **+ Collection** adds the card to the open collection instead, in the finish that is missing.
 
 ## Adding cards
 
 1. Select a printing in the card search.
 2. Press Enter, choose **+ Collection** on the row, double-click the row, or use **Add to collection**.
-3. One copy is added to the target collection. If that collection already has the printing in the same finish, its count goes up by one.
+3. One copy is added to the target collection (or the deck selected last). If that collection already has the printing in the same finish, its count goes up by one.
 4. When a wishlist wants the card, its want goes down by one (see [Wishlists and trading](/about/wishlists-and-trading)).
 
 **Add as proxy** (right-click menu, card page) adds a proxy copy instead.
@@ -75,6 +77,10 @@ Rows that are not regular, near mint or English show the difference after the se
 | Enter the date added as a date, such as 2026-08-10 | The date is not a date |
 | Select a row in the collection first | Copy details with no row selected |
 | Card name changed | The change was saved |
+
+## Change printing
+
+**Change printing...** in a row's right-click menu changes the printing of the row's copies, for a card that was added as the wrong printing. Choose the printing in the printing chooser. The copies keep their count, finish, condition, language, proxy mark, number for trade and copy details. When the collection already has a row of the new printing with the same finish, condition, language and proxy, the rows are merged. Copies linked to decks stay linked, and the deck cards they fill change to the new printing too. The change can be undone, and the message reads "Card name is now (SET) number".
 
 ## The collection view
 
@@ -184,7 +190,7 @@ The Card panel's Owned group shows, for the selected printing, the regular, foil
 
 ## Collections panel
 
-The Collections panel lists your collections, including those shared with you, with the number of cards, their value and, for collections linked to sets, a completion bar and percentage. One click on a collection opens it in the collection view. **Add here** makes it the target; the target shows **Adds here**. A **Shared** badge marks collections shared with or by you, and a **Wishlist** badge marks wishlists.
+The Collections panel lists your collections, including those shared with you, with the number of cards, their value and, for collections linked to sets, a completion bar and percentage. One click on a collection opens it in the collection view and makes it where new cards go; it is highlighted until a deck is selected. Right-click or long press a collection for its menu (see [Screen layout](/about/screen-layout)). A **Shared** badge marks collections shared with or by you, and a **Wishlist** badge marks wishlists.
 
 ## Undo
 

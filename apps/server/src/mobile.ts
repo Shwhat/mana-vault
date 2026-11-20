@@ -154,7 +154,10 @@ export function registerMobileRoutes(app: FastifyInstance, database: DatabaseSyn
       `SELECT s.id, s.kind, s.item_name, s.mode, s.created_at, u.name AS user_name FROM shares s JOIN users u ON u.id = s.from_user
        WHERE s.to_user = ? AND s.status = 'pending' ORDER BY s.created_at DESC LIMIT 5`,
     ).all(me).map((row) => ({ id: String(row.id), kind: String(row.kind), itemName: String(row.item_name), mode: String(row.mode), createdAt: String(row.created_at), user: String(row.user_name) }));
-    const catalog = database.prepare("SELECT value FROM catalog_metadata WHERE key = 'updated_at'").get()?.value ?? null;
+    const updated = database.prepare("SELECT value FROM catalog_metadata WHERE key = 'updated_at'").get()?.value ?? null;
+    const custom = database.prepare("SELECT value FROM catalog_metadata WHERE key = 'custom_at'").get()?.value ?? null;
+    // a change of custom cards counts as a change of the card list
+    const catalog = custom ? `${String(updated ?? "")}|${String(custom)}` : updated;
     const rulings = database.prepare("SELECT value FROM catalog_metadata WHERE key = 'rulings_at'").get()?.value ?? null;
     return { revision: revision.value, inbox: Number(inbox?.count ?? 0), newestOffer: inbox?.newest ?? null, offers, catalog, rulings };
   });
@@ -212,7 +215,8 @@ export function registerMobileRoutes(app: FastifyInstance, database: DatabaseSyn
   let compact: CompactCache = null;
   app.get("/api/catalog/compact", async (request, reply) => {
     const stamp = String(database.prepare("SELECT value FROM catalog_metadata WHERE key = 'updated_at'").get()?.value ?? "") +
-      `:${Number(database.prepare("SELECT COUNT(*) AS count FROM cards").get()?.count ?? 0)}`;
+      `:${Number(database.prepare("SELECT COUNT(*) AS count FROM cards").get()?.count ?? 0)}` +
+      `:${String(database.prepare("SELECT value FROM catalog_metadata WHERE key = 'custom_at'").get()?.value ?? "")}`;
     if (request.headers["if-none-match"] === `"${stamp}"`) return reply.code(304).send();
     if (compact?.stamp !== stamp) {
       const rows = database.prepare(

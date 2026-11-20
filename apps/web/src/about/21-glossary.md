@@ -31,7 +31,14 @@
 | Switcher | The button with the open collection's or deck's name that opens a searchable list of the others |
 | Flavor name | Another name printed on some versions of a card, matched by search and imports |
 | Ownership | Which deck cards you own across your collections |
-| Target collection | The collection that Add to collection puts cards into |
+| Target collection | The collection that Add to collection puts cards into, when a collection was selected last |
+| Selected last | The collection or deck clicked last in its panel or switcher, where new cards go; it is the one highlighted |
+| Custom card | A card made in the card maker and saved to the card database for every account, marked Custom |
+| Custom set | A set made for custom cards, with its own code, name, release date and symbol |
+| Print list | The cards to print as proxies, kept with your account |
+| Bleed | Extra picture around a card's cut edge, so a slightly uneven cut shows no white edge |
+| MakePlayingCards | A printing service that prints uploaded card pictures; MPC for short |
+| MPC Autofill | A separate website that fills a MakePlayingCards order from a card list with its own scans |
 | Open collection | The collection shown in the collection view |
 | Linked set | A set whose completion a collection tracks |
 | Completion rule | None, Main set, Every printing or Each card name once; decides which cards a linked set needs |

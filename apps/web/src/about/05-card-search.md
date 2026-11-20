@@ -27,6 +27,7 @@ A filter is a key, an operator and a value with no spaces, such as `t:dragon`. P
 | `c:c` or `c:colorless` | Card has no color (with `id:`, no color identity) | `c:c` |
 | `mv` or `cmc` | Mana value compared with =, :, <, >, <= or >= | `mv>=4` |
 | `legal:` or `f:` | Card is legal in the format | `legal:commander` |
+| `is:custom` | Card is a custom card made in the card maker (`-is:custom` leaves them out) | `is:custom t:goblin` |
 | `usd`, `eur` | Price compared with =, :, <, >, <= or >=. The regular price, or the foil price for printings only in foil. Printings without a price never match | `usd<1`, `eur>=20` |
 
 Colors are W (white), U (blue), B (black), R (red) and G (green), or a color name. Mana values run from 0 to 100.
@@ -36,6 +37,7 @@ Colors are W (white), U (blue), B (black), R (red) and G (green), or a color nam
 | Message | Cause |
 |---|---|
 | Unsupported search filter "x" | The key before the operator is not in the table above |
+| Unknown card kind "x". Use is:custom | `is:` was followed by something other than custom |
 | x only supports the ":" operator | A text filter was used with <, >, = or similar |
 | Unknown rarity "x" | The rarity is not one of the six listed |
 | Invalid color filter "x" | The value contains something other than W, U, B, R, G or a color name |

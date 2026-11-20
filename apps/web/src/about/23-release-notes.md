@@ -2,6 +2,22 @@
 
 The installed version is shown at the top of this guide.
 
+## 0.9.0 (2026-11-19): Proxies, the card maker, change printing and menus for collections and decks
+
+- Proxies: a new Proxies view (key 5, the Proxies ribbon tab and a Proxies tab on phones) with a print list kept on the server. Add a deck, its missing cards, a collection, picked rows, a pasted list, the tokens of the listed cards or any card from a search; choose each line's printing, count and faces.
+- Sheet settings for the paper (Letter, A4, Legal or a custom size), margins, card size, scale, gap, bleed, cutting guides and background, with a live preview of every page.
+- Exports: a PDF at 300 DPI, MakePlayingCards pictures with bleed in a zip, and a card list for MPC Autofill with custom cards as pictures. Mana Vault makes every export itself. After exporting, the printed cards can be added as proxies to a collection or deck.
+- The card maker makes custom cards with a live preview: every card field, mana symbol buttons, Mana Vault's own frames in every color, the ten hybrids, gold, artifact, colorless and land, legendary versions, creature, planeswalker, saga, token and double-faced cards, uploaded art or a card's art with move and zoom, and PNG export.
+- Custom cards are saved to the card database for every account, in custom sets with their own codes (such as XXX), names, release dates and symbols, with colors, color identity, finishes, prices, legality and tokens. They work like every other card, show a Custom badge and are found with `is:custom`. Only their maker can change or delete them, and backups include them.
+- Change printing... in the right-click menu of deck cards and collection rows. A deck card links free copies of the new printing, from the collection you choose when several have them; collection copies keep their count, details and deck links.
+- New cards go to the collection or deck selected last in the Collections panel, the Decks panel or a switcher, and only that one is highlighted. With a deck selected, Add to collection, double-click and the scanner add to the deck. The Add here buttons are gone; the status bar shows ADD TO: DECK name for a deck.
+- The Decks panel groups decks by format, with each deck's card count and value under its name.
+- Right-click menus (long press on phones) on collections and decks in the panels and switchers: Open, Rename..., settings or format, Send..., Export..., Delete or Leave. Rows of the Deck list panel have the deck card menu, and card menus have Add to print list.
+- Deck import, Edit as text and Quick add read `*F*` (foil) and `*E*` (etched) after a card's set and number, and find a card by its set and number when the name does not match.
+- A card whose record from Scryfall fails a check is skipped instead of stopping the whole card database update; the status bar shows how many were skipped, with their names. Two-faced cards keep their back face picture for printing after the next update.
+- Backups are version 5 and can be up to 250 MB.
+- Fixed: deck lines ending in `*F*`, such as `1 Island (HOB) 195 *F*`, were not found in the card database.
+
 ## 0.8.0 (2026-11-19): Saved trades, search views, filters per view and All collections
 
 - Card search shows results as a Grid (the default), Binder pages or a List, chosen with **Options** with the card size; the desktop and phones each remember their choice. Pictures show the price and how many copies you own; click selects, double-click adds, right-click or long press opens the menu.

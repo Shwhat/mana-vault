@@ -1,5 +1,6 @@
 // ---------- actions: every command is defined once and called by name from menus, ribbon and keys ----------
 import { useMemo } from "react";
+import { addFromDeckDialog } from "./views/ProxiesView";
 import { request } from "./api";
 import { checkForUpdate, DeviceList, signOutApp } from "./android/AppScreens";
 import { syncNow, syncStatus } from "./android/offline";
@@ -36,6 +37,7 @@ export const SHORTCUTS: Array<[group: string, key: string, action: string]> = [
   ["Search", "2", "view.collection"],
   ["Search", "3", "view.deck"],
   ["Search", "4", "view.trade"],
+  ["Search", "5", "view.proxies"],
   ["Search", "Up, Down", "Select the previous or next row"],
   ["Adding cards", "Enter", "addCollection"],
   ["Adding cards", "Shift+Enter", "addDeck"],
@@ -177,6 +179,17 @@ export function useActions(store: Store): Record<string, Action> {
       },
       "view.deck": { label: "Deck view", short: "Deck", icon: "deck", key: "3", on: store.view === "deck", run: () => store.setView("deck") },
       "view.trade": { label: "Trade view", short: "Trade", icon: "trade", key: "4", on: store.view === "trade", run: () => store.setView("trade") },
+      "view.proxies": { label: "Proxies view", short: "Proxies", icon: "print", key: "5", on: store.view === "proxies", run: () => store.setView("proxies") },
+      "proxies.print": {
+        label: "Print list", short: "Print list", icon: "print", on: store.view === "proxies" && prefs.proxyTab === "print",
+        run: () => { store.setPrefs({ proxyTab: "print" }); store.setView("proxies"); },
+      },
+      "proxies.maker": {
+        label: "Card maker", short: "Card maker", icon: "maker", on: store.view === "proxies" && prefs.proxyTab === "maker",
+        run: () => { store.setPrefs({ proxyTab: "maker" }); store.setView("proxies"); },
+      },
+      "proxies.deck": { label: "Print a deck...", short: "Print deck", icon: "printdeck", run: () => addFromDeckDialog(store) },
+      "proxies.missing": { label: "Print missing cards...", short: "Print missing", icon: "missing", run: () => addFromDeckDialog(store, true) },
       "collection.stats": {
         label: "Collection statistics", short: "Statistics", icon: "stats", on: store.view === "collection" && store.collectionTab === "stats", run: () => showTab("stats"),
       },
@@ -298,7 +311,7 @@ export function useActions(store: Store): Record<string, Action> {
       },
       scan: { label: "Scan card...", short: "Scan card", icon: "scan", run: () => store.setScannerOpen(true) },
       addCollection: {
-        label: "Add to collection", short: "Add to collection", icon: "addcol", key: "Enter", disabled: !selected || !target,
+        label: "Add to collection", short: "Add to collection", icon: "addcol", key: "Enter", disabled: !selected || (!target && !(prefs.addTo === "deck" && deck)),
         run: () => { if (selected) void store.addToCollection(selected.id, selected.name); else store.flash("Select a card first", "err"); },
       },
       addDeck: {

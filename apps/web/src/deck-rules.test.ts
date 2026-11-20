@@ -82,9 +82,13 @@ describe("deck rules", () => {
   it("writes the deck as text and reads quick add lines", () => {
     const text = deckText([card("Ring", { zone: "main", set_code: "c21", collector_number: "263" }), card("King", { zone: "commander", set_code: "m10", collector_number: "1" })]);
     expect(text).toBe("Commander\n1 King (M10) 1\n\nDeck\n1 Ring (C21) 263");
-    expect(parseQuickAdd("2 Sol Ring")).toEqual({ quantity: 2, name: "Sol Ring", set: "", number: "" });
-    expect(parseQuickAdd("3x Bolt (M10) 146")).toEqual({ quantity: 3, name: "Bolt", set: "M10", number: "146" });
-    expect(parseQuickAdd("Forest")).toEqual({ quantity: 1, name: "Forest", set: "", number: "" });
+    expect(parseQuickAdd("2 Sol Ring")).toEqual({ quantity: 2, name: "Sol Ring", set: "", number: "", finish: "" });
+    expect(parseQuickAdd("3x Bolt (M10) 146")).toEqual({ quantity: 3, name: "Bolt", set: "M10", number: "146", finish: "" });
+    expect(parseQuickAdd("Forest")).toEqual({ quantity: 1, name: "Forest", set: "", number: "", finish: "" });
+    expect(parseQuickAdd("1 Sauron, the Dark Lord (HOC) 36 *F*")).toEqual({ quantity: 1, name: "Sauron, the Dark Lord", set: "HOC", number: "36", finish: "foil" });
+    expect(parseQuickAdd("1 Opt (XLN) 65 *E*")).toEqual({ quantity: 1, name: "Opt", set: "XLN", number: "65", finish: "etched" });
+    expect(parseQuickAdd("1 Island (HOB) 195 *F* *CMDR*")).toEqual({ quantity: 1, name: "Island", set: "HOB", number: "195", finish: "foil" });
+    expect(parseQuickAdd("1 Lightning Bolt (2X2) 117\u2605")).toEqual({ quantity: 1, name: "Lightning Bolt", set: "2X2", number: "117\u2605", finish: "" });
     expect(parseQuickAdd("500 Forest")).toBeNull();
     expect(parseQuickAdd("  ")).toBeNull();
   });

@@ -1,14 +1,34 @@
 // ---------- host: everything that talks to the server ----------
 import { appFetch, SignedOutError } from "./android/net";
 import { appRequest } from "./android/offline";
-import { isApp, saveBlob } from "./android/platform";
+import { apiUrl, isApp, saveBlob } from "./android/platform";
+
+/**
+ * In the Android app pages come from the phone, so the server's own picture addresses (custom card pictures and set
+ * symbols, such as /api/custom/cards/.../picture) are made full addresses on the server.
+ */
+export function withServerPictures<T>(value: T): T {
+  if (typeof value === "string") return (value.startsWith("/api/custom/") ? apiUrl(value) : value) as T;
+  if (Array.isArray(value)) return value.map((item) => withServerPictures(item)) as T;
+  if (value && typeof value === "object") {
+    let changed = false;
+    const next: Record<string, unknown> = {};
+    for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
+      const fixed = typeof item === "string" || (item && typeof item === "object") ? withServerPictures(item) : item;
+      if (fixed !== item) changed = true;
+      next[key] = fixed;
+    }
+    return (changed ? next : value) as T;
+  }
+  return value;
+}
 
 export { SignedOutError };
 export const APP_VERSION = __APP_VERSION__;
 
 /** Sends a request with the safety header the server requires on every change. A 401 returns to the sign-in page. */
 export async function request<T>(url: string, init: RequestInit = {}): Promise<T> {
-  if (isApp()) return appRequest<T>(url, init);
+  if (isApp()) return withServerPictures(await appRequest<T>(url, init));
   const method = (init.method ?? "GET").toUpperCase();
   const response = await fetch(url, {
     ...init,

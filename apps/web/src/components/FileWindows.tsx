@@ -144,21 +144,23 @@ const fromEntry = (entry: CollectionEntry): ExportRow => ({
   purchase_price: entry.purchase_price, price_currency: entry.price_currency, added_at: entry.added_at, misprint: entry.misprint, altered: entry.altered, signed: entry.signed,
 });
 
-function ExportWindow({ initial }: { initial: ExportWhat }) {
+function ExportWindow({ initial, collectionId }: { initial: ExportWhat; collectionId?: string }) {
   const store = useApp();
-  const open = store.collections?.find((item) => item.id === store.prefs.openCollection) ?? null;
-  const filtered = store.visibleCollection.length;
+  // a collection's right-click menu exports that collection, open or not
+  const other = !!collectionId && collectionId !== store.prefs.openCollection;
+  const open = store.collections?.find((item) => item.id === (collectionId ?? store.prefs.openCollection)) ?? null;
+  const filtered = other ? 0 : store.visibleCollection.length;
   const picked = store.checked.size;
   const choices = useMemo(() => {
     const list: Array<[ExportWhat, string, boolean]> = [
       ["collection", open ? `Whole collection: ${open.name}` : "Whole collection", !!open],
       ["filtered", `Filtered cards (${filtered} rows)`, !!open && filtered > 0 && filtered !== (store.collection?.length ?? 0)],
-      ["selected", `Selected cards (${picked} rows)`, picked > 0],
+      ["selected", `Selected cards (${picked} rows)`, picked > 0 && !other],
       ["missing", "Missing cards", !!open && open.completion !== "none" && open.sets.length > 0],
-      ["deck", store.deck ? `Deck: ${store.deck.name}` : "Deck", !!store.deck],
+      ["deck", store.deck ? `Deck: ${store.deck.name}` : "Deck", !!store.deck && !other],
     ];
     return list.filter(([, , ok]) => ok);
-  }, [open, filtered, picked, store.deck, store.collection]);
+  }, [open, filtered, picked, store.deck, store.collection, other]);
   const [what, setWhat] = useState<ExportWhat>(choices.some(([id]) => id === initial) ? initial : choices[0]?.[0] ?? "collection");
   const [format, setFormat] = useState<ExportFormat>(initial === "deck" ? "text" : "manavault");
   const [error, setError] = useState("");
@@ -211,6 +213,6 @@ function ExportWindow({ initial }: { initial: ExportWhat }) {
   );
 }
 
-export function exportWindow(_store: Store, what: ExportWhat = "collection") {
-  customDialog("Export", () => <ExportWindow initial={what} />, 480, "Cancel");
+export function exportWindow(_store: Store, what: ExportWhat = "collection", collectionId?: string) {
+  customDialog("Export", () => <ExportWindow initial={what} collectionId={collectionId} />, 480, "Cancel");
 }

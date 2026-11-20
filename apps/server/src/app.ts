@@ -16,6 +16,8 @@ import { registerInsightRoutes } from "./insights.js";
 import { logDeck, registerDeckRoutes } from "./decks.js";
 import { registerDeckBuilderRoutes } from "./deck-builder.js";
 import { registerTradeRoutes } from "./trades.js";
+import { CUSTOM_PUBLIC, registerCustomRoutes } from "./custom.js";
+import { type Fetcher, registerProxyRoutes } from "./proxies.js";
 import { deviceUser, handleCrossOrigin, registerMobileRoutes, Revision } from "./mobile.js";
 import { access, createCollection, forgetItem, itemSharing, registerLibraryRoutes } from "./library.js";
 import {
@@ -42,6 +44,8 @@ export interface AppOptions {
   /** Failed sign-ins and new accounts allowed per address in 15 minutes. Raised only by the browser tests. */
   addressAttemptLimit?: number;
   version?: string;
+  /** Downloads card pictures and mana symbols from Scryfall; tests replace it. */
+  fetcher?: Fetcher;
 }
 
 // Paths anyone may load without signing in.
@@ -107,7 +111,7 @@ export async function buildApp(
       }
     }
     // the shared trade binder is the one page that works without signing in
-    if (PUBLIC_PATHS.has(path) || request.user || (path === "/api/devices" && request.method === "POST") || (request.method === "GET" && /^\/share\/[\w-]{10,64}$/.test(path))) return;
+    if (PUBLIC_PATHS.has(path) || request.user || (path === "/api/devices" && request.method === "POST") || (request.method === "GET" && (/^\/share\/[\w-]{10,64}$/.test(path) || CUSTOM_PUBLIC.test(path)))) return;
     if (path.startsWith("/api/")) return reply.code(401).send({ error: "You are signed out. Sign in again to continue." });
     if (path === "/" || path.endsWith(".html") || !path.includes(".")) return reply.redirect("/login");
     return reply.code(401).send({ error: "Signed out" });
@@ -130,7 +134,7 @@ export async function buildApp(
   );
   app.addContentTypeParser(
     "application/vnd.mana-vault.backup+json",
-    { parseAs: "string", bodyLimit: 25 * 1024 * 1024 },
+    { parseAs: "string", bodyLimit: 250 * 1024 * 1024 },
     (_request, body, done) => done(null, body),
   );
 
@@ -157,6 +161,8 @@ export async function buildApp(
   registerTradeRoutes(app, database);
   registerInsightRoutes(app, database);
   registerScanRoutes(app, database);
+  registerCustomRoutes(app, database);
+  registerProxyRoutes(app, database, options.fetcher);
 
   app.post<{ Params: { deckId: string }; Body: string }>("/api/decks/:deckId/import/preview", async (request, reply) => {
     if (typeof request.body !== "string" || !request.body.trim()) {
@@ -290,9 +296,22 @@ export async function buildApp(
     return { ok: true };
   });
 
+  // cards the last update left out because their record failed a check
+  const catalogSkipped = () => {
+    const read = (key: string) => String(database.prepare("SELECT value FROM catalog_metadata WHERE key = ?").get(key)?.value ?? "");
+    let names: string[] = [];
+    try {
+      const parsed = JSON.parse(read("last_skipped_names") || "[]");
+      if (Array.isArray(parsed)) names = parsed.map(String);
+    } catch {
+      names = [];
+    }
+    return { count: Number(read("last_skipped_count") || 0), names };
+  };
   app.get("/api/catalog/status", async () => ({
     printingCount: database.prepare("SELECT COUNT(*) AS count FROM cards").get()?.count ?? 0,
     updatedAt: database.prepare("SELECT value FROM catalog_metadata WHERE key = 'updated_at'").get()?.value ?? null,
+    skipped: catalogSkipped(),
     update: getCatalogUpdateStatus(),
   }));
 
@@ -503,7 +522,9 @@ export async function buildApp(
   return app;
 }
 
-function toCardRow(row: Record<string, unknown>): CardRow & { flavor_name: string | null; power: string | null; toughness: string | null; prices: Record<string, number | null> } {
+function toCardRow(row: Record<string, unknown>): CardRow & {
+  flavor_name: string | null; power: string | null; toughness: string | null; prices: Record<string, number | null>; custom?: boolean;
+} {
   const required = (key: string): string => {
     const value = row[key];
     if (typeof value !== "string") throw new Error(`Invalid card database value for ${key}`);
@@ -535,6 +556,8 @@ function toCardRow(row: Record<string, unknown>): CardRow & { flavor_name: strin
     flavor_name: optional("flavor_name"),
     power: typeof row.power === "string" ? row.power : null,
     toughness: typeof row.toughness === "string" ? row.toughness : null,
+    // a card made in the card maker
+    ...(Number(row.custom ?? 0) === 1 ? { custom: true } : {}),
     prices: {
       usd: price(row.price_usd), usd_foil: price(row.price_usd_foil), usd_etched: price(row.price_usd_etched),
       eur: price(row.price_eur), eur_foil: price(row.price_eur_foil),
@@ -543,4 +566,4 @@ function toCardRow(row: Record<string, unknown>): CardRow & { flavor_name: strin
 }
 
 const price = (value: unknown) => (typeof value === "number" ? value : null);
-const CARD_PRICE_COLUMNS = "flavor_name, power, toughness, price_usd, price_usd_foil, price_usd_etched, price_eur, price_eur_foil";
+const CARD_PRICE_COLUMNS = "flavor_name, power, toughness, price_usd, price_usd_foil, price_usd_etched, price_eur, price_eur_foil, custom";

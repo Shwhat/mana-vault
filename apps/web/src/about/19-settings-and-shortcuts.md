@@ -9,7 +9,8 @@ Preferences are saved for your account on the server and follow you to every bro
 | Theme | Light, Dark, System | Light | Theme list on the View ribbon tab, phone Menu |
 | Add as foil | On, Off | Off | FOIL in the status bar, F |
 | Target zone | Main deck, Sideboard, Commander, Maybeboard | Main deck | Zone list beside Quick add on the deck's Add tab, Target zone list on the Decks ribbon tab, Deck list panel, ZONE in the status bar, Z |
-| Target collection | Any of your collections | Your first collection | ADD TO in the status bar, Collections panel, + Add in the collection view, C |
+| Where new cards go | The collection or deck selected last | Your first collection | Clicking a collection or deck in its panel or switcher, ADD TO in the status bar, + Add in the collection view, C |
+| Target collection | Any of your collections | Your first collection | Collections panel, collection switcher, ADD TO in the status bar, + Add in the collection view, C |
 | Open collection | Any of your collections, or All collections | Your first collection | Collection switcher, Collections panel |
 | Search layout, desktop and phone | Grid, Binder, List | Grid | Options in card search, the deck's Add tab and the trade view; each device type remembers its own |
 | Search card size | Small, Medium, Large | Medium | Options in card search (Grid layout) |
@@ -32,6 +33,8 @@ Preferences are saved for your account on the server and follow you to every bro
 | Workspace | Built-in or saved | Deck building | Workspace button on the ribbon, Manage workspaces... |
 | Saved workspaces | Any number | None | Save workspace..., Manage workspaces... |
 | Last open deck | Any deck | None | Open a deck |
+| Proxies tab | Print, Card maker | Print | The tabs of the Proxies view |
+| Proxy sheet | Paper, margins, card size, scale, gap, bleed, cutting guides, background | Letter, 6 mm, standard, 100%, 0 mm, 0 mm, cut lines, white | Sheet settings on the Print tab, Reset sheet |
 | Quick mode | On, Off | Off | Scanner settings |
 | Play sounds | On, Off | On | Scanner settings |
 | Vibrate | On, Off | On | Scanner settings |
@@ -70,13 +73,14 @@ Shortcuts work when no text box, menu or window has focus, except the Ctrl short
 | 2 | Collection view |
 | 3 | Deck view |
 | 4 | Trade view |
+| 5 | Proxies view |
 | Up, Down | Select the previous or next row (Down also leaves the search box) |
 
 ### Adding cards
 
 | Key | Action |
 |---|---|
-| Enter | Add the selected card to the collection |
+| Enter | Add the selected card to the collection or deck selected last |
 | Shift+Enter | Add the selected card to the open deck |
 | F | Switch Add as foil on or off |
 | Z | Cycle zone (cycle the target zone: Main deck, Sideboard, Commander, Maybeboard) |

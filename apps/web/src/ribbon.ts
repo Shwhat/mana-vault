@@ -13,7 +13,7 @@ export const DEFAULT_RIBBON: RibbonTab[] = [
   {
     id: "home", name: "Home", groups: [
       { name: "Search", items: ["find", "scan", "clearFilters"] },
-      { name: "Views", items: ["view.home", "view.cards", "view.collection", "view.deck", "view.trade"] },
+      { name: "Views", items: ["view.home", "view.cards", "view.collection", "view.deck", "view.trade", "view.proxies"] },
       { name: "Files", items: ["io.import", "io.export", "menu.backup"] },
       { name: "Edit", items: ["undo", "redo"] },
     ],
@@ -41,6 +41,12 @@ export const DEFAULT_RIBBON: RibbonTab[] = [
       { name: "Open", items: ["view.trade"] },
       { name: "Trade", items: ["trade.new", "trade.complete", "trade.send"] },
       { name: "Share", items: ["trade.copy", "trade.share"] },
+    ],
+  },
+  {
+    id: "proxies", name: "Proxies", groups: [
+      { name: "Open", items: ["proxies.print", "proxies.maker"] },
+      { name: "Add to print list", items: ["proxies.deck", "proxies.missing"] },
     ],
   },
   {

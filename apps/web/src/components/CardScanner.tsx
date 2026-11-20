@@ -700,7 +700,8 @@ function AddToWindow({ items, done }: { items: ScanItem[]; done: () => void }) {
   const collections = (store.collections ?? []).filter((item) => item.kind === "collection" || items.every((scan) => !scan.proxy));
   const owned = collections.filter((item) => item.kind === "collection");
   const preferred = collections.find((item) => item.id === store.prefs.targetCollection)?.id ?? collections[0]?.id ?? NEW_COLLECTION;
-  const [target, setTarget] = useState(`collection:${preferred}`);
+  // the collection or deck selected last is filled in
+  const [target, setTarget] = useState(store.prefs.addTo === "deck" && store.deck ? `deck:${store.deck.id}` : `collection:${preferred}`);
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const [kind, id] = target.split(":") as ["collection" | "deck", string];

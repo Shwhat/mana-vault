@@ -28,7 +28,7 @@ The **target zone** decides where Add to deck and Quick add put a card. It start
 ## Opening decks
 
 - **The deck switcher**: the button with the deck's name at the left of the deck view header (on a phone, at the top of the Decks tab). It opens a list of every deck with its cover card, commander, format and card count. Type to find a deck by name, commander or format; Up and Down move through the list, Enter opens the highlighted deck and Esc closes the list. **Sort** orders the list by Recently opened, Name, Date created, Card count, Format or Commander; the choice is kept for your account. **New deck...** is at the bottom of the list.
-- **Decks panel**: one click on a deck opens it in the deck view.
+- **Decks panel**: decks are grouped by format, each with its card count and value. One click on a deck opens it in the deck view and makes it where new cards go (see [Collections](/about/collections)). Right-click or long press a deck for its menu: Open, Rename..., Deck format..., Send..., Export..., Delete or Leave.
 - **Open deck...** (Ctrl+O) lists every deck with its format and card count.
 - **New deck...** (Ctrl+N) asks for the name and format. **Create deck** creates it and opens it.
 - **Add to...** in the scanner offers **New deck...** too (see [Scanning cards](/about/scanning-cards)).
@@ -37,7 +37,7 @@ Opening a deck closes the About guide. The last deck you opened opens again the 
 
 ## Renaming and deleting decks
 
-- **Rename deck...** (Decks ribbon tab) changes the open deck's name, 1 to 100 characters. Renaming a shared deck changes it for both people.
+- **Rename deck...** (Decks ribbon tab), or **Rename...** in a deck's right-click menu, changes the deck's name, 1 to 100 characters. Renaming a shared deck changes it for both people.
 - **Delete deck...** asks "Delete name and its N cards?" and removes the deck. A deck you share warns that the other people will lose it too. Deleting cannot be undone, and it clears the undo history. The copies stay in their collections.
 - For a deck shared with you, the command is **Leave shared deck...**: the deck stays with its owner and leaves your list.
 
@@ -63,6 +63,16 @@ Every card you own is in a collection. Putting a card in a deck does not take it
 
 Scanned cards added to a deck are new physical cards, so they go into a collection and are linked to the deck cards they fill. **Copies go into** in the Add to window offers a new collection named after the deck, or any of your collections. The choice is remembered for the deck and filled in the next time; confirm it with **Add**.
 
+### Change printing
+
+**Change printing...** in a deck card's right-click menu (in every deck view and the Deck list panel) changes the printing of the deck card. Choose the printing in the printing chooser.
+
+1. The links to copies of the old printing are removed.
+2. Free copies of the new printing in your collections are linked, up to the card's count. When free copies are in more than one collection, Mana Vault asks which collection's copies to link (or None, missing).
+3. Cards without a copy show as missing. Maybeboard cards are not linked.
+
+When the deck already has the new printing in the same zone, the cards join it. The change is written to the deck's history and can be undone. The message reads "Card name is now (SET) number", with where copies were linked from and how many are missing.
+
 ### Link copies
 
 **Link copies...** (Decks ribbon tab, the link button on a deck card, or the right-click menu) lists the free copies of the card in your collections, each with its collection, set, number, finish, condition, language, proxy and how many are free. Choose a copy and **How many**, or **None (missing)**, then **Link**. The change can be undone.
@@ -78,6 +88,10 @@ The box at the top of the Add tab adds a card by typing it: a count and a name, 
 | Count and name added to deck name | The card was added (with the zone when not the main deck, and the collection its copy came from) |
 | No card named name in the card database | No card has the typed name, or no printing has the typed set and number |
 | Type a card name, such as 2 Sol Ring | The line has no name, or the count is not 1 to 100 |
+
+### Adding from card search
+
+With a deck selected last in the Decks panel or the deck switcher, **Add to collection** (Enter, a double-click on a result, or the Card panel) adds the card to that deck in the target zone, shown as ZONE in the status bar. The status bar shows ADD TO: DECK name. Selecting a collection makes cards go to that collection again.
 
 ### The Add tab
 

@@ -6,6 +6,7 @@ import { renderMarkdown } from "../components/About";
 import { rowMenu } from "../components/ContextMenu";
 import { formatDialog, tagsDialog } from "../components/DeckDialogs";
 import { linkDialog } from "../components/LibraryDialogs";
+import { choosePrinting } from "../components/PrintingDialog";
 import { Switcher } from "../components/Switcher";
 import { cardPrice, checkDeck, type Legality, MANA_COLORS, manaBalance, sections, shuffle, ZONE_ORDER } from "../deck-rules";
 import { Icon } from "../icons";
@@ -30,11 +31,13 @@ const SORTS: Array<[DeckSort, string]> = [["name", "Name"], ["mana", "Mana value
 const VIEWS: Array<[DeckViewKind, string]> = [["list", "List"], ["text", "Text"], ["stacks", "Stacks"], ["grid", "Grid"]];
 const ZONE_CHOICES: Choice[] = ZONES.map((zone) => ({ value: zone.id, label: zone.label }));
 
-/** The commands for one deck card: right-click on the desktop, a long press on a phone. */
-function cardMenu(store: Store, card: DeckCard) {
+/** The commands for one deck card: right-click on the desktop, a long press on a phone. Also used by the Deck list panel. */
+export function cardMenu(store: Store, card: DeckCard) {
   const missing = card.missing ?? 0;
   return rowMenu(store, card.name, () => [
     { label: "Card page", run: () => store.setCardPage(card.card_id) },
+    { label: "Change printing...", run: () => choosePrinting(card.name, card.card_id, card.card_id, { currency: store.prefs.currency },
+      (printing) => void store.changeDeckPrinting(card, printing)) },
     card.zone !== "maybeboard" && { label: "Link copies...", run: () => void linkDialog(store, card) },
     { label: "Tags...", run: () => tagsDialog(store, card) },
     ...ZONES.filter((zone) => zone.id !== card.zone).map((zone) => ({ label: `Move to ${zone.label}`, run: () => void store.moveDeckCard(card, zone.id) })),
@@ -43,6 +46,7 @@ function cardMenu(store: Store, card: DeckCard) {
       label: "Add missing to wishlist",
       run: () => void store.addToWishlist([{ cardId: card.card_id, foil: 0, condition: "NM", language: "en", proxy: false, quantity: missing }], card.name),
     },
+    { label: "Add to print list", run: () => void store.addToPrintList([{ card: { ...card, id: card.card_id }, count: card.quantity }], card.name) },
     { label: "Remove from deck", run: () => void store.setDeckQuantity(card, 0) },
   ]);
 }
@@ -76,7 +80,7 @@ function ListRow({ card, flag, onHover }: { card: DeckCard; flag?: string } & Ho
       onClick={() => pick(store, card)} {...cardMenu(store, card)}>
       <Thumb url={card.image_url} />
       <div className="rowmain" {...hoverHandlers(card, onHover)}>
-        <div className="rowtitle"><b>{card.name}</b><span className="mana">{card.mana_cost}</span><Flag text={flag} /></div>
+        <div className="rowtitle"><b>{card.name}</b>{card.custom && <span className="badge custom">Custom</span>}<span className="mana">{card.mana_cost}</span><Flag text={flag} /></div>
         <div className="rowsub">{card.type_line}</div>
         <div className="rowmeta">{card.set_name} <span className="badge">{card.set_code.toUpperCase()}</span> {card.collector_number}</div>
         <div className="rowtags">

@@ -23,9 +23,18 @@ type BackupLink = {
   proxy: number; quantity: number;
 };
 
+/** A custom set (0.9.0), with its symbol as base64. */
+type BackupCustomSet = { code: string; name: string; released_at: string | null; symbol: string | null; symbol_type: string | null };
+/** A custom card (0.9.0): its card maker design, pictures and art as base64, and the card data kept outside the card row. */
+type BackupCustomCard = {
+  id: string; design: string; picture: string | null; picture_type: string | null; back_picture: string | null; back_picture_type: string | null;
+  art: string | null; art_type: string | null; back_art: string | null; back_art_type: string | null; finishes: string; power: string | null; toughness: string | null;
+  tokens: string; price_usd: number | null; price_usd_foil: number | null; price_eur: number | null; price_eur_foil: number | null;
+};
+
 export interface ManaVaultBackup {
   format: "mana-vault-backup";
-  version: 4;
+  version: 5;
   createdAt: string;
   cards: BackupCard[];
   collections: BackupCollection[];
@@ -39,6 +48,9 @@ export interface ManaVaultBackup {
   deckCards: Array<{ deck_id: string; oracle_id: string; printing_id: string | null; quantity: number; zone: string; tags?: string }>;
   /** Version 4: the collection copies that fill each deck card. */
   deckLinks: BackupLink[];
+  /** Version 5: the custom sets and custom cards the account made or uses. */
+  customSets: BackupCustomSet[];
+  customCards: BackupCustomCard[];
 }
 
 export interface BackupSummary {
@@ -48,6 +60,7 @@ export interface BackupSummary {
   collectionEntryCount: number;
   deckCount: number;
   deckCardCount: number;
+  customCardCount: number;
 }
 
 /** A backup of one account's own collections and decks, with the card records they use. */
@@ -62,11 +75,40 @@ export function createBackup(database: DatabaseSync, userId: number): ManaVaultB
     `SELECT ${cardFields.join(", ")} FROM cards
      WHERE id IN (SELECT card_id FROM collection_cards WHERE collection_id IN (SELECT id FROM collections WHERE owner_id = ?))
         OR oracle_id IN (SELECT oracle_id FROM deck_cards WHERE deck_id IN (SELECT id FROM decks WHERE owner_id = ?))
+        OR id IN (SELECT id FROM custom_cards WHERE owner_id = ?)
      ORDER BY id`,
-  ).all(userId, userId) as BackupCard[];
+  ).all(userId, userId, userId) as BackupCard[];
+  const base64 = (value: unknown) => (value ? Buffer.from(value as Uint8Array).toString("base64") : null);
+  const customIds = new Set(database.prepare("SELECT id FROM cards WHERE custom = 1").all().map((row) => String(row.id)));
+  const customCards = cards.filter((card) => customIds.has(String(card.id))).map((card) => {
+    const row = database.prepare(
+      `SELECT cc.*, c.finishes, c.power, c.toughness, c.tokens, c.price_usd, c.price_usd_foil, c.price_eur, c.price_eur_foil
+       FROM custom_cards cc JOIN cards c ON c.id = cc.id WHERE cc.id = ?`,
+    ).get(String(card.id))!;
+    return {
+      id: String(row.id), design: String(row.design), picture: base64(row.picture), picture_type: (row.picture_type as string | null) ?? null,
+      back_picture: base64(row.back_picture), back_picture_type: (row.back_picture_type as string | null) ?? null,
+      art: base64(row.art), art_type: (row.art_type as string | null) ?? null, back_art: base64(row.back_art), back_art_type: (row.back_art_type as string | null) ?? null,
+      finishes: String(row.finishes ?? ""), power: (row.power as string | null) ?? null, toughness: (row.toughness as string | null) ?? null, tokens: String(row.tokens ?? ""),
+      price_usd: (row.price_usd as number | null) ?? null, price_usd_foil: (row.price_usd_foil as number | null) ?? null,
+      price_eur: (row.price_eur as number | null) ?? null, price_eur_foil: (row.price_eur_foil as number | null) ?? null,
+    };
+  });
+  const setCodes = [...new Set(cards.filter((card) => customIds.has(String(card.id))).map((card) => String(card.set_code)))];
+  const customSets = [
+    ...setCodes,
+    ...database.prepare("SELECT code FROM custom_sets WHERE owner_id = ?").all(userId).map((row) => String(row.code)).filter((code) => !setCodes.includes(code)),
+  ].flatMap((code) => {
+    const row = database.prepare("SELECT cs.code, s.name, s.released_at, cs.symbol, cs.symbol_type FROM custom_sets cs JOIN sets s ON s.code = cs.code WHERE cs.code = ?").get(code);
+    return row ? [{
+      code: String(row.code), name: String(row.name), released_at: (row.released_at as string | null) ?? null, symbol: base64(row.symbol), symbol_type: (row.symbol_type as string | null) ?? null,
+    }] : [];
+  });
   return {
     format: "mana-vault-backup",
-    version: 4,
+    version: 5,
+    customSets,
+    customCards,
     createdAt: new Date().toISOString(),
     cards,
     collections,
@@ -101,11 +143,36 @@ export function restoreBackup(database: DatabaseSync, source: string, userId: nu
   const backup = parseBackup(source);
   const insertCard = cardInsertStatement(database);
   const knownSets = new Set(database.prepare("SELECT DISTINCT set_code FROM cards").all().map((row) => String(row.set_code)));
+  const customIds = new Set(backup.customCards.map((card) => card.id));
+  const bytes = (value: string | null) => (value ? new Uint8Array(Buffer.from(value, "base64")) : null);
   database.exec("BEGIN");
   try {
+    // custom sets missing on this server come back, made by the account restoring them
+    for (const set of backup.customSets) {
+      if (database.prepare("SELECT 1 FROM sets WHERE code = ?").get(set.code)) continue;
+      database.prepare("INSERT INTO sets (code, name, set_type, released_at, printed_size, card_count) VALUES (?, ?, 'custom', ?, NULL, NULL)").run(set.code, set.name, set.released_at);
+      database.prepare("INSERT INTO custom_sets (code, owner_id, symbol, symbol_type) VALUES (?, ?, ?, ?)").run(set.code, userId, bytes(set.symbol), set.symbol_type);
+    }
     for (const card of backup.cards) {
+      // a custom card already on this server keeps its current version: its maker may have changed it since
+      if (customIds.has(String(card.id)) && database.prepare("SELECT 1 FROM custom_cards WHERE id = ?").get(String(card.id))) {
+        knownSets.add(String(card.set_code));
+        continue;
+      }
       insertCard.run(...cardFields.map((field) => card[field]));
       knownSets.add(String(card.set_code));
+    }
+    for (const card of backup.customCards) {
+      if (database.prepare("SELECT 1 FROM custom_cards WHERE id = ?").get(card.id)) continue;
+      database.prepare(
+        `UPDATE cards SET custom = 1, finishes = ?, power = ?, toughness = ?, tokens = ?, price_usd = ?, price_usd_foil = ?, price_eur = ?, price_eur_foil = ?
+         WHERE id = ?`,
+      ).run(card.finishes, card.power, card.toughness, card.tokens, card.price_usd, card.price_usd_foil, card.price_eur, card.price_eur_foil, card.id);
+      database.prepare(
+        `INSERT INTO custom_cards (id, owner_id, design, picture, picture_type, back_picture, back_picture_type, art, art_type, back_art, back_art_type)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ).run(card.id, userId, card.design, bytes(card.picture), card.picture_type, bytes(card.back_picture), card.back_picture_type,
+        bytes(card.art), card.art_type, bytes(card.back_art), card.back_art_type);
     }
     for (const kind of ["collection", "deck"] as const) {
       const table = kind === "collection" ? "collections" : "decks";
@@ -199,11 +266,12 @@ function summarizeBackup(backup: ManaVaultBackup): BackupSummary {
     collectionEntryCount: backup.collectionCards.length,
     deckCount: backup.decks.length,
     deckCardCount: backup.deckCards.length,
+    customCardCount: backup.customCards.length,
   };
 }
 
 function validateBackup(value: unknown): ManaVaultBackup {
-  if (!isRecord(value) || value.format !== "mana-vault-backup" || ![1, 2, 3, 4].includes(Number(value.version))) {
+  if (!isRecord(value) || value.format !== "mana-vault-backup" || ![1, 2, 3, 4, 5].includes(Number(value.version))) {
     throw new Error("Unsupported backup file format or version");
   }
   if (typeof value.createdAt !== "string" || !Number.isFinite(Date.parse(value.createdAt))) {
@@ -329,9 +397,39 @@ function validateBackup(value: unknown): ManaVaultBackup {
       throw new Error("Backup deck card refers to a missing or incompatible card");
     }
   }
+  // version 5 adds custom sets and cards; earlier backups have none
+  const base64 = (field: unknown) => (field === null || field === undefined ? null : typeof field === "string" && /^[A-Za-z0-9+/=]*$/.test(field) ? field : undefined);
+  const pictureType = (field: unknown) => (field === null || field === undefined ? null : typeof field === "string" && /^image\/(jpeg|png|webp)$/.test(field) ? field : undefined);
+  const customSets = (Array.isArray(value.customSets) ? value.customSets : []).map((entry: unknown, index: number) => {
+    if (!isRecord(entry) || typeof entry.code !== "string" || !/^[a-z0-9]{2,6}$/.test(entry.code) || typeof entry.name !== "string" || !entry.name ||
+      base64(entry.symbol) === undefined || pictureType(entry.symbol_type) === undefined) {
+      throw new Error(`Backup custom set ${index + 1} is invalid`);
+    }
+    return {
+      code: entry.code, name: entry.name.slice(0, 100), released_at: typeof entry.released_at === "string" ? entry.released_at : null,
+      symbol: base64(entry.symbol)!, symbol_type: pictureType(entry.symbol_type)!,
+    };
+  });
+  const customCards = (Array.isArray(value.customCards) ? value.customCards : []).map((entry: unknown, index: number) => {
+    if (!isRecord(entry) || typeof entry.id !== "string" || !/^custom-[0-9a-f-]{36}$/.test(entry.id) || !cardsById.has(entry.id) || typeof entry.design !== "string" ||
+      ["picture", "back_picture", "art", "back_art"].some((field) => base64(entry[field]) === undefined || pictureType(entry[`${field}_type`]) === undefined)) {
+      throw new Error(`Backup custom card ${index + 1} is invalid`);
+    }
+    const textOrNull = (field: string) => (typeof entry[field] === "string" ? entry[field] as string : null);
+    const numberOrNull = (field: string) => (typeof entry[field] === "number" && Number.isFinite(entry[field]) ? entry[field] as number : null);
+    return {
+      id: entry.id, design: entry.design.slice(0, 200_000), picture: base64(entry.picture)!, picture_type: pictureType(entry.picture_type)!,
+      back_picture: base64(entry.back_picture)!, back_picture_type: pictureType(entry.back_picture_type)!, art: base64(entry.art)!, art_type: pictureType(entry.art_type)!,
+      back_art: base64(entry.back_art)!, back_art_type: pictureType(entry.back_art_type)!, finishes: textOrNull("finishes") ?? "nonfoil",
+      power: textOrNull("power"), toughness: textOrNull("toughness"), tokens: textOrNull("tokens") ?? "", price_usd: numberOrNull("price_usd"),
+      price_usd_foil: numberOrNull("price_usd_foil"), price_eur: numberOrNull("price_eur"), price_eur_foil: numberOrNull("price_eur_foil"),
+    };
+  });
   return {
     format: "mana-vault-backup",
-    version: 4,
+    version: 5,
+    customSets,
+    customCards,
     createdAt: value.createdAt,
     cards,
     collections,

@@ -60,6 +60,18 @@ Messages appear at the right end of the status bar (on the phone, in a banner ab
 | Trade summary copied | Copy trade summary |
 | Trade cleared | Clear trade |
 | Binder layout, or List layout | Switching the collection layout |
+| Card name is now (SET) number (with ", linked from collection name" and ", N missing" for a deck card) | Change printing |
+| Collection name saved | Rename... in a collection's menu |
+| N cards added to the print list, or name added to the print list | Adding to the print list |
+| PDF with N cards on N pages saved | Export PDF |
+| MakePlayingCards pictures saved | MakePlayingCards pictures |
+| MPC Autofill list saved, or MPC Autofill list and custom card pictures saved | MPC Autofill list |
+| N printed proxies added to name | After exporting, with the printed cards added as proxies |
+| Custom set CODE created, Set renamed, Release date changed, Set symbol changed, Set name deleted | The custom sets window |
+| Card name saved to the card database | Saving in the card maker |
+| Card name deleted | Deleting a custom card |
+| Copy made, not saved yet | Duplicate in the card maker |
+| Card database updated with N printings, N skipped | An update that skipped cards whose record failed a check |
 
 ## Problems shown by Mana Vault
 
@@ -105,6 +117,20 @@ Messages appear at the right end of the status bar (on the phone, in a banner ab
 | Those cards are already there | Moving rows into the collection they are in | Choose another collection |
 | Open a collection linked to a set first | Missing cards commands in All collections | Open one collection |
 | A price is a number of 0 or more | A trade line price that is not a number | Type a number, or empty the box to use the card price |
+| Choose a printing of the same card | Change printing with a printing of another card | Choose a printing from the list |
+| These copies are not in the collection | Change printing of a row someone else removed | Reload the collection |
+| Linked copies must be of the new printing | Change printing with copies of another printing | Try again |
+| There are no cards to add | Adding nothing to the print list | |
+| Add cards to the print list first | Export or Add tokens with an empty print list | Add cards |
+| The listed cards make no tokens that are not already listed | Add tokens with nothing new to add | |
+| Pick cards in a collection first (Select several cards in Options, or Ctrl+click) | Selected cards with no rows picked | Pick rows in a collection |
+| Name has no missing cards, or Name has no cards | From deck... or Missing cards... with nothing to add | |
+| Create a custom set first (Custom sets...) | Saving a custom card with no custom set | Create a set |
+| Give the card a name, Give the card a type line, Give the back face a name | Saving a custom card without them | Fill them in |
+| Art can be up to 10 MB | Uploading larger art | Use a smaller picture |
+| A set symbol can be up to 512 KB | Choosing a larger set symbol | Use a smaller picture |
+| The art of that card could not be downloaded | Art of a card... when the server cannot reach Scryfall | Try again later, or upload art |
+| Other accounts have this card in a collection, deck or trade, so it cannot be deleted | Deleting a custom card others use | Ask them to remove it first |
 | Could not copy to the clipboard | The browser refused clipboard access | Allow clipboard access for the site, or use a secure (HTTPS) address |
 | Could not action. | The action failed and the server gave no reason, often because the server could not be reached | Check the connection and try again |
 
@@ -118,6 +144,20 @@ Messages appear at the right end of the status bar (on the phone, in a banner ab
 | Could not read CSV: reason | The file is not valid CSV |
 | Upload a non-empty CSV file, or Upload a non-empty decklist file | The file is empty |
 | Decklist has no card rows | The decklist has no card lines |
+| A set code has 2 to 6 letters or digits, such as XXX | A custom set code of another length or with other characters |
+| The set code CODE is already used by another set | The code belongs to a Scryfall set or another custom set |
+| Give the set a name | A custom set without a name |
+| The release date must be a date such as 2026-11-19 | A custom set release date that is not a date |
+| Delete or move the cards in this set first | Deleting a custom set that has cards |
+| Only the account that made this set can change it, or delete it | Changing another account's custom set |
+| Only the account that made this card can change it, or delete it | Changing another account's custom card |
+| Choose a custom set | A custom card without a custom set |
+| SET already has a card numbered number | The collector number is taken in that set |
+| The collector number can have up to 10 letters, digits and dashes | A collector number with other characters |
+| Choose at least one finish | A custom card without a finish |
+| Pictures must be JPEG, PNG or WebP, and Pictures can be up to N MB | Art, set symbols or card pictures of another kind or too large |
+| A print list can have up to 1,000 lines, and Each line needs a card and a count from 1 to 100 | A print list that is too long or has a wrong line |
+| The card picture could not be downloaded from Scryfall | The server could not reach Scryfall while printing; the card prints as a white card with its name |
 | Decklist can contain at most 5,000 rows per import | The decklist is too long |
 | Deck not found, Deck card not found, Collection entry not found, Card printing not found | The item was removed, for example by another person or a restore; reload the page |
 | Deck name must be between 1 and 100 characters | The deck name is empty or too long |
@@ -155,7 +195,7 @@ These reasons appear in the import preview and the Import review panel.
 | Unrecognized condition "x" | The Condition column holds something other than the accepted values |
 | Unrecognized language "x" | The Language column holds an unknown language |
 | Tradelist count must be a whole number of 0 or more | The Tradelist Count column is not a whole number |
-| No card with this name exists in the local catalog | The name does not match any card; check the spelling or update the card database |
+| No card with this name exists in the card database | The name does not match any card; check the spelling or update the card database |
 | No printing matched set number | No printing has that set and collector number |
 | No printing matched the supplied set and collector number | The same, for decklists |
 | Theme decks need both a set and collector number | A Theme deck row has no exact printing |

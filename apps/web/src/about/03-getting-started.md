@@ -18,7 +18,7 @@ A new server starts with an empty card database. Search, imports and decks all n
 
 ## Add cards you own
 
-Cards go into the target collection, shown as ADD TO in the status bar. To keep cards in more than one place, use **New collection...** on the Collection ribbon tab; see [Collections](/about/collections).
+Cards go into the collection or deck selected last in its panel or switcher, shown as ADD TO in the status bar. To keep cards in more than one place, use **New collection...** on the Collection ribbon tab; see [Collections](/about/collections).
 
 1. Type part of a card name in the search box (press **/** to jump there).
 2. Click a result to select it. Its details appear in the Card panel.

@@ -48,6 +48,8 @@ saveSets(database, { data: [
 database.prepare("INSERT OR REPLACE INTO catalog_metadata (key, value) VALUES ('updated_at', ?)").run(new Date().toISOString());
 
 const webRoot = fileURLToPath(new URL("../../apps/web/dist", import.meta.url));
-const app = await buildApp(database, webRoot, undefined, () => false, { passwordIterations: 1000, addressAttemptLimit: 10_000, version: "test" });
+// the test machine may not reach Scryfall: card pictures and mana symbols are never downloaded in the browser tests
+const fetcher = async () => { throw new Error("No internet in the browser tests"); };
+const app = await buildApp(database, webRoot, undefined, () => false, { passwordIterations: 1000, addressAttemptLimit: 10_000, version: "test", fetcher });
 await app.listen({ port, host: "127.0.0.1" });
 console.log(`Mana Vault test server on http://127.0.0.1:${port}`);

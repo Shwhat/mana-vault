@@ -4,7 +4,7 @@ import type { FastifyInstance, FastifyReply } from "fastify";
 import type { DatabaseSync } from "node:sqlite";
 import { listSets } from "./sets.js";
 import { type CopyExtras, type CopyKey, type Currency, NO_EXTRAS, PRICE_COLUMNS, priceSql, readCopyExtras, readCopyKey } from "./copies.js";
-import { collectionLinks, linkedCount, moveLinks, rowKey, trimLinks } from "./links.js";
+import { alignDeckCard, collectionLinks, linkedCount, moveLinks, rowKey, trimLinks } from "./links.js";
 
 export type Kind = "collection" | "deck";
 export type Completion = "none" | "main" | "all" | "names";
@@ -265,7 +265,7 @@ export function createCollection(database: DatabaseSync, ownerId: number, input:
 }
 
 export const ENTRY_COLUMNS = `c.id, c.oracle_id, c.name, c.mana_cost, c.mana_value, c.type_line, c.set_code, c.set_name, c.collector_number, c.rarity,
-  c.image_url, c.colors, c.legalities, ${PRICE_COLUMNS}, i.quantity, i.foil, i.condition, i.language, i.proxy, i.trade,
+  c.image_url, c.colors, c.legalities, c.custom, ${PRICE_COLUMNS}, i.quantity, i.foil, i.condition, i.language, i.proxy, i.trade,
   i.purchase_price, i.price_currency, i.added_at, i.misprint, i.altered, i.signed`;
 const KEY_WHERE = "card_id = ? AND foil = ? AND condition = ? AND language = ? AND proxy = ?";
 const KEY_CONFLICT = "ON CONFLICT(collection_id, card_id, foil, condition, language, proxy)";
@@ -281,7 +281,7 @@ export function toEntry(row: Record<string, unknown>) {
   const { legalities, ...rest } = row;
   return {
     ...rest, legal: legalFormats(legalities), proxy: Number(row.proxy) === 1, misprint: Number(row.misprint) === 1, altered: Number(row.altered) === 1,
-    signed: Number(row.signed) === 1,
+    signed: Number(row.signed) === 1, custom: Number(row.custom ?? 0) === 1,
   };
 }
 
@@ -580,6 +580,52 @@ export function registerLibraryRoutes(app: FastifyInstance, database: DatabaseSy
       touch(database, "collection", id);
     });
     return { status: "saved", count: items.length };
+  });
+
+  // changes the printing of copies (a card added as the wrong printing): count, finish, condition, language, trade marks,
+  // copy details and deck links stay with the copies
+  app.post<{ Params: { collectionId: string }; Body: Record<string, unknown> }>("/api/collections/:collectionId/printing", async (request, reply) => {
+    const id = request.params.collectionId;
+    const key = readCopyKey(request.body ?? {});
+    if (!key) return reply.code(400).send({ error: "Send the card, finish, condition and language of the copies" });
+    const to = typeof request.body?.to === "string" ? request.body.to : "";
+    const from = database.prepare("SELECT oracle_id FROM cards WHERE id = ?").get(key.cardId);
+    const next = database.prepare("SELECT oracle_id, name, set_code, collector_number FROM cards WHERE id = ?").get(to);
+    if (!from || !next) return reply.code(404).send({ error: "Card printing not found" });
+    if (from.oracle_id !== next.oracle_id) return reply.code(400).send({ error: "Choose a printing of the same card" });
+    const row = database.prepare(`SELECT * FROM collection_cards WHERE collection_id = ? AND ${KEY_WHERE}`).get(id, ...keyValues(key));
+    if (!row) return reply.code(404).send({ error: "These copies are not in the collection" });
+    const asked = request.body?.quantity === undefined ? Number(row.quantity) : Number(request.body.quantity);
+    if (!Number.isInteger(asked) || asked < 1) return reply.code(400).send({ error: "Quantity must be a whole number of at least 1" });
+    const count = Math.min(asked, Number(row.quantity));
+    if (to === key.cardId) return { status: "unchanged", moved: 0 };
+    const target: CopyKey = { ...key, cardId: to };
+    transaction(database, () => {
+      const linked = linkedCount(database, id, key);
+      const trade = Math.min(Number(row.trade), count);
+      const exists = database.prepare(`SELECT 1 FROM collection_cards WHERE collection_id = ? AND ${KEY_WHERE}`).get(id, ...keyValues(target));
+      if (exists) {
+        database.prepare(`UPDATE collection_cards SET quantity = quantity + ?, trade = MIN(quantity + ?, trade + ?) WHERE collection_id = ? AND ${KEY_WHERE}`)
+          .run(count, count, trade, id, ...keyValues(target));
+      } else {
+        database.prepare(
+          `INSERT INTO collection_cards (collection_id, card_id, foil, condition, language, proxy, quantity, trade, purchase_price, price_currency, added_at, misprint, altered, signed)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ).run(id, ...keyValues(target), count, trade, row.purchase_price ?? null, row.price_currency ?? null, row.added_at ?? null,
+          Number(row.misprint ?? 0), Number(row.altered ?? 0), Number(row.signed ?? 0));
+      }
+      // linked copies move last, so free copies change printing first
+      const deckCards = database.prepare(`SELECT DISTINCT deck_card_id FROM deck_links WHERE collection_id = ? AND ${KEY_WHERE}`).all(id, ...keyValues(key));
+      moveLinks(database, { collectionId: id, key }, { collectionId: id, key: target }, count, Number(row.quantity) - linked);
+      if (count >= Number(row.quantity)) database.prepare(`DELETE FROM collection_cards WHERE collection_id = ? AND ${KEY_WHERE}`).run(id, ...keyValues(key));
+      else {
+        database.prepare(`UPDATE collection_cards SET quantity = quantity - ?, trade = MAX(0, MIN(quantity - ?, trade - ?)) WHERE collection_id = ? AND ${KEY_WHERE}`)
+          .run(count, count, trade, id, ...keyValues(key));
+      }
+      for (const deckCard of deckCards) alignDeckCard(database, Number(deckCard.deck_card_id));
+      touch(database, "collection", id);
+    });
+    return { status: "changed", moved: count, name: String(next.name), set: String(next.set_code).toUpperCase(), number: String(next.collector_number) };
   });
 
   // moves copies to another collection; moves no more than the source holds and reports what moved

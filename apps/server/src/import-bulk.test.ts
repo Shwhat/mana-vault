@@ -80,7 +80,7 @@ describe("Scryfall bulk importer", () => {
     }
   });
 
-  it("rolls back the import when a record is malformed", async () => {
+  it("skips a malformed record and imports the rest", async () => {
     const dataPath = await writeBulkData([
       {
         id: "printing-1",
@@ -97,8 +97,8 @@ describe("Scryfall bulk importer", () => {
     const database = new DatabaseSync(":memory:");
     initializeDatabase(database);
     try {
-      await expect(importBulkFile(dataPath, database)).rejects.toThrow("no valid name");
-      expect(database.prepare("SELECT COUNT(*) AS count FROM cards").get()?.count).toBe(0);
+      expect(await importBulkFile(dataPath, database)).toBe(1);
+      expect(database.prepare("SELECT value FROM catalog_metadata WHERE key = 'last_skipped_names'").get()?.value).toBe('["broken-record"]');
     } finally {
       database.close();
     }
@@ -173,7 +173,7 @@ describe("Scryfall bulk importer", () => {
     }
   });
 
-  it("still rejects a malformed non-string top-level type line", async () => {
+  it("skips a record with a malformed type line, and fails when nothing valid is left", async () => {
     const dataPath = await writeBulkText(JSON.stringify({
       id: "printing-invalid",
       oracle_id: "oracle-invalid",
@@ -187,14 +187,14 @@ describe("Scryfall bulk importer", () => {
     const database = new DatabaseSync(":memory:");
     initializeDatabase(database);
     try {
-      await expect(importBulkFile(dataPath, database)).rejects.toThrow("invalid type_line");
+      await expect(importBulkFile(dataPath, database)).rejects.toThrow("did not contain any valid card printings");
       expect(database.prepare("SELECT COUNT(*) AS count FROM cards").get()?.count).toBe(0);
     } finally {
       database.close();
     }
   });
 
-  it("rolls back JSONL imports when a line is malformed", async () => {
+  it("skips malformed JSONL lines and records them, keeping the good cards", async () => {
     const dataPath = await writeBulkText([
       JSON.stringify({
         id: "printing-1",
@@ -211,8 +211,10 @@ describe("Scryfall bulk importer", () => {
     const database = new DatabaseSync(":memory:");
     initializeDatabase(database);
     try {
-      await expect(importBulkFile(dataPath, database)).rejects.toThrow("JSONL line 2 is invalid");
-      expect(database.prepare("SELECT COUNT(*) AS count FROM cards").get()?.count).toBe(0);
+      expect(await importBulkFile(dataPath, database)).toBe(1);
+      expect(database.prepare("SELECT COUNT(*) AS count FROM cards").get()?.count).toBe(1);
+      expect(database.prepare("SELECT value FROM catalog_metadata WHERE key = 'last_skipped_count'").get()?.value).toBe("1");
+      expect(JSON.parse(String(database.prepare("SELECT value FROM catalog_metadata WHERE key = 'last_skipped_names'").get()?.value))).toEqual(["line 2"]);
     } finally {
       database.close();
     }

@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { Action } from "../actions";
 import { rowMenu } from "../components/ContextMenu";
 import { collectionDialog, copyDialog, moveDialog } from "../components/LibraryDialogs";
+import { choosePrinting } from "../components/PrintingDialog";
 import { Icon } from "../icons";
 import { entryKey } from "../library-state";
 import { type Store, useApp } from "../store";
@@ -69,10 +70,13 @@ function entryMenu(store: Store, entry: CollectionEntry) {
   return rowMenu(store, entry.name, () => [
     { label: "Card page", run: () => store.setCardPage(entry.id) },
     { label: "Copy details...", run: () => copyDialog(store, entry) },
+    !store.allCollections || entry.collection_id ? { label: "Change printing...", run: () => choosePrinting(entry.name, entry.id, entry.id, { finish: entry.foil, currency: store.prefs.currency },
+      (printing) => void store.changeCopyPrinting(entry, printing)) } : null,
     (store.collections?.length ?? 0) > 1 && { label: "Move...", run: () => moveDialog(store, [entry]) },
     !entry.proxy && { label: entry.trade >= entry.quantity ? "Unmark for trade" : "Mark for trade", run: () => void store.markTrade([entry], entry.trade < entry.quantity) },
     !entry.proxy && { label: "Add to trade (you give)", run: () => store.giveEntry(entry) },
     !!store.deck && { label: `Add to ${store.deck.name}`, run: () => void store.addToDeck(entry.id, entry.name) },
+    { label: "Add to print list", run: () => void store.addToPrintList([{ card: entry, count: entry.quantity }], entry.name) },
     { label: "Remove", run: () => void store.setCollectionQuantity(entry, 0) },
   ]);
 }
@@ -327,7 +331,7 @@ function CardsTab({ actions }: { actions: Record<string, Action> }) {
               {selectMode && <input type="checkbox" className="rowcheck" checked={active} readOnly aria-label={`Pick ${entry.name}`} />}
               <Thumb url={entry.image_url} />
               <div className="rowmain">
-                <div className="rowtitle"><b>{entry.name}</b>{entry.foil ? <span className="badge foil">{entry.foil === 2 ? "ETCHED" : "FOIL"}</span> : null}
+                <div className="rowtitle"><b>{entry.name}</b>{entry.custom && <span className="badge custom">Custom</span>}{entry.foil ? <span className="badge foil">{entry.foil === 2 ? "ETCHED" : "FOIL"}</span> : null}
                   {entry.proxy && <span className="badge proxy" title="A proxy: kept apart from real copies, with no value">PROXY</span>}
                   {entry.trade > 0 && <span className="badge trade" title={`${entry.trade} of ${entry.quantity} for trade`}>FOR TRADE {entry.trade}</span>}</div>
                 <Tags entry={entry} />

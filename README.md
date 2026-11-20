@@ -8,23 +8,28 @@ The full user guide is built into the app: Help tab, **About Mana Vault**. The p
 
 ## Features
 
-- Card search across every printing, with filter syntax (`t:dragon c:red mv>=4`, `o:draw`, `set:lea`, `r:rare`, `id:wubg`, `legal:commander`, `usd<1`, `eur>=20`, negation with `-`), flavor name matching and a Filters panel. Results show as a grid of card pictures (the default), binder pages or a list, with prices and owned counts, and load as you scroll with the total in the count line.
+- Card search across every printing, with filter syntax (`t:dragon c:red mv>=4`, `o:draw`, `set:lea`, `r:rare`, `id:wubg`, `legal:commander`, `usd<1`, `eur>=20`, `is:custom`, negation with `-`), flavor name matching and a Filters panel. Results show as a grid of card pictures (the default), binder pages or a list, with prices and owned counts, and load as you scroll with the total in the count line.
 - The Filters panel filters whatever is open: card search, a collection, a deck or a search inside them, each with its own filters that stay when you switch collections or decks.
 - All collections: one list of every row in every collection, with each row's collection (wishlists optional).
 - The app's own choice lists on every screen, the same on desktop and phone.
 - Prices from Scryfall (USD regular, foil, etched; EUR regular, foil) stored with each card database update, shown in USD or EUR, with collection and deck values and sorting by price.
 - Statistics for collections and decks: stat tiles and bar charts for mana curve, color, type, rarity, finish and top sets; clicking a collection bar filters the list.
 - Copy details per collection row: finish (regular, foil, etched), condition, language, proxy, the number for trade, purchase price and currency, date added, misprint, altered and signed.
-- Proxies: marked everywhere, worth nothing, left out of completion, value and statistics, and able to fill a deck slot.
+- Proxy copies: marked everywhere, worth nothing, left out of completion, value and statistics, and able to fill a deck slot.
 - Filter tags (click a set code or rarity), and three collection layouts: a grid of card pictures that loads more while scrolling (Small, Medium, Large), binder pages of nine cards sized to the window with a page box, or a list. Grid is the default; desktop and phone remember their own layout.
 - One switcher for collections and decks: a searchable list with sorting (recently opened, name, date created, card count, value, format, commander), details per row and keyboard control. An Options button holds sort, layout, card size, filters and Select.
 - Wishlists: collections whose cards are wanted, not owned; add a card, a set's missing cards or a deck's missing cards in one step.
 - Deck ownership check: which cards you own across your collections, where they are, and the cost of the missing cards; export the missing cards as text.
 - Saved trades (Open, Done, Cancelled): You give searches your cards for trade, You get searches the card database, each line with its own count, finish, condition and an editable price, and a balance bar. Complete a trade in one undoable step (deck cards are flagged, wishlist wants go down), or send it to another account with counter-offers until one side accepts. Wishlist matches both ways, copy or CSV export, and a public trade binder link that needs no sign-in.
-- Any number of collections per account (binders, boxes, sets being completed), each copy in one place, with a target collection for adding (C cycles it). Every owned card is in a collection.
+- Any number of collections per account (binders, boxes, sets being completed), each copy in one place. New cards go to the collection or deck selected last in its panel or switcher (C cycles the collections). Every owned card is in a collection.
+- Change printing for collection copies and deck cards from the right-click menu; deck cards link free copies of the new printing.
+- Right-click (long press) menus on collections and decks in the panels and switchers: open, rename, settings or format, send, export, delete or leave. The Decks panel groups decks by format with card counts and values.
+- Proxies: a print list kept on the server (a deck, its missing cards, a collection, picked rows, a pasted list, tokens, any card), with printing, count and faces per line; Letter, A4, Legal or custom paper, margins, card size, scale, gap, bleed, cut lines or corner marks and background, with a page preview; exports as a 300 DPI PDF, MakePlayingCards pictures with bleed, and an MPC Autofill card list. Printed cards can be added as proxies to a collection or deck.
+- Card maker: custom cards with a live preview, Mana Vault's own frames (every color, hybrids, gold, artifact, colorless, land, legendary), creature, planeswalker, saga, token and double-faced cards, uploaded or card art with move and zoom, and PNG export. Custom cards join the card database for every account, in custom sets with their own codes, and work like any other card.
 - Set completion (off by default for new collections): link a collection to any number of sets; count by main set, every printing or each card name once, and by any finish, regular only, foil only or one of each; Completion and Missing tabs with filters, add-from-list and text or CSV export of the missing list.
 - Bulk editing: pick rows with Ctrl+click, Shift+click, Ctrl+A or Select mode; remove or move them between collections in one undoable step.
 - Collection tracking per printing, regular and foil, with plus, minus, move and remove controls.
+- Deck import, Edit as text and Quick add read `*F*` and `*E*` finish marks, and find cards by set and number when the name does not match.
 - Decks keep the exact printing, with commander, main deck, sideboard and maybeboard zones and a target zone for adding; rename and delete.
 - Deck builder in the Moxfield style, with a header like the collection's (switcher, tabs, filter box, Options, count line) and an Add tab with a card search and + Main, + Side, + Maybe and + Commander buttons that show the count already in the deck: Quick add ("2 Sol Ring"), Edit as text with a check before applying, List, Text, Stacks and Grid views grouped by type, mana value, color, rarity or tag and sorted by name, mana value or price, tags on deck cards, hover previews and the tokens the deck makes.
 - Format checks for 21 formats: deck and sideboard size, copies, banned and not legal cards, and commander color identity.
@@ -35,14 +40,14 @@ The full user guide is built into the app: Help tab, **About Mana Vault**. The p
 - Undo and redo for collection and deck edits (150 steps).
 - Import window: Mana Vault, Moxfield, ManaBox, Archidekt, Deckbox, TCGplayer or plain text, detected from the file and changeable, into a chosen or new collection, and decklist import (text or CSV), each with a preview and an Import review panel for skipped rows.
 - Export window: the whole collection, filtered cards, selected cards, missing cards or a deck, in any of the import formats.
-- JSON backup and restore of the signed-in account's own collections and decks and the card records they use.
-- Card database updates from Scryfall on demand or on a schedule, including the set list (printed sizes), each printing's finishes, power and toughness, and rulings.
+- JSON backup and restore of the signed-in account's own collections and decks, the card records they use, and the custom cards and sets made or used.
+- Card database updates from Scryfall on demand or on a schedule, including the set list (printed sizes), each printing's finishes, power and toughness, back face pictures, and rulings. A card whose record fails a check is skipped and listed instead of stopping the update.
 - Card page: art, rules text, power and toughness, every version with its market price, and rulings (offline in the app too), with a card actions button.
 - Live camera card scanner: scans continuously, finds the exact printing from the set code and collector number (or the card name, with tolerance for reading mistakes), collects cards in a scanned list with edit, +1 and finish controls, and adds the list to a collection or deck as one undo step. Text recognition runs in the browser with files served by Mana Vault, so it works offline. Settings for quick mode, sounds, camera, proxies, a set filter (any number of sets, with chips on the camera screen and a Not in set warning), ignoring promos, preferring foil, total value and copies owned. A printing picker when more than one printing fits, a strip for finish, condition and language, and an Add to window that can create a new collection or deck. Phone Scan tab; desktop scanner window.
 - Sign-in with accounts, password changes, 30-day sessions and protection against password guessing. New accounts can be turned off.
 - Desktop interface in the OpenSchem style: title bar, customizable ribbon (the only menu) with deck and collection commands added to their tabs when one is open, large, compact or icons-only buttons, right-click menus on rows, dockable and floating panels (Filters, Collections, Decks, Card, Deck list, Import review) that dock and snap together, panel tabs that wrap, saved workspaces, status bar and light, dark or system theme.
-- Phone layout with a Home screen, bottom tabs (Home, Search, Collection, Decks, Scan), a nested top-right menu, long-press menus on rows, full-screen sheets and 44 pixel touch targets.
-- Preferences (theme, foil, target zone, target and open collection, currency, collection sort, layout and card size, switcher sorting and recently opened items, deck view, groups and sort, ribbon, panels, workspaces, last deck) saved per account on the server.
+- Phone layout with a Home screen, bottom tabs (Home, Search, Collection, Decks, Trade, Proxies, Scan), a nested top-right menu, long-press menus on rows, full-screen sheets and 44 pixel touch targets.
+- Preferences (theme, foil, target zone, where new cards go and the open collection, proxy sheet settings, currency, collection sort, layout and card size, switcher sorting and recently opened items, deck view, groups and sort, ribbon, panels, workspaces, last deck) saved per account on the server.
 - Android app (Android 8.0 or newer, APK on the GitHub releases page): every phone feature, sign-in per phone with a device list, offline use of collections, decks, card search and scanning (including new collections and decks) with sync when the connection returns and a Sync now button, the phone's own text recognition for scanning, and notifications for new Inbox offers.
 - Built-in About guide with release notes.
 
@@ -51,9 +56,9 @@ The full user guide is built into the app: Help tab, **About Mana Vault**. The p
 | Key | Action |
 |---|---|
 | / | Find card |
-| 1, 2, 3, 4 | Card search, collection, deck, trade view |
+| 1, 2, 3, 4, 5 | Card search, collection, deck, trade, proxies view |
 | Up, Down | Previous or next row |
-| Enter | Add the selected card to the collection |
+| Enter | Add the selected card to the collection or deck selected last |
 | Shift+Enter | Add the selected card to the open deck |
 | F | Switch Add as foil |
 | Z | Cycle the target zone |

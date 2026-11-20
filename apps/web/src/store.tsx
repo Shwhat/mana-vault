@@ -6,6 +6,7 @@ import { activatePanel, clone, type Layout, openPanel, type PanelId, PRESETS, ty
 import { type Counts, entryKey, useLibraryState, type WishChange } from "./library-state";
 import { useScanState } from "./scan-state";
 import { useTradeState } from "./trade-state";
+import { useProxyState } from "./proxy-state";
 import { isApp } from "./android/platform";
 import { applyTheme, type Prefs, savePrefs } from "./prefs";
 import {
@@ -15,7 +16,7 @@ import {
   cardTypes, colorKey, copyKey, copyPrice, curveKey, money, priceOf, pricesOf,
 } from "./types";
 import { candidateLabel } from "./components/LibraryDialogs";
-import { parseQuickAdd } from "./deck-rules";
+import { type Finish, parseQuickAdd } from "./deck-rules";
 import { usePhone } from "./narrow";
 import { useCardSearch } from "./card-search";
 import { emptyScopes, type FilterScope, filtersOn, matchesFilters } from "./filters";
@@ -92,7 +93,7 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
     setPrefsState((current) => {
       const delta = typeof change === "function" ? change(current) : change;
       const next = { ...current, ...delta };
-      savePrefs(next, "lastDeckId" in delta || "openCollection" in delta || "targetCollection" in delta || "recent" in delta);
+      savePrefs(next, "lastDeckId" in delta || "openCollection" in delta || "targetCollection" in delta || "addTo" in delta || "recent" in delta);
       return next;
     });
   }, []);
@@ -258,7 +259,8 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
     try {
       const detail = await loadDeck(id);
       setDeck(detail);
-      setPrefs({ lastDeckId: id });
+      // a deck opened from the Decks panel or a switcher is where new cards go
+      setPrefs(quiet ? { lastDeckId: id } : { lastDeckId: id, addTo: "deck" });
       if (!quiet) {
         markRecent(id);
         leaveAbout();
@@ -387,7 +389,10 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
         const previous = previousUpdate.current;
         if (previous?.isUpdating && !status.update.isUpdating) {
           if (status.update.lastError) flash(`Card database update failed: ${status.update.lastError}`, "err");
-          else flash(`Card database updated with ${(status.update.lastImportedCount ?? status.printingCount).toLocaleString()} printings`);
+          else {
+            const skipped = status.skipped?.count ?? 0;
+            flash(`Card database updated with ${(status.update.lastImportedCount ?? status.printingCount).toLocaleString()} printings${skipped ? `, ${skipped.toLocaleString()} skipped` : ""}`);
+          }
         }
         previousUpdate.current = status.update;
         setCatalog(status);
@@ -499,7 +504,13 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
     for (const change of changes) await setCounts(change.collectionId, [change[side]]);
   }, [setCounts]);
 
+  const addToDeckRef = useRef<(cardId: string, name: string, chosen?: Candidate | null, options?: { quantity?: number; zone?: Zone; finish?: Finish }) => Promise<void>>(async () => {});
   const addToCollection = useCallback(async (cardId: string, name: string, collectionId?: string, foilOverride?: boolean, proxy = false) => {
+    // with a deck selected last, the add commands put cards into that deck
+    if (!collectionId && !proxy && live.current.prefs.addTo === "deck" && live.current.deck) {
+      await addToDeckRef.current(cardId, name, undefined, { zone: live.current.prefs.zone, finish: (foilOverride ?? live.current.prefs.foil) ? "foil" : "" });
+      return;
+    }
     const target = collectionId ?? prefs.targetCollection;
     if (!target) {
       flash("Create a collection first", "err");
@@ -603,7 +614,7 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
    * Adds a printing to the open deck. A free copy in one collection is linked at once; when copies are in more than
    * one collection the person picks one; with none the card is missing.
    */
-  const addToDeck = useCallback(async (cardId: string, name: string, chosen?: Candidate | null, options?: { quantity?: number; zone?: Zone }) => {
+  const addToDeck = useCallback(async (cardId: string, name: string, chosen?: Candidate | null, options?: { quantity?: number; zone?: Zone; finish?: Finish }) => {
     const current = live.current.deck;
     if (!current) {
       flash("Open or create a deck first", "err");
@@ -614,7 +625,10 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
     let link: Candidate | null = chosen ?? null;
     if (chosen === undefined) {
       try {
-        const candidates = await loadCandidates(cardId);
+        const finishCode = options?.finish === "etched" ? 2 : options?.finish === "foil" ? 1 : 0;
+        // copies in the finish the list asked for come first
+        const candidates = (await loadCandidates(cardId))
+          .sort((a, b) => Number(b.foil === finishCode) - Number(a.foil === finishCode));
         const places = new Set(candidates.map((item) => item.collectionId));
         if (places.size > 1) {
           dialog(`Add ${name} to ${current.name}`, [
@@ -645,6 +659,9 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prefs.zone, loadDeck, loadCandidates, pushUndo, flash, fail, refreshAfterChange]);
 
+  // the add commands reach addToDeck through a ref, since addToCollection is made before it
+  addToDeckRef.current = addToDeck;
+
   /** Replaces the copies linked to a deck card. */
   const setDeckLinks = useCallback(async (card: DeckCard, links: Array<CopyKey & { collectionId: string; quantity: number }>) => {
     const current = live.current.deck;
@@ -661,6 +678,101 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadDeck, pushUndo, collectionName, flash, fail, refreshAfterChange]);
+
+  /**
+   * Changes the printing of a deck card. Free copies of the new printing are linked: from the one collection that has
+   * them, or the collection the person picks when several do. Without free copies the card is missing.
+   */
+  const changeDeckPrinting = useCallback(async (card: DeckCard, to: { id: string; set_code: string; collector_number: string }, collectionId?: string) => {
+    const current = live.current.deck;
+    if (!current || to.id === card.card_id) return;
+    let candidates: Candidate[] = [];
+    if (card.zone !== "maybeboard") {
+      try {
+        candidates = (await loadCandidates(to.id, card.entry_id)).filter((item) => item.cardId === to.id);
+      } catch {
+        candidates = [];
+      }
+    }
+    const places = [...new Map(candidates.map((item) => [item.collectionId, item.collectionName])).entries()];
+    if (collectionId === undefined && places.length > 1) {
+      dialog(`Change printing of ${card.name}`, [
+        ["place", "Link copies from", places[0]![0], "select", [...places.map(([id, name]): [string, string] => {
+          const free = candidates.filter((item) => item.collectionId === id).reduce((sum, item) => sum + item.free, 0);
+          return [id, `${name} (${free} free)`];
+        }), ["", "None (missing)"]]],
+      ], async (values) => { await changeDeckPrinting(card, to, String(values.place)); }, "Change");
+      return;
+    }
+    const place = collectionId ?? places[0]?.[0] ?? "";
+    const links: Array<CopyKey & { collectionId: string; quantity: number }> = [];
+    let wanted = card.quantity;
+    for (const item of candidates.filter((candidate) => candidate.collectionId === place)) {
+      if (wanted <= 0) break;
+      const take = Math.min(wanted, item.free);
+      links.push({ collectionId: item.collectionId, cardId: item.cardId, foil: item.foil, condition: item.condition, language: item.language, proxy: item.proxy, quantity: take });
+      wanted -= take;
+    }
+    try {
+      const before = await loadDeck(current.id);
+      const result = await request<{ linked: number }>(`/api/decks/${encodeURIComponent(current.id)}/entries/${card.entry_id}/printing`, {
+        method: "PUT", body: JSON.stringify({ cardId: to.id, links }),
+      });
+      const after = await loadDeck(current.id);
+      pushUndo({ label: `Change printing of ${card.name}`, undo: () => restoreDeck(after, before), redo: () => restoreDeck(before, after) });
+      const missing = card.zone === "maybeboard" ? 0 : card.quantity - result.linked;
+      flash(`${card.name} is now (${to.set_code.toUpperCase()}) ${to.collector_number}${result.linked ? `, linked from ${collectionName(place)}` : ""}${missing > 0 ? `, ${missing} missing` : ""}`);
+      await refreshAfterChange();
+    } catch (reason) {
+      fail(reason, "Could not change the printing.");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadDeck, loadCandidates, pushUndo, collectionName, flash, fail, refreshAfterChange]);
+
+  /**
+   * After printing: adds the printed cards as proxies, as one undo step. To a collection, as proxy copies. To a deck, as proxy
+   * copies in the collection chosen for them, linked to the deck's missing cards (cards the deck does not have are added).
+   */
+  const addPrintedAsProxies = useCallback(async (cards: Array<{ cardId: string; name: string; count: number }>, target: { kind: "collection" | "deck"; id: string; collectionId?: string }) => {
+    const collectionId = target.kind === "collection" ? target.id : target.collectionId;
+    if (!collectionId || !cards.length) return;
+    const items = cards.map((card) => ({ cardId: card.cardId, foil: 0 as FinishCode, condition: "NM" as const, language: "en", proxy: true, quantity: Math.min(10_000, card.count) }));
+    try {
+      const deckBefore = target.kind === "deck" ? await loadDeck(target.id) : null;
+      const added = await request<{ before: Counts; after: Counts }>(`/api/collections/${encodeURIComponent(collectionId)}/cards/add`, { method: "POST", body: JSON.stringify({ items }) });
+      if (target.kind === "deck") {
+        for (const card of cards) {
+          let left = card.count;
+          const detail = await loadDeck(target.id);
+          const entry = detail.cards.find((item) => item.card_id === card.cardId && item.zone !== "maybeboard" && (item.missing ?? 0) > 0);
+          const proxyLink = (quantity: number) => ({ collectionId, cardId: card.cardId, foil: 0, condition: "NM", language: "en", proxy: true, quantity });
+          if (entry) {
+            const take = Math.min(left, entry.missing ?? 0);
+            await request(`/api/decks/${encodeURIComponent(target.id)}/entries/${entry.entry_id}/links`, {
+              method: "PUT", body: JSON.stringify({ links: [...(entry.links ?? []), proxyLink(take)] }),
+            });
+            left -= take;
+          }
+          if (left > 0) {
+            await request(`/api/decks/${encodeURIComponent(target.id)}/cards`, { method: "POST", body: JSON.stringify({ cardId: card.cardId, quantity: Math.min(100, left), zone: "main", links: [proxyLink(Math.min(100, left))] }) });
+          }
+        }
+      }
+      const deckAfter = target.kind === "deck" ? await loadDeck(target.id) : null;
+      const total = cards.reduce((sum, card) => sum + card.count, 0);
+      const where = target.kind === "deck" ? decks.find((deck) => deck.id === target.id)?.name ?? "the deck" : collectionName(collectionId);
+      pushUndo({
+        label: `Add ${total} printed proxies to ${where}`,
+        undo: async () => { if (deckBefore && deckAfter) await restoreDeck(deckAfter, deckBefore); await setCounts(collectionId, added.before); },
+        redo: async () => { await setCounts(collectionId, added.after); if (deckBefore && deckAfter) await restoreDeck(deckBefore, deckAfter); },
+      });
+      flash(`${total} printed ${total === 1 ? "proxy" : "proxies"} added to ${where}`);
+      await refreshAfterChange();
+    } catch (reason) {
+      fail(reason, "Could not add the printed proxies.");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadDeck, pushUndo, setCounts, collectionName, decks, flash, fail, refreshAfterChange]);
 
   const setDeckQuantity = useCallback(async (card: DeckCard, quantity: number) => {
     const current = live.current.deck;
@@ -746,7 +858,7 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
     try {
       const params = new URLSearchParams({ name: line.name, set: line.set, number: line.number });
       const found = await request<{ id: string; name: string }>(`/api/cards/resolve?${params}`);
-      await addToDeck(found.id, found.name, undefined, { quantity: line.quantity, zone });
+      await addToDeck(found.id, found.name, undefined, { quantity: line.quantity, zone, finish: line.finish });
       return true;
     } catch (reason) {
       fail(reason, "Could not find the card.");
@@ -803,7 +915,7 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
   const restoreBackup = useCallback(async () => {
     const file = await pickFile(".json,application/json");
     if (!file) return;
-    if (file.size > 25 * 1024 * 1024) return flash("The backup file must be 25 MB or smaller", "err");
+    if (file.size > 250 * 1024 * 1024) return flash("The backup file must be 250 MB or smaller", "err");
     try {
       const content = await file.text();
       const headers = { "content-type": "application/vnd.mana-vault.backup+json" };
@@ -899,6 +1011,7 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
   });
 
   const trading = useTradeState({ live, flash, fail, pushUndo, refreshAfterChange, collectionName });
+  const proxies = useProxyState({ flash, fail });
 
   const scan = useScanState({ userId: user.id, live, flash, fail, pushUndo, setCounts, loadDeck, restoreDeck, restoreWishes, refreshAfterChange });
 
@@ -934,6 +1047,8 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
   }, [leaveAbout]);
   const openCollection = useCallback((id: string) => {
     library.openCollection(id);
+    // a collection chosen in the Collections panel or a switcher is where new cards go
+    setPrefs(id === ALL_COLLECTIONS ? { addTo: "collection" } : { targetCollection: id, addTo: "collection" });
     markRecent(id);
     leaveAbout();
   }, [library, markRecent, leaveAbout]);
@@ -969,9 +1084,10 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
     collection, visibleCollection, collectionFilter, setCollectionFilter, reloadCollection, facets, setFacet, binderPage, setBinderPage,
     collectionStats, deckTab, setDeckTab, deckStats, ownership, tradeList, reloadTradeList,
     ...trading,
+    ...proxies,
     collections, reloadCollections, collectionName, collectionTab, setCollectionTab, completion, reloadCompletion,
     checked, setChecked, pickRow, selectMode, setSelectMode, ...library,
-    decks, deck, openDeck, reloadDecks, createDeck, setDeckTags, updateDeckInfo, quickAdd, replaceDeckText, markRecent, leaveAbout,
+    decks, deck, openDeck, reloadDecks, createDeck, setDeckTags, updateDeckInfo, quickAdd, replaceDeckText, changeDeckPrinting, addPrintedAsProxies, markRecent, leaveAbout,
     phone, layout, setCollectionLayout, searchLayout, setSearchLayout, allCollections: prefs.openCollection === ALL_COLLECTIONS,
     selection, select, cardDetail, selectedCard, moveSelection,
     catalog, catalogRequestPending, updateCatalog,

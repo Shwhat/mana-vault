@@ -16,7 +16,25 @@ export async function importBulkFile(
   const insertPrices = cardPricesStatement(database);
   const insertStats = database.prepare("UPDATE cards SET power = ?, toughness = ? WHERE id = ?");
   const insertBuilder = cardBuilderStatement(database);
+  const insertBack = database.prepare("UPDATE cards SET back_image_url = ? WHERE id = ?");
   let imported = 0;
+  // a record that fails a check is skipped so one bad card never stops the whole update
+  let skipped = 0;
+  const skippedNames: string[] = [];
+  const skip = (value: unknown) => {
+    skipped += 1;
+    const record = typeof value === "object" && value !== null ? value as Record<string, unknown> : {};
+    const label = [record.name, record.set && record.collector_number ? `(${String(record.set).toUpperCase()}) ${String(record.collector_number)}` : ""]
+      .filter((part) => typeof part === "string" && part).join(" ") || (typeof record.id === "string" ? record.id : "unnamed record");
+    if (skippedNames.length < 50) skippedNames.push(label);
+  };
+  const tryImport = (value: unknown) => {
+    try {
+      importValue(value);
+    } catch {
+      skip(value);
+    }
+  };
   const importValue = (value: unknown) => {
     const card = parsePrinting(value);
     if (!card.oracleId) return;
@@ -44,6 +62,7 @@ export async function importBulkFile(
     insertPrices.run(prices.usd, prices.usd_foil, prices.usd_etched, prices.eur, prices.eur_foil, card.flavorName, card.id);
     insertStats.run(card.power, card.toughness, card.id);
     insertBuilder.run(card.producedMana.join(""), card.tokens.length ? JSON.stringify(card.tokens) : "", card.id);
+    insertBack.run(card.backImageUrl, card.id);
     imported += 1;
     if (imported % 25_000 === 0) onProgress?.(imported);
   };
@@ -54,9 +73,10 @@ export async function importBulkFile(
       const source = chain([createReadStream(dataPath), parser(), streamArray()]);
       for await (const item of source) {
         if (typeof item !== "object" || item === null || !("value" in item)) {
-          throw new Error("Scryfall bulk data contains an invalid entry");
+          skip(null);
+          continue;
         }
-        importValue(item.value);
+        tryImport(item.value);
       }
     } else {
       const lines = createInterface({ input: createReadStream(dataPath), crlfDelay: Infinity });
@@ -68,18 +88,11 @@ export async function importBulkFile(
         let value: unknown;
         try {
           value = JSON.parse(content);
-        } catch (error) {
-          throw new Error(
-            `Scryfall JSONL line ${lineNumber} is invalid: ${error instanceof Error ? error.message : "invalid JSON"}`,
-          );
+        } catch {
+          skip({ id: `line ${lineNumber}` });
+          continue;
         }
-        try {
-          importValue(value);
-        } catch (error) {
-          throw new Error(
-            `Scryfall JSONL line ${lineNumber} is invalid: ${error instanceof Error ? error.message : "invalid card record"}`,
-          );
-        }
+        tryImport(value);
       }
     }
     if (imported === 0) throw new Error("Scryfall bulk data did not contain any valid card printings");
@@ -89,6 +102,8 @@ export async function importBulkFile(
     );
     saveMetadata.run("updated_at", updatedAt);
     saveMetadata.run("last_imported_count", String(imported));
+    saveMetadata.run("last_skipped_count", String(skipped));
+    saveMetadata.run("last_skipped_names", JSON.stringify(skippedNames));
     database.exec("COMMIT");
     return imported;
   } catch (error) {
@@ -125,6 +140,7 @@ interface Printing {
   collectorNumber: string;
   rarity: string;
   imageUrl: string | null;
+  backImageUrl: string | null;
   releasedAt: string | null;
   artist: string | null;
   finishes: string[];
@@ -194,6 +210,9 @@ function parsePrinting(value: unknown): Printing {
     collectorNumber: requiredString(record, "collector_number"),
     rarity: requiredString(record, "rarity"),
     imageUrl: optionalString(imageUris ?? {}, "normal") ?? optionalString(faceImageUris ?? {}, "normal"),
+    // two-faced cards with a picture for each face (transform, modal) keep the back face's picture for printing
+    backImageUrl: imageUris === undefined && cardFaces[1]?.image_uris !== undefined
+      ? optionalString(toRecord(cardFaces[1].image_uris, "card face image"), "normal") : null,
     releasedAt: optionalString(record, "released_at"),
     artist: optionalString(record, "artist"),
     finishes: Array.isArray(record.finishes) ? record.finishes.filter((finish): finish is string => typeof finish === "string") : [],

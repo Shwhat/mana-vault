@@ -86,7 +86,7 @@ function ResultRow({ card, props, store }: { card: FoundCard; props: ResultProps
       onClick={() => props.onPick(card)} onDoubleClick={() => props.onOpen(card)} {...rowMenu(store, card.name, () => props.menu(card))}>
       <Thumb url={card.image_url} />
       <div className="rowmain">
-        <div className="rowtitle"><b>{card.name}</b><span className="mana">{card.mana_cost}</span><OwnedBadge owned={card.owned} /></div>
+        <div className="rowtitle"><b>{card.name}</b>{card.custom && <span className="badge custom">Custom</span>}<span className="mana">{card.mana_cost}</span><OwnedBadge owned={card.owned} /></div>
         <div className="rowsub">{card.type_line}</div>
         <div className="rowmeta">{card.set_name}{" "}
           {props.onTag
