@@ -107,6 +107,22 @@ Each view keeps its own filters. A collection's filters stay when another collec
 
 The count line after the search box shows the number of matching cards (or printings, with Show every printing), and while more are still to load, how many are loaded. More results load as you scroll, or as you turn binder pages.
 
+**Sort** beside the search box orders the results:
+
+| Sort | Order |
+|---|---|
+| Best match | The default. Cards named exactly as the search words come first (a search for sol ring puts Sol Ring at the top), then names that start with the words, then names that hold every word, then the rest, each by name |
+| Name | A to Z |
+| Newest, Oldest | By release date |
+| Price, high to low; Price, low to high | By the price in the chosen currency; cards with no price last |
+| Mana value | Lowest first |
+| Rarity | Mythic, rare, uncommon, common |
+| Color | White, blue, black, red, green, then multicolor, then colorless |
+| Set | By set name and collector number |
+| Owned first | Cards you own the most copies of first |
+
+Card search, the deck's Add tab and the You give and You get searches in a trade each keep their own sort for your account.
+
 **Options** beside the search box holds:
 
 | Item | Use |
@@ -120,7 +136,7 @@ The desktop and phones each remember their own layout. The deck's Add tab and bo
 
 | Layout | Each result shows |
 |---|---|
-| Grid, Binder | The card picture with its price, an **N printings** badge when the card has more than one printing, and a line under it with the copies you own by finish (such as 2 regular, 1 foil); the buttons are under the picture (in Binder, under the selected one) |
+| Grid, Binder | The card picture, an **N printings** badge when the card has more than one printing, and pips on the picture for the copies you own by finish (OWNED with the regular count, FOIL and ETCHED counts); the buttons are under the picture (in Binder, under the selected one). Pictures show no price; the List layout has it |
 | List | The image, name, mana cost, type line, set, set code, collector number, rarity, price and an OWNED badge with your copies. Clicking the set code fills the Set code filter; clicking the rarity sets the Rarity filter |
 
 The add button names where the card goes: **+ name** of the collection or deck selected last, then **+ Wishlist**. It opens the printing chooser titled "Add card name to name" with the printing shown already selected and the finish set by Add as foil, so Enter adds it; another printing or finish can be picked first. A card made in only one printing and one finish is added at once. Owned counts are real copies in your collections and collections shared with you, not wishlists or proxies.
@@ -139,7 +155,6 @@ Click a result (or move to it with Up and Down) to select it. The Card panel sho
 | Add a copy to where cards go, choosing the printing and finish | **+ name**, **Add to name...** in the right-click menu |
 | Add one copy to the open deck, in the target zone | Shift+Enter |
 | Add one copy to the wishlist | W, **+ Wishlist**, **Add to wishlist** |
-| Add one copy to what you get in the open trade | G, **Add to trade (you get)** in the right-click menu |
 | Open the card page | **Card page** in the right-click menu; a tap on a phone |
 
 ## Empty results

@@ -125,3 +125,17 @@ export function removeCard(store: Store, name: string, quantity: number, apply: 
     </div>
   ));
 }
+
+/** The count on a card picture, top right, when more than one copy is shown. Used by every picture view. */
+export function CountPip({ count }: { count: number }) {
+  return count > 1 ? <span className="pocketqty" title={`${count} copies`}>{count}</span> : null;
+}
+
+/**
+ * The finish of one line under a card picture as a pip: FOIL, ETCHED, a special foil, or REGULAR. Lines appear only
+ * when a picture stands for more than one kind of copy.
+ */
+export function FinishPip({ finish, promoTypes }: { finish: FinishCode | number | undefined | null; promoTypes?: string | null }) {
+  const code = Number(finish ?? 0);
+  return code === 1 || code === 2 ? <FinishBadge finish={code} promoTypes={promoTypes} /> : <span className="badge regular">REGULAR</span>;
+}

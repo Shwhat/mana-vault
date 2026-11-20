@@ -10,10 +10,11 @@ import { choices, Picker } from "../components/Picker";
 import { SCOPE_NAMES } from "../filters";
 import { Meter } from "../views/CollectionView";
 import { NoDeck, Quantity, zoneGroups } from "../views/Views";
-import { cardMenu } from "../views/DeckView";
+import { cardMenu, ZoneButtons } from "../views/DeckView";
 import { FinishBadge, UpgradeBadge } from "../components/CardMarks";
 import { AddButtons } from "../components/AddButtons";
 import { entryKey } from "../library-state";
+import { pickOrOpen } from "../components/PickOpen";
 
 /** The Filters panel: it filters the open view (card search, the collection, the deck or a search inside it); each keeps its own filters. */
 export function FiltersPanel({ actions }: { actions: Record<string, Action> }) {
@@ -133,7 +134,7 @@ export function CollectionsPanel({ actions }: { actions: Record<string, Action> 
         const selected = store.prefs.addTo === "collection" && store.prefs.targetCollection === item.id;
         return (
           <div key={item.id} className={selected ? "navitem colitem active" : "navitem colitem"} role="button" aria-current={selected || undefined}
-            onClick={() => { store.openCollection(item.id); store.setView("collection"); }} {...collectionMenu(store, item)}>
+            {...pickOrOpen(`c:${item.id}`, () => store.targetCollection(item.id), () => { store.openCollection(item.id); store.setView("collection"); })} {...collectionMenu(store, item)}>
             <span className="colline">
               <span className="nl">{item.name}</span>
               {selected && store.prefs.targetCollection === item.id && <span className="target-mark strong" title="New cards are added here">Adding here</span>}
@@ -183,7 +184,7 @@ export function DecksPanel({ actions }: { actions: Record<string, Action> }) {
             return (
               <div key={deck.id} className={selected ? "navitem colitem active" : "navitem colitem"} role="button" aria-current={selected || undefined}
                 title={[deck.commander, formatName(deck.format)].filter(Boolean).join(", ")}
-                onClick={() => void store.openDeck(deck.id).then(() => store.setView("deck"))} {...deckMenu(store, deck)}>
+                {...pickOrOpen(`d:${deck.id}`, () => void store.targetDeck(deck.id), () => void store.openDeck(deck.id).then(() => store.setView("deck")))} {...deckMenu(store, deck)}>
                 <span className="colline">
                   <span className="nl">{deck.name}</span>
                   {selected && store.deck?.id === deck.id && <span className="target-mark strong" title="New cards are added here">Adding here</span>}
@@ -221,7 +222,6 @@ export function CardPanel({ actions }: { actions: Record<string, Action> }) {
       <div className="btnrow">
         <AddButtons store={store} card={card} large />
         <button type="button" className="btn" onClick={actions["wishlist.add"]?.run}>Add to wishlist</button>
-        <button type="button" className="btn" onClick={actions["trade.get"]?.run}>You get</button>
       </div>
       <div className="pgrp">
         <h4>Card</h4>
@@ -274,14 +274,10 @@ export function DeckListPanel({ actions }: { actions: Record<string, Action> }) 
       <div className="dlhead">
         <div className="ident">{deck.name}</div>
         <div className="sub">{formatName(deck.format)}, {total} cards</div>
-        <div className="seg" role="group" aria-label="Target zone">
-          {(["zone.main", "zone.sideboard", "zone.commander", "zone.maybeboard"] as const).map((id) => (
-            <button key={id} type="button" className={actions[id]?.on ? "on" : ""} onClick={actions[id]?.run}>{actions[id]?.short}</button>
-          ))}
-        </div>
+        <ZoneButtons actions={actions} />
       </div>
       {deck.cards.length === 0 && <p className="note pad">This deck is empty</p>}
-      {zoneGroups(deck.cards).map((group) => (
+      {zoneGroups(deck.cards).filter((group) => store.prefs.deckZoneView === "all" || group.zone === store.prefs.deckZoneView).map((group) => (
         <div key={group.zone}>
           <div className="navgroup">{zoneLabel(group.zone)} <span className="cnt">{group.count}</span></div>
           {group.cards.map((card) => {

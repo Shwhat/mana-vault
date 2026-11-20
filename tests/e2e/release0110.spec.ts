@@ -86,12 +86,13 @@ test("Edit as text links exact printings, finish badges show in every view, and 
     await deckOptions(page, () => page.getByRole("group", { name: "Show cards as" }).getByRole("button", { name: view }).click());
     await expect(page.locator(`#view-deck ${selector}`, { hasText: view === "Text" ? "Lightning Bolt" : "" }).locator(".badge.foil").first()).toHaveText("FOIL");
   }
-  // Grid: one picture per printing with a line per finish and a Total line
+  // Grid: one picture per printing with pips for the count, the finish and Missing; one finish needs no lines; no prices
   await deckOptions(page, () => page.getByRole("group", { name: "Show cards as" }).getByRole("button", { name: "Grid" }).click());
-  const lines = page.getByRole("group", { name: "Lightning Bolt (M10) 146" }).locator(".sline");
-  await expect(lines.first()).toContainText("Foil");
-  await expect(lines.first()).toContainText("Missing 1");
-  await expect(lines.last()).toContainText("Total3");
+  const picture = page.locator('#view-deck .dgrid .dcard[title^="Lightning Bolt"]');
+  await expect(picture.locator(".pocketqty")).toHaveText("3");
+  await expect(picture.locator(".dmarks .badge.foil")).toHaveText("FOIL");
+  await expect(picture.locator(".dmarks .badge.miss")).toHaveText("Missing 1");
+  await expect(page.locator("#view-deck .dgrid .sline")).toHaveCount(0);
   await deckOptions(page, () => page.getByRole("group", { name: "Show cards as" }).getByRole("button", { name: "List" }).click());
 
   // Remove on three copies asks how many; Reduce to 1 keeps one
@@ -120,6 +121,7 @@ test("Upgrade wanted, part of a stack changing finish, and a deck that keeps its
   // one of the two cards becomes foil; the other stays
   await rightClick(page, bolt.first(), "Change printing...");
   await page.getByRole("spinbutton", { name: "How many to change" }).fill("1");
+  await expect(page.getByRole("spinbutton", { name: "How many to change" })).toHaveValue("1");
   await page.getByRole("button", { name: "Foil M10 146" }).click();
   await expect(status(page)).toHaveText("1 of 2 Lightning Bolt changed to (M10) 146 foil, 1 missing");
   await expect(bolt).toHaveCount(2);
@@ -135,7 +137,7 @@ test("Upgrade wanted, part of a stack changing finish, and a deck that keeps its
   await page.getByRole("tab", { name: "Cards", exact: true }).click();
 
   // the collection copy linked to the deck changes printing; the deck keeps its version and offers the other one
-  await page.locator(".navitem", { hasText: "Main collection" }).first().click();
+  await page.locator(".navitem", { hasText: "Main collection" }).first().dblclick();
   await page.keyboard.press("2");
   const copy = page.locator("#view-collection .row", { hasText: "Lightning Bolt" }).first();
   await rightClick(page, copy, "Change printing...");
@@ -144,7 +146,7 @@ test("Upgrade wanted, part of a stack changing finish, and a deck that keeps its
   await page.locator("dialog[open]").getByRole("button", { name: "No, show it as missing" }).click();
   await expect(status(page)).toHaveText("Lightning Bolt is now (LEA) 161, decks kept their version");
   await page.locator('.tab[data-panel="decks"]').click();
-  await page.locator(".navitem", { hasText: "Burn" }).first().click();
+  await page.locator(".navitem", { hasText: "Burn" }).first().dblclick();
   const kept = page.locator("#view-deck .row", { hasText: "Lightning Bolt" }).filter({ hasNot: page.locator(".badge.foil") });
   await expect(kept.locator(".badge.miss")).toHaveText("Missing");
   await kept.getByRole("button", { name: "Other version owned" }).click();

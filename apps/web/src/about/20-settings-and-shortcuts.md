@@ -8,7 +8,9 @@ Preferences are saved for your account on the server and follow you to every bro
 |---|---|---|---|
 | Theme | Light, Dark, System | Light | Theme list on the View ribbon tab, phone Menu |
 | Add as foil (the finish the printing chooser starts on) | On, Off | Off | FOIL in the status bar, F |
-| Target zone | Main deck, Sideboard, Commander, Maybeboard | Main deck | Zone list beside Quick add on the deck's Add tab, Target zone list on the Decks ribbon tab, Deck list panel, ZONE in the status bar, Z |
+| Target zone | Main deck, Sideboard, Commander, Maybeboard | Main deck | Zone list beside Quick add on the deck's Add tab, Target zone list on the Decks ribbon tab, the zone buttons, ZONE in the status bar, Z |
+| Zone shown | All, Commander, Main, Sideboard, Maybe | All | The zone buttons above the deck's cards and in the Deck list panel, Target zone list on the Decks ribbon tab, Z. A zone also becomes the target zone; All makes it Main deck |
+| Sort | Best match, Name, Newest, Oldest, Price (high or low), Mana value, Rarity, Color, Set, Owned first | Best match | Sort beside each card search; card search, the deck's Add tab and the two trade searches each keep their own |
 | Where new cards go | The collection or deck selected last | Your first collection | Clicking a collection or deck in its panel or switcher, ADDING TO in the status bar, + Add in the collection view, C |
 | Target collection | Any of your collections | Your first collection | Collections panel, collection switcher, ADDING TO in the status bar, + Add in the collection view, C |
 | Open collection | Any of your collections, or All collections | Your first collection | Collection switcher, Collections panel |
@@ -84,7 +86,7 @@ Shortcuts work when no text box, menu or window has focus, except the Ctrl short
 | Enter | Add the selected card to the collection or deck selected last |
 | Shift+Enter | Add the selected card to the open deck |
 | F | Switch Add as foil on or off |
-| Z | Cycle zone (cycle the target zone: Main deck, Sideboard, Commander, Maybeboard) |
+| Z | Cycle zone (All, Commander, Main, Sideboard, Maybe: the zone shown and the target zone) |
 | C | Cycle target collection |
 | W | Add to wishlist |
 
@@ -99,13 +101,6 @@ Shortcuts work when no text box, menu or window has focus, except the Ctrl short
 | B | Binder layout (switch between binder and grid) |
 | Page Up, Page Down | Show the previous or next binder page |
 
-### Trade
-
-| Key | Action |
-|---|---|
-| T | Add to trade (you give): the selected collection row goes into the open trade (a new one when none is open) |
-| G | Add to trade (you get): the selected card goes into the open trade |
-
 ### Editing
 
 | Key | Action |
@@ -118,11 +113,10 @@ Shortcuts work when no text box, menu or window has focus, except the Ctrl short
 
 | Key | Action |
 |---|---|
-| Ctrl+N | New deck... |
 | Ctrl+O | Open deck... |
 | Q | Go to Quick add in the open deck |
 
-In the collection and deck switchers, type to find, Up and Down move, Enter opens and Esc closes the list.
+In the collection and deck switchers, type to find, Up and Down move, Enter opens and Esc closes the list. A click on a collection or deck makes it where new cards go; a double click opens it.
 
 ### General
 

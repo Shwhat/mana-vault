@@ -35,7 +35,6 @@ function useKeyboard(store: Store, actions: Record<string, Action>) {
         if (typing && (key === "z" || key === "y")) return;
         if (key === "z") { event.preventDefault(); run(event.shiftKey ? "redo" : "undo"); }
         else if (key === "y") { event.preventDefault(); run("redo"); }
-        else if (key === "n") { event.preventDefault(); run("newDeck"); }
         else if (key === "o") { event.preventDefault(); run("openDeck"); }
         else if (key === "a" && !typing && store.view === "collection") { event.preventDefault(); run("pickAll"); }
         return;
@@ -51,8 +50,6 @@ function useKeyboard(store: Store, actions: Record<string, Action>) {
         case "w": case "W": run("wishlist.add"); break;
         case "e": case "E": run("copy.details"); break;
         case "b": case "B": run("collection.binder"); break;
-        case "t": case "T": run("trade.give"); break;
-        case "g": case "G": run("trade.get"); break;
         case "PageDown": case "PageUp":
           if (store.view === "collection" && store.layout === "binder") {
             event.preventDefault();

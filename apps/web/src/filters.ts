@@ -1,7 +1,7 @@
 // ---------- filters: the Filters panel's fields, kept per view, and how they match cards ----------
 import { useEffect, useState } from "react";
 import { request } from "./api";
-import { type Currency, EMPTY_FILTERS, type Filters } from "./types";
+import { type Currency, EMPTY_FILTERS, type Filters, type SearchSort } from "./types";
 
 /** The views the Filters panel can act on. Each keeps its own filters. */
 export type FilterScope = "cards" | "collection" | "deck" | "deckAdd" | "tradeGive" | "tradeGet";
@@ -100,11 +100,13 @@ export function matchesFilters(card: Filterable & { id?: string; card_id?: strin
 }
 
 /** The search address for the card database: /api/cards with the filters, a page offset and the total. */
-export function searchParams(filters: Filters, offset: number, limit: number, options: { group?: boolean; currency?: Currency } = {}): URLSearchParams {
+export function searchParams(filters: Filters, offset: number, limit: number, options: { group?: boolean; currency?: Currency; sort?: SearchSort } = {}): URLSearchParams {
   const query = [filters.query.trim(), serverQuery(filters, options.currency)].filter(Boolean).join(" ");
   const params = new URLSearchParams({ q: query, paged: "1", offset: String(offset), limit: String(limit) });
   // one result per card unless every printing is wanted
   if (options.group) params.set("group", "1");
+  if (options.sort && options.sort !== "best") params.set("sort", options.sort);
+  if (options.currency) params.set("currency", options.currency);
   if (filters.type.trim()) params.set("type", filters.type.trim());
   if (filters.set.trim()) params.set("set", filters.set.trim());
   if (filters.color) params.set("color", filters.color);

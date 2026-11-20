@@ -32,7 +32,8 @@ Messages appear at the right end of the status bar (on the phone, in a banner ab
 | Deck name created | New deck |
 | Deck name opened | Opening a deck |
 | Cards are added as foil, or Cards are added as regular copies | Switching Add as foil |
-| New deck cards go to the main deck (or the sideboard, the commander, the maybeboard) | Changing the target zone |
+| New deck cards go to the main deck (or the sideboard, the commander, the maybeboard) | Changing the target zone in the zone list or the status bar |
+| Showing zone. New deck cards go to the zone; Showing every zone. New deck cards go to the main deck | A zone button, the Target zone list or Z |
 | Imported N cards from M rows (into collection name for collections) | A collection or decklist import |
 | Deck name exported as text, or as CSV | Export deck |
 | Backup downloaded | Download backup |
@@ -91,7 +92,9 @@ Messages appear at the right end of the status bar (on the phone, in a banner ab
 | N of M Card name changed to (SET) number | Change printing for some of a card's copies |
 | Card name is now (SET) number, decks kept their version | Change printing of copies in a deck, answered No, show it as missing |
 | Card name reduced to 1 copy, N entries reduced to 1 copy each | Reduce to 1 |
-| Adding to name | Clicking ADDING TO in the status bar |
+| Adding to name | Clicking ADDING TO in the status bar, or one click on a collection or deck in a panel or switcher |
+| N cards added to name, N linked to the deck | Add deck to collection |
+| The deck is not missing any cards | Add deck to collection with Missing cards only when nothing is missing |
 
 ## Problems shown by Mana Vault
 
@@ -125,7 +128,6 @@ Messages appear at the right end of the status bar (on the phone, in a banner ab
 | The CSV file must be 5 MB or smaller | Collection import file too large | Split the file |
 | The decklist file must be 5 MB or smaller | Decklist file too large | Split the file |
 | Select a row in the collection first | Copy details with no collection row selected | Click a row |
-| Select a row in a collection first | Add to trade (you give) with no collection row selected | Click a row, or use Give on the trade list |
 | Enter a number for trade from 0 to N | Copy details with For trade outside the row's count | Enter a valid number |
 | Those copies are already for trade, or None of those copies are for trade | Mark or Unmark for trade with nothing to change | |
 | There is nothing to add to the wishlist | Adding nothing to the wishlist | |

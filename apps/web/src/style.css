@@ -502,7 +502,6 @@ dialog::backdrop{background:rgba(20,28,40,.35)}
 .pocketqty{position:absolute;right:4px;top:4px;min-width:20px;padding:0 5px;border-radius:8px;background:#2b3442;color:#fff;font-size:11px;font-weight:700;line-height:18px;text-align:center}
 .pocketfoil{position:absolute;left:4px;top:4px}
 .pockettrade{position:absolute;left:4px;bottom:22px;margin:0}
-.pocketprice{position:absolute;left:0;right:0;bottom:0;padding:1px 6px;background:rgba(20,28,40,.72);color:#fff;font-size:11px;font-variant-numeric:tabular-nums;text-align:right}
 .binderpager{display:flex;align-items:center;gap:10px;color:var(--muted);font-variant-numeric:tabular-nums}
 
 .statswrap{padding:12px}
@@ -1056,7 +1055,7 @@ ul.skipped{max-height:40vh;overflow:auto;margin:6px 0 0;padding-left:18px;font-s
 .stackcell{display:flex;flex-direction:column;gap:3px;min-width:0}
 .stackcell .pocket{width:100%}
 .slines{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:4px;background:var(--panel2);overflow:hidden;font-size:11px}
-.sline{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:6px;align-items:center;padding:1px 6px;cursor:pointer;line-height:16px}
+.sline{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px;align-items:center;padding:1px 6px;cursor:pointer;line-height:16px}
 .sline+.sline{border-top:1px solid var(--line2)}
 .sline:hover{background:#e8edf4}
 .sline.active{background:var(--accent-soft);color:#0f3f86}
@@ -1066,6 +1065,7 @@ ul.skipped{max-height:40vh;overflow:auto;margin:6px 0 0;padding-left:18px;font-s
 .sline.total{cursor:default;font-weight:600;background:var(--panel)}
 .sline.total:hover{background:var(--panel)}
 .sline .badge{font-size:9.5px;padding:0 4px}
+.badge.regular{background:var(--panel);color:var(--muted);border-color:var(--line)}
 :root[data-theme=dark] .sline:hover{background:#2f3640}
 :root[data-theme=dark] .sline.active{color:#cfe0ff}
 :root[data-theme=dark] .sline.total,:root[data-theme=dark] .sline.total:hover{background:var(--panel)}
@@ -1123,3 +1123,4 @@ ul.skipped{max-height:40vh;overflow:auto;margin:6px 0 0;padding-left:18px;font-s
 :root[data-theme=dark] .folderlist .row:hover { background: #2f3640; }
 .note.err, .err { color: var(--err); }
 .check { display: flex; gap: 6px; align-items: center; }
+.seg.deckzones{margin:6px 10px;align-self:flex-start}

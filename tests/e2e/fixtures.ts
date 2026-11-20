@@ -31,7 +31,7 @@ export async function signUp(page: Page, prefix = "user", grid = false): Promise
 export async function switchTo(page: Page, kind: "collection" | "deck", name: string) {
   await page.locator(`#view-${kind} .switcher`).first().click();
   await page.locator(".swpop input").fill(name);
-  await page.locator(".swrow", { hasText: name }).first().click();
+  await page.locator(".swrow", { hasText: name }).first().dblclick();
 }
 
 /** Chooses in one of the app's pickers: opens it, then clicks the choice by value or by its text. */

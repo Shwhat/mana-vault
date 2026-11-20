@@ -2,8 +2,8 @@
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import type { Action } from "../actions";
 import { request } from "../api";
-import type { CardSearch, FoundCard } from "../card-search";
-import { CardResults, countLine, useViewSearch } from "../components/CardResults";
+import { type CardSearch, type FoundCard, sortFound } from "../card-search";
+import { CardResults, countLine, SortPicker, useViewSearch } from "../components/CardResults";
 import { choices, type Choice, Picker } from "../components/Picker";
 import { acceptTradeDialog, completeTradeDialog, newTradeDialog, renameTradeDialog, sendTradeDialog, shareBinderDialog } from "../components/TradeDialogs";
 import { matchesFilters, useServerMatch } from "../filters";
@@ -125,7 +125,9 @@ function GiveSearch({ trade, editable }: { trade: Trade | null; editable: boolea
     set_name: row.set_name, collector_number: row.collector_number, rarity: row.rarity, colors: row.colors, image_url: row.image_url,
     prices: { usd: priceOf(row, row.foil, "usd"), usd_foil: null, usd_etched: null, eur: priceOf(row, row.foil, "eur"), eur_foil: null },
   })), [rows, filters, match]);
-  const search = useLocalSearch(cards);
+  const sort = store.prefs.searchSort.tradeGive;
+  const sorted = useMemo(() => sortFound(cards, sort, filters.query, store.prefs.currency), [cards, sort, filters.query, store.prefs.currency]);
+  const search = useLocalSearch(sorted);
   const give = (card: FoundCard) => { const row = byKey.get(card.id); if (row) store.giveEntry(row); };
   return (
     <SideSearch side="give" search={rows === null ? { ...search, loading: true } : search} trade={trade} editable={editable}
@@ -141,7 +143,7 @@ function GiveSearch({ trade, editable }: { trade: Trade | null; editable: boolea
 function GetSearch({ trade, editable }: { trade: Trade | null; editable: boolean }) {
   const store = useApp();
   // trade lines are printings, so the trade search lists every printing
-  const search = useViewSearch(store.filterSets.tradeGet, store.view === "trade", false);
+  const search = useViewSearch(store.filterSets.tradeGet, store.view === "trade", "tradeGet", false);
   return <SideSearch side="get" search={search} trade={trade} editable={editable} onAdd={(card) => void store.getCard(card.id)} buttonText={() => "+ Get"} />;
 }
 
@@ -161,6 +163,7 @@ function SideSearch({ side, search, trade, editable, onAdd, buttonText, extra, d
           <input value={filters.query} onFocus={() => store.setTradeSide(scope)} onChange={(event) => store.setScopeFilters({ query: event.target.value }, scope)}
             placeholder={side === "give" ? "Search your cards" : "Search all cards"} aria-label={side === "give" ? "Search cards you give" : "Search cards you get"} />
         </label>
+        <SortPicker scope={scope} />
         <span className="sub">{countLine(search)}</span>
       </div>
       {extra}

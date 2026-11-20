@@ -61,6 +61,7 @@ Press **4**, choose **Trade view** (Views group of the Home ribbon tab, or the T
 | Rename... | Changes the open trade's name (also **Rename trade...** in the phone Menu) |
 | Cancel, Reopen | Cancels the open trade, or opens a cancelled trade again. For a trade with another account, Cancel declines it for both sides |
 | Delete... | **Delete trade...**: deletes the trade after asking; the cards stay where they are. Only the account that started a trade can delete it |
+| Sort | Each search has its own Sort, with the same choices as card search (see [Card search](/about/card-search)); Best match puts exact names first |
 | Options | The layout and card size of the two searches (the same as card search) |
 | Count | The cards in the trade and its status |
 
@@ -73,7 +74,7 @@ The trade has two columns, **You give** and **You get**. Each column lists its l
 | You give | The cards you marked for trade, in every collection you own. **All cards, not only for trade** searches every card in your collections. Each result shows its collection | **+ Give** (with the number for trade), a double-click, or the right-click menu |
 | You get | The whole card database | **+ Get**, a double-click, or the right-click menu |
 
-The Filters panel filters the search you last used; the Filters line says which. When no trade is open, adding a card starts a new trade.
+The Filters panel filters the search you last used; the Filters line says which. When no trade is open, adding a card starts a new trade. Cards are added to a trade only here, in the Trade view; elsewhere **Mark for trade** puts collection copies on the trade list and in the trade binder.
 
 Each line shows the picture, name (with FOIL or ETCHED for those finishes), set, number and the collection it comes from (You give), and has:
 

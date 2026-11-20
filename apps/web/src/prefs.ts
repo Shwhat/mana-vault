@@ -4,7 +4,7 @@ import { isApp } from "./android/platform";
 import { DEFAULT_WORKSPACE, isOpen, openPanel, PRESETS, type Layout, type Workspace, validLayout } from "./dock";
 import type { RibbonSize, RibbonTab } from "./ribbon";
 import { DEFAULT_SHEET, readSheet, type SheetSettings } from "./proxy-print";
-import type { CollectionLayout, CollectionSort, Currency, DeckGroup, DeckSort, DeckView, GridSize, SwitchSort, Zone } from "./types";
+import { type CollectionLayout, type CollectionSort, type Currency, type DeckGroup, type DeckSort, type DeckView, type GridSize, SEARCH_SORTS, type SearchSort, type SortScope, type SwitchSort, type Zone } from "./types";
 
 export type Theme = "light" | "dark" | "system";
 
@@ -12,6 +12,8 @@ export type Prefs = {
   theme: Theme;
   foil: boolean;
   zone: Zone;
+  /** The zone the deck list shows (0.13.0): all zones, or one zone, which is then also where Add puts cards. */
+  deckZoneView: Zone | "all";
   ribbon: RibbonTab[] | null;
   ribbonTab: string;
   layout: Layout;
@@ -42,6 +44,8 @@ export type Prefs = {
   tradeAllCards: boolean;
   /** Card search shows every printing in its own spot instead of one spot per card (0.12.0). */
   searchAllPrintings: boolean;
+  /** How each card search orders its results (0.13.0): card search, the deck's Add tab and the two trade searches. */
+  searchSort: Record<SortScope, SearchSort>;
   /** How the collection and deck switchers sort their lists. */
   collectionSwitchSort: SwitchSort;
   deckSwitchSort: SwitchSort;
@@ -82,10 +86,11 @@ export type Prefs = {
 export function defaultPrefs(): Prefs {
   const preset = PRESETS[DEFAULT_WORKSPACE]!();
   return {
-    theme: "light", foil: false, zone: "main", ribbon: null, ribbonTab: "home", layout: preset.layout,
+    theme: "light", foil: false, zone: "main", deckZoneView: "all", ribbon: null, ribbonTab: "home", layout: preset.layout,
     workspace: DEFAULT_WORKSPACE, workspaces: {}, lastDeckId: null, targetCollection: null, addTo: "collection", openCollection: null,
     currency: "usd", collectionSort: "name", collectionLayout: "grid", collectionLayoutPhone: "grid", gridSize: "m",
     searchLayout: "grid", searchLayoutPhone: "grid", searchSize: "m", allWishlists: false, tradeAllCards: false, searchAllPrintings: false,
+    searchSort: { cards: "best", deckAdd: "best", tradeGive: "best", tradeGet: "best" },
     collectionSwitchSort: "recent", deckSwitchSort: "recent", recent: {}, deckView: "list", deckGroup: "type", deckSort: "name",
     scanVibrate: true, scanFoil: false, scanCamera: "environment", scanQuick: false, scanSounds: true, scanSets: [], scanIgnorePromos: false,
     scanProxy: false, scanCondition: "NM", scanLanguage: "en", scanShowTotal: false, scanShowOwned: false, ribbonSize: "large",
@@ -103,6 +108,7 @@ export function mergePrefs(saved: unknown): Prefs {
     theme: value.theme === "dark" || value.theme === "system" ? value.theme : "light",
     foil: value.foil === true,
     zone: value.zone === "sideboard" || value.zone === "commander" || value.zone === "maybeboard" ? value.zone : "main",
+    deckZoneView: (["all", "main", "sideboard", "commander", "maybeboard"] as const).find((item) => item === value.deckZoneView) ?? "all",
     ribbon: sameVersion && Array.isArray(value.ribbon) ? value.ribbon : null,
     ribbonTab: typeof value.ribbonTab === "string" ? value.ribbonTab : base.ribbonTab,
     // a new version adds the panels it introduced (Collections in 0.2.0) to a saved layout
@@ -129,6 +135,7 @@ export function mergePrefs(saved: unknown): Prefs {
     allWishlists: value.allWishlists === true,
     tradeAllCards: value.tradeAllCards === true,
     searchAllPrintings: value.searchAllPrintings === true,
+    searchSort: readSearchSort(value.searchSort),
     collectionSwitchSort: switchSortOf(value.collectionSwitchSort, ["recent", "name", "created", "cards", "value"]),
     deckSwitchSort: switchSortOf(value.deckSwitchSort, ["recent", "name", "created", "cards", "format", "commander"]),
     recent: value.recent && typeof value.recent === "object"
@@ -202,4 +209,11 @@ export function watchSystemTheme(getTheme: () => Theme) {
   const listener = () => { if (getTheme() === "system") applyTheme("system"); };
   media?.addEventListener("change", listener);
   return () => media?.removeEventListener("change", listener);
+}
+
+/** Each search's sort, Best match when missing or not a known sort. */
+function readSearchSort(value: unknown): Record<SortScope, SearchSort> {
+  const saved = value && typeof value === "object" ? value as Record<string, unknown> : {};
+  const of = (key: SortScope): SearchSort => (SEARCH_SORTS.find(([sort]) => sort === saved[key])?.[0] ?? "best");
+  return { cards: of("cards"), deckAdd: of("deckAdd"), tradeGive: of("tradeGive"), tradeGet: of("tradeGet") };
 }

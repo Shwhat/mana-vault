@@ -23,7 +23,7 @@ The ribbon is the only menu. It has tabs of grouped buttons. A button shows an i
 |---|---|
 | Home | Search: Find, Scan card, Clear filters. Views: Home, Search, Collection, Deck, Trade, Proxies. Files: Import, Export, Backup ▾ (Download backup, Restore backup...). Edit: Undo, Redo |
 | Collection | Collection: New collection, Settings, Delete (Leave when shared with you). Selection: Select all, Move, Remove, Details, For trade (Mark for trade or Unmark for trade). Layout: Grid (Grid layout), Binder (Binder layout), List (List layout). Wishlist: Missing to wishlist. Share: Send, Sharing |
-| Decks | Deck: New deck, Open deck, Rename, Delete (Leave when shared with you). Build: Add to deck, Target zone ▾ (Main deck, Sideboard, Commander, Maybeboard), Link copies, Tags (Tags...), Edit as text (Edit as text...). Check: Format (Deck format...), Playtest, History (Deck history). Missing: Missing to wishlist. Share: Send, Sharing |
+| Decks | Deck: New deck, Open deck, Rename, Delete (Leave when shared with you). Build: Add to deck, Target zone ▾ (All zones, Commander, Main deck, Sideboard, Maybeboard), Link copies, Link owned copies, To collection (Add deck to collection...), Tags (Tags...), Edit as text (Edit as text...). Check: Format (Deck format...), Playtest, History (Deck history). Missing: Missing to wishlist. Share: Send, Sharing |
 | Trade | Open: Trade (Trade view, shown at all times). Trade: New trade (New trade...), Complete (Complete trade...), Send (Send trade...). Share: Copy list (Copy trade list), Share binder (Share trade binder...) |
 | Proxies | Open: Print list, Card maker. Add to print list: Print deck (Print a deck...), Print missing (Print missing cards...) |
 | View | Look: Theme ▾ (Light theme, Dark theme, System theme), Currency ▾ (Prices in US dollars, Prices in euros). Panels: Panels ▾ (Filters panel, Collections panel, Decks panel, Card panel, Deck list panel, Import review panel), Workspace ▾ (Save workspace..., Manage workspaces..., Reset panels). Ribbon: Button size ▾ (Large buttons, Compact buttons, Icons only), Customize. Card database: Update database |
@@ -76,11 +76,11 @@ Right-clicking a card, a collection or a deck opens a menu of what can be done w
 
 | Item | Menu |
 |---|---|
-| Search result | Card page, Add to name... (where cards go), Add as proxy, Add to wishlist, Add to trade (you get), Add to print list |
-| Collection entry, grid card or binder pocket | Card page, Copy details..., Change printing..., Move..., Mark for trade or Unmark for trade, Add to trade (you give), Add to the open deck, Add to print list, Reduce to 1 (more than one copy), Remove |
+| Search result | Card page, Add to name... (where cards go), Add as proxy, Add to wishlist, Add to print list |
+| Collection entry, grid card or binder pocket | Card page, Copy details..., Change printing..., Move..., Mark for trade or Unmark for trade, Add to the open deck, Add to print list, Reduce to 1 (more than one copy), Remove |
 | Deck card, in any view and in the Deck list panel | Card page, Change printing..., Link copies..., Link owned copies and Switch to the version owned... (for missing cards you own), Mark as upgrade wanted... or Change upgrade wanted... and Remove upgrade wanted mark, Tags..., Move to each other zone, Use as cover card, Add missing to wishlist (when cards are missing), Add to print list, Reduce to 1 (more than one copy), Remove from deck |
 | Collection, in the Collections panel or the collection switcher | Open, Rename..., Collection settings..., Send..., Export..., Delete (Leave for a collection shared with you). Rename, settings and Send are only for your own collections |
-| Deck, in the Decks panel or the deck switcher | Open, Rename..., Deck format..., Send..., Export..., Delete (Leave for a deck shared with you). Rename, format and Send are only for your own decks. Deck format and Export open the deck first |
+| Deck, in the Decks panel or the deck switcher | Open, Rename..., Deck format..., Add deck to collection..., Send..., Export..., Delete (Leave for a deck shared with you). Rename, format and Send are only for your own decks. Deck format and Export open the deck first |
 
 **Change printing...** opens the printing chooser: every printing of the card, newest first, with its picture, set, number and year, a button with the price for each finish the printing is made in (**Regular**, **Foil**, **Etched**), and a box to find a set, code or number. The current printing shows **Current** with its finish, and its finish button is highlighted. Choose a finish button to switch to that printing in that finish, such as the foil version of the current printing. Clicking a printing, or pressing Enter on it, chooses it in the finish in use (or its first finish when it is not made in that one). For a collection entry or deck card with more than one copy, **How many to change** at the top sets how many copies change (all by default). The same chooser, titled "Version wanted for card", picks the version for **Mark as upgrade wanted...**, and, titled "Add card to name", the printing and finish to add, with the printing shown selected so Enter takes it. Special foils show their name on the finish button and the Current mark, such as **Surge foil**.
 
@@ -111,17 +111,17 @@ The card page shows one card in full. It opens from **Card page** in a right-cli
 - **Versions**: every printing of the card with set, number, rarity and year, and the market price for Normal, Foil and Etched where the printing exists in that finish. The card shown is first and highlighted; tapping another printing shows it.
 - **Rulings**: the official rulings for the card with their dates, or "No rulings".
 - **Price history**: the printing's saved prices as a line chart per finish, with **Show table** (see [Prices and statistics](/about/prices-and-statistics)).
-- A round actions button at the bottom right: **Add to name...** (where cards go, opening the printing chooser), Add as proxy, Add to wishlist, Add to trade (you get) and Scan cards.
+- A round actions button at the bottom right: **Add to name...** (where cards go, opening the printing chooser), Add as proxy, Add to wishlist and Scan cards.
 
 ## Panels
 
 | Panel | Shows |
 |---|---|
 | Filters | Type, set code, color, rarity, legal format and mana value range filters for the open view (card search, collection, deck or a search inside them), with a Filtering line naming it, and **Clear filters** |
-| Collections | Your collections with card counts, values, completion bars and percentages, Wishlist and Shared badges, and **New...**. Click a collection to open it; it becomes where new cards go and is highlighted |
-| Decks | Every deck grouped by format (Commander, Standard and the other formats, Casual last, each heading with its number of decks), with its card count and value under its name and a Shared badge for shared decks, a box to find a deck by name or commander, and **New...**. Click a deck to open it; it becomes where new cards go and is highlighted |
+| Collections | Your collections with card counts, values, completion bars and percentages, Wishlist and Shared badges, and **New...**. Click a collection once to make it where new cards go (it is highlighted and marked Adding here); double-click it to open it |
+| Decks | Every deck grouped by format (Commander, Standard and the other formats, Casual last, each heading with its number of decks), with its card count and value under its name and a Shared badge for shared decks, a box to find a deck by name or commander, and **New...**. Click a deck once to make it where new cards go (it is highlighted and marked Adding here); double-click it to open it |
 | Card | The selected card: image, name (with FOIL, ETCHED or Upgrade wanted for the selected copy or deck card), type, the **Add to name** button for where cards go (it opens the printing chooser), **Add to wishlist**, **You get**, mana cost, mana value, rules text, set, number, rarity, artist, release date, flavor name, regular, foil and etched prices, copies owned of this printing (regular, foil and etched), of all printings and in each of your collections with the number for trade, and copies wanted in each wishlist |
-| Deck list | The open deck in compact form by zone, with FOIL, ETCHED, Upgrade wanted and Missing marks, plus and minus buttons, the deck card menu on right-click, and the Main, Sideboard, Commander and Maybeboard target zone switch |
+| Deck list | The open deck in compact form by zone, with FOIL, ETCHED, Upgrade wanted and Missing marks, plus and minus buttons, the deck card menu on right-click, and the All, Commander, Main, Sideboard and Maybe buttons: each shows only that zone and is where Add puts cards (All shows every zone and adds to Main) |
 | Import review | The rows skipped by the latest import or import preview, with row number, card name and reason, and **Clear** |
 
 ### Moving and arranging panels

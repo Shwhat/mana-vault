@@ -3,7 +3,8 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import { type CardSearch, type FoundCard, useCardSearch } from "../card-search";
 import { Icon } from "../icons";
 import { type Store, useApp } from "../store";
-import { anyPrice, capitalize, type CollectionLayout, type Filters, type GridSize, money, pricesOf } from "../types";
+import { anyPrice, capitalize, type CollectionLayout, type Filters, type GridSize, money, pricesOf, SEARCH_SORTS, type SearchSort, type SortScope } from "../types";
+import { choices, Picker } from "./Picker";
 import { Thumb } from "../views/Views";
 import { rowMenu } from "./ContextMenu";
 
@@ -69,6 +70,19 @@ export function ownedLine(card: FoundCard): string {
   return parts.length ? `Owned: ${parts.join(", ")}` : "";
 }
 
+/** Owned copies as pips on a search picture: OWNED with the regular count, then FOIL and ETCHED counts. */
+function OwnedPips({ card }: { card: FoundCard }) {
+  const finishes = card.ownedFinishes;
+  if (!finishes) return <span className="badge own">OWNED {card.owned}</span>;
+  return (
+    <>
+      {finishes.regular > 0 && <span className="badge own">OWNED {finishes.regular}</span>}
+      {finishes.foil > 0 && <span className="badge own foil">FOIL {finishes.foil}</span>}
+      {finishes.etched > 0 && <span className="badge own foil">ETCHED {finishes.etched}</span>}
+    </>
+  );
+}
+
 /** "12 printings" for a grouped search result with more than one. */
 const PrintingsBadge = ({ card, className = "" }: { card: FoundCard; className?: string }) =>
   (card.printings && card.printings > 1 ? <span className={`badge prints${className ? ` ${className}` : ""}`} title="Adding asks which printing">{card.printings} printings</span> : null);
@@ -84,9 +98,8 @@ function ResultPicture({ card, props, store }: { card: FoundCard; props: ResultP
         onClick={() => props.onPick(card)} onDoubleClick={() => props.onOpen(card)} {...rowMenu(store, card.name, () => props.menu(card))}>
         {card.image_url ? <img src={card.image_url} alt={card.name} loading="lazy" draggable={false} /> : <span className="pocketname">{card.name}</span>}
         <PrintingsBadge card={card} className="pocketfoil" />
-        <span className="pocketprice">{money(anyPrice(pricesOf(card), currency), currency)}</span>
+        {!!card.owned && <span className="dmarks" title={ownedLine(card)}><OwnedPips card={card} /></span>}
       </div>
-      {!!card.owned && <div className="resowned">{ownedLine(card)}</div>}
       {props.buttons && <div className="resbtns">{props.buttons(card)}</div>}
     </div>
   );
@@ -190,9 +203,9 @@ export function CardResults(props: ResultProps) {
 }
 
 /** A card search inside a view (the deck's Add tab, the trade searches) whose owned counts follow cards being added. */
-export function useViewSearch(filters: Filters, enabled: boolean, group = true): CardSearch {
+export function useViewSearch(filters: Filters, enabled: boolean, scope: SortScope, group = true): CardSearch {
   const store = useApp();
-  const search = useCardSearch(filters, enabled, { group: group && !store.prefs.searchAllPrintings, currency: store.prefs.currency });
+  const search = useCardSearch(filters, enabled, { group: group && !store.prefs.searchAllPrintings, currency: store.prefs.currency, sort: store.prefs.searchSort[scope] });
   const hooks = store.ownedHooks;
   useEffect(() => {
     const hook = search.owned;
@@ -200,4 +213,14 @@ export function useViewSearch(filters: Filters, enabled: boolean, group = true):
     return () => { hooks.current.delete(hook); };
   }, [hooks, search.owned]);
   return search;
+}
+
+/** The Sort menu of a card search; each search keeps its own choice. Best match puts exact name matches first. */
+export function SortPicker({ scope }: { scope: SortScope }) {
+  const store = useApp();
+  const value = store.prefs.searchSort[scope];
+  return (
+    <Picker label="Sort results" prefix="Sort: " value={value} options={choices(SEARCH_SORTS)}
+      onChange={(next) => store.setPrefs({ searchSort: { ...store.prefs.searchSort, [scope]: next as SearchSort } })} />
+  );
 }

@@ -1,6 +1,7 @@
 // ---------- switcher: one searchable list for opening a collection or a deck ----------
 import { choices, Picker } from "./Picker";
 import { collectionMenu, deckMenu } from "./ItemMenus";
+import { pickOrOpen } from "./PickOpen";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Action } from "../actions";
 import { Icon } from "../icons";
@@ -109,6 +110,12 @@ function SwitcherList({ kind, items, currentId, anchor, actions, onClose }: {
       void store.openDeck(item.id).then(() => store.setView("deck"));
     }
   };
+  // one click: the row becomes where new cards go and the list stays open
+  const pick = (item: Item) => {
+    if (kind === "collection") store.targetCollection(item.id);
+    else void store.targetDeck(item.id);
+    input.current?.focus();
+  };
   // right-click or long press on a row: the collection's or deck's commands
   const itemMenu = (id: string) => {
     if (kind === "collection") {
@@ -142,12 +149,15 @@ function SwitcherList({ kind, items, currentId, anchor, actions, onClose }: {
         {shown.map((item, position) => (
           <div key={item.id} data-index={position} role="option" aria-selected={position === index}
             className={`swrow${position === index ? " hi" : ""}${item.id === currentId ? " cur" : ""}`}
-            onMouseEnter={() => setIndex(position)} onClick={() => choose(item)} {...itemMenu(item.id)}>
+            onMouseEnter={() => setIndex(position)}
+            {...(item.pinned ? { onClick: () => choose(item) } : pickOrOpen(`s${kind}:${item.id}`, () => pick(item), () => choose(item)))} {...itemMenu(item.id)}>
             {kind === "deck" && (item.image ? <img className="swart" src={item.image} alt="" loading="lazy" /> : <span className="swart none" aria-hidden="true" />)}
             <span className="swtext">
               <span className="swtitle"><b>{item.name}</b>{item.badge && <span className={item.badge === "Wishlist" ? "badge wish" : "badge"}>{item.badge}</span>}</span>
               <span className="swdetail">{item.detail}</span>
             </span>
+            {(kind === "collection" ? store.prefs.addTo === "collection" && store.prefs.targetCollection === item.id : store.prefs.addTo === "deck" && store.deck?.id === item.id)
+              && <span className="target-mark strong" title="New cards are added here">Adding here</span>}
             {item.id === currentId && <span className="badge main">Open</span>}
           </div>
         ))}

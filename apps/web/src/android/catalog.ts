@@ -1,6 +1,7 @@
 // ---------- the compact card catalog kept on the phone: offline search, card lookup and scan matching ----------
 import { bestName, buildNameIndex, MIN_NAME_SCORE, normalize, readInfoLine, type NameIndex } from "../../../server/src/scan-core";
-import type { Card } from "../types";
+import type { Card, Currency, SearchSort } from "../types";
+import { sortFound } from "../search-sort";
 import { idbGet, idbSet } from "./idb";
 import { appFetch, OfflineError } from "./net";
 
@@ -99,6 +100,8 @@ export async function searchCards(params: URLSearchParams): Promise<Card[] | { t
   const limit = Math.min(100, Number(params.get("limit") ?? 40) || 40);
   const offset = Math.max(0, Number(params.get("offset") ?? 0) || 0);
   const paged = params.get("paged") === "1";
+  const sort = (params.get("sort") ?? "best") as SearchSort;
+  const sorting = paged && (sort !== "best" || words.length > 0);
   const found: Card[] = [];
   let total = 0;
   for (const card of cards) {
@@ -113,8 +116,13 @@ export async function searchCards(params: URLSearchParams): Promise<Card[] | { t
       if (!words.every((word) => text.includes(word))) continue;
     }
     total += 1;
-    if (total > offset && found.length < limit) found.push(card);
+    if (sorting) found.push(card);
+    else if (total > offset && found.length < limit) found.push(card);
     else if (!paged && found.length >= limit) break;
+  }
+  if (sorting) {
+    const currency: Currency = params.get("currency") === "eur" ? "eur" : "usd";
+    return { total, cards: sortFound(found, sort, params.get("q") ?? "", currency).slice(offset, offset + limit) };
   }
   return paged ? { total, cards: found } : found;
 }
