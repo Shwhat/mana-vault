@@ -1,10 +1,12 @@
 // Browser tests for 0.11.0: exact links from Edit as text, finish badges in every deck view, Remove how many and
 // Reduce to 1, Upgrade wanted, decks that keep their version, Other version owned, Add buttons with finishes and the add target.
 import type { Page } from "@playwright/test";
-import { choose, search, signUp, status, test, expect, takePrinting } from "./fixtures";
+import { choose, menu, search, signUp, status, test, expect, takePrinting } from "./fixtures";
 
 async function newDeck(page: Page, name: string, format = "modern") {
-  await page.keyboard.press("Control+n");
+  // the ribbon, not Ctrl+N: Chromium can keep Ctrl+N for itself (new window) instead of passing it to the page
+  await menu(page, "Decks", "New deck...");
+  await expect(page.locator("#f-name")).toBeFocused();
   await page.keyboard.type(name);
   await choose(page, page.locator("#f-format"), format);
   await page.keyboard.press("Enter");

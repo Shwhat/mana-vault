@@ -2,10 +2,10 @@
 // right-click menus on collections and decks, the card maker and the print list.
 import { readFileSync } from "node:fs";
 import type { Page } from "@playwright/test";
-import { choose, search, signUp, status, test, expect, takePrinting } from "./fixtures";
+import { choose, search, signUp, status, test, expect, takePrinting, menu } from "./fixtures";
 
 async function newDeck(page: Page, name: string, format = "commander") {
-  await page.keyboard.press("Control+n");
+  await menu(page, "Decks", "New deck...");
   await page.keyboard.type(name);
   await choose(page, page.locator("#f-format"), format);
   await page.keyboard.press("Enter");

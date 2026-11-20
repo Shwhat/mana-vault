@@ -55,7 +55,7 @@ test("search shows pictures with owned counts, and the Filters panel filters the
 
 test("the deck's Add tab searches cards and adds them to a zone, counting what is already in the deck", async ({ page }) => {
   await signUp(page, "v8deck");
-  await page.keyboard.press("Control+n");
+  await menu(page, "Decks", "New deck...");
   await page.keyboard.type("Elves");
   await choose(page, page.locator("#f-format"), "casual");
   await page.keyboard.press("Enter");
