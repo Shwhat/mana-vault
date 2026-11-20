@@ -10,6 +10,7 @@ import { CardPage } from "../views/CardPage";
 import { CollectionView } from "../views/CollectionView";
 import { HomeView } from "../views/HomeView";
 import { TradeView } from "../views/TradeView";
+import { ProxiesView } from "../views/ProxiesView";
 import { CardsView } from "../views/Views";
 import { DeckView } from "../views/DeckView";
 import { About } from "./About";
@@ -29,6 +30,7 @@ function CenterView({ actions, onFilters }: { actions: Record<string, Action>; o
   if (store.view === "collection") return <CollectionView actions={actions} />;
   if (store.view === "deck") return <DeckView actions={actions} />;
   if (store.view === "trade") return <TradeView actions={actions} />;
+  if (store.view === "proxies") return <ProxiesView actions={actions} />;
   return <CardsView actions={actions} onFilters={onFilters} />;
 }
 
@@ -130,7 +132,7 @@ export function PhoneShell({ actions }: { actions: Record<string, Action> }) {
   }, [store.selection]);
 
   const leave = () => { setSheet(null); store.setScannerOpen(false); store.setCardPage(null); };
-  const tab = (id: "home" | "cards" | "collection" | "deck" | "trade", label: string, icon: string) => (
+  const tab = (id: "home" | "cards" | "collection" | "deck" | "trade" | "proxies", label: string, icon: string) => (
     <button type="button" className={store.view === id && !sheet && !store.scannerOpen && !store.cardPage ? "ptab on" : "ptab"}
       onClick={() => { leave(); store.setView(id); }}>
       <Icon name={icon} /><span>{label}</span>
@@ -172,6 +174,7 @@ export function PhoneShell({ actions }: { actions: Record<string, Action> }) {
         {tab("collection", "Collection", "collection")}
         {tab("deck", "Decks", "deck")}
         {tab("trade", "Trade", "trade")}
+        {tab("proxies", "Proxies", "print")}
         <button type="button" className={store.scannerOpen && !sheet && !store.cardPage ? "ptab on" : "ptab"} onClick={() => { setSheet(null); store.setCardPage(null); store.setScannerOpen(true); }}>
           <Icon name="scan" /><span>Scan</span>
         </button>

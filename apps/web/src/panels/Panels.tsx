@@ -3,11 +3,13 @@ import { useState } from "react";
 import type { Action } from "../actions";
 import { Icon } from "../icons";
 import { useApp, zoneLabel } from "../store";
-import { capitalize, type Filters, FORMATS, formatName, money, type OwnedIn } from "../types";
+import { capitalize, type Deck, type Filters, FORMATS, formatName, money, type OwnedIn } from "../types";
+import { collectionMenu, deckMenu } from "../components/ItemMenus";
 import { choices, Picker } from "../components/Picker";
 import { SCOPE_NAMES } from "../filters";
 import { Meter } from "../views/CollectionView";
 import { NoDeck, Quantity, zoneGroups } from "../views/Views";
+import { cardMenu } from "../views/DeckView";
 
 /** The Filters panel: it filters the open view (card search, the collection, the deck or a search inside it); each keeps its own filters. */
 export function FiltersPanel({ actions }: { actions: Record<string, Action> }) {
@@ -54,18 +56,16 @@ export function CollectionsPanel({ actions }: { actions: Record<string, Action> 
       </div>
       {store.collections !== null && list.length === 0 && <p className="note pad">No collections yet</p>}
       {list.map((item) => {
-        const target = store.prefs.targetCollection === item.id;
+        // the collection selected last is where new cards go; with a deck selected last no collection is highlighted
+        const selected = store.prefs.addTo === "collection" && store.prefs.targetCollection === item.id;
         return (
-          <div key={item.id} className={store.prefs.openCollection === item.id ? "navitem colitem active" : "navitem colitem"} role="button"
-            onClick={() => { store.openCollection(item.id); store.setView("collection"); }}>
+          <div key={item.id} className={selected ? "navitem colitem active" : "navitem colitem"} role="button" aria-current={selected || undefined}
+            onClick={() => { store.openCollection(item.id); store.setView("collection"); }} {...collectionMenu(store, item)}>
             <span className="colline">
               <span className="nl">{item.name}</span>
               {item.kind === "wishlist" && <span className="badge wish" title="Cards here are wanted, not owned">Wishlist</span>}
               {item.role === "member" && <span className="badge" title={`Shared by ${item.owner.name}`}>Shared</span>}
               {item.role === "owner" && item.sharedWith.length > 0 && <span className="badge" title={`Shared with ${item.sharedWith.map((person) => person.name).join(", ")}`}>Shared</span>}
-              <button type="button" className={target ? "tgt on" : "tgt"} title={target ? "Add to collection puts cards here" : "Make this the collection new cards go to"}
-                aria-label={target ? `${item.name} receives new cards` : `Add new cards to ${item.name}`} aria-pressed={target}
-                onClick={(event) => { event.stopPropagation(); store.setTargetCollection(item.id); }}>{target ? "Adds here" : "Add here"}</button>
             </span>
             <span className="colline sub">
               <span className="cnt">{item.cardCount} cards, {money(item.value[store.prefs.currency], store.prefs.currency)}</span>
@@ -77,6 +77,15 @@ export function CollectionsPanel({ actions }: { actions: Record<string, Action> 
       })}
     </div>
   );
+}
+
+/** Decks grouped by format in the order of the format list, Casual last; each group keeps the list's order. */
+export function deckGroups(decks: Deck[]): Array<[string, Deck[]]> {
+  const groups = new Map<string, Deck[]>();
+  for (const deck of decks) groups.set(deck.format, [...(groups.get(deck.format) ?? []), deck]);
+  const order: readonly string[] = FORMATS;
+  const rank = (format: string) => (format === "casual" ? order.length : order.includes(format) ? order.indexOf(format) : order.length - 1);
+  return [...groups.entries()].sort(([a], [b]) => rank(a) - rank(b));
 }
 
 export function DecksPanel({ actions }: { actions: Record<string, Action> }) {
@@ -91,12 +100,26 @@ export function DecksPanel({ actions }: { actions: Record<string, Action> }) {
         <button type="button" className="btn small" onClick={actions.newDeck?.run}>New...</button>
       </div>
       {store.decks.length === 0 && <p className="note pad">No decks yet</p>}
-      {shown.map((deck) => (
-        <div key={deck.id} className={store.deck?.id === deck.id ? "navitem active" : "navitem"} role="button" title={[deck.commander, formatName(deck.format)].filter(Boolean).join(", ")}
-          onClick={() => void store.openDeck(deck.id).then(() => store.setView("deck"))}>
-          <span className="nl">{deck.name}</span>
-          {(deck.role === "member" || (deck.sharedWith?.length ?? 0) > 0) && <span className="badge">Shared</span>}
-          <span className="cnt">{deck.card_count ?? 0}</span>
+      {deckGroups(shown).map(([format, decks]) => (
+        <div key={format} role="group" aria-label={formatName(format)}>
+          <div className="navgroup">{formatName(format)} <span className="cnt">{decks.length}</span></div>
+          {decks.map((deck) => {
+            // the deck selected last is where new cards go; with a collection selected last no deck is highlighted
+            const selected = store.prefs.addTo === "deck" && store.deck?.id === deck.id;
+            return (
+              <div key={deck.id} className={selected ? "navitem colitem active" : "navitem colitem"} role="button" aria-current={selected || undefined}
+                title={[deck.commander, formatName(deck.format)].filter(Boolean).join(", ")}
+                onClick={() => void store.openDeck(deck.id).then(() => store.setView("deck"))} {...deckMenu(store, deck)}>
+                <span className="colline">
+                  <span className="nl">{deck.name}</span>
+                  {(deck.role === "member" || (deck.sharedWith?.length ?? 0) > 0) && <span className="badge">Shared</span>}
+                </span>
+                <span className="colline sub">
+                  <span className="cnt">{deck.card_count ?? 0} cards, {money(deck.value?.[store.prefs.currency] ?? 0, store.prefs.currency)}</span>
+                </span>
+              </div>
+            );
+          })}
         </div>
       ))}
     </div>
@@ -188,7 +211,7 @@ export function DeckListPanel({ actions }: { actions: Record<string, Action> }) 
             const key = String(card.entry_id);
             const active = store.selection?.view === "deck" && store.selection.key === key;
             return (
-              <div key={key} className={active ? "dlrow active" : "dlrow"} onClick={() => store.select({ view: "deck", key, printingId: card.card_id })}>
+              <div key={key} className={active ? "dlrow active" : "dlrow"} onClick={() => store.select({ view: "deck", key, printingId: card.card_id })} {...cardMenu(store, card)}>
                 <span className="num">{card.quantity}</span>
                 <span className="nl">{card.name}</span>
                 <Quantity value={card.quantity} name={card.name} max={100} onChange={(quantity) => void store.setDeckQuantity(card, quantity)} />

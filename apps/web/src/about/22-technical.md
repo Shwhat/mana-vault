@@ -53,7 +53,7 @@ The container checks itself every 30 seconds by running the server with `-health
 ## Limits
 
 - Sending is limited to accounts on the same server.
-- Imports accept files up to 5 MB and 5,000 rows; backups up to 25 MB.
+- Imports accept files up to 5 MB and 5,000 rows; backups up to 250 MB.
 - Set completion needs Scryfall's set list for printed sizes; it arrives with the first card database update after installing 0.2.0.
 - Card images need internet access to Scryfall's image servers.
 - Prices are as old as the last card database update, and are not kept over time.
@@ -70,6 +70,8 @@ The container checks itself every 30 seconds by running the server with `-health
 | React, React DOM | Interface | MIT |
 | Vite | Building the interface | MIT |
 | Tesseract.js, Tesseract.js core | Card text recognition | Apache 2.0 |
+| pdf-lib | Making the proxy PDF | MIT |
+| fflate | Making the zip files of MakePlayingCards pictures | MIT |
 | Tesseract English model (@tesseract.js-data/eng) | Card text recognition | Apache 2.0 |
 | Capacitor (@capacitor/core, @capacitor/android, @capacitor/cli) | Android app | MIT |
 | Google ML Kit text recognition | Card text recognition in the Android app | ML Kit terms of service |

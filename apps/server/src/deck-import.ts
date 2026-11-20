@@ -3,7 +3,28 @@ import { parse } from "csv-parse/sync";
 import type { DatabaseSync } from "node:sqlite";
 
 type Zone = "main" | "sideboard" | "commander" | "maybeboard";
-export type DeckImportRow = { name: string; quantity: number; set: string; collectorNumber: string; zone: Zone | null; sourceRow?: number };
+export type DeckImportRow = {
+  name: string; quantity: number; set: string; collectorNumber: string; zone: Zone | null; sourceRow?: number; finish?: "" | "foil" | "etched";
+};
+
+/**
+ * Splits the card part of a list line into name, set, collector number and finish marks: "Sauron, the Dark Lord (HOC) 36 *F*",
+ * "Sol Ring [C21] #263", "Opt (XLN) 65". `*F*` marks foil and `*E*` etched; other marks such as `*CMDR*` are dropped.
+ */
+export function splitPrinting(raw: string): { name: string; set: string; number: string; finish: "" | "foil" | "etched" } {
+  let text = raw.trim();
+  let finish: "" | "foil" | "etched" = "";
+  for (;;) {
+    const mark = /\s*\*([A-Za-z]+)\*\s*$/.exec(text);
+    if (!mark) break;
+    const code = mark[1]!.toUpperCase();
+    if (code === "E") finish = "etched";
+    else if (code === "F" && finish !== "etched") finish = "foil";
+    text = text.slice(0, mark.index).trim();
+  }
+  const printing = /^(.*?)\s*[[(]([A-Za-z0-9]{2,6})[\])]\s*#?([A-Za-z0-9-]+[a-z\u2605\u2020]?)?$/.exec(text);
+  return { name: (printing?.[1] ?? text).trim(), set: printing?.[2] ?? "", number: printing?.[3] ?? "", finish };
+}
 
 export interface DeckImportResult {
   matchedRows: number;
@@ -68,13 +89,13 @@ export function parseText(text: string): DeckImportRow[] {
       continue;
     }
     const rowZone = match[1] ? zoneFrom(match[1], zone) ?? zone : zone;
-    const rawCard = match[3] ?? "";
-    const printing = /^(.*?)\s*[\[(]([A-Za-z0-9]{2,6})[\])]\s*#?([A-Za-z0-9-]+)?$/.exec(rawCard.trim());
+    const card = splitPrinting(match[3] ?? "");
     result.push({
       quantity: Number(match[2] ?? "0"),
-      name: (printing?.[1] ?? rawCard).trim(),
-      set: printing?.[2] ?? "",
-      collectorNumber: printing?.[3] ?? "",
+      name: card.name,
+      set: card.set,
+      collectorNumber: card.number,
+      finish: card.finish,
       zone: rowZone,
       sourceRow: lineIndex + 1,
     });
@@ -93,14 +114,7 @@ export function importDecklist(
   if (!rows.length) throw new Error("Decklist has no card rows");
   if (rows.length > 5000) throw new Error("Decklist can contain at most 5,000 rows per import");
 
-  const findPrinting = database.prepare(
-    `SELECT id, oracle_id FROM cards
-     WHERE (name = ? COLLATE NOCASE OR flavor_name = ? COLLATE NOCASE OR name LIKE ? ESCAPE '\\')
-       AND (? = '' OR lower(set_code) = lower(?) OR set_name = ? COLLATE NOCASE)
-       AND (? = '' OR collector_number = ?)
-     ORDER BY name = ? COLLATE NOCASE DESC, released_at DESC, set_code, collector_number
-     LIMIT 1`,
-  );
+  const find = printingFinder(database);
   const unmatched: DeckImportResult["unmatched"] = [];
   const additions = new Map<string, { oracleId: string; printingId: string | null; quantity: number; zone: Zone }>();
   let matchedRows = 0;
@@ -116,14 +130,12 @@ export function importDecklist(
       unmatched.push({ row: sourceRow, name: row.name, reason: "Quantity must be a whole number from 1 to 100" });
       return;
     }
-    const printing = findPrinting.get(
-      ...nameMatch(row.name), row.set, row.set, row.set, row.collectorNumber, row.collectorNumber, row.name,
-    ) as { id: string; oracle_id: string } | undefined;
+    const printing = find(row.name, row.set, row.collectorNumber);
     if (!printing) {
       unmatched.push({
         row: sourceRow,
         name: row.name,
-        reason: row.set || row.collectorNumber ? "No printing matched the supplied set and collector number" : "No card with this name exists in the local catalog",
+        reason: row.set || row.collectorNumber ? "No printing matched the supplied set and collector number" : "No card with this name exists in the card database",
       });
       return;
     }
@@ -182,6 +194,11 @@ export function printingFinder(database: DatabaseSync) {
      ORDER BY name = ? COLLATE NOCASE DESC, released_at DESC, set_code, collector_number
      LIMIT 1`,
   );
+  // a line whose name does not match (another language, a typo) is still found by its set and collector number
+  const bySetNumber = database.prepare(
+    "SELECT id, oracle_id, name FROM cards WHERE lower(set_code) = lower(?) AND collector_number = ? COLLATE NOCASE ORDER BY released_at DESC LIMIT 1",
+  );
   return (name: string, set = "", number = "") =>
-    statement.get(...nameMatch(name), set, set, set, number, number, name) as { id: string; oracle_id: string; name: string } | undefined;
+    (statement.get(...nameMatch(name), set, set, set, number, number, name)
+      ?? (set && number ? bySetNumber.get(set, number) : undefined)) as { id: string; oracle_id: string; name: string } | undefined;
 }

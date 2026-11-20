@@ -3,6 +3,7 @@ import { request, APP_VERSION } from "./api";
 import { isApp } from "./android/platform";
 import { DEFAULT_WORKSPACE, isOpen, openPanel, PRESETS, type Layout, type Workspace, validLayout } from "./dock";
 import type { RibbonSize, RibbonTab } from "./ribbon";
+import { DEFAULT_SHEET, readSheet, type SheetSettings } from "./proxy-print";
 import type { CollectionLayout, CollectionSort, Currency, DeckGroup, DeckSort, DeckView, GridSize, SwitchSort, Zone } from "./types";
 
 export type Theme = "light" | "dark" | "system";
@@ -17,8 +18,10 @@ export type Prefs = {
   workspace: string;
   workspaces: Record<string, Workspace>;
   lastDeckId: string | null;
-  /** The collection that Add to collection puts cards into. */
+  /** The collection that Add to collection puts cards into, when a collection was selected last. */
   targetCollection: string | null;
+  /** Whether new cards go to the collection or the deck selected last. */
+  addTo: "collection" | "deck";
   /** The collection shown in the collection view. */
   openCollection: string | null;
   currency: Currency;
@@ -68,6 +71,9 @@ export type Prefs = {
   /** Scanner: show how many copies of the last card are already in your collections. */
   scanShowOwned: boolean;
   ribbonSize: RibbonSize;
+  /** Proxies: the sheet settings for printing, and the tab shown (Print or Card maker). */
+  proxySheet: SheetSettings;
+  proxyTab: "print" | "maker";
   appVersion: string;
 };
 
@@ -75,12 +81,13 @@ export function defaultPrefs(): Prefs {
   const preset = PRESETS[DEFAULT_WORKSPACE]!();
   return {
     theme: "light", foil: false, zone: "main", ribbon: null, ribbonTab: "home", layout: preset.layout,
-    workspace: DEFAULT_WORKSPACE, workspaces: {}, lastDeckId: null, targetCollection: null, openCollection: null,
+    workspace: DEFAULT_WORKSPACE, workspaces: {}, lastDeckId: null, targetCollection: null, addTo: "collection", openCollection: null,
     currency: "usd", collectionSort: "name", collectionLayout: "grid", collectionLayoutPhone: "grid", gridSize: "m",
     searchLayout: "grid", searchLayoutPhone: "grid", searchSize: "m", allWishlists: false, tradeAllCards: false,
     collectionSwitchSort: "recent", deckSwitchSort: "recent", recent: {}, deckView: "list", deckGroup: "type", deckSort: "name",
     scanVibrate: true, scanFoil: false, scanCamera: "environment", scanQuick: false, scanSounds: true, scanSets: [], scanIgnorePromos: false,
-    scanProxy: false, scanCondition: "NM", scanLanguage: "en", scanShowTotal: false, scanShowOwned: false, ribbonSize: "large", appVersion: APP_VERSION,
+    scanProxy: false, scanCondition: "NM", scanLanguage: "en", scanShowTotal: false, scanShowOwned: false, ribbonSize: "large",
+    proxySheet: DEFAULT_SHEET, proxyTab: "print", appVersion: APP_VERSION,
   };
 }
 
@@ -106,6 +113,7 @@ export function mergePrefs(saved: unknown): Prefs {
       : {},
     lastDeckId: typeof value.lastDeckId === "string" ? value.lastDeckId : null,
     targetCollection: typeof value.targetCollection === "string" ? value.targetCollection : null,
+    addTo: value.addTo === "deck" ? "deck" : "collection",
     openCollection: typeof value.openCollection === "string" ? value.openCollection : null,
     currency: value.currency === "eur" ? "eur" : "usd",
     collectionSort: ["price-desc", "price-asc", "quantity", "set"].includes(String(value.collectionSort)) ? value.collectionSort as CollectionSort : "name",
@@ -133,6 +141,8 @@ export function mergePrefs(saved: unknown): Prefs {
     scanSounds: value.scanSounds !== false,
     scanSets: Array.isArray(value.scanSets) ? value.scanSets.filter((code): code is string => typeof code === "string" && /^[a-z0-9]{2,8}$/.test(code)).slice(0, 50) : [],
     scanIgnorePromos: value.scanIgnorePromos === true,
+    proxySheet: readSheet(value.proxySheet),
+    proxyTab: value.proxyTab === "maker" ? "maker" : "print",
     scanProxy: value.scanProxy === true,
     scanCondition: ["M", "NM", "LP", "MP", "HP", "DMG"].includes(String(value.scanCondition)) ? String(value.scanCondition) : "NM",
     scanLanguage: typeof value.scanLanguage === "string" && /^[a-z]{2,3}$/.test(value.scanLanguage) ? value.scanLanguage : "en",

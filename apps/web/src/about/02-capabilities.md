@@ -20,7 +20,9 @@ This page lists what Mana Vault does in the current version, followed by what is
 ### Collections
 
 - Keep any number of collections per account, each with a name and description. Every account starts with a Main collection.
-- Add any printing as a regular or foil copy to the target collection with one click, Enter or a double-click, and switch the target with C.
+- Add any printing as a regular or foil copy with Enter or a double-click to the collection or deck selected last in the Collections panel, the Decks panel or a switcher, and cycle the collections with C.
+- Change the printing of copies added as the wrong printing, keeping their count, finish, condition, language, trade marks, details and deck links.
+- Right-click or long press a collection (panel or switcher) to open, rename, change settings, send, export, delete or leave it.
 - Record each copy's finish (regular, foil or etched), condition (Mint to Damaged) and language with Copy details.
 - Show each row's value, and each collection's total value, in US dollars or euros.
 - Sort rows by name, price, quantity, or set and number.
@@ -66,6 +68,9 @@ This page lists what Mana Vault does in the current version, followed by what is
 
 - Create decks with a name and one of 21 formats; every deck keeps the printing of each card.
 - Open decks from a switcher with search, six sort orders, cover card, commander, format and card count.
+- Change the printing of a deck card: free copies of the new printing are linked, from the collection you choose when several have them.
+- Right-click or long press a deck (panel or switcher) to open, rename, change the format, send, export, delete or leave it, and a card in the Deck list panel for the deck card menu.
+- The Decks panel groups decks by format with each deck's card count and value.
 - Add cards by typing them (Quick add, such as 2 Sol Ring), from the Add tab's card search with + Main, + Side, + Maybe and + Commander (each showing how many are already in the deck), from card search or from the scanner.
 - Filter the deck's cards with a filter box and the Filters panel.
 - Edit the whole deck as text, checked before it is applied, as one step that can be undone.
@@ -77,11 +82,21 @@ This page lists what Mana Vault does in the current version, followed by what is
 - Link each deck card to the copy in a collection that fills it: one deck per copy, chosen when a card is free in more than one collection, changeable later, following the copy when it moves, and missing when it is removed.
 - Rename and delete decks.
 - Add cards to the commander zone, main deck, sideboard or maybeboard, change counts, move cards between zones and remove cards.
-- Import decklists as text (Moxfield, Arena and MTGO style) or CSV, with a preview.
+- Import decklists as text (Moxfield, Arena and MTGO style, with `*F*` foil and `*E*` etched marks) or CSV, with a preview. A line whose name does not match is found by its set and collector number.
 - Export decks as text or CSV.
 - Check which deck cards have a linked copy, where they are, and what the missing cards cost.
 - Export the missing cards of a deck as text, or add them to the wishlist.
 - Show deck statistics, colored mana symbols beside the cards that make each color, and the deck's value.
+
+### Proxies and custom cards
+
+- Keep a print list on the server: add a deck, its missing cards, a collection, picked rows, a pasted list, the tokens of the listed cards, or any card from a search.
+- Choose each line's printing, count and faces (front, back or both for two-faced cards).
+- Set the paper (Letter, A4, Legal or custom), margins, card size, scale, gap, bleed, cutting guides and background, with a live page preview.
+- Export a PDF at 300 DPI, pictures for MakePlayingCards with bleed, and a card list for MPC Autofill with custom cards as pictures.
+- After exporting, add the printed cards as proxies to a collection or deck.
+- Make custom cards in the card maker: every card field, mana symbol buttons, Mana Vault's own frames in every color, hybrid, gold, artifact, colorless and land with legendary versions, creature, planeswalker, saga, token and double-faced cards, uploaded art or a card's art with move and zoom, and PNG export.
+- Save custom cards to the card database for every account, in custom sets with their own codes, names, release dates and symbols, with colors, color identity, finishes, prices, legality and tokens, found with `is:custom`.
 
 ### Sending and sharing
 
@@ -97,6 +112,7 @@ This page lists what Mana Vault does in the current version, followed by what is
 
 - Update the local card database from Scryfall on demand, and on a schedule when the server is set up for it, with prices, flavor names, power and toughness, and rulings.
 - Show the number of printings and the date of the last update in the status bar.
+- Skip a card whose record fails a check instead of stopping the update, and list the skipped cards.
 
 ### Scanning
 
@@ -114,7 +130,7 @@ This page lists what Mana Vault does in the current version, followed by what is
 
 ### Backups
 
-- Download a backup of your own collections, decks and the card records they use.
+- Download a backup of your own collections, decks and the card records they use, with the custom cards and sets you made or use.
 - Check a backup before restoring it, then replace your own collections and decks with it.
 
 ### Accounts
@@ -122,15 +138,15 @@ This page lists what Mana Vault does in the current version, followed by what is
 - Sign in with a user name and password. New accounts can be turned off by the server owner.
 - Change your password, which signs out your other devices and phones.
 - See the phones signed in to your account in Devices..., and remove any of them.
-- Keep theme, ribbon, panel layout, workspace, target collection and open collection choices per account.
+- Keep theme, ribbon, panel layout, workspace, where new cards go, open collection and proxy sheet choices per account.
 
 ### Interface
 
 - Desktop layout with a title bar, the ribbon as the only menu (lists for related commands, context groups, hidden commands that do not apply, three button sizes), dockable panels whose floating windows dock onto other panels and snap to each other, saved workspaces, status bar and light, dark or system theme.
-- Right-click menus on cards and rows; a long press opens them on a phone.
+- Right-click menus on cards, rows, collections and decks; a long press opens them on a phone.
 - Card page with art, rules text, power and toughness, every version with market prices, rulings, and where you own the card.
 - Home view with totals, recent scans and the Inbox.
-- Phone layout with Home, Search, Collection, Decks, Trade and Scan tabs, a nested menu at the top right, full-screen sheets and an installable home screen app.
+- Phone layout with Home, Search, Collection, Decks, Trade, Proxies and Scan tabs, a nested menu at the top right, full-screen sheets and an installable home screen app.
 - The app's own choice lists everywhere, with a search box for long lists and a sheet on phones.
 - A built-in About guide (this guide).
 

@@ -25,6 +25,7 @@ export function searchMenu(store: Store, card: FoundCard) {
     { label: "Add to wishlist", run: wish },
     !!store.deck && { label: `Add to ${store.deck.name}`, run: () => void store.addToDeck(card.id, card.name) },
     { label: "Add to trade (you get)", run: () => void store.getCard(card.id) },
+    { label: "Add to print list", run: () => void store.addToPrintList([{ card, count: 1 }], card.name) },
   ];
 }
 

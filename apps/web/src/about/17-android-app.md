@@ -89,7 +89,7 @@ Every change made offline waits on the phone in order. Changes are sent:
 - every minute while the app is open,
 - when you tap the sync button in the top bar, or choose **Sync now** (Menu, Account).
 
-After sending, the phone downloads the lists of collections and decks, then only the collections and decks that changed on the server since the last sync, a newer card list when the server's card database was updated, and newer rulings.
+After sending, the phone downloads the lists of collections and decks, then only the collections and decks that changed on the server since the last sync, a newer card list when the server's card database was updated or a custom card changed, and newer rulings.
 
 How the server applies offline changes:
 

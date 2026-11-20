@@ -214,7 +214,7 @@ export function importCollectionCsv(database: DatabaseSync, text: string, commit
       ?? (named ? findPrinting.get(...nameMatch(row.name), named, named, named, row.number, row.number, row.name) : undefined);
     if (!printing) {
       const details = [set, row.number].filter(Boolean).join(" ");
-      skip(details ? `No printing matched ${details}` : "No card with this name exists in the local catalog");
+      skip(details ? `No printing matched ${details}` : "No card with this name exists in the card database");
       continue;
     }
     const proxy = readFlag(row.proxy);

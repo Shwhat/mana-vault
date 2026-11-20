@@ -26,7 +26,7 @@ export class NameMatcher {
     ).get();
     const key = `${String(stamp?.count)}:${String(stamp?.updated)}`;
     if (this.index?.key === key) return this.index;
-    this.index = buildNameIndex(key, this.database.prepare("SELECT DISTINCT name, flavor_name FROM cards").all() as Array<{ name: unknown; flavor_name: unknown }>);
+    this.index = buildNameIndex(key, this.database.prepare("SELECT DISTINCT name, flavor_name FROM cards WHERE custom = 0").all() as Array<{ name: unknown; flavor_name: unknown }>);
     return this.index;
   }
 
@@ -62,7 +62,7 @@ export function matchScan(database: DatabaseSync, matcher: NameMatcher, lines: s
   const flavored = !inSet && nameOk.flavor
     ? database.prepare(`SELECT ${CARD_COLUMNS} FROM cards WHERE name = ? AND flavor_name = ? ${NEWEST} LIMIT 1`).get(nameOk.name, nameOk.flavor) as ScanCard | undefined
     : undefined;
-  const card = inSet ?? flavored ?? database.prepare(`SELECT ${CARD_COLUMNS} FROM cards WHERE name = ? ${NEWEST} LIMIT 1`).get(nameOk.name) as ScanCard | undefined;
+  const card = inSet ?? flavored ?? database.prepare(`SELECT ${CARD_COLUMNS} FROM cards WHERE name = ? AND custom = 0 ${NEWEST} LIMIT 1`).get(nameOk.name) as ScanCard | undefined;
   return { card: card ?? null, score: nameOk.score, by: inSet ? "printing" : "name", read: nameOk.read };
 }
 

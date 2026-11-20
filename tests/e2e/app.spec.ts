@@ -133,7 +133,7 @@ test("collection CSV import shows the detected format, a preview and the review 
   await expect(page.locator(".revhead")).toContainText("Imported: 2 matched rows (5 cards), 1 skipped");
   await page.keyboard.press("2");
   await expect(page.locator("#view-collection .row", { hasText: "Counterspell" }).locator(".badge.foil")).toBeVisible();
-  await expect(page.locator(".dgbody .msg", { hasText: "Not A Real Card" })).toContainText("No card with this name exists in the local catalog");
+  await expect(page.locator(".dgbody .msg", { hasText: "Not A Real Card" })).toContainText("No card with this name exists in the card database");
 });
 
 test("decklist import into a deck", async ({ page }) => {
@@ -276,7 +276,7 @@ test.describe("phone layout", () => {
 
   test("tabs, card page and the nested menu", async ({ page }) => {
     await signUp(page, "phone");
-    await expect(page.locator("#ptabs .ptab")).toHaveText(["Home", "Search", "Collection", "Decks", "Trade", "Scan"]);
+    await expect(page.locator("#ptabs .ptab")).toHaveText(["Home", "Search", "Collection", "Decks", "Trade", "Proxies", "Scan"]);
     await expect(page.locator("#view-home")).toBeVisible();
     await expect(page.locator("#titlebar")).toHaveCount(0);
     await page.locator(".ptab", { hasText: "Search" }).click();

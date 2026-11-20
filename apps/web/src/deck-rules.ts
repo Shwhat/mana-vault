@@ -196,14 +196,34 @@ export function deckText(cards: DeckCard[]): string {
 }
 
 /** A typed line for Quick add: "2 Sol Ring", "2x Sol Ring", "Sol Ring" or "1 Sol Ring (C21) 263". */
-export function parseQuickAdd(text: string): { quantity: number; name: string; set: string; number: string } | null {
+export type Finish = "" | "foil" | "etched";
+
+/**
+ * Splits the card part of a list line into name, set, collector number and finish marks, the same way as the server:
+ * "Sauron, the Dark Lord (HOC) 36 *F*". `*F*` marks foil and `*E*` etched; other marks are dropped.
+ */
+export function splitPrinting(raw: string): { name: string; set: string; number: string; finish: Finish } {
+  let text = raw.trim();
+  let finish: Finish = "";
+  for (;;) {
+    const mark = /\s*\*([A-Za-z]+)\*\s*$/.exec(text);
+    if (!mark) break;
+    const code = mark[1]!.toUpperCase();
+    if (code === "E") finish = "etched";
+    else if (code === "F" && finish !== "etched") finish = "foil";
+    text = text.slice(0, mark.index).trim();
+  }
+  const printing = /^(.*?)\s*[[(]([A-Za-z0-9]{2,6})[\])]\s*#?([A-Za-z0-9-]+[a-z\u2605\u2020]?)?$/.exec(text);
+  return { name: (printing?.[1] ?? text).trim(), set: printing?.[2] ?? "", number: printing?.[3] ?? "", finish };
+}
+
+export function parseQuickAdd(text: string): { quantity: number; name: string; set: string; number: string; finish: Finish } | null {
   const match = /^\s*(?:(\d+)\s*x?\s+)?(.+?)\s*$/i.exec(text);
   if (!match || !match[2]) return null;
   const quantity = match[1] ? Number(match[1]) : 1;
   if (!Number.isInteger(quantity) || quantity < 1 || quantity > 100) return null;
-  const printing = /^(.*?)\s*[[(]([A-Za-z0-9]{2,6})[\])]\s*#?([A-Za-z0-9-]+)?$/.exec(match[2]);
-  const name = (printing?.[1] ?? match[2]).trim();
-  return name ? { quantity, name, set: printing?.[2] ?? "", number: printing?.[3] ?? "" } : null;
+  const card = splitPrinting(match[2]);
+  return card.name ? { quantity, ...card } : null;
 }
 
 // ---------- playtest ----------

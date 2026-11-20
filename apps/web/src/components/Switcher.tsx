@@ -1,5 +1,6 @@
 // ---------- switcher: one searchable list for opening a collection or a deck ----------
 import { choices, Picker } from "./Picker";
+import { collectionMenu, deckMenu } from "./ItemMenus";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Action } from "../actions";
 import { Icon } from "../icons";
@@ -108,6 +109,15 @@ function SwitcherList({ kind, items, currentId, anchor, actions, onClose }: {
       void store.openDeck(item.id).then(() => store.setView("deck"));
     }
   };
+  // right-click or long press on a row: the collection's or deck's commands
+  const itemMenu = (id: string) => {
+    if (kind === "collection") {
+      const found = store.collections?.find((item) => item.id === id);
+      return found ? collectionMenu(store, found) : {};
+    }
+    const found = store.decks.find((item) => item.id === id);
+    return found ? deckMenu(store, found) : {};
+  };
   const rect = anchor?.getBoundingClientRect();
   const phone = store.phone;
   const style = phone || !rect ? undefined : { left: Math.max(4, Math.min(rect.left, window.innerWidth - 384)), top: rect.bottom + 2 };
@@ -132,7 +142,7 @@ function SwitcherList({ kind, items, currentId, anchor, actions, onClose }: {
         {shown.map((item, position) => (
           <div key={item.id} data-index={position} role="option" aria-selected={position === index}
             className={`swrow${position === index ? " hi" : ""}${item.id === currentId ? " cur" : ""}`}
-            onMouseEnter={() => setIndex(position)} onClick={() => choose(item)}>
+            onMouseEnter={() => setIndex(position)} onClick={() => choose(item)} {...itemMenu(item.id)}>
             {kind === "deck" && (item.image ? <img className="swart" src={item.image} alt="" loading="lazy" /> : <span className="swart none" aria-hidden="true" />)}
             <span className="swtext">
               <span className="swtitle"><b>{item.name}</b>{item.badge && <span className={item.badge === "Wishlist" ? "badge wish" : "badge"}>{item.badge}</span>}</span>

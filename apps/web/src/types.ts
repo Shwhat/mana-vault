@@ -2,6 +2,8 @@
 export type Card = {
   id: string;
   oracle_id?: string;
+  /** A card made in the card maker (0.9.0). */
+  custom?: boolean;
   name: string;
   mana_cost: string | null;
   mana_value: number | null;
@@ -39,7 +41,7 @@ export type CopyKey = { cardId: string; foil: FinishCode; condition: Condition; 
 export type CopyExtras = {
   purchase_price: number | null; price_currency: string | null; added_at: string | null; misprint: boolean; altered: boolean; signed: boolean;
 };
-export type CollectionEntry = Pick<Card, "id" | "name" | "set_code" | "set_name" | "collector_number" | "rarity" | "image_url" | "colors" | "mana_cost" | "mana_value" | "type_line"> &
+export type CollectionEntry = Pick<Card, "id" | "name" | "set_code" | "set_name" | "collector_number" | "rarity" | "image_url" | "colors" | "mana_cost" | "mana_value" | "type_line" | "custom"> &
   PriceFields & {
     oracle_id: string;
     quantity: number;
@@ -131,6 +133,8 @@ export type Deck = Partial<Sharing> & {
   format: string;
   mode: DeckMode;
   card_count?: number;
+  /** The value of the cards in the deck (not the maybeboard), each at its printing's price. */
+  value?: { usd: number; eur: number };
   /** The collection that receives copies added straight to this deck, remembered per deck. */
   collection_id?: string | null;
   created_at?: string;
@@ -147,7 +151,7 @@ export type Deck = Partial<Sharing> & {
 /** A collection copy that fills a deck card. */
 export type DeckLink = CopyKey & { collectionId: string; collectionName: string; quantity: number };
 
-export type DeckCard = Pick<Card, "name" | "mana_cost" | "type_line" | "set_code" | "set_name" | "collector_number" | "image_url"> & Partial<PriceFields> & {
+export type DeckCard = Pick<Card, "name" | "mana_cost" | "type_line" | "set_code" | "set_name" | "collector_number" | "image_url" | "custom"> & Partial<PriceFields> & {
   mana_value?: number | null;
   rarity?: string;
   colors?: string;
@@ -189,6 +193,8 @@ export type ImportReport = {
 export type CatalogStatus = {
   printingCount: number;
   updatedAt: string | null;
+  /** Cards the last update left out because their record failed a check (up to 50 names). */
+  skipped?: { count: number; names: string[] };
   update: {
     scheduled: boolean;
     intervalHours: number | null;
@@ -210,7 +216,7 @@ export type BackupSummary = {
 
 export type User = { id: number; name: string };
 
-export type View = "home" | "cards" | "collection" | "deck" | "trade" | "about";
+export type View = "home" | "cards" | "collection" | "deck" | "trade" | "proxies" | "about";
 export type CollectionTab = "cards" | "completion" | "missing" | "stats";
 export type DeckTab = "cards" | "add" | "ownership" | "stats" | "playtest" | "description" | "history";
 export type DeckView = "list" | "text" | "stacks" | "grid";

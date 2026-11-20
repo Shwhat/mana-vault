@@ -93,6 +93,13 @@ export function parseCardQuery(query: string): SearchClause[] {
       continue;
     }
 
+    if (key === "is") {
+      if (operator !== ":") throw new Error(`${rawKey} only supports the ":" operator`);
+      if (value.toLowerCase() !== "custom") throw new Error(`Unknown card kind "${value}". Use is:custom`);
+      clauses.push({ sql: `${negate}(custom = 1)`, values: [] });
+      continue;
+    }
+
     if (key === "legal" || key === "f") {
       if (operator !== ":") throw new Error(`${rawKey} only supports the ":" operator`);
       if (!/^[a-z0-9-]{2,30}$/i.test(value)) throw new Error(`Invalid format "${value}"`);

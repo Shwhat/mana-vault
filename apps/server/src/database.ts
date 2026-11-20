@@ -408,6 +408,41 @@ function upgradeDeckBuilder(database: DatabaseSync): void {
     );
     CREATE INDEX IF NOT EXISTS deck_history_deck_idx ON deck_history(deck_id, id);
   `);
+  initializeCustomTables(database);
+}
+
+/** Custom cards and sets (0.9.0): cards made in the card maker are rows of the card database marked custom. */
+function initializeCustomTables(database: DatabaseSync): void {
+  const cardColumns = new Set((database.prepare("PRAGMA table_info(cards)").all() as Array<{ name: string }>).map((column) => column.name));
+  if (!cardColumns.has("custom")) database.exec("ALTER TABLE cards ADD COLUMN custom INTEGER NOT NULL DEFAULT 0");
+  // the picture of a two-faced card's back face, for printing proxies (0.9.0)
+  if (!cardColumns.has("back_image_url")) database.exec("ALTER TABLE cards ADD COLUMN back_image_url TEXT");
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS custom_sets (
+      code TEXT PRIMARY KEY,
+      owner_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      symbol BLOB,
+      symbol_type TEXT,
+      created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%f', 'now'))
+    );
+    CREATE TABLE IF NOT EXISTS custom_cards (
+      id TEXT PRIMARY KEY,
+      owner_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      design TEXT NOT NULL DEFAULT '{}',
+      picture BLOB,
+      picture_type TEXT,
+      back_picture BLOB,
+      back_picture_type TEXT,
+      art BLOB,
+      art_type TEXT,
+      back_art BLOB,
+      back_art_type TEXT,
+      version INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%f', 'now')),
+      updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%f', 'now'))
+    );
+    CREATE INDEX IF NOT EXISTS cards_custom_idx ON cards(custom);
+  `);
 }
 
 /** Collections and decks without an owner (from before accounts owned data) go to the oldest account. */
