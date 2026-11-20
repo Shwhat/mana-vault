@@ -5,6 +5,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { listSets } from "./sets.js";
 import { type CopyExtras, type CopyKey, type Currency, NO_EXTRAS, PRICE_COLUMNS, priceSql, readCopyExtras, readCopyKey } from "./copies.js";
 import { alignDeckCard, collectionLinks, linkedCount, moveLinks, rowKey, trimLinks } from "./links.js";
+import { finishOffered, readDeckFinish } from "./decks.js";
 
 export type Kind = "collection" | "deck";
 export type Completion = "none" | "main" | "all" | "names";
@@ -391,7 +392,7 @@ export function copyDeck(database: DatabaseSync, from: string, ownerId: number, 
   const id = randomUUID();
   database.prepare("INSERT INTO decks (id, name, format, mode, owner_id) SELECT ?, ?, format, 'theme', ? FROM decks WHERE id = ?").run(id, name, ownerId, from);
   database.prepare(
-    "INSERT INTO deck_cards (deck_id, oracle_id, printing_id, quantity, zone) SELECT ?, oracle_id, printing_id, quantity, zone FROM deck_cards WHERE deck_id = ?",
+    "INSERT INTO deck_cards (deck_id, oracle_id, printing_id, quantity, zone, finish) SELECT ?, oracle_id, printing_id, quantity, zone, finish FROM deck_cards WHERE deck_id = ?",
   ).run(id, from);
   return id;
 }
@@ -590,16 +591,19 @@ export function registerLibraryRoutes(app: FastifyInstance, database: DatabaseSy
     if (!key) return reply.code(400).send({ error: "Send the card, finish, condition and language of the copies" });
     const to = typeof request.body?.to === "string" ? request.body.to : "";
     const from = database.prepare("SELECT oracle_id FROM cards WHERE id = ?").get(key.cardId);
-    const next = database.prepare("SELECT oracle_id, name, set_code, collector_number FROM cards WHERE id = ?").get(to);
+    const next = database.prepare("SELECT oracle_id, name, set_code, collector_number, finishes FROM cards WHERE id = ?").get(to);
     if (!from || !next) return reply.code(404).send({ error: "Card printing not found" });
     if (from.oracle_id !== next.oracle_id) return reply.code(400).send({ error: "Choose a printing of the same card" });
+    // the copies may also change finish, such as to the foil version of the printing
+    const finish = (request.body?.toFinish === undefined ? key.foil : readDeckFinish(request.body.toFinish)) as CopyKey["foil"];
+    if (!finishOffered(String(next.finishes ?? ""), finish)) return reply.code(400).send({ error: "That printing is not made in that finish" });
     const row = database.prepare(`SELECT * FROM collection_cards WHERE collection_id = ? AND ${KEY_WHERE}`).get(id, ...keyValues(key));
     if (!row) return reply.code(404).send({ error: "These copies are not in the collection" });
     const asked = request.body?.quantity === undefined ? Number(row.quantity) : Number(request.body.quantity);
     if (!Number.isInteger(asked) || asked < 1) return reply.code(400).send({ error: "Quantity must be a whole number of at least 1" });
     const count = Math.min(asked, Number(row.quantity));
-    if (to === key.cardId) return { status: "unchanged", moved: 0 };
-    const target: CopyKey = { ...key, cardId: to };
+    if (to === key.cardId && finish === key.foil) return { status: "unchanged", moved: 0 };
+    const target: CopyKey = { ...key, cardId: to, foil: finish };
     transaction(database, () => {
       const linked = linkedCount(database, id, key);
       const trade = Math.min(Number(row.trade), count);
@@ -625,7 +629,7 @@ export function registerLibraryRoutes(app: FastifyInstance, database: DatabaseSy
       for (const deckCard of deckCards) alignDeckCard(database, Number(deckCard.deck_card_id));
       touch(database, "collection", id);
     });
-    return { status: "changed", moved: count, name: String(next.name), set: String(next.set_code).toUpperCase(), number: String(next.collector_number) };
+    return { status: "changed", moved: count, name: String(next.name), set: String(next.set_code).toUpperCase(), number: String(next.collector_number), finish };
   });
 
   // moves copies to another collection; moves no more than the source holds and reports what moved

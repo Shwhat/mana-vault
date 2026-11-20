@@ -49,11 +49,15 @@ export function groupsOf(card: DeckCard, group: DeckGroup): Array<{ key: string;
   }
 }
 
-export const cardPrice = (card: DeckCard, currency: Currency) =>
-  priceOf({
+/** A deck card's price in its finish, or in another finish of the printing when that one has no price. */
+export const cardPrice = (card: DeckCard, currency: Currency) => {
+  const prices = {
     price_usd: card.price_usd ?? null, price_usd_foil: card.price_usd_foil ?? null, price_usd_etched: card.price_usd_etched ?? null,
     price_eur: card.price_eur ?? null, price_eur_foil: card.price_eur_foil ?? null,
-  }, 0, currency) ?? (currency === "eur" ? card.price_eur_foil ?? null : card.price_usd_foil ?? card.price_usd_etched ?? null);
+  };
+  const finish = card.finish ?? 0;
+  return priceOf(prices, finish, currency) ?? priceOf(prices, 0, currency) ?? priceOf(prices, 1, currency) ?? priceOf(prices, 2, currency);
+};
 
 export function sortCards(cards: DeckCard[], sort: DeckSort, currency: Currency): DeckCard[] {
   const byName = (a: DeckCard, b: DeckCard) => a.name.localeCompare(b.name);
@@ -191,7 +195,8 @@ export function deckText(cards: DeckCard[]): string {
   return ZONE_ORDER.map((zone) => {
     const list = cards.filter((card) => card.zone === zone).sort((a, b) => a.name.localeCompare(b.name));
     if (!list.length) return "";
-    return [ZONE_HEADINGS[zone], ...list.map((card) => `${card.quantity} ${card.name} (${card.set_code.toUpperCase()}) ${card.collector_number}`)].join("\n");
+    const mark = (card: DeckCard) => (card.finish === 2 ? " *E*" : card.finish === 1 ? " *F*" : "");
+    return [ZONE_HEADINGS[zone], ...list.map((card) => `${card.quantity} ${card.name} (${card.set_code.toUpperCase()}) ${card.collector_number}${mark(card)}`)].join("\n");
   }).filter(Boolean).join("\n\n");
 }
 

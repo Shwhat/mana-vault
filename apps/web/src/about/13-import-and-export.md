@@ -103,7 +103,7 @@ A deck exports its cards with their printings (and the finish of the first linke
 One card per line: a count, an optional "x", then the card name, for example `4 Lightning Bolt` or `1x Sol Ring`. Card names match the same way as collection rows: exact name, flavor name, or front face.
 
 - A printing can follow the name as a set code in brackets or parentheses and an optional collector number: `1 Lightning Bolt (M10) 146` or `1 Sol Ring [LEA] #269`. Without one, the newest printing is used.
-- Marks after the printing are read: `*F*` means foil and `*E*` means etched, as in `1 Sauron, the Dark Lord (HOC) 36 *F*`; other marks such as `*CMDR*` are skipped. Quick add links copies in that finish first.
+- Marks after the printing are read: `*F*` means foil and `*E*` means etched, as in `1 Sauron, the Dark Lord (HOC) 36 *F*`; other marks such as `*CMDR*` are skipped. The deck card takes that finish, and Quick add links copies in that finish first.
 - When the name does not match any card but the set and collector number do, the card is found by its set and number (for example a card name in another language).
 - The same rules apply to **Edit as text** and Quick add.
 - A line reading `Main`, `Mainboard`, `Deck`, `Side`, `Sideboard`, `Commander`, `Maybe`, `Maybeboard` or `Considering` (optionally after `//` or `#`, optionally ending with a colon) starts that zone. Lines before any heading go to the main deck.

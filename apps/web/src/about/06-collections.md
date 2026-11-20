@@ -80,7 +80,7 @@ Rows that are not regular, near mint or English show the difference after the se
 
 ## Change printing
 
-**Change printing...** in a row's right-click menu changes the printing of the row's copies, for a card that was added as the wrong printing. Choose the printing in the printing chooser. The copies keep their count, finish, condition, language, proxy mark, number for trade and copy details. When the collection already has a row of the new printing with the same finish, condition, language and proxy, the rows are merged. Copies linked to decks stay linked, and the deck cards they fill change to the new printing too. The change can be undone, and the message reads "Card name is now (SET) number".
+**Change printing...** in a row's right-click menu changes the printing of the row's copies, for a card that was added as the wrong printing, or their finish, such as switching to the foil version. Choose the printing and finish in the printing chooser. The copies keep their count, condition, language, proxy mark, number for trade and copy details. When the collection already has a row of the new printing with the same finish, condition, language and proxy, the rows are merged. Copies linked to decks stay linked, and the deck cards they fill change to the new printing too. The change can be undone, and the message reads "Card name is now (SET) number", followed by "foil" or "etched" for those finishes.
 
 ## The collection view
 

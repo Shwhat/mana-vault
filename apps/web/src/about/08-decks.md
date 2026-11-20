@@ -65,13 +65,23 @@ Scanned cards added to a deck are new physical cards, so they go into a collecti
 
 ### Change printing
 
-**Change printing...** in a deck card's right-click menu (in every deck view and the Deck list panel) changes the printing of the deck card. Choose the printing in the printing chooser.
+**Change printing...** in a deck card's right-click menu (in every deck view and the Deck list panel) changes the printing of the deck card, its finish, or both. Choose the printing and finish in the printing chooser, such as the foil version of the current printing.
 
-1. The links to copies of the old printing are removed.
-2. Free copies of the new printing in your collections are linked, up to the card's count. When free copies are in more than one collection, Mana Vault asks which collection's copies to link (or None, missing).
+1. The links to the old copies are removed.
+2. Free copies of the new printing in the chosen finish in your collections are linked, up to the card's count. When free copies are in more than one collection, Mana Vault asks which collection's copies to link (or None, missing).
 3. Cards without a copy show as missing. Maybeboard cards are not linked.
 
-When the deck already has the new printing in the same zone, the cards join it. The change is written to the deck's history and can be undone. The message reads "Card name is now (SET) number", with where copies were linked from and how many are missing.
+When the deck already has the new printing in the same zone, the cards join it. The change is written to the deck's history and can be undone. The message reads "Card name is now (SET) number" (with "foil" or "etched" for those finishes), with where copies were linked from and how many are missing. A printing can only be chosen in a finish it is made in.
+
+### Finish
+
+Every deck card has a finish: regular, foil or etched. A foil or etched card shows FOIL or ETCHED on its row, and the deck's value, statistics and the card's price use the price of that finish (or another finish of the printing when that one has no price). The finish is set by:
+
+- `*F*` (foil) or `*E*` (etched) after a line in Quick add, Edit as text and decklist imports. In Edit as text, a line without a mark makes the card regular, and **Edit as text** writes the marks for foil and etched cards.
+- **Add as foil** when cards go to the deck selected last.
+- **Change printing...**.
+
+A card added to a zone that already has the same printing keeps that card's finish. The finish is kept in backups and when a deck is sent as a copy.
 
 ### Link copies
 

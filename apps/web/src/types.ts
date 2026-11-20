@@ -164,6 +164,10 @@ export type DeckCard = Pick<Card, "name" | "mana_cost" | "type_line" | "set_code
   power?: string | null;
   toughness?: string | null;
   tags?: string[];
+  /** The finish the deck card is played in: 0 regular, 1 foil, 2 etched (0.10.0). */
+  finish?: FinishCode;
+  /** The finishes the printing is made in, such as "nonfoil,foil". */
+  finishes?: string;
   entry_id: number;
   card_id: string;
   oracle_id: string;

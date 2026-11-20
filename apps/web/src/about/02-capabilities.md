@@ -21,7 +21,7 @@ This page lists what Mana Vault does in the current version, followed by what is
 
 - Keep any number of collections per account, each with a name and description. Every account starts with a Main collection.
 - Add any printing as a regular or foil copy with Enter or a double-click to the collection or deck selected last in the Collections panel, the Decks panel or a switcher, and cycle the collections with C.
-- Change the printing of copies added as the wrong printing, keeping their count, finish, condition, language, trade marks, details and deck links.
+- Change the printing or finish of copies (such as to the foil version), keeping their count, condition, language, trade marks, details and deck links.
 - Right-click or long press a collection (panel or switcher) to open, rename, change settings, send, export, delete or leave it.
 - Record each copy's finish (regular, foil or etched), condition (Mint to Damaged) and language with Copy details.
 - Show each row's value, and each collection's total value, in US dollars or euros.
@@ -68,7 +68,8 @@ This page lists what Mana Vault does in the current version, followed by what is
 
 - Create decks with a name and one of 21 formats; every deck keeps the printing of each card.
 - Open decks from a switcher with search, six sort orders, cover card, commander, format and card count.
-- Change the printing of a deck card: free copies of the new printing are linked, from the collection you choose when several have them.
+- Change the printing or finish of a deck card: free copies of the new printing in that finish are linked, from the collection you choose when several have them.
+- Keep a finish for every deck card (regular, foil or etched), shown on its row and used for its price, set by `*F*` and `*E*` marks, Add as foil and Change printing.
 - Right-click or long press a deck (panel or switcher) to open, rename, change the format, send, export, delete or leave it, and a card in the Deck list panel for the deck card menu.
 - The Decks panel groups decks by format with each deck's card count and value.
 - Add cards by typing them (Quick add, such as 2 Sol Ring), from the Add tab's card search with + Main, + Side, + Maybe and + Commander (each showing how many are already in the deck), from card search or from the scanner.

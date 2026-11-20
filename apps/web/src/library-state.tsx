@@ -256,24 +256,25 @@ export function useLibraryState(deps: LibraryDeps) {
   }, [live, setCounts, pushUndo, flash, fail, refreshAfterChange]);
 
   /** Changes the printing of a row's copies (a card added as the wrong printing). Deck links stay with the copies. */
-  const changeCopyPrinting = useCallback(async (entry: CollectionEntry, to: { id: string; set_code: string; collector_number: string }) => {
+  const changeCopyPrinting = useCallback(async (entry: CollectionEntry, to: { id: string; set_code: string; collector_number: string }, finish: FinishCode = entry.foil) => {
     const target = entry.collection_id ?? live.current.prefs.openCollection;
-    if (!target || target === ALL_COLLECTIONS || to.id === entry.id) return;
-    const move = async (from: CopyKey, cardId: string, quantity?: number) => request<{ moved: number }>(
+    if (!target || target === ALL_COLLECTIONS || (to.id === entry.id && finish === entry.foil)) return;
+    const move = async (from: CopyKey, cardId: string, toFinish: FinishCode, quantity?: number) => request<{ moved: number }>(
       `/api/collections/${encodeURIComponent(target)}/printing`,
-      { method: "POST", body: JSON.stringify({ ...from, to: cardId, ...(quantity ? { quantity } : {}) }) },
+      { method: "POST", body: JSON.stringify({ ...from, to: cardId, toFinish, ...(quantity ? { quantity } : {}) }) },
     );
     try {
       const from = copyKey(entry);
-      const { moved } = await move(from, to.id);
-      const next = { ...from, cardId: to.id };
+      const { moved } = await move(from, to.id, finish);
+      const next: CopyKey = { ...from, cardId: to.id, foil: finish };
       pushUndo({
         label: `Change printing of ${entry.name}`,
-        undo: async () => { await move(next, entry.id, moved); },
-        redo: async () => { await move(from, to.id, moved); },
+        undo: async () => { await move(next, entry.id, entry.foil, moved); },
+        redo: async () => { await move(from, to.id, finish, moved); },
       });
       depsRef.current.setChecked(new Set());
-      flash(`${entry.name} is now (${to.set_code.toUpperCase()}) ${to.collector_number}`);
+      const finishWord = finish === 2 ? " etched" : finish === 1 ? " foil" : "";
+      flash(`${entry.name} is now (${to.set_code.toUpperCase()}) ${to.collector_number}${finishWord}`);
       await refreshAfterChange();
     } catch (reason) {
       fail(reason, "Could not change the printing.");

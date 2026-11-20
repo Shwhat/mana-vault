@@ -36,8 +36,8 @@ export function cardMenu(store: Store, card: DeckCard) {
   const missing = card.missing ?? 0;
   return rowMenu(store, card.name, () => [
     { label: "Card page", run: () => store.setCardPage(card.card_id) },
-    { label: "Change printing...", run: () => choosePrinting(card.name, card.card_id, card.card_id, { currency: store.prefs.currency },
-      (printing) => void store.changeDeckPrinting(card, printing)) },
+    { label: "Change printing...", run: () => choosePrinting(card.name, card.card_id, card.card_id, { finish: card.finish ?? 0, currency: store.prefs.currency },
+      (printing, finish) => void store.changeDeckPrinting(card, printing, finish)) },
     card.zone !== "maybeboard" && { label: "Link copies...", run: () => void linkDialog(store, card) },
     { label: "Tags...", run: () => tagsDialog(store, card) },
     ...ZONES.filter((zone) => zone.id !== card.zone).map((zone) => ({ label: `Move to ${zone.label}`, run: () => void store.moveDeckCard(card, zone.id) })),
@@ -80,7 +80,8 @@ function ListRow({ card, flag, onHover }: { card: DeckCard; flag?: string } & Ho
       onClick={() => pick(store, card)} {...cardMenu(store, card)}>
       <Thumb url={card.image_url} />
       <div className="rowmain" {...hoverHandlers(card, onHover)}>
-        <div className="rowtitle"><b>{card.name}</b>{card.custom && <span className="badge custom">Custom</span>}<span className="mana">{card.mana_cost}</span><Flag text={flag} /></div>
+        <div className="rowtitle"><b>{card.name}</b>{card.custom && <span className="badge custom">Custom</span>}
+          {!!card.finish && <span className="badge foil">{card.finish === 2 ? "ETCHED" : "FOIL"}</span>}<span className="mana">{card.mana_cost}</span><Flag text={flag} /></div>
         <div className="rowsub">{card.type_line}</div>
         <div className="rowmeta">{card.set_name} <span className="badge">{card.set_code.toUpperCase()}</span> {card.collector_number}</div>
         <div className="rowtags">

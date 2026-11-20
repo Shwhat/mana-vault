@@ -1024,3 +1024,6 @@ ul.skipped{max-height:40vh;overflow:auto;margin:6px 0 0;padding-left:18px;font-s
 .phone .cardcanvas{max-width:300px}
 .phone .symbols{margin-left:0}
 .phone .pside .prow,.phone .makerform .prow{grid-template-columns:110px minmax(0,1fr)}
+.printrow .pfinishes{display:flex;flex-wrap:wrap;gap:4px;margin-top:3px}
+.printrow .pfinishes .btn.on{background:var(--accent-soft);border-color:var(--on-line);color:var(--on-text);font-weight:600}
+.printrow .pfinishes .muted{font-variant-numeric:tabular-nums}

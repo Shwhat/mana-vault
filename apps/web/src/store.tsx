@@ -646,7 +646,8 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
     try {
       const before = await loadDeck(current.id);
       const links = link ? [{ ...link, quantity: Math.min(quantity, link.free) }] : undefined;
-      await request(`/api/decks/${encodeURIComponent(current.id)}/cards`, { method: "POST", body: JSON.stringify({ cardId, quantity, zone, links }) });
+      // a card added as foil or etched (a *F* or *E* line, or Add as foil) keeps that finish in the deck
+      await request(`/api/decks/${encodeURIComponent(current.id)}/cards`, { method: "POST", body: JSON.stringify({ cardId, quantity, zone, links, finish: options?.finish || undefined }) });
       const after = await loadDeck(current.id);
       const zoneLabel = zone === "main" ? "" : ` (${zone})`;
       const count = quantity > 1 ? `${quantity} ` : "";
@@ -683,13 +684,15 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
    * Changes the printing of a deck card. Free copies of the new printing are linked: from the one collection that has
    * them, or the collection the person picks when several do. Without free copies the card is missing.
    */
-  const changeDeckPrinting = useCallback(async (card: DeckCard, to: { id: string; set_code: string; collector_number: string }, collectionId?: string) => {
+  const changeDeckPrinting = useCallback(async (card: DeckCard, to: { id: string; set_code: string; collector_number: string }, finish: FinishCode = card.finish ?? 0,
+    collectionId?: string) => {
     const current = live.current.deck;
-    if (!current || to.id === card.card_id) return;
+    if (!current || (to.id === card.card_id && finish === (card.finish ?? 0))) return;
     let candidates: Candidate[] = [];
     if (card.zone !== "maybeboard") {
       try {
-        candidates = (await loadCandidates(to.id, card.entry_id)).filter((item) => item.cardId === to.id);
+        // free copies of the new printing in the chosen finish fill the card
+        candidates = (await loadCandidates(to.id, card.entry_id)).filter((item) => item.cardId === to.id && item.foil === finish);
       } catch {
         candidates = [];
       }
@@ -701,7 +704,7 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
           const free = candidates.filter((item) => item.collectionId === id).reduce((sum, item) => sum + item.free, 0);
           return [id, `${name} (${free} free)`];
         }), ["", "None (missing)"]]],
-      ], async (values) => { await changeDeckPrinting(card, to, String(values.place)); }, "Change");
+      ], async (values) => { await changeDeckPrinting(card, to, finish, String(values.place)); }, "Change");
       return;
     }
     const place = collectionId ?? places[0]?.[0] ?? "";
@@ -716,12 +719,13 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
     try {
       const before = await loadDeck(current.id);
       const result = await request<{ linked: number }>(`/api/decks/${encodeURIComponent(current.id)}/entries/${card.entry_id}/printing`, {
-        method: "PUT", body: JSON.stringify({ cardId: to.id, links }),
+        method: "PUT", body: JSON.stringify({ cardId: to.id, links, finish }),
       });
       const after = await loadDeck(current.id);
       pushUndo({ label: `Change printing of ${card.name}`, undo: () => restoreDeck(after, before), redo: () => restoreDeck(before, after) });
       const missing = card.zone === "maybeboard" ? 0 : card.quantity - result.linked;
-      flash(`${card.name} is now (${to.set_code.toUpperCase()}) ${to.collector_number}${result.linked ? `, linked from ${collectionName(place)}` : ""}${missing > 0 ? `, ${missing} missing` : ""}`);
+      const finishWord = finish === 2 ? " etched" : finish === 1 ? " foil" : "";
+      flash(`${card.name} is now (${to.set_code.toUpperCase()}) ${to.collector_number}${finishWord}${result.linked ? `, linked from ${collectionName(place)}` : ""}${missing > 0 ? `, ${missing} missing` : ""}`);
       await refreshAfterChange();
     } catch (reason) {
       fail(reason, "Could not change the printing.");

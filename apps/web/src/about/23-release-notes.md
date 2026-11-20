@@ -2,6 +2,14 @@
 
 The installed version is shown at the top of this guide.
 
+## 0.10.0 (2026-11-19): Foil versions in Change printing, and a finish for deck cards
+
+- The printing chooser has a button for each finish a printing is made in (Regular, Foil, Etched) with its price. Choosing one switches to that printing in that finish, so a card can switch to its foil version.
+- Collection copies switched to another finish keep their count, condition, language, trade marks, details and deck links; they merge with a row that already has that printing and finish.
+- Deck cards keep their own finish: regular, foil or etched. Foil and etched cards show FOIL or ETCHED, and their price, the deck's value and statistics use that finish.
+- `*F*` and `*E*` in Quick add, Edit as text and decklist imports set the deck card's finish, and Edit as text writes the marks back. Add as foil sets it when cards go to the selected deck.
+- Changing a deck card to another finish links free copies in that finish.
+
 ## 0.9.0 (2026-11-19): Proxies, the card maker, change printing and menus for collections and decks
 
 - Proxies: a new Proxies view (key 5, the Proxies ribbon tab and a Proxies tab on phones) with a print list kept on the server. Add a deck, its missing cards, a collection, picked rows, a pasted list, the tokens of the listed cards or any card from a search; choose each line's printing, count and faces.
