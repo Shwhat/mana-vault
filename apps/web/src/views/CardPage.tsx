@@ -54,7 +54,6 @@ export function CardPage({ actions }: { actions: Record<string, Action> }) {
     ...addMenuItems(store, card).map((item): [string, () => void] => [item.label, item.run]),
     ["Add as proxy", () => void store.addToCollection(card.id, card.name, undefined, undefined, true)],
     ["Add to wishlist", () => void store.addToWishlist([{ cardId: card.id, foil: store.prefs.foil ? 1 : 0, condition: "NM", language: "en", proxy: false, quantity: 1 }], card.name)],
-    ["Add to trade (you get)", () => void store.getCard(card.id)],
   ];
   return (
     <div className="view cardpage" id="view-card">

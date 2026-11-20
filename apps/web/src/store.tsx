@@ -408,7 +408,7 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
   const setFilters = useCallback((change: Partial<Filters>) => setScopeFilters(change, "cards"), [setScopeFilters]);
   const clearFilters = useCallback((scope?: FilterScope) => setScopeFilters({ ...EMPTY_FILTERS }, scope), [setScopeFilters]);
   const filtersActive = filtersOn(scopeFilters);
-  const search = useCardSearch(filters, view === "cards", { group: !prefs.searchAllPrintings, currency: prefs.currency });
+  const search = useCardSearch(filters, view === "cards", { group: !prefs.searchAllPrintings, currency: prefs.currency, sort: prefs.searchSort.cards });
   // the owned counts of every open search: card search, the deck's Add tab and the trade searches register here
   type OwnedHook = (id: string, change: number, finish?: FinishCode, oracleId?: string | null) => void;
   const ownedHooks = useRef(new Set<OwnedHook>());
@@ -879,6 +879,33 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadDeck, pushUndo, setCounts, collectionName, decks, flash, fail, refreshAfterChange]);
 
+  /**
+   * Add deck to collection: new copies of the deck's cards in their printing and finish go into a collection and are
+   * linked to the cards the deck is missing. "missing" adds only missing cards; "all" adds every card. One undo step.
+   */
+  const addDeckToCollection = useCallback(async (deckId: string, collectionId: string, mode: "missing" | "all") => {
+    try {
+      const before = await loadDeck(deckId);
+      const result = await request<{ added: number; linked: number; before: Counts; after: Counts; wishlist?: WishChange[] }>(
+        `/api/decks/${encodeURIComponent(deckId)}/add-to-collection`, { method: "POST", body: JSON.stringify({ collectionId, mode }) });
+      const where = collectionName(collectionId);
+      if (!result.added) {
+        flash(mode === "missing" ? "The deck is not missing any cards" : "Nothing was added");
+        return;
+      }
+      const after = await loadDeck(deckId);
+      pushUndo({
+        label: `Add ${result.added} deck cards to ${where}`,
+        undo: async () => { await restoreDeck(after, before); await setCounts(collectionId, result.before); await restoreWishes(result.wishlist ?? [], "before"); },
+        redo: async () => { await setCounts(collectionId, result.after); await restoreWishes(result.wishlist ?? [], "after"); await restoreDeck(before, after); },
+      });
+      flash(`${result.added} ${result.added === 1 ? "card" : "cards"} added to ${where}${result.linked ? `, ${result.linked} linked to the deck` : ""}`);
+      await refreshAfterChange();
+    } catch (reason) {
+      fail(reason, "Could not add the deck to the collection.");
+    }
+  }, [loadDeck, pushUndo, restoreDeck, setCounts, restoreWishes, collectionName, flash, fail, refreshAfterChange]);
+
   const setDeckQuantity = useCallback(async (card: DeckCard, quantity: number) => {
     const current = live.current.deck;
     if (!current) return;
@@ -1163,6 +1190,20 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
     leaveAbout();
   }, [library, markRecent, leaveAbout]);
 
+  /** A single click on a collection or deck: it becomes where new cards go, and nothing else opens or closes. */
+  const targetCollection = useCallback((id: string) => {
+    if (id === ALL_COLLECTIONS) return;
+    setPrefs({ targetCollection: id, addTo: "collection" });
+    const name = live.current.collections?.find((item) => item.id === id)?.name;
+    if (name) flash(`Adding to ${name}`);
+  }, [setPrefs, flash]);
+  const targetDeck = useCallback(async (id: string) => {
+    if (live.current.deck?.id !== id) await openDeck(id, true);
+    setPrefs({ addTo: "deck" });
+    const name = decks.find((item) => item.id === id)?.name;
+    if (name) flash(`Adding to ${name}`);
+  }, [openDeck, setPrefs, flash, decks]);
+
   /** The collection layout on this device: phones and the desktop each remember their own. */
   const layout: CollectionLayout = phone ? prefs.collectionLayoutPhone : prefs.collectionLayout;
   const setCollectionLayout = useCallback((next: CollectionLayout) => {
@@ -1197,7 +1238,7 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
     ...proxies,
     collections, reloadCollections, collectionName, collectionTab, setCollectionTab, completion, reloadCompletion,
     checked, setChecked, pickRow, selectMode, setSelectMode, ...library,
-    decks, deck, openDeck, reloadDecks, createDeck, setDeckTags, updateDeckInfo, quickAdd, replaceDeckText, changeDeckPrinting, addPrintedAsProxies, markRecent, leaveAbout,
+    decks, deck, openDeck, reloadDecks, createDeck, setDeckTags, updateDeckInfo, quickAdd, replaceDeckText, changeDeckPrinting, addPrintedAsProxies, addDeckToCollection, markRecent, leaveAbout,
     phone, layout, setCollectionLayout, searchLayout, setSearchLayout, allCollections: prefs.openCollection === ALL_COLLECTIONS,
     selection, select, cardDetail, selectedCard, moveSelection,
     catalog, catalogRequestPending, updateCatalog,
@@ -1207,7 +1248,7 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
     addToCollection, setCollectionQuantity, addToDeck, setDeckQuantity, moveDeckCard, linkOwnedCopies, markUpgrade,
     showReview, downloadBackup, restoreBackup, loadCandidates, setDeckLinks, restoreDeck, loadDeck, restoreWishes,
     applyWorkspace, saveWorkspace, deleteWorkspace,
-    scannerOpen, setScannerOpen, ...scan, cardPage, setCardPage: showCardPage, contextMenu, setContextMenu, openCollection,
+    scannerOpen, setScannerOpen, ...scan, cardPage, setCardPage: showCardPage, contextMenu, setContextMenu, openCollection, targetCollection, targetDeck,
     refreshAfterChange,
   };
 }

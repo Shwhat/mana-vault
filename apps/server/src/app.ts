@@ -10,7 +10,7 @@ const readImportFormat = (value: unknown): ImportFormat | undefined =>
   (typeof value === "string" && value in IMPORT_FORMATS ? value as ImportFormat : undefined);
 import { importDecklist } from "./deck-import.js";
 import { createBackup, inspectBackup, restoreBackup } from "./backup.js";
-import { parseCardQuery } from "./card-search.js";
+import { parseCardQuery, SEARCH_SORTS, type SearchSort, searchOrder } from "./card-search.js";
 import { type CatalogUpdateStatus } from "./catalog-updater.js";
 import { registerInsightRoutes } from "./insights.js";
 import { logDeck, registerDeckRoutes } from "./decks.js";
@@ -441,10 +441,12 @@ export async function buildApp(
     }
   });
 
-  app.get<{ Querystring: { q?: string; color?: string; type?: string; set?: string; rarity?: string; format?: string; mvMin?: string; mvMax?: string; limit?: string; offset?: string; paged?: string; group?: string } }>(
+  app.get<{ Querystring: { q?: string; color?: string; type?: string; set?: string; rarity?: string; format?: string; mvMin?: string; mvMax?: string; limit?: string; offset?: string; paged?: string; group?: string; sort?: string; currency?: string } }>(
     "/api/cards",
     async (request, reply) => {
-      const { q = "", color, type, set, rarity, format, mvMin, mvMax, limit = "40", offset = "0", paged, group } = request.query;
+      const { q = "", color, type, set, rarity, format, mvMin, mvMax, limit = "40", offset = "0", paged, group, sort = "best", currency } = request.query;
+      if (typeof sort !== "string" || !(SEARCH_SORTS as readonly string[]).includes(sort)) return reply.code(400).send({ error: "Choose a valid sort" });
+      const order = searchOrder(sort as SearchSort, typeof q === "string" ? q : "", { currency: typeof currency === "string" ? currency : undefined, userId: request.user?.id });
       const parsedLimit = Number(limit);
       const parsedOffset = Number(offset);
       if (!Number.isInteger(parsedOffset) || parsedOffset < 0 || parsedOffset > 1_000_000) return reply.code(400).send({ error: "Invalid search parameters" });
@@ -527,9 +529,9 @@ export async function buildApp(
           `WITH matched AS (SELECT * FROM cards ${where}),
                 ranked AS (SELECT *, ROW_NUMBER() OVER (PARTITION BY oracle_id ORDER BY lang != 'en', promo, variation, released_at IS NULL, released_at DESC) AS pick,
                                   COUNT(*) OVER (PARTITION BY oracle_id) AS printings FROM matched)
-           SELECT ${columns}, printings FROM ranked WHERE pick = 1 ORDER BY name LIMIT ? OFFSET ?`,
-        ).all(...values, parsedLimit, parsedOffset)
-        : database.prepare(`SELECT ${columns} FROM cards ${where} ORDER BY name, lang != 'en', released_at DESC LIMIT ? OFFSET ?`).all(...values, parsedLimit, parsedOffset);
+           SELECT ${columns}, printings FROM ranked x WHERE pick = 1 ORDER BY ${order.sql} LIMIT ? OFFSET ?`,
+        ).all(...values, ...order.values, parsedLimit, parsedOffset)
+        : database.prepare(`SELECT ${columns} FROM cards x ${where} ORDER BY ${order.sql} LIMIT ? OFFSET ?`).all(...values, ...order.values, parsedLimit, parsedOffset);
       if (paged !== "1") return rows.map(toCardRow);
       // a page of results with the total number of matches and how many copies the account owns, by finish
       const total = Number(database.prepare(grouped ? `SELECT COUNT(DISTINCT oracle_id) AS count FROM cards ${where}` : `SELECT COUNT(*) AS count FROM cards ${where}`).get(...values)?.count ?? 0);

@@ -404,3 +404,12 @@ const FORMAT_NAMES: Record<string, string> = {
 export const formatName = (format: string) => FORMAT_NAMES[format] ?? capitalize(format);
 
 export const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
+
+/** How a card search orders its results (0.13.0); the server uses the same names. */
+export type SearchSort = "best" | "name" | "newest" | "oldest" | "priceHigh" | "priceLow" | "mv" | "rarity" | "color" | "set" | "owned";
+export const SEARCH_SORTS: Array<[SearchSort, string]> = [
+  ["best", "Best match"], ["name", "Name"], ["newest", "Newest"], ["oldest", "Oldest"], ["priceHigh", "Price, high to low"], ["priceLow", "Price, low to high"],
+  ["mv", "Mana value"], ["rarity", "Rarity"], ["color", "Color"], ["set", "Set"], ["owned", "Owned first"],
+];
+/** The searches that each keep their own sort. */
+export type SortScope = "cards" | "deckAdd" | "tradeGive" | "tradeGet";

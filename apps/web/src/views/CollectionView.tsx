@@ -4,7 +4,7 @@ import type { Action } from "../actions";
 import { rowMenu } from "../components/ContextMenu";
 import { collectionDialog, copyDialog, moveDialog } from "../components/LibraryDialogs";
 import { choosePrinting } from "../components/PrintingDialog";
-import { FinishBadge, finishName, removeCard } from "../components/CardMarks";
+import { CountPip, FinishBadge, FinishPip, finishName, removeCard } from "../components/CardMarks";
 import { Icon } from "../icons";
 import { entryKey } from "../library-state";
 import { type Store, useApp } from "../store";
@@ -75,7 +75,6 @@ function entryMenu(store: Store, entry: CollectionEntry) {
       (printing, finish, count) => void store.changeCopyPrinting(entry, printing, finish, count)) } : null,
     (store.collections?.length ?? 0) > 1 && { label: "Move...", run: () => moveDialog(store, [entry]) },
     !entry.proxy && { label: entry.trade >= entry.quantity ? "Unmark for trade" : "Mark for trade", run: () => void store.markTrade([entry], entry.trade < entry.quantity) },
-    !entry.proxy && { label: "Add to trade (you give)", run: () => store.giveEntry(entry) },
     !!store.deck && { label: `Add to ${store.deck.name}`, run: () => void store.addToDeck(entry.id, entry.name, undefined, { finish: finishName(entry.foil) }) },
     { label: "Add to print list", run: () => void store.addToPrintList([{ card: entry, count: entry.quantity }], entry.name) },
     entry.quantity > 1 && { label: "Reduce to 1", run: () => void store.setCollectionQuantity(entry, 1) },
@@ -202,48 +201,62 @@ export function stacksOf(entries: CollectionEntry[]): CollectionEntry[][] {
   return [...stacks.values()];
 }
 
-/** A line under a picture: the finish (and condition, language, proxy when they differ), how many and the price of each. */
+/** A line under a picture: pips for the finish (and condition, language, proxy when they differ) and how many. */
 function StackLine({ entry }: { entry: CollectionEntry }) {
   const store = useApp();
   const key = entryKey(entry);
   const active = store.checked.has(key);
-  const currency = store.prefs.currency;
   const label = [finishLabel(entry.foil, entry.promo_types), entry.condition !== "NM" ? conditionName(entry.condition) : "",
     entry.language !== "en" ? languageName(entry.language) : "", entry.proxy ? "Proxy" : ""].filter(Boolean).join(", ");
   return (
-    <div data-key={key} role="option" aria-selected={active} className={active ? "sline active" : "sline"}
+    <div data-key={key} role="option" aria-selected={active} className={active ? "sline active" : "sline"} aria-label={`${label}, ${entry.quantity}`}
       onClick={(event) => { event.stopPropagation(); store.pickRow(entry, { ctrl: event.ctrlKey || event.metaKey, shift: event.shiftKey }); }}
       onDoubleClick={(event) => { event.stopPropagation(); copyDialog(store, entry); }} {...entryMenu(store, entry)}>
-      <span className="sl-name">{label}{entry.trade > 0 && <span className="badge trade">T{entry.trade}</span>}</span>
+      <span className="sl-name"><CopyPips entry={entry} regular /></span>
       <span className="sl-qty">{entry.quantity}</span>
-      <span className="sl-price">{entry.proxy ? "" : money(copyPrice(entry, currency), currency)}</span>
     </div>
   );
 }
 
+/** Pips for a copy: finish, condition and language when not NM English, Proxy, and how many are for trade. */
+function CopyPips({ entry, regular = false }: { entry: CollectionEntry; regular?: boolean }) {
+  return (
+    <>
+      {regular ? <FinishPip finish={entry.foil} promoTypes={entry.promo_types} /> : <FinishBadge finish={entry.foil} promoTypes={entry.promo_types} />}
+      {entry.condition !== "NM" && <span className="badge" title={conditionName(entry.condition)}>{entry.condition}</span>}
+      {entry.language !== "en" && <span className="badge" title={languageName(entry.language)}>{entry.language.toUpperCase()}</span>}
+      {entry.proxy && <span className="badge proxy">Proxy</span>}
+      {entry.trade > 0 && <span className="badge trade" title={`${entry.trade} for trade`}>T{entry.trade}</span>}
+    </>
+  );
+}
+
 /**
- * One picture for a printing, with a line for each finish (and condition or language) under it and the total count and
- * value. Clicking a line selects it; the picture selects the first line. Used by the binder and the grid.
+ * One picture for a printing, with pips on it for the count, finish and other copy details. When the printing is held
+ * as more than one kind of copy, a line for each sits under it to pick one. No prices are shown on pictures; the List
+ * layout has them. Clicking the picture selects the first copy. Used by the binder and the grid.
  */
 function Stack({ entries }: { entries: CollectionEntry[] }) {
   const store = useApp();
   const first = entries[0]!;
   const active = entries.some((entry) => store.checked.has(entryKey(entry)));
-  const currency = store.prefs.currency;
   const count = entries.reduce((sum, entry) => sum + entry.quantity, 0);
-  const value = entries.reduce((sum, entry) => sum + (copyPrice(entry, currency) ?? 0) * entry.quantity, 0);
+  const split = entries.length > 1;
   return (
     <div className={active ? "stackcell active" : "stackcell"}>
-      <div className={active ? "pocket active" : "pocket"}
+      <div className={active ? "pocket active" : "pocket"} data-key={split ? undefined : entryKey(first)} role={split ? undefined : "option"} aria-selected={split ? undefined : active}
         title={`${first.name}, ${first.set_name} ${first.collector_number}${first.collection_name ? `, in ${first.collection_name}` : ""}`}
         onClick={(event) => store.pickRow(first, { ctrl: event.ctrlKey || event.metaKey, shift: event.shiftKey })}
         onDoubleClick={() => copyDialog(store, first)} {...entryMenu(store, first)}>
         {first.image_url ? <img src={first.image_url} alt={first.name} loading="lazy" draggable={false} /> : <span className="pocketname">{first.name}</span>}
+        <CountPip count={count} />
+        <span className="dmarks">{split ? entries.map((entry) => <FinishBadge key={entryKey(entry)} finish={entry.foil} promoTypes={entry.promo_types} />) : <CopyPips entry={first} />}</span>
       </div>
-      <div className="slines" role="group" aria-label={`Copies of ${first.name} (${first.set_code.toUpperCase()}) ${first.collector_number}`}>
-        {entries.map((entry) => <StackLine key={entryKey(entry)} entry={entry} />)}
-        <div className="sline total"><span className="sl-name">Total</span><span className="sl-qty">{count}</span><span className="sl-price">{money(value, currency)}</span></div>
-      </div>
+      {split && (
+        <div className="slines" role="group" aria-label={`Copies of ${first.name} (${first.set_code.toUpperCase()}) ${first.collector_number}`}>
+          {entries.map((entry) => <StackLine key={entryKey(entry)} entry={entry} />)}
+        </div>
+      )}
     </div>
   );
 }

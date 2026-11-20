@@ -205,3 +205,58 @@ function normalizeColors(value: string): string {
 function pattern(value: string): string {
   return `%${value.replace(/[\\%_]/g, "\\$&")}%`;
 }
+
+/** How card search results can be ordered. Best match is the default. */
+export const SEARCH_SORTS = ["best", "name", "newest", "oldest", "priceHigh", "priceLow", "mv", "rarity", "color", "set", "owned"] as const;
+export type SearchSort = (typeof SEARCH_SORTS)[number];
+
+/** The plain words of a search (the words that are not filters like t:creature), joined by spaces. */
+export function plainWords(query: string): string {
+  const tokens = query.match(/(?:[^\s"]+|"[^"]*")+/g) ?? [];
+  return tokens.filter((token) => !/^(-?)([a-z]+)(>=|<=|>|<|=|:)/i.test(token) && !token.startsWith("-"))
+    .map((token) => token.replace(/^"|"$/g, "")).filter(Boolean).join(" ");
+}
+
+/**
+ * The ORDER BY for card search, on rows named `x`. Best match puts cards named exactly as the search words first,
+ * then names that start with them, then names that hold every word, then everything else, each by name.
+ */
+export function searchOrder(sort: SearchSort, query: string, options: { currency?: string; userId?: number } = {}): { sql: string; values: (string | number)[] } {
+  const words = plainWords(query).toLowerCase();
+  const byName = "x.name, x.lang != 'en', x.released_at DESC";
+  const usd = options.currency === "eur" ? "COALESCE(x.price_eur, x.price_eur_foil)" : "COALESCE(x.price_usd, x.price_usd_foil, x.price_usd_etched)";
+  switch (sort) {
+    case "name": return { sql: byName, values: [] };
+    case "newest": return { sql: `x.released_at IS NULL, x.released_at DESC, ${byName}`, values: [] };
+    case "oldest": return { sql: `x.released_at IS NULL, x.released_at, ${byName}`, values: [] };
+    case "priceHigh": return { sql: `${usd} IS NULL, ${usd} DESC, ${byName}`, values: [] };
+    case "priceLow": return { sql: `${usd} IS NULL, ${usd}, ${byName}`, values: [] };
+    case "mv": return { sql: `x.mana_value, ${byName}`, values: [] };
+    case "rarity": return { sql: `CASE x.rarity WHEN 'mythic' THEN 0 WHEN 'rare' THEN 1 WHEN 'uncommon' THEN 2 WHEN 'common' THEN 3 ELSE 4 END, ${byName}`, values: [] };
+    case "color": return {
+      sql: `CASE WHEN COALESCE(x.colors, '') = '' THEN 7 WHEN length(replace(x.colors, ',', '')) > 1 THEN 6 ELSE instr('WUBRG', replace(x.colors, ',', '')) END, ${byName}`,
+      values: [],
+    };
+    case "set": return { sql: `x.set_name, CAST(x.collector_number AS INTEGER), x.collector_number, ${byName}`, values: [] };
+    case "owned": {
+      if (!options.userId) return { sql: byName, values: [] };
+      return {
+        sql: `(SELECT COALESCE(SUM(i.quantity), 0) FROM collection_cards i JOIN collections col ON col.id = i.collection_id
+               WHERE i.card_id IN (SELECT o.id FROM cards o WHERE o.oracle_id = x.oracle_id) AND i.proxy = 0 AND col.kind = 'collection'
+                 AND (col.owner_id = ? OR EXISTS (SELECT 1 FROM members m WHERE m.kind = 'collection' AND m.item_id = col.id AND m.user_id = ?))) DESC, ${byName}`,
+        values: [options.userId, options.userId],
+      };
+    }
+    default: {
+      if (!words) return { sql: byName, values: [] };
+      const like = (value: string) => value.replace(/[\\%_]/g, "\\$&");
+      const all = words.split(/\s+/);
+      return {
+        sql: `CASE WHEN lower(x.name) = ? OR lower(COALESCE(x.flavor_name, '')) = ? OR lower(x.name) LIKE ? ESCAPE '\\' THEN 0
+                   WHEN lower(x.name) LIKE ? ESCAPE '\\' THEN 1
+                   WHEN ${all.map(() => "lower(x.name) LIKE ? ESCAPE '\\'").join(" AND ")} THEN 2 ELSE 3 END, ${byName}`,
+        values: [words, words, `${like(words)} // %`, `${like(words)}%`, ...all.map((word) => `%${like(word)}%`)],
+      };
+    }
+  }
+}

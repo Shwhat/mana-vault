@@ -23,14 +23,16 @@ Every deck keeps the printing of each card. Each printing in a zone is its own r
 | Sideboard | Extra cards kept with the deck |
 | Maybeboard | Cards you are considering. They are not counted in the deck's size, value, statistics, ownership or legality, and they are never missing |
 
-The **target zone** decides where Add to deck and Quick add put a card. It starts at Main deck and is kept for your account. Change it with the zone list beside Quick add on the Add tab, the Target zone list on the Decks ribbon tab, the Deck list panel switch, the ZONE item in the status bar, or **Z** (Main deck, Sideboard, Commander, Maybeboard, then Main deck again).
+The **target zone** decides where Add to deck and Quick add put a card. It starts at Main deck and is kept for your account.
+
+The **All**, **Commander**, **Main**, **Sideboard** and **Maybe** buttons above the deck's cards and in the Deck list panel choose what the list shows and where cards go. A zone button shows only that zone and makes it the target zone. **All** shows every zone and makes Main deck the target zone. The same choice is in the Target zone list on the Decks ribbon tab and **Z** (All, Commander, Main, Sideboard, Maybe, then All again). The zone list beside Quick add and the ZONE item in the status bar change only the target zone. A zone with no cards shows "No cards in zone".
 
 ## Opening decks
 
-- **The deck switcher**: the button with the deck's name at the left of the deck view header (on a phone, at the top of the Decks tab). It opens a list of every deck with its cover card, commander, format and card count. Type to find a deck by name, commander or format; Up and Down move through the list, Enter opens the highlighted deck and Esc closes the list. **Sort** orders the list by Recently opened, Name, Date created, Card count, Format or Commander; the choice is kept for your account. **New deck...** is at the bottom of the list.
-- **Decks panel**: decks are grouped by format, each with its card count and value. One click on a deck opens it in the deck view and makes it where new cards go (see [Collections](/about/collections)). The deck shows **Adding here** while it is where cards go. Right-click or long press a deck for its menu: Open, Rename..., Deck format..., Send..., Export..., Delete or Leave.
+- **The deck switcher**: the button with the deck's name at the left of the deck view header (on a phone, at the top of the Decks tab). It opens a list of every deck with its cover card, commander, format and card count. Type to find a deck by name, commander or format; Up and Down move through the list, Enter opens the highlighted deck and Esc closes the list. One click on a deck makes it where new cards go and keeps the list open; a double click opens it. **Sort** orders the list by Recently opened, Name, Date created, Card count, Format or Commander; the choice is kept for your account. **New deck...** is at the bottom of the list.
+- **Decks panel**: decks are grouped by format, each with its card count and value. One click on a deck makes it where new cards go without leaving the view you are in (see [Collections](/about/collections)); a double click opens it in the deck view. The deck shows **Adding here** while it is where cards go. Right-click or long press a deck for its menu: Open, Rename..., Deck format..., Send..., Export..., Delete or Leave.
 - **Open deck...** (Ctrl+O) lists every deck with its format and card count.
-- **New deck...** (Ctrl+N) asks for the name and format. **Create deck** creates it and opens it.
+- **New deck...** (Decks ribbon tab, Decks panel, deck switcher) asks for the name and format. **Create deck** creates it and opens it.
 - **Add to...** in the scanner offers **New deck...** too (see [Scanning cards](/about/scanning-cards)).
 
 Opening a deck closes the About guide. The last deck you opened opens again the next time you sign in.
@@ -195,7 +197,7 @@ The cards are shown under a heading for each zone (Commander, Main deck, Sideboa
 | List | A row for each card: picture, name, mana cost, type, printing, a **Not legal** badge, its tags, the collections its copies are in, PROXY, Missing and + Wishlist, the price, the link button, the count controls, the zone list and a remove button |
 | Text | A compact line for each card: count, name, mana cost and price, in columns. Cards that break a rule are red; missing cards have an amber count |
 | Stacks | A column of overlapping card pictures for each group, one picture per printing with its total count and finish badges |
-| Grid | Card pictures in rows, one per printing, with a line under each for every finish giving the count (or Missing and the number missing) and price, and a Total line |
+| Grid | Card pictures in rows, one per printing, with pips on the picture: the count, FOIL or ETCHED, Missing (with the number when only some are missing), Upgrade wanted and the owned marks. A printing in the deck in more than one finish gets a line under the picture for each finish with its pip, Missing and count. Pictures show no prices; the List view has them |
 
 On the desktop, pointing at a card's name in the List or Text view shows a large picture of the card. Click a card to select it; on a phone, tapping opens its card page.
 
@@ -290,3 +292,22 @@ The History tab lists the deck's changes, newest first, with the date and time a
 ## Undo
 
 Adding cards (by search, Quick add or the scanner), changing counts, moving between zones, linking copies, tags, Edit as text and removing cards can be undone and redone. Creating, renaming and deleting decks, and changes to the format, description and cover card, cannot be undone.
+
+## Add deck to collection
+
+**Add deck to collection...** puts the deck's cards into a collection as copies, for example after building a deck with Edit as text from cards you have in hand. It is on the Decks ribbon tab (**To collection**), beside Edit as text on the Add tab, and in a deck's right-click menu in the Decks panel and the deck switcher.
+
+1. Choose **Add deck to collection...**.
+2. Pick the **Collection** (the deck's own collection or the target collection first). Wishlists are not offered.
+3. Pick **Cards to add**: **Missing cards only, linked to the deck** adds a copy for every card the deck is missing; **Every card as new copies** adds a copy for every card in the deck, even cards already filled by copies you own.
+4. Choose **Add cards**.
+
+The copies are near mint English in the deck card's printing and finish, and the deck's missing cards are linked to them either way. The maybeboard is left out. Wishlist wants for those cards go down as for any added card. The change is written to the deck's history ("Added N cards to name") and is one undo step.
+
+| Message | Meaning |
+|---|---|
+| N cards added to name, N linked to the deck | The copies were added and the missing cards linked |
+| The deck is not missing any cards | Missing cards only found nothing to add |
+| Nothing was added | The collection already holds 10,000 copies of each card |
+| Choose a collection, not a wishlist | The collection is a wishlist |
+| Create a collection first | You have no collection to add to |

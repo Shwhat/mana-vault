@@ -12,9 +12,10 @@ test("search shows pictures with owned counts, and the Filters panel filters the
   await page.locator("#view-cards").getByRole("button", { name: /^Options/ }).click();
   await page.locator(".optpop").getByRole("button", { name: "Grid" }).click();
   await page.locator(".optpop").getByRole("button", { name: "Done" }).click();
-  // the owned count by finish is under the picture, not on it
+  // the owned count by finish is a pip on the picture, with no price
   const sol = page.locator("#view-cards .rescard", { has: page.locator('.pocket[title^="Sol Ring,"]') }).first();
-  await expect(sol.locator(".resowned")).toHaveText("Owned: Regular 1");
+  await expect(sol.locator(".pocket .dmarks")).toHaveText("OWNED 1");
+  await expect(sol.locator(".pocketprice")).toHaveCount(0);
   await expect(sol.locator(".pocketqty")).toHaveCount(0);
   await expect(page.locator("#view-cards .phpos")).toHaveText(/^\d+ results?/);
 

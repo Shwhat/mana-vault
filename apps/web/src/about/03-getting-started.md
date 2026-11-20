@@ -22,7 +22,7 @@ A new server starts with an empty card database. Search, imports and decks all n
 
 ## Add cards you own
 
-Cards go into the collection or deck selected last in its panel or switcher, shown as ADDING TO in the status bar and as **Adding here** in the panel. To keep cards in more than one place, use **New collection...** on the Collection ribbon tab; see [Collections](/about/collections).
+Cards go into the collection or deck selected last with one click in its panel or switcher (a double click opens it), shown as ADDING TO in the status bar and as **Adding here** in the panel. To keep cards in more than one place, use **New collection...** on the Collection ribbon tab; see [Collections](/about/collections).
 
 1. Type part of a card name in the search box (press **/** to jump there).
 2. Click a result to select it. Its details appear in the Card panel.
@@ -31,7 +31,7 @@ Cards go into the collection or deck selected last in its panel or switcher, sho
 
 ## Build the first deck
 
-1. Press **Ctrl+N** (or **Deck**, **New deck...**). Enter a name, pick a format, and choose **Create deck**.
+1. Choose **New deck...** on the Decks ribbon tab. Enter a name, pick a format, and choose **Create deck**.
 2. The new deck opens in the Deck list panel and the **Deck** ribbon tab appears.
 3. Select a card in the search results and press **Shift+Enter** (or **+ Deck**) to add it to the target zone.
 4. Press **3** to see the whole deck in the work area.

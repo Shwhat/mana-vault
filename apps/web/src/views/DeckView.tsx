@@ -8,7 +8,7 @@ import { formatDialog, tagsDialog } from "../components/DeckDialogs";
 import { linkDialog } from "../components/LibraryDialogs";
 import { choosePrinting } from "../components/PrintingDialog";
 import { addCard } from "../components/AddButtons";
-import { FinishBadge, finishName, OwnedMarks, ownedVersions, removeCard, switchVersionDialog, linkExact, UpgradeBadge, wantedLabel } from "../components/CardMarks";
+import { CountPip, FinishBadge, FinishPip, finishName, OwnedMarks, ownedVersions, removeCard, switchVersionDialog, linkExact, UpgradeBadge, wantedLabel } from "../components/CardMarks";
 import { Switcher } from "../components/Switcher";
 import { cardPrice, checkDeck, type Legality, MANA_COLORS, manaBalance, sections, shuffle, ZONE_ORDER } from "../deck-rules";
 import { Icon } from "../icons";
@@ -20,8 +20,9 @@ import {
 } from "../types";
 import { StatsPanel } from "./StatsView";
 import { NoDeck, OwnershipTab, Quantity, SearchOptions, Thumb } from "./Views";
+import { ZONE_BUTTONS } from "../zones";
 import type { CardSearch, FoundCard } from "../card-search";
-import { CardResults, countLine, useViewSearch } from "../components/CardResults";
+import { CardResults, countLine, SortPicker, useViewSearch } from "../components/CardResults";
 import { OptionsButton, Segments } from "../components/Options";
 import { choices, type Choice, Picker } from "../components/Picker";
 import { filterCount, matchesFilters, useServerMatch } from "../filters";
@@ -169,46 +170,44 @@ function byPrinting(cards: DeckCard[]): DeckCard[][] {
 }
 
 /**
- * One picture for a printing in the deck. In Grid (`lines`) a line for each finish sits under it with the count, what
- * is missing and the price, then the total; in Stacks, where pictures overlap, the picture carries the total and marks.
+ * One picture for a printing in the deck, with pips on it: the count, the finish, Missing and the owned marks. In Grid
+ * (`lines`) a printing held in more than one finish also gets a line for each finish under it, to pick one.
+ * No prices are shown on pictures; the List view has them.
  */
 function Picture({ cards, flag, lines = false }: { cards: DeckCard[]; flag?: string; lines?: boolean }) {
   const store = useApp();
   const card = cards[0]!;
-  const currency = store.prefs.currency;
   const active = cards.some((item) => isActive(store, item));
   const total = cards.reduce((sum, item) => sum + item.quantity, 0);
-  const value = cards.reduce((sum, item) => sum + (cardPrice(item, currency) ?? 0) * item.quantity, 0);
   const missing = cards.reduce((sum, item) => sum + (item.missing ?? 0), 0);
+  const split = lines && cards.length > 1;
   return (
     <div className={lines ? "stackcell dstack" : "dstack"}>
-      <div data-key={lines ? undefined : String(card.entry_id)} role={lines ? undefined : "option"} aria-selected={lines ? undefined : active}
+      <div data-key={split ? undefined : String(card.entry_id)} role={split ? undefined : "option"} aria-selected={split ? undefined : active}
         className={`dcard${active ? " active" : ""}${flag ? " bad" : ""}`} title={flag ? `${card.name}: ${flag}` : card.name}
         onClick={() => pick(store, card)} {...cardMenu(store, card)}>
         {card.image_url ? <img src={card.image_url} alt={card.name} loading="lazy" draggable={false} /> : <span className="pocketname">{card.name}</span>}
-        {!lines && total > 1 && <span className="pocketqty">{total}</span>}
+        <CountPip count={total} />
         <span className="dmarks">
-          {!lines && cards.map((item) => <FinishBadge key={item.entry_id} finish={item.finish} promoTypes={item.promo_types} />)}
+          {cards.map((item) => <FinishBadge key={item.entry_id} finish={item.finish} promoTypes={item.promo_types} />)}
           {cards.map((item) => <UpgradeBadge key={item.entry_id} card={item} />)}
-          {!lines && missing > 0 && <span className="badge miss">Missing</span>}
+          {missing > 0 && <span className="badge miss">{missing < total ? `Missing ${missing}` : "Missing"}</span>}
           {cards.map((item) => <OwnedMarks key={item.entry_id} store={store} card={item} compact />)}
         </span>
       </div>
-      {lines && (
+      {split && (
         <div className="slines" role="group" aria-label={`${card.name} (${card.set_code.toUpperCase()}) ${card.collector_number}`}>
           {cards.map((item) => {
             const on = isActive(store, item);
-            const price = cardPrice(item, currency);
             return (
               <div key={item.entry_id} data-key={String(item.entry_id)} role="option" aria-selected={on} className={on ? "sline active" : "sline"}
+                aria-label={`${finishLabel(item.finish ?? 0, item.promo_types)}, ${item.quantity}`}
                 onClick={(event) => { event.stopPropagation(); pick(store, item); }} {...cardMenu(store, item)}>
-                <span className="sl-name">{finishLabel(item.finish ?? 0, item.promo_types)}{(item.missing ?? 0) > 0 && <span className="badge miss">Missing {item.missing}</span>}</span>
+                <span className="sl-name"><FinishPip finish={item.finish} promoTypes={item.promo_types} />{(item.missing ?? 0) > 0 && <span className="badge miss">Missing {item.missing}</span>}</span>
                 <span className="sl-qty">{item.quantity}</span>
-                <span className="sl-price">{money(price, currency)}</span>
               </div>
             );
           })}
-          <div className="sline total"><span className="sl-name">Total</span><span className="sl-qty">{total}</span><span className="sl-price">{money(value, currency)}</span></div>
         </div>
       )}
     </div>
@@ -380,9 +379,11 @@ function CardsTab({ actions, legality, cards }: { actions: Record<string, Action
   const deck = store.deck!;
   const [hover, setHover] = useState<Hover>(null);
   const onHover = store.phone ? undefined : (url: string | null, event?: ReactMouseEvent) => setHover(url && event ? { url, x: event.clientX, y: event.clientY } : null);
+  const view = store.prefs.deckZoneView;
   return (
     <>
       <LegalityBar legality={legality} format={deck.format} />
+      <ZoneButtons actions={actions} className="deckzones" />
       <div className="list deckbody" role="listbox" aria-label="Deck cards" onScroll={() => setHover(null)}>
         {deck.cards.length === 0 && (
           <div className="empty">
@@ -395,17 +396,29 @@ function CardsTab({ actions, legality, cards }: { actions: Record<string, Action
           </div>
         )}
         {deck.cards.length > 0 && cards.length === 0 && <div className="emptynote">No deck cards match the filters</div>}
-        {ZONE_ORDER.map((zone) => {
+        {deck.cards.length > 0 && view !== "all" && !cards.some((card) => card.zone === view) && <div className="emptynote">No cards in {zoneLabel(view)}</div>}
+        {ZONE_ORDER.filter((zone) => view === "all" || zone === view).map((zone) => {
           const inZone = cards.filter((card) => card.zone === zone);
           return inZone.length ? <Board key={zone} zone={zone} cards={inZone} legality={legality} onHover={onHover} /> : null;
         })}
-        {cards.length === deck.cards.length && <Tokens />}
+        {cards.length === deck.cards.length && view === "all" && <Tokens />}
       </div>
       {hover && (
         <img className="hoverpreview" src={hover.url} alt="" aria-hidden="true"
           style={{ left: hover.x + 260 + 24 > window.innerWidth ? hover.x - 284 : hover.x + 24, top: Math.max(8, Math.min(hover.y - 120, window.innerHeight - 372)) }} />
       )}
     </>
+  );
+}
+
+/** All, Commander, Main, Sideboard and Maybe: the deck list shows the zone chosen, and Add puts cards there (All adds to Main). */
+export function ZoneButtons({ actions, className = "" }: { actions: Record<string, Action>; className?: string }) {
+  return (
+    <div className={`seg${className ? ` ${className}` : ""}`} role="group" aria-label="Zone">
+      {ZONE_BUTTONS.map((id) => (
+        <button key={id} type="button" className={actions[id]?.on ? "on" : ""} aria-pressed={!!actions[id]?.on} onClick={actions[id]?.run}>{actions[id]?.short}</button>
+      ))}
+    </div>
   );
 }
 
@@ -428,6 +441,7 @@ function AddTab({ actions, search }: { actions: Record<string, Action>; search: 
       <div className="deckbar">
         <QuickAdd />
         <button type="button" className="btn small" onClick={actions["deck.editText"]?.run}>Edit as text...</button>
+        <button type="button" className="btn small" onClick={actions["deck.toCollection"]?.run}>Add deck to collection...</button>
       </div>
       <CardResults
         search={search} layout={store.searchLayout} size={store.prefs.searchSize} label="Cards to add" resetKey={store.filterSets.deckAdd}
@@ -609,7 +623,7 @@ export function DeckView({ actions }: { actions: Record<string, Action> }) {
   const filters = store.filterSets.deck;
   const match = useServerMatch(filters, store.prefs.currency);
   const shown = useMemo(() => (deck?.cards ?? []).filter((card) => matchesFilters(card, filters, match)), [deck?.cards, filters, match]);
-  const search = useViewSearch(store.filterSets.deckAdd, !!deck && store.deckTab === "add");
+  const search = useViewSearch(store.filterSets.deckAdd, !!deck && store.deckTab === "add", "deckAdd");
   if (!deck) {
     return (
       <div className="view" id="view-deck">
@@ -650,6 +664,7 @@ export function DeckView({ actions }: { actions: Record<string, Action> }) {
           </label>
         )}
         {tab === "cards" && <DeckOptions actions={actions} />}
+        {tab === "add" && <SortPicker scope="deckAdd" />}
         {tab === "add" && <SearchOptions />}
         <span className="phpos">
           <button type="button" className={legality.checked ? (errors ? "badge illegal fmt" : "badge own fmt") : "badge fmt"}

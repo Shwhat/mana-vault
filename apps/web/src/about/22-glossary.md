@@ -22,7 +22,7 @@
 | Server backup | A copy of the whole server's database (every account and the card database), written by Administration |
 | Price history | The prices saved with each card database update, for the days they changed |
 | Printings badge | The N printings mark on a card search result for a card with more than one printing |
-| Total line | The last line under a picture in Grid and Binder, with the count and value of every copy of that printing |
+| Pip | A small mark on a card picture or the line under it: the count, FOIL, ETCHED, REGULAR, Missing, Proxy, condition, language or T with the number for trade |
 | Condition | How worn a copy is: Mint, Near mint, Lightly played, Moderately played, Heavily played or Damaged |
 | Copy details | The window that changes an entry's finish, condition, language and number for trade |
 | Wishlist | A collection of cards you want. Its cards do not count as owned |
@@ -83,6 +83,7 @@
 | Token | A card that a deck's cards create during a game, listed under Tokens |
 | Playtest | Drawing sample hands from a deck without changing it |
 | Target zone | The zone that Add to deck puts cards into |
+| Best match | The default sort of card search: exact names first, then names that start with the search words |
 | Scanned list | Cards recognized by the scanner or added by name, waiting on this device to be added to a collection or deck |
 | Information line | The small text at the bottom left of a card printed since 2019, with the collector number, rarity letter, set code and language |
 | Open deck | The deck that Add to deck, the Deck list panel and the deck view work with |

@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import type { FastifyInstance, FastifyReply } from "fastify";
 import type { DatabaseSync } from "node:sqlite";
 import { type CopyKey, readCopyKey } from "./copies.js";
-import { access, forgetItem, itemSharing } from "./library.js";
+import { access, forgetItem, itemSharing, lowerWishlists } from "./library.js";
 import { addLink, capDeckCardLinks, deckLinks, type Link, touchDeckCollections } from "./links.js";
 
 export const ZONES = ["main", "sideboard", "commander", "maybeboard"];
@@ -467,6 +467,69 @@ export function registerDeckRoutes(app: FastifyInstance, database: DatabaseSync)
       return count;
     });
     return { status: "linked", linked };
+  });
+
+  // Add deck to collection: new copies in the deck's printing and finish (NM, English) go into a collection. "missing" adds
+  // only the cards the deck is missing; "all" adds every card. Either way the new copies are linked to the missing cards.
+  // The maybeboard is left out. The answer has the collection counts before and after, for undo.
+  app.post<{ Params: { deckId: string }; Body: { collectionId?: unknown; mode?: unknown } }>("/api/decks/:deckId/add-to-collection", async (request, reply) => {
+    const deckId = request.params.deckId;
+    const userId = userOf(request);
+    const collectionId = request.body?.collectionId;
+    const mode = request.body?.mode;
+    if (typeof collectionId !== "string" || !access(database, "collection", collectionId, userId)) return reply.code(404).send({ error: "Collection not found" });
+    if (mode !== "missing" && mode !== "all") return reply.code(400).send({ error: "Choose missing cards or every card" });
+    if (database.prepare("SELECT kind FROM collections WHERE id = ?").get(collectionId)?.kind === "wishlist") {
+      return reply.code(400).send({ error: "Choose a collection, not a wishlist" });
+    }
+    const cards = database.prepare(
+      `SELECT dc.id, dc.printing_id, dc.finish, dc.quantity, dc.quantity - COALESCE((SELECT SUM(l.quantity) FROM deck_links l WHERE l.deck_card_id = dc.id), 0) AS missing
+       FROM deck_cards dc JOIN cards c ON c.id = dc.printing_id WHERE dc.deck_id = ? AND dc.zone != 'maybeboard' ORDER BY dc.id`,
+    ).all(deckId);
+    const current = database.prepare(`SELECT i.quantity, i.trade FROM collection_cards i WHERE i.collection_id = ? AND ${KEY}`);
+    const insert = database.prepare(
+      `INSERT INTO collection_cards (collection_id, card_id, foil, condition, language, proxy, quantity, added_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+       ON CONFLICT(collection_id, card_id, foil, condition, language, proxy) DO UPDATE SET quantity = MIN(10000, quantity + excluded.quantity)`,
+    );
+    const result = transaction(database, () => {
+      const adding = new Map<string, { key: CopyKey; count: number }>();
+      const links: Array<{ deckCardId: number; key: CopyKey; quantity: number }> = [];
+      for (const card of cards) {
+        const missing = Math.max(0, Number(card.missing));
+        const count = mode === "all" ? Number(card.quantity) : missing;
+        if (count <= 0) continue;
+        const key: CopyKey = { cardId: String(card.printing_id), foil: (Number(card.finish ?? 0) as 0 | 1 | 2), condition: "NM", language: "en", proxy: false };
+        const id = `${key.cardId}:${key.foil}`;
+        adding.set(id, { key, count: (adding.get(id)?.count ?? 0) + count });
+        if (missing > 0) links.push({ deckCardId: Number(card.id), key, quantity: missing });
+      }
+      const before: Array<CopyKey & { quantity: number; trade: number }> = [];
+      const after: Array<CopyKey & { quantity: number; trade: number }> = [];
+      for (const { key, count } of adding.values()) {
+        const row = current.get(collectionId, ...keyValues(key));
+        const have = Number(row?.quantity ?? 0);
+        const add = Math.min(count, 10_000 - have);
+        if (add <= 0) continue;
+        insert.run(collectionId, ...keyValues(key), add);
+        before.push({ ...key, quantity: have, trade: Number(row?.trade ?? 0) });
+        after.push({ ...key, quantity: have + add, trade: Number(row?.trade ?? 0) });
+      }
+      let linked = 0;
+      for (const link of links) {
+        addLink(database, link.deckCardId, { collectionId, ...link.key, quantity: link.quantity });
+        linked += link.quantity;
+      }
+      const added = after.reduce((sum, item, index) => sum + item.quantity - before[index]!.quantity, 0);
+      lowerWishlists(database, userId, after.map((item, index) => ({ cardId: item.cardId, quantity: item.quantity - before[index]!.quantity, proxy: false })));
+      if (added || linked) {
+        touchDeck(database, deckId);
+        const name = String(database.prepare("SELECT name FROM collections WHERE id = ?").get(collectionId)?.name ?? "a collection");
+        logDeck(database, deckId, nameOf(request), `Added ${added} ${added === 1 ? "card" : "cards"} to ${name}${linked ? `, ${linked} linked` : ""}`);
+      }
+      return { added, linked, before, after };
+    });
+    return result;
   });
 
   // marks a deck card Upgrade wanted with the version wanted, or removes the mark (cardId null)

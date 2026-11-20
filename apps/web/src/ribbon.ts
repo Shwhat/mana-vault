@@ -30,7 +30,7 @@ export const DEFAULT_RIBBON: RibbonTab[] = [
   {
     id: "decks", name: "Decks", groups: [
       { name: "Deck", items: ["newDeck", "openDeck", "deck.rename", "deck.delete"] },
-      { name: "Build", context: "deck", items: ["addDeck", "menu.zone", "deck.link", "deck.linkOwned", "deck.tags", "deck.editText"] },
+      { name: "Build", context: "deck", items: ["addDeck", "menu.zone", "deck.link", "deck.linkOwned", "deck.toCollection", "deck.tags", "deck.editText"] },
       { name: "Check", context: "deck", items: ["deck.format", "deck.playtest", "deck.history"] },
       { name: "Missing", context: "deck", items: ["deck.missingWishlist"] },
       { name: "Share", context: "deck", items: ["deck.send", "deck.sharing"] },
@@ -70,7 +70,7 @@ export const RIBBON_MENUS: Record<string, string[]> = {
   "menu.currency": ["currency.usd", "currency.eur"],
   "menu.panels": ["panel.filters", "panel.collections", "panel.decks", "panel.card", "panel.decklist", "panel.review"],
   "menu.workspace": ["workspace.save", "workspace.manage", "workspace.reset"],
-  "menu.zone": ["zone.main", "zone.sideboard", "zone.commander", "zone.maybeboard"],
+  "menu.zone": ["zone.all", "zone.commander", "zone.main", "zone.sideboard", "zone.maybeboard"],
   "menu.backup": ["backup", "restore"],
   "menu.ribbonSize": ["ribbon.large", "ribbon.compact", "ribbon.icons"],
 };

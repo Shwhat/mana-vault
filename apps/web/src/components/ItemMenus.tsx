@@ -57,6 +57,22 @@ const withDeck = (store: Store, deck: Deck, run: () => void) => {
   void store.openDeck(deck.id, true).then(run);
 };
 
+/**
+ * Add deck to collection: asks which collection and whether to add only the cards the deck is missing or every card
+ * as new copies. Missing cards are linked to the new copies either way. The maybeboard is left out.
+ */
+export function addDeckToCollectionDialog(store: Store, deck: { id: string; name: string; collection_id?: string | null }) {
+  const list = (store.collections ?? []).filter((item) => item.kind !== "wishlist");
+  if (!list.length) return store.flash("Create a collection first", "err");
+  const preferred = [deck.collection_id, store.prefs.targetCollection].find((id) => id && list.some((item) => item.id === id)) ?? list[0]!.id;
+  dialog(`Add ${deck.name} to a collection`, [
+    ["collection", "Collection", preferred, "select", list.map((item) => [item.id, item.name])],
+    ["mode", "Cards to add", "missing", "select", [["missing", "Missing cards only, linked to the deck"], ["all", "Every card as new copies"]]],
+  ], async (values) => {
+    await store.addDeckToCollection(deck.id, String(values.collection), values.mode === "all" ? "all" : "missing");
+  }, "Add cards");
+}
+
 export function collectionMenu(store: Store, item: Collection) {
   const owner = item.role === "owner";
   return rowMenu(store, item.name, () => [
@@ -85,6 +101,7 @@ export function deckMenu(store: Store, deck: Deck) {
         if (!ok) return false;
       }, "Save"),
     },
+    { label: "Add deck to collection...", run: () => addDeckToCollectionDialog(store, deck) },
     owner && { label: "Send...", run: () => void sendDialog(store, "deck", deck) },
     { label: "Export...", run: () => withDeck(store, deck, () => exportWindow(store, "deck")) },
     { label: owner ? "Delete" : "Leave", run: () => void store.deleteDeck(deck) },

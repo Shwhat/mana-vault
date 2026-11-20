@@ -153,11 +153,11 @@ test("the switcher opens collections and decks by search and keyboard, and one c
   await page.keyboard.press("Escape");
   await expect(page.locator(".swpop")).toHaveCount(0);
 
-  // Help closes when a deck is opened from a panel, and one click opens it
+  // Help closes when a deck is opened from a panel with a double click
   await menu(page, "Help", "About Mana Vault");
   await expect(page.locator(".about")).toBeVisible();
   await page.locator('.tab[data-panel="decks"]').click();
-  await page.locator(".navitem", { hasText: "Burn" }).click();
+  await page.locator(".navitem", { hasText: "Burn" }).dblclick();
   await expect(page.locator(".about")).toHaveCount(0);
   await expect(page.locator("#view-deck .switcher")).toContainText("Burn");
 });

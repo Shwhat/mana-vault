@@ -15,6 +15,7 @@ This page lists what Mana Vault does in the current version, followed by what is
 - Show every result, sorted by name, loading more while scrolling or turning binder pages, with the total in the count line.
 - Show results as a Grid or Binder of card pictures with prices and how many you own, or as a List. Each device type remembers its own choice. The deck's Add tab and the trade searches use the same views.
 - Click a result to select it, double-click to add it, right-click or long press for its menu.
+- Sort results by Best match (the default: exact names first, then names that start with the search words), Name, Newest, Oldest, Price, Mana value, Rarity, Color, Set or Owned first. Card search, the deck's Add tab and both trade searches each keep their own sort.
 - Search by price with `usd` and `eur`, and find cards by their flavor names (such as a Godzilla series name).
 - Click a result's set code or rarity to filter by it.
 - Show each result's price.
@@ -25,7 +26,7 @@ This page lists what Mana Vault does in the current version, followed by what is
 - Keep any number of collections per account, each with a name and description. Every account starts with a Main collection.
 - Add any printing as a regular, foil or etched copy with Enter, a double-click or one add button that names where the card goes (+ name) and opens the printing chooser with the shown printing selected; a card with one printing and one finish is added at once.
 - See where cards go: an Adding here mark in the Collections and Decks panels, and ADDING TO in the status bar, which switches between the open deck and the target collection. Cycle the collections with C.
-- See one picture per printing in Grid and Binder, with a line under it for each finish (and each condition or language when they differ) giving its count and price, and a Total line with the count and value.
+- See one picture per printing in Grid and Binder, with pips on the picture for the count, FOIL or ETCHED, condition, language, Proxy and the number for trade. A printing held as more than one kind of copy gets a line under the picture for each, with its pips and count. Card pictures show no prices; the List layout has them.
 - Change the printing or finish of all or some copies (such as one of two copies to the foil version), keeping their count, condition, language, trade marks and details, and choose whether the decks they fill change too or keep their version.
 - Right-click or long press a collection (panel or switcher) to open, rename, change settings, send, export, delete or leave it.
 - Record each copy's finish (regular, foil or etched), condition (Mint to Damaged) and language with Copy details.
@@ -33,7 +34,7 @@ This page lists what Mana Vault does in the current version, followed by what is
 - Sort entries by name, price, quantity, or set and number.
 - Narrow the list with filter tags by clicking a set code or rarity on an entry, or a bar in Statistics.
 - Show a collection as a grid of card pictures that loads more while scrolling (Small, Medium or Large), as binder pages of nine cards with a page box, or as a list. Each device type remembers its own layout.
-- Open collections from a switcher with search, five sort orders and the keyboard.
+- Open collections from a switcher with search, five sort orders and the keyboard. One click on a collection in the Collections panel or the switcher makes it where new cards go; a double click opens it.
 - All collections, the first entry of the switcher, lists every entry of every collection with its collection, wishlists included when chosen in Options. Edits act on each entry's own collection.
 - Filters, tags and the filter box stay when another collection opens.
 - Show statistics: mana curve, colors, types, rarity, finish, top sets by value, average and median prices.
@@ -72,7 +73,7 @@ This page lists what Mana Vault does in the current version, followed by what is
 ### Decks
 
 - Create decks with a name and one of 21 formats; every deck keeps the printing of each card.
-- Open decks from a switcher with search, six sort orders, cover card, commander, format and card count.
+- Open decks from a switcher with search, six sort orders, cover card, commander, format and card count. One click on a deck in the Decks panel or the switcher makes it where new cards go; a double click opens it.
 - Change the printing or finish of all or some of a deck card's cards: free copies of the new printing in that finish are linked, from the collection you choose when several have them.
 - Keep a finish for every deck card (regular, foil or etched), shown as FOIL or ETCHED in every deck view, the Deck list panel and the Card panel, used for its price, set by `*F*` and `*E*` marks, Add as foil, Add as, linked copies and Change printing. A regular and a foil card of the same printing are separate deck cards.
 - Link lines of Edit as text and decklist imports that name a set and number to free copies of exactly that printing and finish; lines without them stay missing until linked. Link owned copies fills every missing card from exact copies.
@@ -90,6 +91,8 @@ This page lists what Mana Vault does in the current version, followed by what is
 - Write a description with headings, lists and links, choose a cover card, and see the history of every change.
 - Link each deck card to the copy in a collection that fills it: one deck per copy, chosen when a card is free in more than one collection, changeable later, following the copy when it moves or changes printing (or keeping its version when you choose), and missing when it is removed.
 - Rename and delete decks.
+- Show all zones or only one (All, Commander, Main, Sideboard, Maybe); the zone shown is where Add puts cards.
+- Add deck to collection: put the missing cards, or every card as new copies, into a chosen collection in the deck's printings and finishes, with the missing cards linked to them.
 - Add cards to the commander zone, main deck, sideboard or maybeboard, change counts, move cards between zones, remove a chosen number of copies or Reduce to 1, and remove cards.
 - Import decklists as text (Moxfield, Arena and MTGO style, with `*F*` foil and `*E*` etched marks) or CSV, with a preview. A line whose name does not match is found by its set and collector number.
 - Export decks as text or CSV.

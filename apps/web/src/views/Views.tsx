@@ -1,7 +1,7 @@
 // ---------- central work area: card search, collection and deck views ----------
 import type { Action } from "../actions";
 import type { FoundCard } from "../card-search";
-import { CardResults, countLine } from "../components/CardResults";
+import { CardResults, countLine, SortPicker } from "../components/CardResults";
 import { LayoutRows, OptionsButton } from "../components/Options";
 import { linkDialog } from "../components/LibraryDialogs";
 import { AddButtons, addCard, addMenuItems } from "../components/AddButtons";
@@ -25,7 +25,6 @@ export function searchMenu(store: Store, card: FoundCard) {
     ...addMenuItems(store, card),
     { label: "Add as proxy", run: () => void store.addToCollection(card.id, card.name, undefined, undefined, true) },
     { label: "Add to wishlist", run: wish },
-    { label: "Add to trade (you get)", run: () => void store.getCard(card.id) },
     { label: "Add to print list", run: () => void store.addToPrintList([{ card, count: 1 }], card.name) },
   ];
 }
@@ -69,6 +68,7 @@ export function CardsView({ actions, onFilters }: { actions: Record<string, Acti
           <kbd>/</kbd>
         </label>
         {onFilters && <button type="button" className={anyFilter ? "btn on" : "btn"} onClick={onFilters}>Filters</button>}
+        <SortPicker scope="cards" />
         <SearchOptions />
         <span className="phpos">{countLine(search)}</span>
       </div>

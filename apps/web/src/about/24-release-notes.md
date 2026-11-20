@@ -2,6 +2,16 @@
 
 The installed version is shown at the top of this guide.
 
+## 0.13.0 (2026-11-20): Select with one click, search sorting, zone views and Add deck to collection
+
+- One click (or tap) on a collection or deck in the Collections panel, the Decks panel or a switcher makes it where new cards go without opening it, so a card search stays open. A double click (or double tap) opens it. The switcher list stays open after one click and marks the chosen one Adding here.
+- Sort in card search, the deck's Add tab and both trade searches: Best match (the default, exact names first, so sol ring puts Sol Ring at the top), Name, Newest, Oldest, Price high to low or low to high, Mana value, Rarity, Color, Set and Owned first. Each search keeps its own sort. The Android app sorts offline searches the same way.
+- The You give and You get buttons, the Add to trade menu items and the T and G keys are gone; cards are added to trades in the Trade view. Mark for trade and the trade binder stay.
+- Card pictures show no prices. Collection Grid and Binder, All collections, deck Grid and Stacks and search pictures show pips on the picture for the count, FOIL, ETCHED, Missing, Proxy, condition, language and copies for trade. Lines under a picture appear only when it stands for more than one kind of copy, with pips and counts. The Total line is gone. List views keep their prices.
+- Zone buttons All, Commander, Main, Sideboard and Maybe above the deck's cards and in the Deck list panel: each shows only its zone and makes it where Add puts cards; All shows every zone and adds to Main. Z and the Target zone list on the Decks ribbon tab cycle the same choices.
+- Add deck to collection... (Decks ribbon tab, the deck's Add tab, deck right-click menus): adds the deck's missing cards, or every card as new copies, to a chosen collection in the deck's printings and finishes, links the missing cards to them, and is one undo step.
+- Ctrl+N no longer opens New deck....
+
 ## 0.12.0 (2026-11-20): Administration, full card data offline and card pictures on the server
 
 Before updating a Docker install: create the pictures folder on the Docker host (`sudo mkdir -p /opt/mana-vault/pictures` and `sudo chown -R 65532:65532 /opt/mana-vault/pictures`). Remove MANAVAULT_SIGNUP and MANAVAULT_CARD_UPDATE_INTERVAL_HOURS from the stack's environment to manage them in Administration. After updating, run Update card database once.

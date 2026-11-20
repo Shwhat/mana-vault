@@ -25,7 +25,7 @@ A new account starts with an empty collection named **Main collection** that is 
 
 ## Where new cards go
 
-New cards go to the collection or deck **selected last**: the one clicked in the Collections panel, the Decks panel or a switcher. Only that one is highlighted and marked **Adding here** in its panel. The status bar shows it as ADDING TO: name, or ADDING TO: DECK name; clicking it with a deck open switches between the deck and the target collection ("Adding to name").
+New cards go to the collection or deck **selected last**: the one clicked once in the Collections panel, the Decks panel or a switcher. One click only selects it, so a card search or other view stays open while you change where cards go; a double click (or double tap on a phone) opens it. Only that one is highlighted and marked **Adding here** in its panel. The status bar shows it as ADDING TO: name, or ADDING TO: DECK name; clicking it with a deck open switches between the deck and the target collection ("Adding to name").
 
 - With a collection selected, **Add to collection** puts cards into it, the **target collection**.
 - With a deck selected, every add command (**Add to collection**, Enter, a double-click in card search, the Card panel and the scanner's **Add to**, which is filled in with the deck) adds the card to that deck in the target zone. A free collection copy is linked; when free copies are in more than one collection you choose one; with none the card is missing (see [Decks](/about/decks)). **Add as proxy** still adds a proxy copy to the target collection.
@@ -109,7 +109,7 @@ Press **2** (or **Collection** on the Home ribbon tab) to open it. The header ho
 
 ### The collection switcher
 
-The switcher lists every collection, including those shared with you, with a Wishlist or Shared badge. Type to find a collection by name; Up and Down move through the list, Enter opens the highlighted collection and Esc closes the list. **Sort** orders the list by Recently opened, Name, Date created, Card count or Value, and is kept for your account. **New collection...** is at the bottom of the list. On a phone the list opens as a full sheet. Opening a collection closes the About guide.
+The switcher lists every collection, including those shared with you, with a Wishlist or Shared badge. Type to find a collection by name; Up and Down move through the list, Enter opens the highlighted collection and Esc closes the list. One click on a collection makes it where new cards go and keeps the list open (it is marked Adding here); a double click opens it. All collections opens with one click. **Sort** orders the list by Recently opened, Name, Date created, Card count or Value, and is kept for your account. **New collection...** is at the bottom of the list. On a phone the list opens as a full sheet. Opening a collection closes the About guide.
 
 ### All collections
 
@@ -159,9 +159,9 @@ The Cards tab shows the rows in the current sort and filter in one of three layo
 | Binder | Pages of nine printings in three rows, like a binder sheet, as large as the work area allows |
 | List | One row per entry, as described below |
 
-In Grid and Binder each printing has one picture, with no count, finish or price on it. Under the picture is one line per finish, and per condition, language or proxy when they differ, such as "Regular 2 $1.10" and "Foil 1 $4.00": the finish (special foils by name, such as Surge foil), the condition and language when not near mint English, Proxy, a T badge with the number for trade, the count and the price of one copy. A **Total** line follows with the count and value of every line.
+In Grid and Binder each printing has one picture, with pips on it: the count at the top right when there is more than one copy, and at the bottom FOIL or ETCHED (special foils by name, such as SURGE FOIL), the condition and language when not near mint English (such as LP and JA), Proxy, and a T badge with the number for trade. When the printing is held as more than one kind of copy (such as regular and foil), a line for each sits under the picture with its pips (REGULAR, FOIL, ETCHED and the others) and its count. Pictures show no prices; the List layout has them.
 
-Click a line to select it, Ctrl+click or Shift+click to pick several, double-click a line to open Copy details, and right-click a line (or long press on a phone) for its menu. Clicking the picture selects the first line; right-clicking the picture opens the first line's menu. All collections uses the same layout. The List layout keeps one row per entry.
+Click a picture or line to select it, Ctrl+click or Shift+click to pick several, double-click to open Copy details, and right-click (or long press on a phone) for its menu. Clicking a picture with lines selects the first line; right-clicking it opens the first line's menu. All collections uses the same layout. The List layout keeps one row per entry.
 
 In the Binder, **First**, **Previous page**, **Next page** and **Last**, or Page Up and Page Down, turn the pages. Type a page number in the page box and press Enter to go to that page.
 

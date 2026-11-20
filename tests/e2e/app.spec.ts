@@ -75,7 +75,7 @@ test("search, filters and adding to the collection with undo", async ({ page }) 
 
 test("deck building with zones, moves and undo", async ({ page }) => {
   await signUp(page);
-  await page.keyboard.press("Control+n");
+  await menu(page, "Decks", "New deck...");
   await expect(page.locator("dialog[open] .dlghead")).toHaveText("New deck");
   await expect(page.locator("#f-name")).toBeFocused();
   await page.keyboard.press("Enter");
@@ -94,7 +94,8 @@ test("deck building with zones, moves and undo", async ({ page }) => {
   await expect(status(page)).toHaveText("Lightning Bolt added to Burn test");
   await page.keyboard.press("Shift+Enter");
   await takePrinting(page);
-  await page.keyboard.press("z");
+  // Z cycles All, Commander, Main, Sideboard and Maybe
+  for (const key of ["z", "z", "z"]) await page.keyboard.press(key);
   await expect(page.locator("#st-toggles")).toContainText("ZONE: SIDEBOARD");
   // another printing, picked in the chooser
   await page.keyboard.press("Shift+Enter");
@@ -102,6 +103,9 @@ test("deck building with zones, moves and undo", async ({ page }) => {
   await expect(status(page)).toHaveText("Lightning Bolt added to Burn test (sideboard)");
 
   await page.keyboard.press("3");
+  // a zone shows only that zone; Z on to All shows every zone again
+  await expect(page.locator("#view-deck .boardhead")).toHaveText(["Sideboard 1"]);
+  for (const key of ["z", "z"]) await page.keyboard.press(key);
   await expect(page.locator("#view-deck .boardhead")).toHaveText(["Main deck 2", "Sideboard 1"]);
   const side = page.locator("#view-deck .row").nth(1);
   await choose(page, side.locator(".zonesel"), "main");
