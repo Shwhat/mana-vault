@@ -6,7 +6,7 @@ import type { CardSearch, FoundCard } from "../card-search";
 import { CardResults, countLine, useViewSearch } from "../components/CardResults";
 import { choices, type Choice, Picker } from "../components/Picker";
 import { acceptTradeDialog, completeTradeDialog, newTradeDialog, renameTradeDialog, sendTradeDialog, shareBinderDialog } from "../components/TradeDialogs";
-import { matchesFilters } from "../filters";
+import { matchesFilters, useServerMatch } from "../filters";
 import { Icon } from "../icons";
 import { entryKey } from "../library-state";
 import { useApp } from "../store";
@@ -119,11 +119,12 @@ function GiveSearch({ trade, editable }: { trade: Trade | null; editable: boolea
   }, [all, store.collections]);
   const filters = store.filterSets.tradeGive;
   const byKey = useMemo(() => new Map((rows ?? []).map((row) => [entryKey(row), row])), [rows]);
-  const cards = useMemo(() => (rows ?? []).filter((row) => matchesFilters(row, filters)).map((row): FoundCard => ({
+  const match = useServerMatch(filters, store.prefs.currency);
+  const cards = useMemo(() => (rows ?? []).filter((row) => matchesFilters(row, filters, match)).map((row): FoundCard => ({
     id: entryKey(row), name: row.name, mana_cost: row.mana_cost, mana_value: row.mana_value, type_line: row.type_line, oracle_text: null, set_code: row.set_code,
     set_name: row.set_name, collector_number: row.collector_number, rarity: row.rarity, colors: row.colors, image_url: row.image_url,
     prices: { usd: priceOf(row, row.foil, "usd"), usd_foil: null, usd_etched: null, eur: priceOf(row, row.foil, "eur"), eur_foil: null },
-  })), [rows, filters]);
+  })), [rows, filters, match]);
   const search = useLocalSearch(cards);
   const give = (card: FoundCard) => { const row = byKey.get(card.id); if (row) store.giveEntry(row); };
   return (
@@ -139,7 +140,8 @@ function GiveSearch({ trade, editable }: { trade: Trade | null; editable: boolea
 
 function GetSearch({ trade, editable }: { trade: Trade | null; editable: boolean }) {
   const store = useApp();
-  const search = useViewSearch(store.filterSets.tradeGet, store.view === "trade");
+  // trade lines are printings, so the trade search lists every printing
+  const search = useViewSearch(store.filterSets.tradeGet, store.view === "trade", false);
   return <SideSearch side="get" search={search} trade={trade} editable={editable} onAdd={(card) => void store.getCard(card.id)} buttonText={() => "+ Get"} />;
 }
 

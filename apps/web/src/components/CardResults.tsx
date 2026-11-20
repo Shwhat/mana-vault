@@ -56,9 +56,22 @@ function useMoreOnScroll(search: CardSearch) {
   return { root, end };
 }
 
-function OwnedBadge({ owned }: { owned?: number }) {
-  return owned ? <span className="badge own" title={`You own ${owned} ${owned === 1 ? "copy" : "copies"} of this printing`}>OWNED {owned}</span> : null;
+function OwnedBadge({ owned, grouped }: { owned?: number; grouped?: boolean }) {
+  return owned ? <span className="badge own" title={`You own ${owned} ${owned === 1 ? "copy" : "copies"} of this ${grouped ? "card" : "printing"}`}>OWNED {owned}</span> : null;
 }
+
+/** How many you own, by finish, such as "Owned: Regular 2, Foil 1". */
+export function ownedLine(card: FoundCard): string {
+  const parts = card.ownedFinishes
+    ? ([["Regular", card.ownedFinishes.regular], ["Foil", card.ownedFinishes.foil], ["Etched", card.ownedFinishes.etched]] as const).filter(([, count]) => count > 0)
+      .map(([name, count]) => `${name} ${count}`)
+    : card.owned ? [String(card.owned)] : [];
+  return parts.length ? `Owned: ${parts.join(", ")}` : "";
+}
+
+/** "12 printings" for a grouped search result with more than one. */
+const PrintingsBadge = ({ card, className = "" }: { card: FoundCard; className?: string }) =>
+  (card.printings && card.printings > 1 ? <span className={`badge prints${className ? ` ${className}` : ""}`} title="Adding asks which printing">{card.printings} printings</span> : null);
 
 /** One card picture with its price and owned count. */
 function ResultPicture({ card, props, store }: { card: FoundCard; props: ResultProps; store: Store }) {
@@ -70,9 +83,10 @@ function ResultPicture({ card, props, store }: { card: FoundCard; props: ResultP
         title={`${card.name}, ${card.set_name} ${card.collector_number}`}
         onClick={() => props.onPick(card)} onDoubleClick={() => props.onOpen(card)} {...rowMenu(store, card.name, () => props.menu(card))}>
         {card.image_url ? <img src={card.image_url} alt={card.name} loading="lazy" draggable={false} /> : <span className="pocketname">{card.name}</span>}
-        {!!card.owned && <span className="pocketqty" title={`You own ${card.owned}`}>{card.owned}</span>}
+        <PrintingsBadge card={card} className="pocketfoil" />
         <span className="pocketprice">{money(anyPrice(pricesOf(card), currency), currency)}</span>
       </div>
+      {!!card.owned && <div className="resowned">{ownedLine(card)}</div>}
       {props.buttons && <div className="resbtns">{props.buttons(card)}</div>}
     </div>
   );
@@ -86,7 +100,7 @@ function ResultRow({ card, props, store }: { card: FoundCard; props: ResultProps
       onClick={() => props.onPick(card)} onDoubleClick={() => props.onOpen(card)} {...rowMenu(store, card.name, () => props.menu(card))}>
       <Thumb url={card.image_url} />
       <div className="rowmain">
-        <div className="rowtitle"><b>{card.name}</b>{card.custom && <span className="badge custom">Custom</span>}<span className="mana">{card.mana_cost}</span><OwnedBadge owned={card.owned} /></div>
+        <div className="rowtitle"><b>{card.name}</b>{card.custom && <span className="badge custom">Custom</span>}<span className="mana">{card.mana_cost}</span><PrintingsBadge card={card} /><OwnedBadge owned={card.owned} grouped={!!card.printings} /></div>
         <div className="rowsub">{card.type_line}</div>
         <div className="rowmeta">{card.set_name}{" "}
           {props.onTag
@@ -176,9 +190,9 @@ export function CardResults(props: ResultProps) {
 }
 
 /** A card search inside a view (the deck's Add tab, the trade searches) whose owned counts follow cards being added. */
-export function useViewSearch(filters: Filters, enabled: boolean): CardSearch {
+export function useViewSearch(filters: Filters, enabled: boolean, group = true): CardSearch {
   const store = useApp();
-  const search = useCardSearch(filters, enabled);
+  const search = useCardSearch(filters, enabled, { group: group && !store.prefs.searchAllPrintings, currency: store.prefs.currency });
   const hooks = store.ownedHooks;
   useEffect(() => {
     const hook = search.owned;

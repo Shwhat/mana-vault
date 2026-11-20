@@ -1,5 +1,6 @@
 // ---------- card page: the card's art, text, versions with prices, rulings and what you own ----------
 import { addMenuItems } from "../components/AddButtons";
+import { PriceHistory } from "./PriceHistory";
 import { useEffect, useState } from "react";
 import type { Action } from "../actions";
 import { request } from "../api";
@@ -22,7 +23,7 @@ export function CardPage({ actions }: { actions: Record<string, Action> }) {
   const [card, setCard] = useState<(CardDetail & { power?: string | null; toughness?: string | null }) | null>(null);
   const [versions, setVersions] = useState<Version[]>([]);
   const [rulings, setRulings] = useState<Ruling[] | null>(null);
-  const [tab, setTab] = useState<"versions" | "rulings">("versions");
+  const [tab, setTab] = useState<"versions" | "rulings" | "prices">("versions");
   const [menu, setMenu] = useState(false);
   const [error, setError] = useState("");
   const currency = store.prefs.currency;
@@ -76,6 +77,7 @@ export function CardPage({ actions }: { actions: Record<string, Action> }) {
         <div className="seg cptabs" role="tablist">
           <button type="button" role="tab" aria-selected={tab === "versions"} className={tab === "versions" ? "on" : ""} onClick={() => setTab("versions")}>Versions</button>
           <button type="button" role="tab" aria-selected={tab === "rulings"} className={tab === "rulings" ? "on" : ""} onClick={() => setTab("rulings")}>Rulings</button>
+          <button type="button" role="tab" aria-selected={tab === "prices"} className={tab === "prices" ? "on" : ""} onClick={() => setTab("prices")}>Price history</button>
         </div>
         {tab === "versions" && (
           <div className="cpversions">
@@ -99,6 +101,7 @@ export function CardPage({ actions }: { actions: Record<string, Action> }) {
             })}
           </div>
         )}
+        {tab === "prices" && <PriceHistory cardId={card.id} currency={currency} />}
         {tab === "rulings" && (
           <div className="cprulings">
             {rulings === null && <p className="note">Loading rulings</p>}

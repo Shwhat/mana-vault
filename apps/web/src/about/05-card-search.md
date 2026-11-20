@@ -1,6 +1,6 @@
 # Card search
 
-Card search finds printings in the local card database. The search box and the Filters panel work together: a card must match every word, every filter in the box and every field in the panel.
+Card search finds cards in the local card database, one result per card name unless Show every printing is on. The search box and the Filters panel work together: a card must match every word, every filter in the box and every field in the panel.
 
 ## The search box
 
@@ -8,7 +8,7 @@ Card search finds printings in the local card database. The search box and the F
 - Results update a quarter of a second after you stop typing.
 - A plain word matches a card whose name, flavor name, type line or rules text contains it. Several words must all match. A flavor name is the other name some printings carry, such as a Godzilla series name; results show it as "Also printed as".
 - Put words in double quotes to search for a phrase, for example `"draw a card"`.
-- Up to 40 results are shown, sorted by name and then by newest printing first. Narrow the search to see more specific results.
+- Results are sorted by name, and load as you scroll.
 
 ## Filter syntax
 
@@ -28,6 +28,19 @@ A filter is a key, an operator and a value with no spaces, such as `t:dragon`. P
 | `mv` or `cmc` | Mana value compared with =, :, <, >, <= or >= | `mv>=4` |
 | `legal:` or `f:` | Card is legal in the format | `legal:commander` |
 | `is:custom` | Card is a custom card made in the card maker (`-is:custom` leaves them out) | `is:custom t:goblin` |
+| `is:owned` | Any printing of the card is in one of your collections or one shared with you (not wishlists or proxies). `not:owned` is the opposite | `is:owned r:mythic` |
+| `is:foil`, `is:nonfoil`, `is:etched` | The printing is made in that finish | `is:etched` |
+| `is:fullart`, `is:borderless`, `is:showcase`, `is:extendedart`, `is:promo`, `is:variation` | The printing has that treatment | `is:borderless t:land` |
+| `is:` and a special foil or promo type | The printing is made in it, such as `is:surgefoil`, `is:galaxyfoil`, `is:textured` or `is:prerelease` | `is:surgefoil` |
+| `art:` or `atag:` | What the art shows, from Scryfall's Art Tags, including narrower tags (art:animal also finds cats) | `art:cat`, `art:dragon` |
+| `role:`, `function:` or `otag:` | What the card does, from Scryfall's Oracle Tags | `role:ramp`, `role:removal` |
+| `pow` or `power`, `tou` or `toughness` | Power or toughness compared with =, :, <, >, <= or >=. Cards with * or no power never match | `pow>=4`, `tou<2` |
+| `year` | Release year compared with =, :, <, >, <= or >= | `year>=2020` |
+| `a:` or `artist:` | Artist name contains the text | `a:"rebecca guay"` |
+| `kw:` or `keyword:` | The card has the keyword ability | `kw:flying` |
+| `frame:` | Frame year (1993, 1997, 2003, 2015, future) or frame effect (showcase, extendedart, etched...) | `frame:1993` |
+| `border:` | Border color: black, white, borderless, silver or gold | `border:white` |
+| `lang:` | Printing language. English, plus unofficial languages such as Phyrexian (`ph`) | `lang:ph` |
 | `usd`, `eur` | Price compared with =, :, <, >, <= or >=. The regular price, or the foil price for printings only in foil. Printings without a price never match | `usd<1`, `eur>=20` |
 
 Colors are W (white), U (blue), B (black), R (red) and G (green), or a color name. Mana values run from 0 to 100.
@@ -37,7 +50,11 @@ Colors are W (white), U (blue), B (black), R (red) and G (green), or a color nam
 | Message | Cause |
 |---|---|
 | Unsupported search filter "x" | The key before the operator is not in the table above |
-| Unknown card kind "x". Use is:custom | `is:` was followed by something other than custom |
+| Unknown card kind "x" | `is:` was followed by something that is not a word of letters and digits |
+| x needs a comparison operator | `pow`, `tou` or `year` was followed by something other than =, :, <, >, <= or >= |
+| x must be a number | The power or toughness is not a number |
+| year must be four digits, such as 2019 | The year is not four digits |
+| is:owned needs a signed-in account | The search ran without an account |
 | x only supports the ":" operator | A text filter was used with <, >, = or similar |
 | Unknown rarity "x" | The rarity is not one of the six listed |
 | Invalid color filter "x" | The value contains something other than W, U, B, R, G or a color name |
@@ -56,7 +73,23 @@ Colors are W (white), U (blue), B (black), R (red) and G (green), or a color nam
 | Color | Any color | Card has the chosen color |
 | Rarity | Any rarity | Common, Uncommon, Rare or Mythic |
 | Legal in | Any format | Commander, Standard, Pioneer, Modern, Legacy, Pauper or Vintage |
+| Name | Empty | Card name or flavor name contains the text |
+| Card text | Empty | Rules text contains the text |
+| Creature type | Empty | Type line contains the creature type |
+| Keyword | Empty | The card has the keyword ability |
+| Artist | Empty | Artist name contains the text |
+| Art shows | Empty | What the art shows (Art Tags), with suggestions from the card database as you type |
+| Role | Empty | What the card does (Oracle Tags), with suggestions as you type |
+| Power, Toughness | Empty | Min and Max for each |
 | Mana value From and To | Empty | Mana value at least From and at most To (0 to 100, in steps of 0.5). From cannot be more than To |
+| Price | Empty | Min and Max, in the chosen currency |
+| Made in | Any finish | Printings made in Foil, Etched or Regular |
+| Foil type | Any foil | Printings made in a special foil, such as Surge foil or Galaxy foil |
+| Frame | Any frame | Full art, Borderless, Showcase, Extended art or Promo |
+| Released | Empty | From year and To year |
+| Owned | Owned or not | Owned or Not owned, by card name, as `is:owned` |
+
+Art shows, Role, Card text and the other fields that need the card database also work on collection and deck cards: the server works out which printings match and the open view keeps only those.
 
 The Filters panel filters the open view, and its first line names it:
 
@@ -72,7 +105,7 @@ Each view keeps its own filters. A collection's filters stay when another collec
 
 ## Results
 
-The count line after the search box shows the number of matching printings, and while more are still to load, how many are loaded. More results load as you scroll, or as you turn binder pages.
+The count line after the search box shows the number of matching cards (or printings, with Show every printing), and while more are still to load, how many are loaded. More results load as you scroll, or as you turn binder pages.
 
 **Options** beside the search box holds:
 
@@ -80,16 +113,21 @@ The count line after the search box shows the number of matching printings, and 
 |---|---|
 | Layout | **Grid** (the default), **Binder** (pages of nine with Previous page and Next page) or **List** |
 | Card size | Small, Medium or Large, for the Grid layout |
+| Show every printing | One result per printing instead of one per card name. Kept for your account |
 | Done | Closes Options |
 
 The desktop and phones each remember their own layout. The deck's Add tab and both trade searches use the same layout and card size.
 
 | Layout | Each result shows |
 |---|---|
-| Grid, Binder | The card picture, its price, and in the top corner how many copies of the printing you own; the buttons are under the picture (in Binder, under the selected one) |
+| Grid, Binder | The card picture with its price, an **N printings** badge when the card has more than one printing, and a line under it with the copies you own by finish (such as 2 regular, 1 foil); the buttons are under the picture (in Binder, under the selected one) |
 | List | The image, name, mana cost, type line, set, set code, collector number, rarity, price and an OWNED badge with your copies. Clicking the set code fills the Set code filter; clicking the rarity sets the Rarity filter |
 
-The buttons name where the card goes: **+ collection name** (the target collection) and, while a deck is open, **+ deck name**, each followed by a button for every other finish the printing is made in (**Foil**, **Etched**, or **Regular** while Add as foil is on), then **+ Wishlist**. Owned counts are real copies in your collections and collections shared with you, not wishlists or proxies.
+The add button names where the card goes: **+ name** of the collection or deck selected last, then **+ Wishlist**. It opens the printing chooser titled "Add card name to name" with the printing shown already selected and the finish set by Add as foil, so Enter adds it; another printing or finish can be picked first. A card made in only one printing and one finish is added at once. Owned counts are real copies in your collections and collections shared with you, not wishlists or proxies.
+
+## One result per card
+
+Card search shows one result per card name: the newest regular printing (not a promo or variant), with an **N printings** badge and the copies you own summed over every printing by finish. Adding opens the printing chooser to pick the exact printing. **Show every printing** in the search Options brings back one result per printing; the choice is kept for your account. The You get search in a trade always lists every printing.
 
 ## The selected card
 
@@ -98,9 +136,8 @@ Click a result (or move to it with Up and Down) to select it. The Card panel sho
 | Action | Keys and buttons |
 |---|---|
 | Add one copy to where cards go (shown as ADDING TO in the status bar) | Enter, double-click |
-| Add one copy to the target collection | **+ collection name**, **Add to collection name** in the right-click menu |
-| Add one foil or etched copy | **Foil** or **Etched** beside an add button, **Add to name as foil** or **as etched** in the right-click menu |
-| Add one copy to the open deck, in the target zone | Shift+Enter, **+ deck name**, **Add to deck name** |
+| Add a copy to where cards go, choosing the printing and finish | **+ name**, **Add to name...** in the right-click menu |
+| Add one copy to the open deck, in the target zone | Shift+Enter |
 | Add one copy to the wishlist | W, **+ Wishlist**, **Add to wishlist** |
 | Add one copy to what you get in the open trade | G, **Add to trade (you get)** in the right-click menu |
 | Open the card page | **Card page** in the right-click menu; a tap on a phone |

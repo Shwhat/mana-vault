@@ -1,7 +1,7 @@
 // ---------- card marks shared by every view: finish badges, Upgrade wanted, owned versions of missing cards, Remove how many ----------
 import type { MouseEvent as ReactMouseEvent } from "react";
 import type { Store } from "../store";
-import { type Candidate, type DeckCard, type FinishCode, copyLabel } from "../types";
+import { type Candidate, type DeckCard, type FinishCode, copyLabel, finishLabel } from "../types";
 import { closeDialog, customDialog, dialog } from "./Dialog";
 
 const FINISH_WORD: Record<FinishCode, string> = { 0: "regular", 1: "foil", 2: "etched" };
@@ -9,11 +9,14 @@ export const finishWord = (finish: FinishCode | undefined | null) => FINISH_WORD
 /** A finish code as the name addToDeck takes: "" (regular), "foil" or "etched". */
 export const finishName = (finish: FinishCode | number | undefined | null): "" | "foil" | "etched" => (finish === 2 ? "etched" : finish === 1 ? "foil" : "");
 
-/** FOIL or ETCHED on a card line or picture; nothing for a regular card. Used everywhere a card is shown. */
-export function FinishBadge({ finish, className = "" }: { finish: FinishCode | number | boolean | undefined | null; className?: string }) {
+/**
+ * FOIL, ETCHED or the special foil (SURGE FOIL, GALAXY FOIL...) on a card line or picture; nothing for a regular card.
+ * Used everywhere a card is shown.
+ */
+export function FinishBadge({ finish, promoTypes, className = "" }: { finish: FinishCode | number | boolean | undefined | null; promoTypes?: string | null; className?: string }) {
   const code = finish === true ? 1 : Number(finish ?? 0);
   if (code !== 1 && code !== 2) return null;
-  return <span className={`badge foil${className ? ` ${className}` : ""}`}>{code === 2 ? "ETCHED" : "FOIL"}</span>;
+  return <span className={`badge foil${className ? ` ${className}` : ""}`}>{finishLabel(code, promoTypes).toUpperCase()}</span>;
 }
 
 /** The version a card marked Upgrade wanted is wanted in, such as "(LEA) 161 foil". */

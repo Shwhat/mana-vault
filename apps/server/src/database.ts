@@ -406,6 +406,70 @@ function upgradeDeckBuilder(database: DatabaseSync): void {
     CREATE INDEX IF NOT EXISTS deck_history_deck_idx ON deck_history(deck_id, id);
   `);
   initializeCustomTables(database);
+  initializeCatalogExtras(database);
+}
+
+/**
+ * 0.12.0: the rest of Scryfall's card data, kept for offline use: the language and finish treatments of each printing,
+ * the full card record, Art and Oracle tags, and a price history.
+ */
+export function initializeCatalogExtras(database: DatabaseSync): void {
+  const columns = new Set(database.prepare("PRAGMA table_info(cards)").all().map((column) => String(column.name)));
+  const add = (name: string, definition: string) => {
+    if (!columns.has(name)) database.exec(`ALTER TABLE cards ADD COLUMN ${name} ${definition}`);
+  };
+  add("lang", "TEXT NOT NULL DEFAULT 'en'");
+  add("promo_types", "TEXT NOT NULL DEFAULT ''");
+  add("frame_effects", "TEXT NOT NULL DEFAULT ''");
+  add("frame", "TEXT NOT NULL DEFAULT ''");
+  add("border_color", "TEXT NOT NULL DEFAULT ''");
+  add("full_art", "INTEGER NOT NULL DEFAULT 0");
+  add("keywords", "TEXT NOT NULL DEFAULT ''");
+  add("printed_name", "TEXT");
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS card_records (
+      id TEXT PRIMARY KEY,
+      record BLOB NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS card_illustrations (
+      card_id TEXT NOT NULL,
+      illustration_id TEXT NOT NULL,
+      PRIMARY KEY (card_id, illustration_id)
+    );
+    CREATE INDEX IF NOT EXISTS card_illustrations_by_art ON card_illustrations(illustration_id);
+    CREATE TABLE IF NOT EXISTS tags (
+      id TEXT PRIMARY KEY,
+      kind TEXT NOT NULL CHECK (kind IN ('art', 'oracle')),
+      label TEXT NOT NULL,
+      description TEXT NOT NULL DEFAULT ''
+    );
+    CREATE INDEX IF NOT EXISTS tags_by_label ON tags(kind, label COLLATE NOCASE);
+    CREATE TABLE IF NOT EXISTS tag_links (
+      tag_id TEXT NOT NULL,
+      ref TEXT NOT NULL,
+      PRIMARY KEY (tag_id, ref)
+    );
+    CREATE INDEX IF NOT EXISTS tag_links_by_ref ON tag_links(ref);
+    CREATE TABLE IF NOT EXISTS tag_children (
+      tag_id TEXT NOT NULL,
+      child_id TEXT NOT NULL,
+      PRIMARY KEY (tag_id, child_id)
+    );
+    CREATE TABLE IF NOT EXISTS price_history (
+      card_id TEXT NOT NULL,
+      day TEXT NOT NULL,
+      usd REAL, usd_foil REAL, usd_etched REAL, eur REAL, eur_foil REAL,
+      PRIMARY KEY (card_id, day)
+    );
+    CREATE INDEX IF NOT EXISTS cards_by_lang ON cards(lang);
+  `);
+}
+
+/** Saves the treatments and language of a printing (0.12.0). */
+export function cardTreatmentStatement(database: DatabaseSync) {
+  return database.prepare(
+    "UPDATE cards SET lang = ?, promo_types = ?, frame_effects = ?, frame = ?, border_color = ?, full_art = ?, keywords = ?, printed_name = ? WHERE id = ?",
+  );
 }
 
 /** Custom cards and sets (0.9.0): cards made in the card maker are rows of the card database marked custom. */

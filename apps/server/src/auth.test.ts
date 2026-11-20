@@ -88,8 +88,12 @@ describe("sign-in", () => {
 
   it("turns off new accounts when signup is off", async () => {
     const app = await setup({ signup: false });
+    // the first account can always be made, so a new server is never locked; it is the admin
+    expect((await app.inject({ method: "GET", url: "/api/config" })).json().signup).toBe(true);
+    const first = await app.inject({ method: "POST", url: "/api/signup", headers: guard, payload: { name: "devon", password: "correct horse" } });
+    expect(first.statusCode).toBe(200);
     expect((await app.inject({ method: "GET", url: "/api/config" })).json().signup).toBe(false);
-    const response = await app.inject({ method: "POST", url: "/api/signup", headers: guard, payload: { name: "devon", password: "correct horse" } });
+    const response = await app.inject({ method: "POST", url: "/api/signup", headers: guard, payload: { name: "alex", password: "correct horse" } });
     expect(response.statusCode).toBe(403);
   });
 

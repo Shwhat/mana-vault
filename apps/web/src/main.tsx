@@ -81,6 +81,7 @@ function useKeyboard(store: Store, actions: Record<string, Action>) {
           if (store.contextMenu) store.setContextMenu(null);
           else if (store.cardPage) store.setCardPage(null);
           else if (store.view === "about") store.closeAbout();
+          else if (store.view === "admin") store.closeAdmin();
           else {
             store.select(null);
             store.setChecked(new Set());

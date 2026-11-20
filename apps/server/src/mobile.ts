@@ -45,9 +45,9 @@ export function deviceUser(database: DatabaseSync, header: string | undefined): 
   const match = BEARER.exec(header ?? "");
   if (!match) return null;
   const row = database.prepare(
-    `SELECT d.id AS device_id, d.last_seen, u.id, u.name FROM devices d JOIN users u ON u.id = d.user_id WHERE d.token_key = ?`,
+    `SELECT d.id AS device_id, d.last_seen, u.id, u.name, u.disabled FROM devices d JOIN users u ON u.id = d.user_id WHERE d.token_key = ?`,
   ).get(tokenKey(match[1]!));
-  if (!row) return null;
+  if (!row || Number(row.disabled) === 1) return null;
   if (Date.now() - Date.parse(`${String(row.last_seen).replace(" ", "T")}Z`) > 60_000) {
     database.prepare("UPDATE devices SET last_seen = CURRENT_TIMESTAMP WHERE id = ?").run(String(row.device_id));
   }

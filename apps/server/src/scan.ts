@@ -11,9 +11,9 @@ export type ScanCard = {
 };
 export type ScanMatch = { card: ScanCard | null; score: number; by: "printing" | "name" | null; read: string };
 
-const CARD_COLUMNS = "id, oracle_id, name, set_code, set_name, collector_number, rarity, image_url, finishes, released_at";
+const CARD_COLUMNS = "id, oracle_id, name, set_code, set_name, collector_number, rarity, image_url, finishes, released_at, promo_types";
 // newest first; regular printings before promos and variants
-const NEWEST = "ORDER BY released_at IS NULL, released_at DESC, promo, variation, length(collector_number), collector_number";
+const NEWEST = "ORDER BY lang != 'en', released_at IS NULL, released_at DESC, promo, variation, length(collector_number), collector_number";
 
 /** An in-memory index of card names (and front face names), rebuilt when the card database changes. */
 export class NameMatcher {

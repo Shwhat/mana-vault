@@ -2,10 +2,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { request } from "./api";
 import { searchParams } from "./filters";
-import type { Card, Filters } from "./types";
+import type { Card, Currency, Filters, FinishCode } from "./types";
 
 /** A search result: a printing with how many copies the account owns. */
-export type FoundCard = Card & { owned?: number };
+export type FoundCard = Card & { owned?: number; ownedFinishes?: { regular: number; foil: number; etched: number } };
 export type CardSearch = {
   cards: FoundCard[];
   total: number;
@@ -22,14 +22,16 @@ export type CardSearch = {
 export const SEARCH_PAGE = 60;
 
 /** Searches the card database with the filters while enabled. A new filter starts again at the top. */
-export function useCardSearch(filters: Filters, enabled: boolean): CardSearch {
+export function useCardSearch(filters: Filters, enabled: boolean, options: { group?: boolean; currency?: Currency } = {}): CardSearch {
   const [cards, setCards] = useState<FoundCard[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [round, setRound] = useState(0);
-  const state = useRef({ cards, total, loading, filters, generation: 0 });
-  state.current = { ...state.current, cards, total, loading, filters };
+  const group = !!options.group;
+  const currency = options.currency ?? "usd";
+  const state = useRef({ cards, total, loading, filters, group, currency, generation: 0 });
+  state.current = { ...state.current, cards, total, loading, filters, group, currency };
 
   useEffect(() => {
     if (!enabled) return;
@@ -39,7 +41,7 @@ export function useCardSearch(filters: Filters, enabled: boolean): CardSearch {
       setLoading(true);
       setError("");
       try {
-        const page = await request<{ total: number; cards: FoundCard[] }>(`/api/cards?${searchParams(filters, 0, SEARCH_PAGE)}`, { signal: controller.signal });
+        const page = await request<{ total: number; cards: FoundCard[] }>(`/api/cards?${searchParams(filters, 0, SEARCH_PAGE, { group, currency })}`, { signal: controller.signal });
         if (generation !== state.current.generation) return;
         setCards(page.cards);
         setTotal(page.total);
@@ -57,7 +59,7 @@ export function useCardSearch(filters: Filters, enabled: boolean): CardSearch {
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [enabled, filters, round]);
+  }, [enabled, filters, round, group, currency]);
 
   const more = useCallback(() => {
     const current = state.current;
@@ -65,7 +67,7 @@ export function useCardSearch(filters: Filters, enabled: boolean): CardSearch {
     const generation = current.generation;
     state.current.loading = true;
     setLoading(true);
-    void request<{ total: number; cards: FoundCard[] }>(`/api/cards?${searchParams(current.filters, current.cards.length, SEARCH_PAGE)}`)
+    void request<{ total: number; cards: FoundCard[] }>(`/api/cards?${searchParams(current.filters, current.cards.length, SEARCH_PAGE, { group: current.group, currency: current.currency })}`)
       .then((page) => {
         if (generation !== state.current.generation) return;
         setCards((list) => {
@@ -79,7 +81,14 @@ export function useCardSearch(filters: Filters, enabled: boolean): CardSearch {
   }, []);
 
   const refresh = useCallback(() => setRound((value) => value + 1), []);
-  const owned = useCallback((id: string, change: number) =>
-    setCards((list) => list.map((card) => (card.id === id ? { ...card, owned: Math.max(0, (card.owned ?? 0) + change) } : card))), []);
+  // a grouped result counts the copies of every printing of its card; the finish keeps the counts by finish right
+  const owned = useCallback((id: string, change: number, finish: FinishCode = 0, oracleId?: string | null) =>
+    setCards((list) => list.map((card) => {
+      if (card.id !== id && !(card.printings && oracleId && card.oracle_id === oracleId)) return card;
+      const key = finish === 2 ? "etched" : finish === 1 ? "foil" : "regular";
+      const finishes = { regular: 0, foil: 0, etched: 0, ...card.ownedFinishes };
+      finishes[key] = Math.max(0, finishes[key] + change);
+      return { ...card, owned: Math.max(0, (card.owned ?? 0) + change), ownedFinishes: finishes };
+    })), []);
   return { cards, total, loading, error, more, refresh, owned };
 }

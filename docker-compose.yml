@@ -8,11 +8,14 @@ services:
       - "${MANAVAULT_PORT:-3417}:3000"
     environment:
       TZ: ${TZ:-America/Los_Angeles}
-      MANAVAULT_SIGNUP: ${MANAVAULT_SIGNUP:-on}
-      MANAVAULT_SECURE_COOKIE: ${MANAVAULT_SECURE_COOKIE:-auto}
-      MANAVAULT_CARD_UPDATE_INTERVAL_HOURS: ${MANAVAULT_CARD_UPDATE_INTERVAL_HOURS:-168}
+      # Left empty, these are set in Administration. A value here locks the setting.
+      MANAVAULT_SIGNUP: ${MANAVAULT_SIGNUP:-}
+      MANAVAULT_SECURE_COOKIE: ${MANAVAULT_SECURE_COOKIE:-}
+      MANAVAULT_CARD_UPDATE_INTERVAL_HOURS: ${MANAVAULT_CARD_UPDATE_INTERVAL_HOURS:-}
+      MANAVAULT_PICTURES_DIR: /pictures
     volumes:
       - ${MANAVAULT_DATA_DIR:-/opt/mana-vault/data}:/data
+      - ${MANAVAULT_PICTURES_HOST:-/opt/mana-vault/pictures}:/pictures
     healthcheck:
       test: ["CMD", "node", "apps/server/dist/index.js", "-healthcheck"]
       interval: 30s

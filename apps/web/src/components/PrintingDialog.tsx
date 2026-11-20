@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { request } from "../api";
 import type { ScanCard } from "../scan-state";
-import { type Currency, type FinishCode, money, priceOf } from "../types";
+import { type Currency, type FinishCode, finishLabel, money, priceOf } from "../types";
 import { customDialog } from "./Dialog";
 
 export type Printing = ScanCard;
@@ -43,6 +43,21 @@ function PrintingList({ cardId, currentId, finish, currency, onPick }: {
   return (
     <div className="printpick">
       <input className="search" autoFocus value={term} onChange={(event) => setTerm(event.target.value)}
+        onKeyDown={(event) => {
+          // Enter takes the printing shown selected (or the first one found); Down moves into the list
+          if (event.key === "Enter") {
+            event.preventDefault();
+            event.stopPropagation();
+            const pick = shown.find((card) => card.id === currentId) ?? shown[0];
+            if (pick) {
+              const finishes = finishesOf(pick);
+              onPick(pick, finishes.includes(finish) ? finish : finishes[0]!);
+            }
+          } else if (event.key === "ArrowDown") {
+            event.preventDefault();
+            (event.currentTarget.parentElement?.querySelector(".printrow") as HTMLElement | null)?.focus();
+          }
+        }}
         placeholder="Find a set, code or number" aria-label="Find a printing" />
       <p className="note">{shown.length} of {printings.length} printings</p>
       <div className="printlist" role="listbox" aria-label="Printings">
@@ -64,15 +79,15 @@ function PrintingList({ cardId, currentId, finish, currency, onPick }: {
                     const on = isCurrent && code === finish;
                     return (
                       <button key={code} type="button" className={on ? "btn small on" : "btn small"} aria-pressed={on}
-                        aria-label={`${FINISH_LABEL[code]} ${card.set_code.toUpperCase()} ${card.collector_number}`}
+                        aria-label={`${finishLabel(code, card.promo_types)} ${card.set_code.toUpperCase()} ${card.collector_number}`}
                         onClick={(event) => { event.stopPropagation(); onPick(card, code); }}>
-                        {FINISH_LABEL[code]} <span className="muted">{priceIn(card, code)}</span>
+                        {finishLabel(code, card.promo_types)} <span className="muted">{priceIn(card, code)}</span>
                       </button>
                     );
                   })}
                 </span>
               </span>
-              {isCurrent && <span className="badge">Current: {FINISH_LABEL[finish].toLowerCase()}</span>}
+              {isCurrent && <span className="badge">Current: {finishLabel(finish, card.promo_types).toLowerCase()}</span>}
             </div>
           );
         })}

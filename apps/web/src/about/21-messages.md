@@ -1,6 +1,6 @@
 # Messages
 
-Messages appear at the right end of the status bar (on the phone, in a banner above the tabs). Confirmations are blue and disappear after a few seconds. Problems are red and stay for about seven seconds. Messages specific to search, scanning, the card database, accounts and backups are listed on those pages: [Card search](/about/card-search), [Scanning cards](/about/scanning-cards), [Card database](/about/card-database), [Accounts and access](/about/accounts) and [Storage and backups](/about/storage-and-backups).
+Messages appear at the right end of the status bar (on the phone, in a banner above the tabs). Confirmations are blue and disappear after a few seconds. Problems are red and stay for about seven seconds. Messages specific to search, scanning, the card database, accounts, Administration and backups are listed on those pages: [Card search](/about/card-search), [Scanning cards](/about/scanning-cards), [Card database](/about/card-database), [Accounts and access](/about/accounts), [Administration](/about/administration) and [Storage and backups](/about/storage-and-backups).
 
 ## Confirmations
 
@@ -38,6 +38,18 @@ Messages appear at the right end of the status bar (on the phone, in a banner ab
 | Backup downloaded | Download backup |
 | Backup restored | Restore backup |
 | Card database update started | Update card database |
+| Settings saved, Server name saved, Backup folder saved, Picture sizes saved | Saving a setting in Administration |
+| Sign-up is open, Sign-up is invite codes, or Sign-up is closed | Changing Sign-up in Administration |
+| Card database updates every N hours, or Scheduled updates turned off | Changing Update every in Administration |
+| Picture sizes measured | Measure sizes |
+| Picture downloads paused, or Picture downloads resumed | Pause, Resume |
+| Downloads stop below N GB free | Changing Minimum free space |
+| Moving pictures. The old folder is left for you to delete. | Choosing a new picture folder |
+| Size pictures deleted | Delete them, after unticking a picture size |
+| Server backup written | Back up now |
+| Name turned on, Name turned off, Name is an admin, Name is no longer an admin, Name signed out everywhere, Password of name reset, Name deleted | The buttons in Administration, Accounts |
+| Device signed out | Remove in Administration, Devices |
+| Setup finished, or Setup skipped. Everything is in Administration. | Finish or Skip for now in Setup |
 | Card database updated with N printings | An update finished |
 | Undone: change, or Redone: change | Undo or Redo |
 | Filters cleared | Clear filters, for the open view |

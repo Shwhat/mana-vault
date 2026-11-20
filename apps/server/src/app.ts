@@ -20,8 +20,11 @@ import { CUSTOM_PUBLIC, registerCustomRoutes } from "./custom.js";
 import { type Fetcher, registerProxyRoutes } from "./proxies.js";
 import { deviceUser, handleCrossOrigin, registerMobileRoutes, Revision } from "./mobile.js";
 import { access, createCollection, forgetItem, itemSharing, registerLibraryRoutes } from "./library.js";
+import { isAdmin, logActivity, registerAdminRoutes, startBackupSchedule, useInvite } from "./admin.js";
+import { type Locks, type ServerSettings, Settings } from "./settings.js";
+import { type PictureController, registerPictureRoutes } from "./pictures.js";
 import {
-  AuthStore, COOKIE_NAME, DEFAULT_ITERATIONS, GUARD_HEADER, Limiter, readCookie, SESSION_DAYS, sessionCookie,
+  AuthStore, COOKIE_NAME, DEFAULT_ITERATIONS, GUARD_HEADER, Limiter, readCookie, sessionCookie,
   type User, validName, validPassword,
 } from "./auth.js";
 
@@ -46,6 +49,23 @@ export interface AppOptions {
   version?: string;
   /** Downloads card pictures and mana symbols from Scryfall; tests replace it. */
   fetcher?: Fetcher;
+  /** Settings locked by environment variables (index.ts reads them). */
+  settingsEnv?: { forced: Partial<ServerSettings>; locks: Locks };
+  /** The database file, for backups, restores and storage figures. */
+  databasePath?: string;
+  /** Stop the server after a restore is saved, so Docker starts it on the restored data. */
+  exitAfterRestore?: boolean;
+  /** Changes the card database update schedule. */
+  setUpdateInterval?: (hours: number) => void;
+  /** Turns off the background picture downloads (tests). */
+  pictureDownloads?: boolean;
+}
+
+declare module "fastify" {
+  interface FastifyInstance {
+    pictures: PictureController;
+    serverSettings: Settings;
+  }
 }
 
 // Paths anyone may load without signing in.
@@ -53,6 +73,8 @@ const PUBLIC_PATHS = new Set([
   "/login", "/login.html", "/icon.svg", "/icon-192.png", "/icon-512.png", "/manifest.webmanifest", "/sw.js",
   "/api/health", "/api/config", "/api/login", "/api/signup", "/api/logout",
 ]);
+// card pictures are public, like Scryfall's own
+const PICTURE_PATH = /^\/pictures\//;
 
 export async function buildApp(
   database = openDatabase(),
@@ -71,11 +93,22 @@ export async function buildApp(
   initializeDatabase(database);
   const app = Fastify({ logger: process.env.NODE_ENV !== "test" });
   const requireSignIn = options.requireSignIn ?? true;
-  const signupOpen = options.signup ?? true;
   const secureMode = options.secureCookie ?? "auto";
   const auth = new AuthStore(database, options.passwordIterations ?? DEFAULT_ITERATIONS);
+  // settings saved in Administration; environment variables (and test options) lock some of them
+  const forced: Partial<ServerSettings> = { ...(options.settingsEnv?.forced ?? {}) };
+  const locks: Locks = { ...(options.settingsEnv?.locks ?? {}) };
+  if (options.signup !== undefined) {
+    forced.signup = options.signup ? "open" : "closed";
+    locks.signup = "MANAVAULT_SIGNUP";
+  }
+  if (options.addressAttemptLimit !== undefined) forced.attemptLimit = options.addressAttemptLimit;
+  const settings = new Settings(database, locks, forced);
+  app.decorate("serverSettings", settings);
   const nameLimiter = new Limiter(5, 5 * 60_000);
-  const addressLimiter = new Limiter(options.addressAttemptLimit ?? 30, 15 * 60_000);
+  const addressLimiter = new Limiter(settings.get().attemptLimit, 15 * 60_000);
+  const databasePath = options.databasePath
+    ?? String(database.prepare("PRAGMA database_list").all().find((row) => row.name === "main")?.file || "data/mana-vault.sqlite");
   app.decorateRequest("user", null);
   // tests of the card and deck logic run without sign-in as one built-in account
   const localUser = requireSignIn ? null : (auth.checkPassword("local", "local-test-account") ?? auth.addUser("local", "local-test-account"));
@@ -111,7 +144,8 @@ export async function buildApp(
       }
     }
     // the shared trade binder is the one page that works without signing in
-    if (PUBLIC_PATHS.has(path) || request.user || (path === "/api/devices" && request.method === "POST") || (request.method === "GET" && (/^\/share\/[\w-]{10,64}$/.test(path) || CUSTOM_PUBLIC.test(path)))) return;
+    if (PUBLIC_PATHS.has(path) || request.user || (path === "/api/devices" && request.method === "POST")
+      || ((request.method === "GET" || request.method === "HEAD") && (/^\/share\/[\w-]{10,64}$/.test(path) || CUSTOM_PUBLIC.test(path) || PICTURE_PATH.test(path)))) return;
     if (path.startsWith("/api/")) return reply.code(401).send({ error: "You are signed out. Sign in again to continue." });
     if (path === "/" || path.endsWith(".html") || !path.includes(".")) return reply.redirect("/login");
     return reply.code(401).send({ error: "Signed out" });
@@ -164,6 +198,27 @@ export async function buildApp(
   registerCustomRoutes(app, database);
   registerProxyRoutes(app, database, options.fetcher);
 
+  // card pictures kept on the server, the picture downloads and Administration
+  const pictures = registerPictureRoutes(app, { database, settings, databasePath, fetcher: options.fetcher, downloads: options.pictureDownloads ?? true });
+  app.decorate("pictures", pictures);
+  const applySettings = () => {
+    addressLimiter.max = settings.get().attemptLimit;
+    options.setUpdateInterval?.(settings.get().updateIntervalHours);
+    pictures.apply();
+  };
+  const adminContext = {
+    database, auth, settings, version: options.version ?? "", startedAt: Date.now(), databasePath,
+    fetcher: (options.fetcher ?? fetch) as unknown as Parameters<typeof registerAdminRoutes>[1]["fetcher"],
+    applySettings, exitAfterRestore: options.exitAfterRestore ?? false, pictureSummary: () => pictures.summary(),
+  };
+  registerAdminRoutes(app, adminContext);
+  const stopBackups = startBackupSchedule(adminContext);
+  app.addHook("onClose", async () => {
+    stopBackups();
+    pictures.stop();
+  });
+  applySettings();
+
   app.post<{ Params: { deckId: string }; Body: string }>("/api/decks/:deckId/import/preview", async (request, reply) => {
     if (typeof request.body !== "string" || !request.body.trim()) {
       return reply.code(400).send({ error: "Upload a non-empty decklist file" });
@@ -201,26 +256,39 @@ export async function buildApp(
     return reply.sendFile("login.html");
   });
 
-  app.get("/api/config", async () => ({ signup: signupOpen, version: options.version ?? null }));
+  // the first account can always be made, so a new server is never locked
+  const signupMode = () => (auth.userCount() === 0 ? "open" : settings.get().signup);
+  app.get("/api/config", async () => ({
+    signup: signupMode() !== "closed", signupMode: signupMode(), serverName: settings.get().serverName,
+    minPasswordLength: settings.get().minPasswordLength, version: options.version ?? null,
+  }));
 
   const startSession = (request: Parameters<typeof secure>[0], reply: { header: (name: string, value: string) => unknown }, user: User) => {
-    const token = auth.newSession(user.id);
-    reply.header("set-cookie", sessionCookie(token, SESSION_DAYS * 86_400, secure(request)));
+    const days = settings.get().sessionDays;
+    const token = auth.newSession(user.id, days);
+    reply.header("set-cookie", sessionCookie(token, days * 86_400, secure(request)));
     return { id: user.id, name: user.name };
   };
 
-  app.post<{ Body: { name?: unknown; password?: unknown } }>("/api/signup", async (request, reply) => {
-    if (!signupOpen) return reply.code(403).send({ error: "New accounts are turned off on this server." });
+  app.post<{ Body: { name?: unknown; password?: unknown; invite?: unknown } }>("/api/signup", async (request, reply) => {
+    const mode = signupMode();
+    if (mode === "closed") return reply.code(403).send({ error: "New accounts are turned off on this server." });
     const name = typeof request.body?.name === "string" ? request.body.name.trim() : "";
     const password = typeof request.body?.password === "string" ? request.body.password : "";
+    const invite = typeof request.body?.invite === "string" ? request.body.invite.trim() : "";
     if (!validName(name)) {
       return reply.code(400).send({ error: "User names are 3 to 32 letters, digits, dots, dashes or underscores, starting with a letter or digit." });
     }
-    if (!validPassword(password)) return reply.code(400).send({ error: "Passwords need at least 8 characters." });
+    const minimum = settings.get().minPasswordLength;
+    if (!validPassword(password, minimum)) return reply.code(400).send({ error: `Passwords need at least ${minimum} characters.` });
     if (addressLimiter.blocked(address(request))) return reply.code(429).send({ error: "Too many attempts. Try again in a few minutes." });
     addressLimiter.hit(address(request));
+    if (mode === "invite" && !invite) return reply.code(403).send({ error: "This server needs an invite code to create an account." });
+    if (database.prepare("SELECT 1 FROM users WHERE name = ?").get(name)) return reply.code(409).send({ error: "That user name is taken." });
+    if (mode === "invite" && !useInvite(database, invite, name)) return reply.code(403).send({ error: "That invite code is not valid or was already used." });
     const user = auth.addUser(name, password);
     if (!user) return reply.code(409).send({ error: "That user name is taken." });
+    logActivity(database, name, "Account created", mode === "invite" ? `With invite ${invite.toUpperCase()}` : "Sign-up", request.ip);
     assignUnowned(database);
     // every account starts with a collection, so Add to collection works at once
     if (!database.prepare("SELECT 1 FROM collections WHERE owner_id = ?").get(user.id)) {
@@ -240,10 +308,17 @@ export async function buildApp(
     if (!user) {
       nameLimiter.hit(key);
       addressLimiter.hit(address(request));
+      logActivity(database, name, "Failed sign-in", "", address(request));
       reply.code(401).send({ error: "Wrong user name or password." });
       return null;
     }
+    if (auth.disabled(user.id)) {
+      logActivity(database, user.name, "Failed sign-in", "Account disabled", address(request));
+      reply.code(403).send({ error: "This account is turned off. Ask the server's admin." });
+      return null;
+    }
     nameLimiter.reset(key);
+    logActivity(database, user.name, "Sign-in", "", address(request));
     return user;
   };
 
@@ -265,7 +340,11 @@ export async function buildApp(
     return { ok: true };
   });
 
-  app.get("/api/me", async (request) => request.user ?? { id: 0, name: "" });
+  app.get("/api/me", async (request) => {
+    if (!request.user) return { id: 0, name: "" };
+    const row = database.prepare("SELECT is_admin, must_change FROM users WHERE id = ?").get(request.user.id);
+    return { ...request.user, admin: Number(row?.is_admin ?? 0) === 1, mustChange: Number(row?.must_change ?? 0) === 1 };
+  });
 
   app.post<{ Body: { old?: unknown; new?: unknown } }>("/api/password", async (request, reply) => {
     const user = request.user;
@@ -277,7 +356,8 @@ export async function buildApp(
       return reply.code(401).send({ error: "The current password is wrong." });
     }
     const next = typeof request.body?.new === "string" ? request.body.new : "";
-    if (!validPassword(next)) return reply.code(400).send({ error: "Passwords need at least 8 characters." });
+    const minimum = settings.get().minPasswordLength;
+    if (!validPassword(next, minimum)) return reply.code(400).send({ error: `Passwords need at least ${minimum} characters.` });
     auth.setPassword(user.id, next);
     // phones signed in to the account are signed out too, except the one making the change
     database.prepare("DELETE FROM devices WHERE user_id = ? AND id IS NOT ?").run(user.id, request.deviceId ?? null);
@@ -313,9 +393,16 @@ export async function buildApp(
     updatedAt: database.prepare("SELECT value FROM catalog_metadata WHERE key = 'updated_at'").get()?.value ?? null,
     skipped: catalogSkipped(),
     update: getCatalogUpdateStatus(),
+    tags: {
+      art: Number(database.prepare("SELECT COUNT(*) AS n FROM tags WHERE kind = 'art'").get()?.n ?? 0),
+      oracle: Number(database.prepare("SELECT COUNT(*) AS n FROM tags WHERE kind = 'oracle'").get()?.n ?? 0),
+    },
+    languages: database.prepare("SELECT lang, COUNT(*) AS n FROM cards GROUP BY lang ORDER BY n DESC").all().map((row) => ({ lang: String(row.lang), count: Number(row.n) })),
+    priceHistoryDays: Number(database.prepare("SELECT COUNT(DISTINCT day) AS n FROM price_history").get()?.n ?? 0),
   }));
 
-  app.post("/api/catalog/update", async (_request, reply) => {
+  app.post("/api/catalog/update", async (request, reply) => {
+    if (requireSignIn && !isAdmin(database, request.user?.id)) return reply.code(403).send({ error: "Only an admin can update the card database." });
     if (!requestCatalogUpdate()) {
       const update = getCatalogUpdateStatus();
       if (update.isUpdating) {
@@ -354,16 +441,16 @@ export async function buildApp(
     }
   });
 
-  app.get<{ Querystring: { q?: string; color?: string; type?: string; set?: string; rarity?: string; format?: string; mvMin?: string; mvMax?: string; limit?: string; offset?: string; paged?: string } }>(
+  app.get<{ Querystring: { q?: string; color?: string; type?: string; set?: string; rarity?: string; format?: string; mvMin?: string; mvMax?: string; limit?: string; offset?: string; paged?: string; group?: string } }>(
     "/api/cards",
     async (request, reply) => {
-      const { q = "", color, type, set, rarity, format, mvMin, mvMax, limit = "40", offset = "0", paged } = request.query;
+      const { q = "", color, type, set, rarity, format, mvMin, mvMax, limit = "40", offset = "0", paged, group } = request.query;
       const parsedLimit = Number(limit);
       const parsedOffset = Number(offset);
       if (!Number.isInteger(parsedOffset) || parsedOffset < 0 || parsedOffset > 1_000_000) return reply.code(400).send({ error: "Invalid search parameters" });
       if (
         typeof q !== "string" ||
-        q.length > 200 ||
+        q.length > 400 ||
         (color !== undefined && typeof color !== "string") ||
         (type !== undefined && typeof type !== "string") ||
         (set !== undefined && typeof set !== "string") ||
@@ -385,7 +472,7 @@ export async function buildApp(
       const conditions: string[] = [];
       const values: (string | number)[] = [];
       try {
-        for (const clause of parseCardQuery(q)) {
+        for (const clause of parseCardQuery(q, { userId: request.user?.id })) {
           conditions.push(clause.sql);
           values.push(...clause.values);
         }
@@ -431,26 +518,72 @@ export async function buildApp(
       }
 
       const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
-      const rows = database.prepare(
-        `SELECT id, oracle_id, name, mana_cost, mana_value, type_line, oracle_text, colors, color_identity, legalities,
-                set_code, set_name, collector_number, rarity, image_url, released_at, artist, ${CARD_PRICE_COLUMNS}
-         FROM cards ${where} ORDER BY name, released_at DESC LIMIT ? OFFSET ?`,
-      ).all(...values, parsedLimit, parsedOffset);
+      const columns = `id, oracle_id, name, mana_cost, mana_value, type_line, oracle_text, colors, color_identity, legalities,
+                set_code, set_name, collector_number, rarity, image_url, released_at, artist, ${CARD_PRICE_COLUMNS}`;
+      // grouped: one result per card, showing its newest regular English printing, with how many printings matched
+      const grouped = group === "1";
+      const rows = grouped
+        ? database.prepare(
+          `WITH matched AS (SELECT * FROM cards ${where}),
+                ranked AS (SELECT *, ROW_NUMBER() OVER (PARTITION BY oracle_id ORDER BY lang != 'en', promo, variation, released_at IS NULL, released_at DESC) AS pick,
+                                  COUNT(*) OVER (PARTITION BY oracle_id) AS printings FROM matched)
+           SELECT ${columns}, printings FROM ranked WHERE pick = 1 ORDER BY name LIMIT ? OFFSET ?`,
+        ).all(...values, parsedLimit, parsedOffset)
+        : database.prepare(`SELECT ${columns} FROM cards ${where} ORDER BY name, lang != 'en', released_at DESC LIMIT ? OFFSET ?`).all(...values, parsedLimit, parsedOffset);
       if (paged !== "1") return rows.map(toCardRow);
-      // a page of results with the total number of matches and how many copies of each printing the account owns
-      const total = Number(database.prepare(`SELECT COUNT(*) AS count FROM cards ${where}`).get(...values)?.count ?? 0);
+      // a page of results with the total number of matches and how many copies the account owns, by finish
+      const total = Number(database.prepare(grouped ? `SELECT COUNT(DISTINCT oracle_id) AS count FROM cards ${where}` : `SELECT COUNT(*) AS count FROM cards ${where}`).get(...values)?.count ?? 0);
       const userId = request.user!.id;
       const ownedOf = database.prepare(
-        `SELECT COALESCE(SUM(i.quantity), 0) AS owned FROM collection_cards i JOIN collections col ON col.id = i.collection_id
-         WHERE i.card_id = ? AND i.proxy = 0 AND col.kind = 'collection'
-           AND (col.owner_id = ? OR EXISTS (SELECT 1 FROM members m WHERE m.kind = 'collection' AND m.item_id = col.id AND m.user_id = ?))`,
+        `SELECT i.foil, COALESCE(SUM(i.quantity), 0) AS owned FROM collection_cards i JOIN collections col ON col.id = i.collection_id
+         WHERE ${grouped ? "i.card_id IN (SELECT id FROM cards WHERE oracle_id = ?)" : "i.card_id = ?"} AND i.proxy = 0 AND col.kind = 'collection'
+           AND (col.owner_id = ? OR EXISTS (SELECT 1 FROM members m WHERE m.kind = 'collection' AND m.item_id = col.id AND m.user_id = ?))
+         GROUP BY i.foil`,
       );
       return {
         total,
-        cards: rows.map((row) => ({ ...toCardRow(row), owned: Number(ownedOf.get(String(row.id), userId, userId)?.owned ?? 0) })),
+        cards: rows.map((row) => {
+          const finishes = ownedOf.all(String(grouped ? row.oracle_id : row.id), userId, userId);
+          const count = (foil: number) => Number(finishes.find((item) => Number(item.foil) === foil)?.owned ?? 0);
+          return {
+            ...toCardRow(row), owned: count(0) + count(1) + count(2), ownedFinishes: { regular: count(0), foil: count(1), etched: count(2) },
+            ...(grouped ? { printings: Number(row.printings) } : {}),
+          };
+        }),
       };
     },
   );
+
+  // the printing ids a search matches, for filters on collection and deck cards that need the card database (art, roles...)
+  app.get<{ Querystring: { q?: string } }>("/api/cards/match", async (request, reply) => {
+    const q = typeof request.query.q === "string" ? request.query.q : "";
+    if (!q.trim() || q.length > 400) return reply.code(400).send({ error: "Invalid card search" });
+    try {
+      const clauses = parseCardQuery(q, { userId: request.user?.id });
+      const where = clauses.length ? `WHERE ${clauses.map((clause) => clause.sql).join(" AND ")}` : "";
+      const ids = database.prepare(`SELECT id FROM cards ${where} LIMIT 200000`).all(...clauses.flatMap((clause) => clause.values)).map((row) => String(row.id));
+      return { ids };
+    } catch (error) {
+      return reply.code(400).send({ error: error instanceof Error ? error.message : "Invalid card search" });
+    }
+  });
+
+  // tag suggestions for the Art shows and Role filters
+  app.get<{ Querystring: { kind?: string; q?: string } }>("/api/tags", async (request) => {
+    const kind = request.query.kind === "oracle" ? "oracle" : "art";
+    const q = typeof request.query.q === "string" ? request.query.q.trim().slice(0, 60) : "";
+    return database.prepare(
+      `SELECT t.label, t.description, (SELECT COUNT(*) FROM tag_links l WHERE l.tag_id = t.id) AS uses FROM tags t
+       WHERE t.kind = ? AND t.label LIKE ? ESCAPE '\\' ORDER BY t.label LIKE ? ESCAPE '\\' DESC, uses DESC LIMIT 30`,
+    ).all(kind, `%${q.replace(/[\\%_]/g, "\\$&")}%`, `${q.replace(/[\\%_]/g, "\\$&")}%`)
+      .map((row) => ({ label: String(row.label), description: String(row.description), uses: Number(row.uses) }));
+  });
+
+  // the saved price history of a printing, oldest first
+  app.get<{ Params: { cardId: string } }>("/api/cards/:cardId/prices", async (request) => {
+    return database.prepare("SELECT day, usd, usd_foil, usd_etched, eur, eur_foil FROM price_history WHERE card_id = ? ORDER BY day").all(request.params.cardId)
+      .map((row) => ({ day: String(row.day), usd: row.usd, usdFoil: row.usd_foil, usdEtched: row.usd_etched, eur: row.eur, eurFoil: row.eur_foil }));
+  });
 
   app.get<{ Params: { cardId: string } }>("/api/cards/:cardId", async (request, reply) => {
     const row = database.prepare(
@@ -524,6 +657,7 @@ export async function buildApp(
 
 function toCardRow(row: Record<string, unknown>): CardRow & {
   flavor_name: string | null; power: string | null; toughness: string | null; prices: Record<string, number | null>; custom?: boolean; finishes?: string;
+  promo_types?: string; lang?: string;
 } {
   const required = (key: string): string => {
     const value = row[key];
@@ -560,6 +694,9 @@ function toCardRow(row: Record<string, unknown>): CardRow & {
     ...(Number(row.custom ?? 0) === 1 ? { custom: true } : {}),
     // the finishes the printing is made in, such as "nonfoil,foil"
     ...(typeof row.finishes === "string" ? { finishes: row.finishes } : {}),
+    // Scryfall's promo types (surgefoil, galaxyfoil...) and the printed language, when not English
+    ...(typeof row.promo_types === "string" && row.promo_types ? { promo_types: row.promo_types } : {}),
+    ...(typeof row.lang === "string" && row.lang !== "en" ? { lang: row.lang } : {}),
     prices: {
       usd: price(row.price_usd), usd_foil: price(row.price_usd_foil), usd_etched: price(row.price_usd_etched),
       eur: price(row.price_eur), eur_foil: price(row.price_eur_foil),
@@ -568,4 +705,4 @@ function toCardRow(row: Record<string, unknown>): CardRow & {
 }
 
 const price = (value: unknown) => (typeof value === "number" ? value : null);
-const CARD_PRICE_COLUMNS = "flavor_name, power, toughness, price_usd, price_usd_foil, price_usd_etched, price_eur, price_eur_foil, custom, finishes";
+const CARD_PRICE_COLUMNS = "flavor_name, power, toughness, price_usd, price_usd_foil, price_usd_etched, price_eur, price_eur_foil, custom, finishes, promo_types, lang";

@@ -27,12 +27,19 @@ export function catalogUpdateIntervalFromEnvironment(value = process.env.MANAVAU
 }
 
 export function startCatalogUpdater({
-  intervalHours,
+  intervalHours: initialHours,
   databasePath,
   dataPath,
   updateCatalog = importCardCatalog,
   onError = (error) => console.error("Card catalog refresh failed:", error),
-}: CatalogUpdaterOptions): { getStatus: () => CatalogUpdateStatus; requestRefresh: () => boolean; close: () => void } {
+}: CatalogUpdaterOptions): {
+  getStatus: () => CatalogUpdateStatus; requestRefresh: () => boolean; close: () => void;
+  /** Changes the schedule (0 turns it off); the next update is that many hours from now. */
+  setIntervalHours: (hours: number) => void;
+  /** Runs after each successful update. */
+  onUpdated: (run: () => void) => void;
+} {
+  let intervalHours = initialHours;
   if (!Number.isInteger(intervalHours) || intervalHours < 0 || intervalHours > 8760) {
     throw new Error("Catalog refresh interval must be 0 (disabled) or a whole number from 1 to 8760");
   }
@@ -49,6 +56,7 @@ export function startCatalogUpdater({
   let nextRunAt: number | undefined;
   let refreshPromise: Promise<void> | null = null;
   let closed = false;
+  let afterUpdate: () => void = () => undefined;
 
   function refresh(): Promise<void> {
     if (refreshPromise) return refreshPromise;
@@ -60,6 +68,7 @@ export function startCatalogUpdater({
       .then(() => updateCatalog(databasePath, dataPath))
       .then((importedCount) => {
         status.lastImportedCount = importedCount;
+        afterUpdate();
       })
       .catch((error: unknown) => {
         status.lastError = error instanceof Error ? error.message : String(error);
@@ -108,9 +117,24 @@ export function startCatalogUpdater({
     scheduleRefresh();
   }
 
+  const setIntervalHours = (hours: number) => {
+    if (!Number.isInteger(hours) || hours < 0 || hours > 8760 || hours === intervalHours) return;
+    intervalHours = hours;
+    status.scheduled = hours > 0;
+    status.intervalHours = hours || null;
+    if (timer) clearTimeout(timer);
+    timer = undefined;
+    nextRunAt = hours > 0 ? Date.now() + hours * 60 * 60 * 1000 : undefined;
+    if (!refreshPromise) scheduleRefresh();
+  };
+
   return {
     getStatus: () => ({ ...status }),
     requestRefresh,
+    setIntervalHours,
+    onUpdated: (run) => {
+      afterUpdate = run;
+    },
     close: () => {
       closed = true;
       nextRunAt = undefined;

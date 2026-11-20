@@ -4,12 +4,26 @@ import { chain } from "stream-chain";
 import { parser } from "stream-json";
 import { streamArray } from "stream-json/streamers/stream-array.js";
 import { DatabaseSync } from "node:sqlite";
-import { cardBuilderStatement, cardExtrasStatement, cardInsertStatement, cardPricesStatement } from "./database.js";
+import { gzipSync } from "node:zlib";
+import { cardBuilderStatement, cardExtrasStatement, cardInsertStatement, cardPricesStatement, cardTreatmentStatement } from "./database.js";
+
+/** The ten languages Wizards prints Magic in besides English. Other Scryfall languages (Phyrexian, Quenya...) are unofficial. */
+export const OFFICIAL_LANGUAGES = new Set(["es", "fr", "de", "it", "pt", "ja", "ko", "ru", "zhs", "zht"]);
+
+export type BulkImportOptions = {
+  /** Which printings to keep, by Scryfall language code; others are passed over without counting as skipped. */
+  keep?: (lang: string) => boolean;
+  /** Writes the update date and counts (the main card file does; the extra languages file does not). */
+  metadata?: boolean;
+};
+
+const textList = (value: unknown) => (Array.isArray(value) ? value.filter((item): item is string => typeof item === "string").join(",") : "");
 
 export async function importBulkFile(
   dataPath: string,
   database: DatabaseSync,
   onProgress?: (imported: number) => void,
+  { keep, metadata = true }: BulkImportOptions = {},
 ): Promise<number> {
   const insertCard = cardInsertStatement(database);
   const insertExtras = cardExtrasStatement(database);
@@ -17,6 +31,11 @@ export async function importBulkFile(
   const insertStats = database.prepare("UPDATE cards SET power = ?, toughness = ? WHERE id = ?");
   const insertBuilder = cardBuilderStatement(database);
   const insertBack = database.prepare("UPDATE cards SET back_image_url = ? WHERE id = ?");
+  const insertTreatment = cardTreatmentStatement(database);
+  // the whole Scryfall record, compressed, so any field can be read later without the internet
+  const insertRecord = database.prepare("INSERT INTO card_records (id, record) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET record = excluded.record");
+  const clearArt = database.prepare("DELETE FROM card_illustrations WHERE card_id = ?");
+  const insertArt = database.prepare("INSERT OR IGNORE INTO card_illustrations (card_id, illustration_id) VALUES (?, ?)");
   let imported = 0;
   // a record that fails a check is skipped so one bad card never stops the whole update
   let skipped = 0;
@@ -36,6 +55,9 @@ export async function importBulkFile(
     }
   };
   const importValue = (value: unknown) => {
+    const raw = typeof value === "object" && value !== null ? value as Record<string, unknown> : {};
+    const lang = typeof raw.lang === "string" ? raw.lang : "en";
+    if (keep && !keep(lang)) return;
     const card = parsePrinting(value);
     if (!card.oracleId) return;
     insertCard.run(
@@ -63,6 +85,17 @@ export async function importBulkFile(
     insertStats.run(card.power, card.toughness, card.id);
     insertBuilder.run(card.producedMana.join(""), card.tokens.length ? JSON.stringify(card.tokens) : "", card.id);
     insertBack.run(card.backImageUrl, card.id);
+    const faces = Array.isArray(raw.card_faces) ? raw.card_faces.filter((face): face is Record<string, unknown> => !!face && typeof face === "object") : [];
+    insertTreatment.run(
+      lang, textList(raw.promo_types), textList(raw.frame_effects), typeof raw.frame === "string" ? raw.frame : "",
+      typeof raw.border_color === "string" ? raw.border_color : "", raw.full_art === true ? 1 : 0, textList(raw.keywords),
+      typeof raw.printed_name === "string" ? raw.printed_name : null, card.id,
+    );
+    clearArt.run(card.id);
+    for (const art of [raw.illustration_id, ...faces.map((face) => face.illustration_id)]) {
+      if (typeof art === "string" && art) insertArt.run(card.id, art);
+    }
+    insertRecord.run(card.id, gzipSync(JSON.stringify(value)));
     imported += 1;
     if (imported % 25_000 === 0) onProgress?.(imported);
   };
@@ -94,6 +127,10 @@ export async function importBulkFile(
         }
         tryImport(value);
       }
+    }
+    if (!metadata) {
+      database.exec("COMMIT");
+      return imported;
     }
     if (imported === 0) throw new Error("Scryfall bulk data did not contain any valid card printings");
     const updatedAt = new Date().toISOString();

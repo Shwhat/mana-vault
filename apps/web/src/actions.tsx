@@ -1,4 +1,5 @@
 // ---------- actions: every command is defined once and called by name from menus, ribbon and keys ----------
+import { addCard } from "./components/AddButtons";
 import { useMemo } from "react";
 import { addFromDeckDialog } from "./views/ProxiesView";
 import { request } from "./api";
@@ -58,7 +59,7 @@ export const SHORTCUTS: Array<[group: string, key: string, action: string]> = [
   ["Editing", "Ctrl+Y", "redo"],
   ["Decks", "Ctrl+N", "newDeck"],
   ["Decks", "Ctrl+O", "openDeck"],
-  ["General", "Esc", "Close the dialog, menu, scanner or About guide, or clear the selection"],
+  ["General", "Esc", "Close the dialog, menu, scanner, About guide or Administration, or clear the selection"],
 ];
 
 export function useActions(store: Store): Record<string, Action> {
@@ -320,11 +321,11 @@ export function useActions(store: Store): Record<string, Action> {
       scan: { label: "Scan card...", short: "Scan card", icon: "scan", run: () => store.setScannerOpen(true) },
       addCollection: {
         label: "Add to collection", short: "Add to collection", icon: "addcol", key: "Enter", disabled: !selected || (!target && !(prefs.addTo === "deck" && deck)),
-        run: () => { if (selected) void store.addToCollection(selected.id, selected.name); else store.flash("Select a card first", "err"); },
+        run: () => { if (selected) void addCard(store, selected); else store.flash("Select a card first", "err"); },
       },
       addDeck: {
         label: "Add to deck", short: "Add to deck", icon: "adddeck", key: "Shift+Enter", disabled: !selected || !deck,
-        run: () => { if (selected) void store.addToDeck(selected.id, selected.name); else store.flash("Select a card first", "err"); },
+        run: () => { if (selected) void addCard(store, selected, "deck"); else store.flash("Select a card first", "err"); },
       },
       foil: {
         label: "Add as foil", short: "Add as foil", icon: "foil", key: "F", on: prefs.foil,
@@ -340,7 +341,7 @@ export function useActions(store: Store): Record<string, Action> {
       },
       updateCatalog: {
         label: "Update card database", short: "Update database", icon: "update",
-        disabled: store.catalogRequestPending || !store.catalog || store.catalog.update.isUpdating,
+        disabled: !store.user.admin || store.catalogRequestPending || !store.catalog || store.catalog.update.isUpdating,
         run: () => void store.updateCatalog(),
       },
       importCollection: { label: "Import collection...", short: "Import", icon: "csvin", run: () => importWindow(store, "collection") },
@@ -440,6 +441,10 @@ export function useActions(store: Store): Record<string, Action> {
           }
           void request("/api/logout", { method: "POST", body: "{}" }).finally(() => { window.location.href = "/login"; });
         },
+      },
+      admin: {
+        label: "Administration...", short: "Administration", icon: "gear", disabled: !store.user.admin,
+        run: () => store.openAdmin(),
       },
       devices: {
         label: "Devices...", short: "Devices", icon: "phone",

@@ -1,9 +1,10 @@
 // ---------- dockable panels: filters, decks, card, deck list and import review ----------
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { request } from "../api";
 import type { Action } from "../actions";
 import { Icon } from "../icons";
 import { useApp, zoneLabel } from "../store";
-import { capitalize, type Deck, type Filters, FORMATS, formatName, money, type OwnedIn } from "../types";
+import { capitalize, type Deck, type Filters, FORMATS, formatName, money, type OwnedIn, SPECIAL_FOILS } from "../types";
 import { collectionMenu, deckMenu } from "../components/ItemMenus";
 import { choices, Picker } from "../components/Picker";
 import { SCOPE_NAMES } from "../filters";
@@ -22,8 +23,15 @@ export function FiltersPanel({ actions }: { actions: Record<string, Action> }) {
   const pick = (key: "color" | "rarity" | "format", options: Array<[string, string]>, label: string) => (
     <Picker id={`flt-${key}`} label={label} value={filters[key]} onChange={(value) => set({ [key]: value })} options={choices(options)} />
   );
-  const text = (key: "type" | "set", placeholder: string) => (
+  const text = (key: "type" | "set" | "name" | "text" | "creature" | "keyword" | "artist", placeholder: string) => (
     <input id={`flt-${key}`} value={filters[key]} placeholder={placeholder} onChange={(event) => set({ [key]: event.target.value })} />
+  );
+  const number = (key: keyof Filters, placeholder: string, step = "1") => (
+    <input id={`flt-${String(key).toLowerCase()}`} type="number" step={step} value={filters[key]} placeholder={placeholder} aria-label={placeholder}
+      onChange={(event) => set({ [key]: event.target.value })} />
+  );
+  const choose = (key: "made" | "owned" | "frame" | "foilType", options: Array<[string, string]>, label: string) => (
+    <Picker id={`flt-${key.toLowerCase()}`} label={label} value={filters[key]} onChange={(value) => set({ [key]: value })} options={choices(options)} />
   );
   return (
     <div className="pbody">
@@ -35,6 +43,30 @@ export function FiltersPanel({ actions }: { actions: Record<string, Action> }) {
         <div className="prow"><label htmlFor="flt-color">Color</label>{pick("color", [["", "Any color"], ["W", "White"], ["U", "Blue"], ["B", "Black"], ["R", "Red"], ["G", "Green"]], "Color")}</div>
         <div className="prow"><label htmlFor="flt-rarity">Rarity</label>{pick("rarity", [["", "Any rarity"], ["common", "Common"], ["uncommon", "Uncommon"], ["rare", "Rare"], ["mythic", "Mythic"]], "Rarity")}</div>
         <div className="prow"><label htmlFor="flt-format">Legal in</label>{pick("format", [["", "Any format"], ...FORMATS.filter((f) => f !== "casual").map((f): [string, string] => [f, formatName(f)])], "Legal in")}</div>
+        <div className="prow"><label htmlFor="flt-name">Name</label>{text("name", "angel")}</div>
+        <div className="prow"><label htmlFor="flt-text">Card text</label>{text("text", "draw a card")}</div>
+        <div className="prow"><label htmlFor="flt-creature">Creature type</label>{text("creature", "Elf")}</div>
+        <div className="prow"><label htmlFor="flt-keyword">Keyword</label>{text("keyword", "Flying")}</div>
+        <div className="prow"><label htmlFor="flt-artist">Artist</label>{text("artist", "Rebecca Guay")}</div>
+      </div>
+      <div className="pgrp">
+        <h4>Art and role</h4>
+        <div className="prow"><label htmlFor="flt-art">Art shows</label><TagInput id="flt-art" kind="art" value={filters.art} placeholder="cat" onChange={(art) => set({ art })} /></div>
+        <div className="prow"><label htmlFor="flt-role">Role</label><TagInput id="flt-role" kind="oracle" value={filters.role} placeholder="removal" onChange={(role) => set({ role })} /></div>
+      </div>
+      <div className="pgrp">
+        <h4>Power and toughness</h4>
+        <div className="prow"><label htmlFor="flt-powmin">Power</label><span className="rangebox">{number("powMin", "Min")}{number("powMax", "Max")}</span></div>
+        <div className="prow"><label htmlFor="flt-toumin">Toughness</label><span className="rangebox">{number("touMin", "Min")}{number("touMax", "Max")}</span></div>
+      </div>
+      <div className="pgrp">
+        <h4>Printing</h4>
+        <div className="prow"><label htmlFor="flt-pricemin">Price</label><span className="rangebox">{number("priceMin", "Min", "0.01")}{number("priceMax", "Max", "0.01")}</span></div>
+        <div className="prow"><label htmlFor="flt-made">Made in</label>{choose("made", [["", "Any finish"], ["foil", "Foil"], ["etched", "Etched"], ["nonfoil", "Regular"]], "Made in")}</div>
+        <div className="prow"><label htmlFor="flt-foiltype">Foil type</label>{choose("foilType", [["", "Any foil"], ...Object.entries(SPECIAL_FOILS).sort((a, b) => a[1].localeCompare(b[1]))], "Foil type")}</div>
+        <div className="prow"><label htmlFor="flt-frame">Frame</label>{choose("frame", [["", "Any frame"], ["fullart", "Full art"], ["borderless", "Borderless"], ["showcase", "Showcase"], ["extendedart", "Extended art"], ["promo", "Promo"]], "Frame")}</div>
+        <div className="prow"><label htmlFor="flt-yearmin">Released</label><span className="rangebox">{number("yearMin", "From year")}{number("yearMax", "To year")}</span></div>
+        <div className="prow"><label htmlFor="flt-owned">Owned</label>{choose("owned", [["", "Owned or not"], ["owned", "Owned"], ["notowned", "Not owned"]], "Owned")}</div>
       </div>
       <div className="pgrp">
         <h4>Mana value</h4>
@@ -45,6 +77,44 @@ export function FiltersPanel({ actions }: { actions: Record<string, Action> }) {
       </div>
       <div className="btnrow"><button type="button" className="btn" disabled={actions.clearFilters?.disabled} onClick={actions.clearFilters?.run}>Clear filters</button></div>
     </div>
+  );
+}
+
+/** A box for an Art or Role tag with suggestions from the card database as you type. */
+function TagInput({ id, kind, value, placeholder, onChange }: { id: string; kind: "art" | "oracle"; value: string; placeholder: string; onChange: (value: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [found, setFound] = useState<Array<{ label: string; uses: number }>>([]);
+  useEffect(() => {
+    if (!open || !value.trim()) {
+      setFound([]);
+      return;
+    }
+    let live = true;
+    const timer = window.setTimeout(() => {
+      void request<Array<{ label: string; uses: number }>>(`/api/tags?kind=${kind}&q=${encodeURIComponent(value.trim())}`)
+        .then((list) => { if (live) setFound(list.slice(0, 8)); })
+        .catch(() => { if (live) setFound([]); });
+    }, 200);
+    return () => {
+      live = false;
+      window.clearTimeout(timer);
+    };
+  }, [open, value, kind]);
+  return (
+    <span className="taginput">
+      <input id={id} value={value} placeholder={placeholder} autoComplete="off" onChange={(event) => onChange(event.target.value)}
+        onFocus={() => setOpen(true)} onBlur={() => window.setTimeout(() => setOpen(false), 150)} />
+      {open && found.length > 0 && (
+        <span className="tagsuggest" role="listbox" aria-label={kind === "art" ? "Art tags" : "Role tags"}>
+          {found.map((tag) => (
+            <button key={tag.label} type="button" role="option" aria-selected={tag.label === value}
+              onMouseDown={(event) => { event.preventDefault(); onChange(tag.label); setOpen(false); }}>
+              {tag.label} <span className="muted">{tag.uses}</span>
+            </button>
+          ))}
+        </span>
+      )}
+    </span>
   );
 }
 
@@ -66,10 +136,7 @@ export function CollectionsPanel({ actions }: { actions: Record<string, Action> 
             onClick={() => { store.openCollection(item.id); store.setView("collection"); }} {...collectionMenu(store, item)}>
             <span className="colline">
               <span className="nl">{item.name}</span>
-              {store.prefs.targetCollection === item.id && (
-                <span className={selected ? "target-mark strong" : "target-mark"} title={selected ? "Enter and + Add put cards here" : "+ Add to collection puts cards here"}>
-                  {selected ? "Adding here" : "Target"}</span>
-              )}
+              {selected && store.prefs.targetCollection === item.id && <span className="target-mark strong" title="New cards are added here">Adding here</span>}
               {item.kind === "wishlist" && <span className="badge wish" title="Cards here are wanted, not owned">Wishlist</span>}
               {item.role === "member" && <span className="badge" title={`Shared by ${item.owner.name}`}>Shared</span>}
               {item.role === "owner" && item.sharedWith.length > 0 && <span className="badge" title={`Shared with ${item.sharedWith.map((person) => person.name).join(", ")}`}>Shared</span>}
@@ -119,10 +186,7 @@ export function DecksPanel({ actions }: { actions: Record<string, Action> }) {
                 onClick={() => void store.openDeck(deck.id).then(() => store.setView("deck"))} {...deckMenu(store, deck)}>
                 <span className="colline">
                   <span className="nl">{deck.name}</span>
-                  {store.deck?.id === deck.id && (
-                    <span className={selected ? "target-mark strong" : "target-mark"} title={selected ? "Enter and + Add put cards here" : "+ Add to deck puts cards here"}>
-                      {selected ? "Adding here" : "Target"}</span>
-                  )}
+                  {selected && store.deck?.id === deck.id && <span className="target-mark strong" title="New cards are added here">Adding here</span>}
                   {(deck.role === "member" || (deck.sharedWith?.length ?? 0) > 0) && <span className="badge">Shared</span>}
                 </span>
                 <span className="colline sub">
@@ -152,7 +216,7 @@ export function CardPanel({ actions }: { actions: Record<string, Action> }) {
   return (
     <div className="pbody">
       {card.image_url && <img className="cardimg" src={card.image_url} alt={card.name} />}
-      <div className="ident">{card.name} <FinishBadge finish={pickedDeckCard?.finish ?? pickedEntry?.foil} />{pickedDeckCard && <UpgradeBadge card={pickedDeckCard} />}</div>
+      <div className="ident">{card.name} <FinishBadge finish={pickedDeckCard?.finish ?? pickedEntry?.foil} promoTypes={card.promo_types} />{pickedDeckCard && <UpgradeBadge card={pickedDeckCard} />}</div>
       <div className="sub">{card.type_line}</div>
       <div className="btnrow">
         <AddButtons store={store} card={card} large />
@@ -227,7 +291,7 @@ export function DeckListPanel({ actions }: { actions: Record<string, Action> }) 
               <div key={key} className={active ? "dlrow active" : "dlrow"} onClick={() => store.select({ view: "deck", key, printingId: card.card_id })} {...cardMenu(store, card)}>
                 <span className="num">{card.quantity}</span>
                 <span className="nl">{card.name}</span>
-                <FinishBadge finish={card.finish} /><UpgradeBadge card={card} />
+                <FinishBadge finish={card.finish} promoTypes={card.promo_types} /><UpgradeBadge card={card} />
                 {(card.missing ?? 0) > 0 && <span className="badge miss" title={`${card.missing} missing`}>Missing</span>}
                 <Quantity value={card.quantity} name={card.name} max={100} onChange={(quantity) => void store.setDeckQuantity(card, quantity)} />
               </div>

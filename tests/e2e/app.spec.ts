@@ -1,4 +1,4 @@
-import { menu, row, search, signUp, status, test, expect, choose } from "./fixtures";
+import { menu, row, search, signUp, status, test, expect, choose, takePrinting } from "./fixtures";
 
 test("sign-in protects the app and accounts work", async ({ page }) => {
   await page.goto("/");
@@ -36,12 +36,16 @@ test("search, filters and adding to the collection with undo", async ({ page }) 
   await page.keyboard.press("ArrowDown");
   await expect(page.locator(".ident")).toHaveText("Dark Ritual");
   await page.keyboard.press("Enter");
+  // adding opens the printing chooser titled with where the card goes; Enter takes the printing shown
+  await expect(page.locator("dialog[open] .dlghead")).toHaveText("Add Dark Ritual to Main collection");
+  await takePrinting(page);
   await expect(status(page)).toHaveText("Dark Ritual added to Main collection");
   await page.keyboard.press("f");
   await page.keyboard.press("Enter");
+  await takePrinting(page);
   await expect(status(page)).toHaveText("Dark Ritual (foil) added to Main collection");
   await page.keyboard.press("f");
-  await expect(page.locator(".pgrp", { hasText: "Owned" })).toContainText(/This printing\s*\d+ regular, \d+ foil/);
+  await expect(page.locator(".pgrp", { has: page.locator("h4", { hasText: /^Owned$/ }) })).toContainText(/This printing\s*\d+ regular, \d+ foil/);
 
   await page.keyboard.press("2");
   const entry = page.locator("#view-collection .row", { hasText: "Dark Ritual" });
@@ -86,12 +90,15 @@ test("deck building with zones, moves and undo", async ({ page }) => {
   await search(page, "Lightning Bolt");
   await row(page, "Lightning Bolt").click();
   await page.keyboard.press("Shift+Enter");
+  await takePrinting(page);
   await expect(status(page)).toHaveText("Lightning Bolt added to Burn test");
   await page.keyboard.press("Shift+Enter");
+  await takePrinting(page);
   await page.keyboard.press("z");
   await expect(page.locator("#st-toggles")).toContainText("ZONE: SIDEBOARD");
-  await page.locator("#view-cards .row", { hasText: "Lightning Bolt" }).nth(1).click();
+  // another printing, picked in the chooser
   await page.keyboard.press("Shift+Enter");
+  await page.locator("dialog[open] .printrow").nth(1).click();
   await expect(status(page)).toHaveText("Lightning Bolt added to Burn test (sideboard)");
 
   await page.keyboard.press("3");
@@ -285,7 +292,8 @@ test.describe("phone layout", () => {
     await page.locator("#view-cards .row", { hasText: "Counterspell" }).click();
     await expect(page.locator(".cardpage h2")).toHaveText("Counterspell");
     await page.getByRole("button", { name: "Card actions" }).click();
-    await page.locator(".fabmenu .pmrow", { hasText: /^Add to Main collection$/ }).click();
+    await page.locator(".fabmenu .pmrow", { hasText: /^Add to Main collection\.\.\.$/ }).click();
+    await takePrinting(page);
     await expect(page.locator(".ptoast")).toHaveText("Counterspell added to Main collection");
     await page.getByRole("button", { name: "Back" }).click();
     await expect(page.locator(".cardpage")).toHaveCount(0);

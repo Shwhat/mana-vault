@@ -9,16 +9,16 @@ Visitors who are not signed in are sent to the sign-in page. It has two tabs:
 | Tab | Fields | Result |
 |---|---|---|
 | Sign in | User name, Password | Opens Mana Vault |
-| Create account | User name, Password, Repeat password | Creates the account and opens Mana Vault |
+| Create account | User name, Password, Repeat password, and Invite code when sign-up is by invite | Creates the account and opens Mana Vault |
 
-The Create account tab is hidden when the server owner has turned new accounts off.
+The Create account tab is hidden when sign-up is closed. An admin sets sign-up to open, invite codes or closed in Administration; the first account on a new server can always be created, and becomes the admin. The hint under the password shows the minimum length the admin set.
 
 ## Account rules
 
 | Field | Rule |
 |---|---|
 | User name | 3 to 32 characters: letters, digits, dots, dashes or underscores, starting with a letter or digit. Names are unique without regard to capital letters, so "Devon" and "devon" are the same account |
-| Password | At least 8 characters |
+| Password | At least 8 characters, or the minimum length set in Administration (8 to 64) |
 
 ## What accounts share
 
@@ -28,9 +28,13 @@ When Mana Vault is updated from a version before 0.2.0, the collection and decks
 
 ## Sessions
 
-- Signing in keeps you signed in on that browser for 30 days.
+- Signing in keeps you signed in on that browser for 30 days, or the length an admin set in Administration.
 - **Sign out** (account menu, or Menu on the phone) ends the session on that browser and returns to the sign-in page.
 - When a session ends or expires, the next action returns to the sign-in page.
+
+## Admins and turned-off accounts
+
+Admin accounts open **Administration...** from the account menu (see [Administration](/about/administration)). An admin can create accounts with a temporary password, reset passwords, turn accounts off and on, sign them out everywhere and delete them. An account given a temporary password is asked to choose a new password ("Choose a new password") when it signs in. A turned-off account cannot sign in.
 
 ## Changing your password
 
@@ -45,7 +49,7 @@ Each phone signed in with the Android app has its own device sign-in. **Devices.
 ## Protection against guessing
 
 - After 5 wrong passwords for one user name within 5 minutes, sign-in for that name pauses until the 5 minutes pass.
-- After 30 failed sign-in or account attempts from one address within 15 minutes, further attempts from that address pause until the window passes.
+- After 30 failed sign-in or account attempts (or the number set in Administration) from one address within 15 minutes, further attempts from that address pause until the window passes.
 
 ## Messages
 
@@ -55,9 +59,12 @@ Each phone signed in with the Android app has its own device sign-in. **Devices.
 | Too many attempts. Try again in a few minutes. | The guessing limit was reached | Wait a few minutes |
 | That user name is taken. | Another account has the name | Choose another name |
 | User names are 3 to 32 letters, digits, dots, dashes or underscores, starting with a letter or digit. | The name breaks the rule | Choose a valid name |
-| Passwords need at least 8 characters. | The password is too short | Use a longer password |
+| Passwords need at least N characters. | The password is shorter than the minimum length | Use a longer password |
+| This server needs an invite code to create an account. | Sign-up is by invite and no code was entered | Enter the invite code from an admin |
+| That invite code is not valid or was already used. | The code is unknown or was used | Ask an admin for a new code |
+| This account is turned off. Ask the server's admin. | An admin turned the account off | Ask an admin |
 | The passwords do not match. | The two password fields differ | Type them again |
-| New accounts are turned off on this server. | The server owner turned off new accounts | Ask the owner for an account |
+| New accounts are turned off on this server. | Sign-up is closed | Ask an admin for an account |
 | The current password is wrong. | Change password was given the wrong current password | Enter the current password again |
 | The new passwords do not match | The two new password fields differ | Type them again |
 | Password changed. Other devices are signed out. | The password was changed | None |

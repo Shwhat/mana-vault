@@ -1,4 +1,5 @@
-import { createWriteStream } from "node:fs";
+import { createReadStream, createWriteStream } from "node:fs";
+import { createInterface } from "node:readline";
 import { mkdir, rename, rm } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -8,7 +9,7 @@ import { PassThrough, Readable, Transform } from "node:stream";
 import { DatabaseSync } from "node:sqlite";
 import { initializeDatabase } from "./database.js";
 import { saveSets } from "./sets.js";
-import { importBulkFile } from "./import-bulk.js";
+import { importBulkFile, OFFICIAL_LANGUAGES } from "./import-bulk.js";
 import { chain } from "stream-chain";
 import { parser } from "stream-json";
 import { streamArray } from "stream-json/streamers/stream-array.js";
@@ -27,13 +28,15 @@ interface BulkDownloadResult {
 }
 
 interface ImportCardOptions {
+  /** Which bulk file to download: a Scryfall bulk type, or a test on the type and name (default: default_cards). */
+  bulk?: string | ((entry: Record<string, unknown>) => boolean);
   fetcher?: typeof fetch;
   onDownloadProgress?: (downloadedBytes: number, totalBytes: number | null) => void;
 }
 
 export async function downloadBulkData(
   dataPath: string,
-  { fetcher = fetch, onDownloadProgress }: ImportCardOptions = {},
+  { fetcher = fetch, onDownloadProgress, bulk = "default_cards" }: ImportCardOptions = {},
 ): Promise<BulkDownloadResult> {
   const downloadPath = `${dataPath}.download`;
   try {
@@ -42,7 +45,7 @@ export async function downloadBulkData(
       throw new Error(`Scryfall bulk-data request failed: ${metadataResponse.status} ${metadataResponse.statusText}`);
     }
     const metadata = await metadataResponse.json() as BulkMetadata;
-    const bulkData = findDefaultCards(metadata);
+    const bulkData = findBulk(metadata, bulk);
     const jsonlUri = optionalString(bulkData.jsonl_download_uri);
     const legacyUri = optionalString(bulkData.download_uri);
     const downloadUri = jsonlUri ?? legacyUri;
@@ -117,6 +120,7 @@ export async function importCardCatalog(
     } catch (error) {
       console.warn(`Could not update the rulings: ${error instanceof Error ? error.message : String(error)}`);
     }
+    await importCatalogExtras(database, dataPath, options);
     return imported;
   } finally {
     database.close();
@@ -124,15 +128,150 @@ export async function importCardCatalog(
   }
 }
 
-function findDefaultCards(metadata: BulkMetadata): Record<string, unknown> {
+function findBulk(metadata: BulkMetadata, bulk: NonNullable<ImportCardOptions["bulk"]>): Record<string, unknown> {
   if (!metadata || !Array.isArray(metadata.data)) {
     throw new Error("Scryfall bulk-data response has no data list");
   }
-  const bulkData = metadata.data.find((entry): entry is Record<string, unknown> =>
-    typeof entry === "object" && entry !== null && "type" in entry && entry.type === "default_cards",
-  );
-  if (!bulkData) throw new Error("Scryfall did not return default_cards bulk data");
+  const match = typeof bulk === "string" ? (entry: Record<string, unknown>) => entry.type === bulk : bulk;
+  const bulkData = metadata.data.find((entry): entry is Record<string, unknown> => typeof entry === "object" && entry !== null && match(entry as Record<string, unknown>));
+  if (!bulkData) throw new Error(`Scryfall did not return ${typeof bulk === "string" ? bulk : "that"} bulk data`);
   return bulkData;
+}
+
+/** Scryfall's tag files, found by their type or name ("art_tags", "Art Tags"...). */
+const tagBulk = (kind: "art" | "oracle") => (entry: Record<string, unknown>) =>
+  new RegExp(`^${kind}[ _-]?tags?$`, "i").test(String(entry.type ?? "")) || new RegExp(`^${kind} tags$`, "i").test(String(entry.name ?? ""));
+
+const listOf = (value: unknown) => (Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : []);
+
+/**
+ * Reads a Scryfall tag file (Art Tags or Oracle Tags) and replaces the stored tags of that kind. Each tag links to
+ * illustrations (art tags) or cards (oracle tags) through its taggings or id lists. Returns how many tags were saved.
+ */
+export async function importTagFile(database: DatabaseSync, path: string, kind: "art" | "oracle"): Promise<number> {
+  const insertTag = database.prepare("INSERT INTO tags (id, kind, label, description) VALUES (?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET kind = excluded.kind, label = excluded.label, description = excluded.description");
+  const insertLink = database.prepare("INSERT OR IGNORE INTO tag_links (tag_id, ref) VALUES (?, ?)");
+  const insertChild = database.prepare("INSERT OR IGNORE INTO tag_children (tag_id, child_id) VALUES (?, ?)");
+  let saved = 0;
+  const save = (value: unknown) => {
+    if (!value || typeof value !== "object") return;
+    const tag = value as Record<string, unknown>;
+    const id = typeof tag.id === "string" ? tag.id : null;
+    const label = typeof tag.label === "string" ? tag.label : typeof tag.slug === "string" ? tag.slug : typeof tag.name === "string" ? tag.name : null;
+    if (!id || !label) return;
+    insertTag.run(id, kind, label, typeof tag.description === "string" ? tag.description : "");
+    const refs = new Set<string>([...listOf(tag.illustration_ids), ...listOf(tag.oracle_ids)]);
+    if (Array.isArray(tag.taggings)) {
+      for (const tagging of tag.taggings) {
+        if (!tagging || typeof tagging !== "object") continue;
+        const item = tagging as Record<string, unknown>;
+        const ref = kind === "art" ? item.illustration_id ?? item.oracle_id : item.oracle_id ?? item.illustration_id;
+        if (typeof ref === "string") refs.add(ref);
+      }
+    }
+    for (const ref of refs) insertLink.run(id, ref);
+    for (const child of listOf(tag.child_ids)) insertChild.run(id, child);
+    saved += 1;
+  };
+  database.exec("BEGIN");
+  try {
+    database.exec(`DELETE FROM tag_links WHERE tag_id IN (SELECT id FROM tags WHERE kind = '${kind}');
+      DELETE FROM tag_children WHERE tag_id IN (SELECT id FROM tags WHERE kind = '${kind}');
+      DELETE FROM tags WHERE kind = '${kind}';`);
+    const head = await readHead(path);
+    if (head === "[") {
+      for await (const item of chain([createReadStream(path), parser(), streamArray()])) save((item as { value: unknown }).value);
+    } else if (head === "{") {
+      // a JSON Lines file, or one object holding the list in "data"
+      let text = "";
+      let lines = 0;
+      for await (const line of createInterface({ input: createReadStream(path), crlfDelay: Infinity })) {
+        lines += 1;
+        if (lines <= 1) text = line;
+        else if (lines === 2) {
+          save(JSON.parse(text));
+          save(JSON.parse(line));
+        } else if (line.trim()) save(JSON.parse(line));
+      }
+      if (lines === 1) {
+        const whole = JSON.parse(text) as { data?: unknown };
+        if (Array.isArray(whole.data)) whole.data.forEach(save);
+        else save(whole);
+      }
+    }
+    if (!saved) throw new Error(`The ${kind} tags file held no tags`);
+    database.exec("COMMIT");
+  } catch (error) {
+    database.exec("ROLLBACK");
+    throw error;
+  }
+  return saved;
+}
+
+async function readHead(path: string): Promise<string> {
+  for await (const chunk of createReadStream(path)) {
+    for (const byte of chunk as Buffer) {
+      if (byte === 0x20 || byte === 0x09 || byte === 0x0a || byte === 0x0d || byte === 0xef || byte === 0xbb || byte === 0xbf) continue;
+      return String.fromCharCode(byte);
+    }
+  }
+  return "";
+}
+
+/**
+ * Saves today's prices of every printing whose price changed since its last saved day, so the history grows only
+ * with changes. Returns how many prices were saved.
+ */
+export function snapshotPrices(database: DatabaseSync, day = new Date().toISOString().slice(0, 10)): number {
+  return Number(database.prepare(
+    `INSERT INTO price_history (card_id, day, usd, usd_foil, usd_etched, eur, eur_foil)
+     SELECT c.id, ?, c.price_usd, c.price_usd_foil, c.price_usd_etched, c.price_eur, c.price_eur_foil FROM cards c
+     LEFT JOIN price_history h ON h.card_id = c.id AND h.day = (SELECT MAX(day) FROM price_history x WHERE x.card_id = c.id AND x.day < ?)
+     WHERE c.custom = 0 AND COALESCE(c.price_usd, c.price_usd_foil, c.price_usd_etched, c.price_eur, c.price_eur_foil) IS NOT NULL
+       AND (h.card_id IS NULL OR h.usd IS NOT c.price_usd OR h.usd_foil IS NOT c.price_usd_foil OR h.usd_etched IS NOT c.price_usd_etched
+            OR h.eur IS NOT c.price_eur OR h.eur_foil IS NOT c.price_eur_foil)
+     ON CONFLICT(card_id, day) DO UPDATE SET usd = excluded.usd, usd_foil = excluded.usd_foil, usd_etched = excluded.usd_etched,
+       eur = excluded.eur, eur_foil = excluded.eur_foil`,
+  ).run(day, day).changes);
+}
+
+/**
+ * The parts of a card database update after the main card file: Scryfall's unofficial languages (from All Cards, when
+ * turned on), the Art and Oracle tag files, and a price snapshot. Each part that fails keeps what was stored before.
+ */
+export async function importCatalogExtras(database: DatabaseSync, dataPath: string, options: ImportCardOptions = {}): Promise<void> {
+  const setting = database.prepare("SELECT value FROM server_settings WHERE key = 'extraLanguages'").get();
+  const extraLanguages = setting ? String(setting.value) !== "false" : true;
+  const extraPath = `${dataPath}.extra`;
+  if (extraLanguages) {
+    try {
+      await downloadBulkData(extraPath, { ...options, bulk: "all_cards" });
+      const kept = await importBulkFile(extraPath, database, undefined, { keep: (lang) => lang !== "en" && !OFFICIAL_LANGUAGES.has(lang), metadata: false });
+      console.log(`Saved ${kept.toLocaleString()} printings in unofficial languages`);
+    } catch (error) {
+      console.warn(`Could not update the unofficial languages: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      await rm(extraPath, { force: true });
+    }
+  }
+  for (const kind of ["art", "oracle"] as const) {
+    const path = `${dataPath}.${kind}-tags`;
+    try {
+      await downloadBulkData(path, { ...options, bulk: tagBulk(kind) });
+      const saved = await importTagFile(database, path, kind);
+      console.log(`Saved ${saved.toLocaleString()} ${kind} tags`);
+    } catch (error) {
+      console.warn(`Could not update the ${kind} tags: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      await rm(path, { force: true });
+    }
+  }
+  try {
+    const saved = snapshotPrices(database);
+    console.log(`Saved ${saved.toLocaleString()} changed prices to the price history`);
+  } catch (error) {
+    console.warn(`Could not save the price history: ${error instanceof Error ? error.message : String(error)}`);
+  }
 }
 
 /** Downloads Scryfall's rulings file and replaces the stored rulings. Returns how many were saved. */

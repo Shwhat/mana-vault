@@ -3,7 +3,7 @@ import type { Action } from "../actions";
 import { customDialog } from "./Dialog";
 import { useApp, zoneLabel } from "../store";
 
-const VIEW_NAMES = { home: "Home", cards: "Card search", collection: "Collection", deck: "Deck", trade: "Trade", proxies: "Proxies", about: "About" } as const;
+const VIEW_NAMES = { home: "Home", cards: "Card search", collection: "Collection", deck: "Deck", trade: "Trade", proxies: "Proxies", about: "About", admin: "Administration" } as const;
 
 export function StatusBar({ actions }: { actions: Record<string, Action> }) {
   const store = useApp();
@@ -28,6 +28,11 @@ export function StatusBar({ actions }: { actions: Record<string, Action> }) {
           : "Card database loading"}
       </span>
       {catalog?.update.isUpdating && <span className="st-warn">Updating card database</span>}
+      {store.pictureProgress && (
+        <span id="st-pictures" role="button" tabIndex={-1} title="Open Pictures in Administration" onClick={() => store.openAdmin("pictures")}>
+          {store.pictureProgress.paused ? "Picture downloads paused" : "Downloading pictures"}: {store.pictureProgress.done.toLocaleString()} of {store.pictureProgress.total.toLocaleString()}
+        </span>
+      )}
       {!!catalog?.skipped?.count && !catalog.update.isUpdating && (
         <span
           id="st-skipped"

@@ -206,12 +206,12 @@ export function printingFinder(database: DatabaseSync) {
      WHERE (name = ? COLLATE NOCASE OR flavor_name = ? COLLATE NOCASE OR name LIKE ? ESCAPE '\\')
        AND (? = '' OR lower(set_code) = lower(?) OR set_name = ? COLLATE NOCASE)
        AND (? = '' OR collector_number = ?)
-     ORDER BY name = ? COLLATE NOCASE DESC, released_at DESC, set_code, collector_number
+     ORDER BY lang != 'en', name = ? COLLATE NOCASE DESC, released_at DESC, set_code, collector_number
      LIMIT 1`,
   );
   // a line whose name does not match (another language, a typo) is still found by its set and collector number
   const bySetNumber = database.prepare(
-    "SELECT id, oracle_id, name FROM cards WHERE lower(set_code) = lower(?) AND collector_number = ? COLLATE NOCASE ORDER BY released_at DESC LIMIT 1",
+    "SELECT id, oracle_id, name FROM cards WHERE lower(set_code) = lower(?) AND collector_number = ? COLLATE NOCASE ORDER BY lang != 'en', released_at DESC LIMIT 1",
   );
   return (name: string, set = "", number = "") =>
     (statement.get(...nameMatch(name), set, set, set, number, number, name)

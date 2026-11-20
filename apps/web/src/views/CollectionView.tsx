@@ -9,7 +9,7 @@ import { Icon } from "../icons";
 import { entryKey } from "../library-state";
 import { type Store, useApp } from "../store";
 import {
-  ALL_COLLECTIONS, capitalize, COLOR_NAMES, COMPLETION_RULES, conditionName, copyLabel, copyPrice, FINISH_RULES, FINISHES, type Collection, type CollectionEntry,
+  ALL_COLLECTIONS, capitalize, COLOR_NAMES, COMPLETION_RULES, conditionName, copyLabel, copyPrice, FINISH_RULES, FINISHES, finishLabel, type Collection, type CollectionEntry,
   type CollectionSort, type GridSize,
   type CollectionTab, type Facets, languageName, money,
 } from "../types";
@@ -190,24 +190,60 @@ function useSize<T extends HTMLElement>() {
   return [ref, size] as const;
 }
 
-/** One card picture with its count, finish, trade and price marks. Used by the binder and the grid. */
-function Pocket({ entry }: { entry: CollectionEntry }) {
+/** Entries of the same printing (and collection) together, in the order they are shown: one picture each. */
+export function stacksOf(entries: CollectionEntry[]): CollectionEntry[][] {
+  const stacks = new Map<string, CollectionEntry[]>();
+  for (const entry of entries) {
+    const key = `${entry.collection_id ?? ""}:${entry.id}`;
+    const stack = stacks.get(key);
+    if (stack) stack.push(entry);
+    else stacks.set(key, [entry]);
+  }
+  return [...stacks.values()];
+}
+
+/** A line under a picture: the finish (and condition, language, proxy when they differ), how many and the price of each. */
+function StackLine({ entry }: { entry: CollectionEntry }) {
   const store = useApp();
   const key = entryKey(entry);
   const active = store.checked.has(key);
-  const label = copyLabel(entry);
   const currency = store.prefs.currency;
+  const label = [finishLabel(entry.foil, entry.promo_types), entry.condition !== "NM" ? conditionName(entry.condition) : "",
+    entry.language !== "en" ? languageName(entry.language) : "", entry.proxy ? "Proxy" : ""].filter(Boolean).join(", ");
   return (
-    <div data-key={key} role="option" aria-selected={active} className={active ? "pocket active" : "pocket"}
-      title={`${entry.name}, ${entry.set_name} ${entry.collector_number}${label ? `, ${label}` : ""}${entry.collection_name ? `, in ${entry.collection_name}` : ""}`}
-      onClick={(event) => store.pickRow(entry, { ctrl: event.ctrlKey || event.metaKey, shift: event.shiftKey })}
-      onDoubleClick={() => copyDialog(store, entry)} {...entryMenu(store, entry)}>
-      {entry.image_url ? <img src={entry.image_url} alt={entry.name} loading="lazy" draggable={false} /> : <span className="pocketname">{entry.name}</span>}
-      <FinishBadge finish={entry.foil} className="pocketfoil" />
-      {entry.proxy && <span className="badge proxy pocketproxy">PROXY</span>}
-      <span className="pocketqty">{entry.quantity}</span>
-      {entry.trade > 0 && <span className="badge trade pockettrade">TRADE {entry.trade}</span>}
-      <span className="pocketprice">{entry.proxy ? "Proxy" : money(copyPrice(entry, currency), currency)}</span>
+    <div data-key={key} role="option" aria-selected={active} className={active ? "sline active" : "sline"}
+      onClick={(event) => { event.stopPropagation(); store.pickRow(entry, { ctrl: event.ctrlKey || event.metaKey, shift: event.shiftKey }); }}
+      onDoubleClick={(event) => { event.stopPropagation(); copyDialog(store, entry); }} {...entryMenu(store, entry)}>
+      <span className="sl-name">{label}{entry.trade > 0 && <span className="badge trade">T{entry.trade}</span>}</span>
+      <span className="sl-qty">{entry.quantity}</span>
+      <span className="sl-price">{entry.proxy ? "" : money(copyPrice(entry, currency), currency)}</span>
+    </div>
+  );
+}
+
+/**
+ * One picture for a printing, with a line for each finish (and condition or language) under it and the total count and
+ * value. Clicking a line selects it; the picture selects the first line. Used by the binder and the grid.
+ */
+function Stack({ entries }: { entries: CollectionEntry[] }) {
+  const store = useApp();
+  const first = entries[0]!;
+  const active = entries.some((entry) => store.checked.has(entryKey(entry)));
+  const currency = store.prefs.currency;
+  const count = entries.reduce((sum, entry) => sum + entry.quantity, 0);
+  const value = entries.reduce((sum, entry) => sum + (copyPrice(entry, currency) ?? 0) * entry.quantity, 0);
+  return (
+    <div className={active ? "stackcell active" : "stackcell"}>
+      <div className={active ? "pocket active" : "pocket"}
+        title={`${first.name}, ${first.set_name} ${first.collector_number}${first.collection_name ? `, in ${first.collection_name}` : ""}`}
+        onClick={(event) => store.pickRow(first, { ctrl: event.ctrlKey || event.metaKey, shift: event.shiftKey })}
+        onDoubleClick={() => copyDialog(store, first)} {...entryMenu(store, first)}>
+        {first.image_url ? <img src={first.image_url} alt={first.name} loading="lazy" draggable={false} /> : <span className="pocketname">{first.name}</span>}
+      </div>
+      <div className="slines" role="group" aria-label={`Copies of ${first.name} (${first.set_code.toUpperCase()}) ${first.collector_number}`}>
+        {entries.map((entry) => <StackLine key={entryKey(entry)} entry={entry} />)}
+        <div className="sline total"><span className="sl-name">Total</span><span className="sl-qty">{count}</span><span className="sl-price">{money(value, currency)}</span></div>
+      </div>
     </div>
   );
 }
@@ -217,23 +253,25 @@ const PAGE_SIZE = 9;
 /** Pages of nine card pictures, like a binder sheet, as large as the space allows. Page Up and Page Down turn the pages. */
 function Binder() {
   const store = useApp();
-  const entries = store.visibleCollection;
-  const pages = Math.max(1, Math.ceil(entries.length / PAGE_SIZE));
+  const stacks = useMemo(() => stacksOf(store.visibleCollection), [store.visibleCollection]);
+  const pages = Math.max(1, Math.ceil(stacks.length / PAGE_SIZE));
   const page = Math.min(store.binderPage, pages - 1);
-  const shown = entries.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
+  const shown = stacks.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
   const [area, size] = useSize<HTMLDivElement>();
   const [typed, setTyped] = useState("");
   const gap = store.phone ? 6 : 10;
   // three pockets across and down, as big as fits; the sheet adds its padding and border
-  const pocket = Math.max(60, Math.floor(Math.min((size.width - 2 * gap - 4 * gap) / 3, ((size.height - 2 * gap - 4 * gap) / 3) * (63 / 88))));
+  // each pocket keeps room for about three lines under its picture
+  const lines = 54;
+  const pocket = Math.max(60, Math.floor(Math.min((size.width - 2 * gap - 4 * gap) / 3, ((size.height - 2 * gap - 4 * gap - 3 * lines) / 3) * (63 / 88))));
   const go = (next: number) => store.setBinderPage(Math.max(0, Math.min(pages - 1, next)));
   return (
     <div className="binderwrap">
       <div className="binderarea" ref={area}>
         <div className="binder" role="listbox" aria-label={`Binder page ${page + 1} of ${pages}`}
           style={{ gridTemplateColumns: `repeat(3, ${pocket}px)`, gap, padding: gap }}>
-          {shown.map((entry) => <Pocket key={entryKey(entry)} entry={entry} />)}
-          {Array.from({ length: PAGE_SIZE - shown.length }, (_, index) => <div key={`empty-${index}`} className="pocket emptypocket" aria-hidden="true" />)}
+          {shown.map((stack) => <Stack key={entryKey(stack[0]!)} entries={stack} />)}
+          {Array.from({ length: PAGE_SIZE - shown.length }, (_, index) => <div key={`empty-${index}`} className="stackcell"><div className="pocket emptypocket" aria-hidden="true" /></div>)}
         </div>
       </div>
       <div className="binderpager">
@@ -258,7 +296,7 @@ const PHONE_COLUMNS: Record<GridSize, number> = { s: 4, m: 3, l: 2 };
 /** Card pictures that fill the width; more load while scrolling. */
 function Grid() {
   const store = useApp();
-  const entries = store.visibleCollection;
+  const entries = useMemo(() => stacksOf(store.visibleCollection), [store.visibleCollection]);
   const [count, setCount] = useState(GRID_STEP);
   const end = useRef<HTMLDivElement>(null);
   const list = useRef<HTMLDivElement>(null);
@@ -281,7 +319,7 @@ function Grid() {
   return (
     <div className="gridwrap" ref={list}>
       <div className={`cardgrid size-${size}`} role="listbox" aria-label="Collection" aria-multiselectable="true" style={{ gridTemplateColumns: columns }}>
-        {entries.slice(0, count).map((entry) => <Pocket key={entryKey(entry)} entry={entry} />)}
+        {entries.slice(0, count).map((stack) => <Stack key={entryKey(stack[0]!)} entries={stack} />)}
       </div>
       {count < entries.length && <div ref={end} className="gridmore">Loading more cards</div>}
     </div>
@@ -334,7 +372,7 @@ function CardsTab({ actions }: { actions: Record<string, Action> }) {
               {selectMode && <input type="checkbox" className="rowcheck" checked={active} readOnly aria-label={`Pick ${entry.name}`} />}
               <Thumb url={entry.image_url} />
               <div className="rowmain">
-                <div className="rowtitle"><b>{entry.name}</b>{entry.custom && <span className="badge custom">Custom</span>}<FinishBadge finish={entry.foil} />
+                <div className="rowtitle"><b>{entry.name}</b>{entry.custom && <span className="badge custom">Custom</span>}<FinishBadge finish={entry.foil} promoTypes={entry.promo_types} />
                   {entry.proxy && <span className="badge proxy" title="A proxy: kept apart from real copies, with no value">PROXY</span>}
                   {entry.trade > 0 && <span className="badge trade" title={`${entry.trade} of ${entry.quantity} for trade`}>FOR TRADE {entry.trade}</span>}</div>
                 <Tags entry={entry} />

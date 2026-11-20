@@ -215,7 +215,7 @@ export function restoreBackup(database: DatabaseSync, source: string, userId: nu
         typeof deck.description === "string" ? deck.description.slice(0, 20000) : "", cover);
     }
     // a deck card without a printing (Normal decks before 0.6.0) takes the newest printing of the card
-    const newest = database.prepare("SELECT id FROM cards WHERE oracle_id = ? ORDER BY released_at IS NULL, released_at DESC, promo, variation LIMIT 1");
+    const newest = database.prepare("SELECT id FROM cards WHERE oracle_id = ? ORDER BY lang != 'en', released_at IS NULL, released_at DESC, promo, variation LIMIT 1");
     const insertDeckCard = database.prepare(
       `INSERT INTO deck_cards (deck_id, oracle_id, printing_id, quantity, zone, finish) VALUES (?, ?, ?, ?, ?, ?)
        ON CONFLICT(deck_id, oracle_id, printing_id, zone, finish) WHERE printing_id IS NOT NULL DO UPDATE SET quantity = quantity + excluded.quantity`,

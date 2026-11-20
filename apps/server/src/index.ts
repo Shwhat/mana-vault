@@ -12,35 +12,47 @@ if (process.argv.includes("-healthcheck")) {
 }
 
 import { buildApp } from "./app.js";
+import { applyPendingRestore } from "./admin.js";
 import { catalogUpdateIntervalFromEnvironment, startCatalogUpdater } from "./catalog-updater.js";
+import { captureLogs } from "./logs.js";
+import { settingsFromEnvironment } from "./settings.js";
 
+captureLogs();
 const port = Number(process.env.PORT ?? 3000);
 const host = process.env.HOST ?? "127.0.0.1";
-const intervalHours = catalogUpdateIntervalFromEnvironment();
-const signup = (process.env.MANAVAULT_SIGNUP ?? "on").trim().toLowerCase() !== "off";
+const databasePath = process.env.DATABASE_PATH ?? "data/mana-vault.sqlite";
 const secureSetting = (process.env.MANAVAULT_SECURE_COOKIE ?? "auto").trim().toLowerCase();
 if (!["auto", "always", "never"].includes(secureSetting)) {
   throw new Error("MANAVAULT_SECURE_COOKIE must be auto, always or never");
 }
 const version = (JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as { version: string }).version;
+// a restore saved in Administration is put in place before the database is opened
+if (applyPendingRestore(databasePath)) console.log("Restored the server backup chosen in Administration");
 
+// environment variables lock their settings; the rest are kept in the database and changed in Administration
+const settingsEnv = settingsFromEnvironment();
 const updater = startCatalogUpdater({
-  intervalHours,
-  databasePath: process.env.DATABASE_PATH ?? "data/mana-vault.sqlite",
+  intervalHours: settingsEnv.forced.updateIntervalHours ?? catalogUpdateIntervalFromEnvironment("0"),
+  databasePath,
   dataPath: process.env.SCRYFALL_DATA_PATH ?? "data/default-cards.json",
 });
 const app = await buildApp(undefined, undefined, updater.getStatus, updater.requestRefresh, {
-  signup,
+  settingsEnv,
   secureCookie: secureSetting as "auto" | "always" | "never",
   version,
+  databasePath,
+  exitAfterRestore: true,
+  setUpdateInterval: updater.setIntervalHours,
 });
+updater.onUpdated(() => app.pictures.queue());
 app.addHook("onClose", async () => updater.close());
 
 try {
   await app.listen({ port, host });
-  app.log.info(`Mana Vault ${version}, new accounts ${signup ? "on" : "off"}`);
-  if (intervalHours > 0) {
-    app.log.info(`Scheduled Scryfall refresh every ${intervalHours} hour(s)`);
+  const settings = app.serverSettings.get();
+  app.log.info(`Mana Vault ${version}, sign-up ${settings.signup}`);
+  if (settings.updateIntervalHours > 0) {
+    app.log.info(`Scheduled Scryfall refresh every ${settings.updateIntervalHours} hour(s)`);
   }
 } catch (err) {
   app.log.error(err);

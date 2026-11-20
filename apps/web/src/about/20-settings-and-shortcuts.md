@@ -7,13 +7,14 @@ Preferences are saved for your account on the server and follow you to every bro
 | Setting | Choices | Default | Where to change it |
 |---|---|---|---|
 | Theme | Light, Dark, System | Light | Theme list on the View ribbon tab, phone Menu |
-| Add as foil | On, Off | Off | FOIL in the status bar, F |
+| Add as foil (the finish the printing chooser starts on) | On, Off | Off | FOIL in the status bar, F |
 | Target zone | Main deck, Sideboard, Commander, Maybeboard | Main deck | Zone list beside Quick add on the deck's Add tab, Target zone list on the Decks ribbon tab, Deck list panel, ZONE in the status bar, Z |
 | Where new cards go | The collection or deck selected last | Your first collection | Clicking a collection or deck in its panel or switcher, ADDING TO in the status bar, + Add in the collection view, C |
 | Target collection | Any of your collections | Your first collection | Collections panel, collection switcher, ADDING TO in the status bar, + Add in the collection view, C |
 | Open collection | Any of your collections, or All collections | Your first collection | Collection switcher, Collections panel |
 | Search layout, desktop and phone | Grid, Binder, List | Grid | Options in card search, the deck's Add tab and the trade view; each device type remembers its own |
 | Search card size | Small, Medium, Large | Medium | Options in card search (Grid layout) |
+| Show every printing | On, Off | Off | Options in card search |
 | Include wishlists | On, Off | Off | Options in All collections |
 | All cards, not only for trade | On, Off | Off | The You give search of a trade |
 | Switcher sort (collections, decks) | Recently opened, Name, Date created, Card count, Value (collections), Format and Commander (decks) | Recently opened | Sort in the switcher list |

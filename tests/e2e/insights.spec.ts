@@ -1,7 +1,7 @@
 // Browser tests for 0.3.0: prices, copy details, filter tags, binder, statistics, wishlists, deck ownership and trade.
 import { readFileSync } from "node:fs";
 import type { Page } from "@playwright/test";
-import { menu, search, signUp, status, test, expect, choose } from "./fixtures";
+import { menu, search, signUp, status, test, expect, choose, takePrinting } from "./fixtures";
 
 const rows = (page: Page) => page.locator("#view-collection .list .row");
 
@@ -10,6 +10,7 @@ async function add(page: Page, names: string[]) {
   for (const name of names) {
     await page.locator("#view-cards .row", { hasText: name }).first().click();
     await page.keyboard.press("Enter");
+    await takePrinting(page);
     await expect(status(page)).toContainText(`${name} added to`);
   }
 }
@@ -102,10 +103,14 @@ test("deck cards are linked to collection copies, and missing cards go to a wish
   await search(page, "Counterspell");
   await page.locator("#view-cards .row").first().click();
   await page.keyboard.press("Shift+Enter");
+  await takePrinting(page);
+  await expect(status(page)).toContainText("Counterspell added to Blue deck");
   await page.keyboard.press("Shift+Enter");
+  await takePrinting(page);
   await search(page, "Serra Angel");
   await page.locator("#view-cards .row").first().click();
   await page.keyboard.press("Shift+Enter");
+  await takePrinting(page);
   await expect(status(page)).toHaveText("Serra Angel added to Blue deck");
 
   await page.keyboard.press("3");

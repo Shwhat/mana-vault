@@ -1,6 +1,6 @@
 // Browser tests for 0.7.0: the deck builder, the switcher, card views and the layout fixes.
 import type { Page } from "@playwright/test";
-import { menu, signUp, status, switchTo, test, expect, choose } from "./fixtures";
+import { menu, signUp, status, switchTo, test, expect, choose, takePrinting } from "./fixtures";
 
 async function newDeck(page: Page, name: string, format = "commander") {
   await page.keyboard.press("Control+n");
@@ -170,6 +170,7 @@ test("new accounts see a grid; binder pages; Options; the Trade tab and the card
     await page.keyboard.press("1");
     await page.locator(`#view-cards .pocket[title^="${name},"]`).first().click();
     await page.keyboard.press("Enter");
+    await takePrinting(page);
   }
   await page.keyboard.press("Escape");
   await page.keyboard.press("2");

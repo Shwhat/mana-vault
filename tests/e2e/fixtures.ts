@@ -104,3 +104,13 @@ export async function useWorkspace(page: Page, name: string) {
   await page.locator(".wsbox .wsbtn").dispatchEvent("mousedown");
   await page.locator("#dropdown .dd", { hasText: name }).first().click();
 }
+
+/** Takes the printing shown selected in the printing chooser that adding a card opens (Enter in its find box). */
+export async function takePrinting(page: Page) {
+  const chooser = page.locator("dialog#dlg[open] .printpick");
+  await expect(chooser.locator("input.search")).toBeFocused();
+  await expect(chooser.locator(".printrow").first()).toBeVisible();
+  await page.keyboard.press("Enter");
+  // the next key is only handled once the window is closed
+  await expect(page.locator("dialog#dlg[open]")).toHaveCount(0);
+}

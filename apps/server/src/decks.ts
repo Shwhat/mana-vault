@@ -336,10 +336,10 @@ export function registerDeckRoutes(app: FastifyInstance, database: DatabaseSync)
       `SELECT dc.id AS entry_id, c.id AS card_id, dc.oracle_id, dc.printing_id, dc.quantity, dc.zone, dc.finish, dc.tags, c.name, c.mana_cost,
               c.type_line, c.set_code, c.set_name, c.collector_number, c.image_url, c.mana_value, c.rarity, c.colors, c.color_identity,
               c.oracle_text, c.legalities, c.produced_mana, c.tokens, c.power, c.toughness,
-              c.price_usd, c.price_usd_foil, c.price_usd_etched, c.price_eur, c.price_eur_foil, c.custom, c.finishes,
+              c.price_usd, c.price_usd_foil, c.price_usd_etched, c.price_eur, c.price_eur_foil, c.custom, c.finishes, c.promo_types,
               dc.want_card_id, dc.want_finish, w.set_code AS want_set_code, w.collector_number AS want_collector_number
        FROM deck_cards dc LEFT JOIN cards w ON w.id = dc.want_card_id JOIN cards c ON c.id = COALESCE(
-         dc.printing_id, (SELECT p.id FROM cards p WHERE p.oracle_id = dc.oracle_id ORDER BY p.released_at DESC LIMIT 1))
+         dc.printing_id, (SELECT p.id FROM cards p WHERE p.oracle_id = dc.oracle_id ORDER BY p.lang != 'en', p.released_at DESC LIMIT 1))
        WHERE dc.deck_id = ? ORDER BY dc.zone, c.name`,
     ).all(request.params.deckId).map((card) => {
       const list = links.get(Number(card.entry_id)) ?? [];
