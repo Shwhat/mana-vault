@@ -6,10 +6,10 @@ Preferences are saved for your account on the server and follow you to every bro
 
 | Setting | Choices | Default | Where to change it |
 |---|---|---|---|
-| Theme | Light, Dark, System | Light | Theme list on the View ribbon tab, phone Menu |
+| Theme | Light, Dark, System | Light | View menu, phone Menu |
 | Add as foil (the finish the printing chooser starts on) | On, Off | Off | FOIL in the status bar, F |
-| Target zone | Main deck, Sideboard, Commander, Maybeboard | Main deck | Zone list beside Quick add on the deck's Add tab, Target zone list on the Decks ribbon tab, the zone buttons, ZONE in the status bar, Z |
-| Zone shown | All, Commander, Main, Sideboard, Maybe | All | The zone buttons above the deck's cards and in the Deck list panel, Target zone list on the Decks ribbon tab, Z. A zone also becomes the target zone; All makes it Main deck |
+| Target zone | Main deck, Sideboard, Commander, Maybeboard | Main deck | Zone list beside Quick add on the deck's Add tab, the zone buttons, ZONE in the status bar, Z |
+| Zone shown | All, Commander, Main, Sideboard, Maybe | All | The zone buttons above the deck's cards and in the Deck list panel, Z. A zone also becomes the target zone; All makes it Main deck |
 | Sort | Best match, Name, Newest, Oldest, Price (high or low), Mana value, Rarity, Color, Set, Owned first | Best match | Sort beside each card search; card search, the deck's Add tab and the two trade searches each keep their own |
 | Where new cards go | The collection or deck selected last | Your first collection | Clicking a collection or deck in its panel or switcher, ADDING TO in the status bar, + Add in the collection view, C |
 | Target collection | Any of your collections | Your first collection | Collections panel, collection switcher, ADDING TO in the status bar, + Add in the collection view, C |
@@ -21,7 +21,7 @@ Preferences are saved for your account on the server and follow you to every bro
 | All cards, not only for trade | On, Off | Off | The You give search of a trade |
 | Switcher sort (collections, decks) | Recently opened, Name, Date created, Card count, Value (collections), Format and Commander (decks) | Recently opened | Sort in the switcher list |
 | Recently opened | When each collection and deck was last opened | None | Opening a collection or deck |
-| Prices (currency) | US dollars, Euros | US dollars | Currency list on the View ribbon tab, PRICES in the status bar, Statistics tabs |
+| Prices (currency) | US dollars, Euros | US dollars | View menu, PRICES in the status bar, Statistics tabs |
 | Collection sort | Name, Price, highest first, Price, lowest first, Quantity, Set and number | Name | Options in the collection view |
 | Collection layout, desktop | Grid, Binder, List | Grid (List for accounts from before 0.7.0 that used it) | Options in the collection view, Grid layout, Binder layout, List layout, B |
 | Collection layout, phone | Grid, Binder, List | Grid, or the layout chosen before 0.7.0 | Options in the collection view on a phone |
@@ -29,11 +29,11 @@ Preferences are saved for your account on the server and follow you to every bro
 | Deck view | List, Text, Stacks, Grid | List | The deck's Cards tab |
 | Deck groups | Type, Mana value, Color, Rarity, Tag, None | Type | Group on the deck's Cards tab |
 | Deck sort | Name, Mana value, Price | Name | Sort on the deck's Cards tab |
-| Ribbon layout | Any arrangement | Standard ribbon | Customize ribbon... |
-| Button size | Large buttons, Compact buttons, Icons only | Large buttons | Button size list on the View ribbon tab |
-| Selected ribbon tab | Any tab | Home | Click a tab |
-| Panel layout | Any arrangement | Deck building workspace | Drag panels, Panels list on the View ribbon tab |
-| Workspace | Built-in or saved | Deck building | Workspace button on the ribbon, Manage workspaces... |
+| Prices on pictures | On, Off | Off | View menu |
+| Print list sort | Order added, Name, Set, Mana value, Rarity, Color, Price, Count | Order added | Sort on the Print tab |
+| Print list layout and card size | List, Grid, Binder; Small, Medium, Large | List, Medium | Options on the Print tab |
+| Panel layout | Any arrangement | Deck building workspace | Drag panels, View menu |
+| Workspace | Built-in or saved | Deck building | View menu, Manage workspaces... |
 | Saved workspaces | Any number | None | Save workspace..., Manage workspaces... |
 | Last open deck | Any deck | None | Open a deck |
 | Proxies tab | Print, Card maker | Print | The tabs of the Proxies view |
@@ -53,7 +53,7 @@ Preferences are saved for your account on the server and follow you to every bro
 | Notify me about new offers in the Inbox (Android app, kept on the phone) | On, Off | Off | Notifications... |
 | Check only on Wi-Fi (Android app, kept on the phone) | On, Off | Off | Notifications... |
 
-System follows the device's light or dark setting and changes with it. A new version of Mana Vault resets the ribbon layout so new buttons appear; all other preferences are kept.
+System follows the device's light or dark setting and changes with it. A new version of Mana Vault keeps all preferences are kept.
 
 ## Undo and redo
 

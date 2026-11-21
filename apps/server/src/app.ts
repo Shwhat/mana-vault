@@ -49,6 +49,8 @@ export interface AppOptions {
   version?: string;
   /** Downloads card pictures and mana symbols from Scryfall; tests replace it. */
   fetcher?: Fetcher;
+  /** Wait before the second try of a card picture download, in milliseconds (800). */
+  pictureRetryDelay?: number;
   /** Settings locked by environment variables (index.ts reads them). */
   settingsEnv?: { forced: Partial<ServerSettings>; locks: Locks };
   /** The database file, for backups, restores and storage figures. */
@@ -196,7 +198,7 @@ export async function buildApp(
   registerInsightRoutes(app, database);
   registerScanRoutes(app, database);
   registerCustomRoutes(app, database);
-  registerProxyRoutes(app, database, options.fetcher);
+  registerProxyRoutes(app, database, options.fetcher, options.pictureRetryDelay);
 
   // card pictures kept on the server, the picture downloads and Administration
   const pictures = registerPictureRoutes(app, { database, settings, databasePath, fetcher: options.fetcher, downloads: options.pictureDownloads ?? true });

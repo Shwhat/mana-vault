@@ -13,7 +13,7 @@ Collections and decks belong to the account that made them. You can send one to 
 ## Sending
 
 1. Open the collection (collection view) or deck.
-2. Choose **Send collection...** or **Send deck...** (the Share group on the Collection or Decks ribbon tab).
+2. Choose **Send...** in the right-click menu of the collection or deck (Collections or Decks panel, or the switcher).
 3. Pick the account to send to from the list of this server's accounts, and pick Copy, Share or Transfer.
 4. Choose **Send**. The message "Sent to name. It is added when they accept it." confirms it.
 

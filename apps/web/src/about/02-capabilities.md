@@ -154,11 +154,11 @@ This page lists what Mana Vault does in the current version, followed by what is
 - Admins: first-run Setup, and Administration with Accounts, Sign-up, Card database, Pictures, Storage and backups, Devices, Security, Server and Activity. Settings set by environment variables are locked and say which variable sets them.
 - Change your password, which signs out your other devices and phones.
 - See the phones signed in to your account in Devices..., and remove any of them.
-- Keep theme, ribbon, panel layout, workspace, where new cards go, open collection and proxy sheet choices per account.
+- Keep theme, panel layout, workspace, where new cards go, open collection and proxy sheet choices per account.
 
 ### Interface
 
-- Desktop layout with a title bar, the ribbon as the only menu (lists for related commands, context groups, hidden commands that do not apply, three button sizes), dockable panels whose floating windows dock onto other panels and snap to each other, saved workspaces, status bar and light, dark or system theme.
+- Desktop layout with a title bar holding the File, Edit, View and Help menus, mode tabs (Home, Search, Collection, Decks, Trade, Proxies) that switch the program, dockable panels, workspaces and a status bar. Commands for one collection, deck, card or trade are where it is shown (right-click menus, headers, Options).
 - Right-click menus on cards, rows, collections and decks; a long press opens them on a phone.
 - Card page with art, rules text, power and toughness, every version with market prices, rulings, and where you own the card.
 - Home view with totals, recent scans and the Inbox.
@@ -176,6 +176,13 @@ This page lists what Mana Vault does in the current version, followed by what is
 - Scan with the phone's own text recognition, matched against the card list on the phone when offline.
 - Notifications for new offers in the Inbox, checked in the background about every 15 minutes, optionally only on Wi-Fi.
 - The Back button, the Android share sheet for exports and backups, and a daily check for a newer app.
+
+### 0.14.0 additions
+
+- Prices on pictures (View menu): a price pip on every card picture, off by default.
+- The print list sorts (Order added, Name, Set, Mana value, Rarity, Color, Price, Count) and shows as a List, Grid or Binder; the PDF follows its order.
+- Card pictures for printing are fetched three at a time and tried twice; the server uses a smaller size when the full-size picture cannot be had, and cards still without a picture are listed before a PDF or zip is made.
+- The card maker has a mana symbol picker and five frame styles: Classic, Borderless, Full art, Showcase and Nickname. On a phone the whole card shows small at the top and a tap shows it full size.
 
 ## Planned
 

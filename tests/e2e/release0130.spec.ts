@@ -4,7 +4,7 @@ import type { Page } from "@playwright/test";
 import { choose, menu, search, signUp, status, test, expect } from "./fixtures";
 
 async function newDeck(page: Page, name: string) {
-  await menu(page, "Decks", "New deck...");
+  await menu(page, "File", "New deck...");
   await expect(page.locator("#f-name")).toBeFocused();
   await page.keyboard.type(name);
   await choose(page, page.locator("#f-format"), "modern");

@@ -93,9 +93,8 @@
 | Selected card | The row last clicked or moved to with Up and Down; its details show in the Card panel |
 | Panel | A dockable window beside the work area: Filters, Collections, Decks, Card, Deck list or Import review |
 | Workspace | A saved arrangement of panels and a view |
-| Ribbon | The tabs of buttons under the title bar; the program's only menu |
-| Context group | A ribbon group shown only while that part of the program is in use, such as Build while a deck is open |
-| List button | A ribbon button with ▾ that opens a list of related commands |
+| Menu bar | The File, Edit, View and Help menus in the title bar |
+| Mode tabs | Home, Search, Collection, Decks, Trade and Proxies under the title bar; each switches the program to that part |
 | Import preview | The check of an import file that shows what would be added before anything changes |
 | Backup | A JSON file with one account's own collections, decks and the card records they use |
 | Session | A signed-in browser, kept for 30 days |

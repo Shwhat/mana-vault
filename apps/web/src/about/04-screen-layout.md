@@ -4,71 +4,63 @@ On screens 900 pixels wide or more, Mana Vault uses the desktop layout described
 
 ## Desktop layout
 
-From top to bottom: title bar, ribbon, the main area (panels around the work area), and the status bar.
+From top to bottom: the title bar with the menus, the mode tabs, the main area (panels around the work area), and the status bar.
 
-## Title bar
+## Title bar and menus
 
-The title bar shows the program name, the server name when one is set in Administration, the name of the open deck, and the account menu on the right (your user name). An amber count beside your user name shows offers waiting in your Inbox. The account menu holds **Inbox...** (with the number waiting), **Change password...**, **Devices...**, **Administration...** (admins only, see [Administration](/about/administration)) and **Sign out**.
+The title bar shows the program name, the server name when one is set in Administration, the **File**, **Edit**, **View** and **Help** menus, the name of the open deck, and the account menu on the right (your user name). An amber count beside your user name shows offers waiting in your Inbox. The account menu holds **Inbox...** (with the number waiting), **Change password...**, **Devices...**, **Administration...** (admins only, see [Administration](/about/administration)) and **Sign out**.
 
-## Ribbon
+Click a menu to open it. While a menu is open, pointing at another menu opens that one. Each command shows its shortcut on the right, and a check mark shows a choice that is on. Esc or a click elsewhere closes the menu. A command that cannot be used right now is not shown.
 
-The ribbon is the only menu. It has tabs of grouped buttons. A button shows an icon and a short label; pointing at it shows the full name and shortcut. Buttons that are on (such as the current view) are highlighted.
-
-- **Lists**: related commands share one button with a ▾ after its label. Clicking it opens a list of the commands; a check mark shows the one that is on. Esc or a click elsewhere closes the list.
-- **Hidden commands**: a command that cannot be used right now is not shown. A group with no command to show is not shown.
-- **Context groups**: some groups appear only while that part of the program is in use. Their group name is blue. The Decks tab adds Build, Check, Missing and Share while a deck is open; the Collection tab adds Selection, Layout and Wishlist while the collection view is shown. Opening a deck selects the Decks tab.
-- **Import...** and **Export...** open the import and export windows; see [Import and export](/about/import-and-export).
-
-| Tab | Groups and buttons |
+| Menu | Commands |
 |---|---|
-| Home | Search: Find, Scan card, Clear filters. Views: Home, Search, Collection, Deck, Trade, Proxies. Files: Import, Export, Backup ▾ (Download backup, Restore backup...). Edit: Undo, Redo |
-| Collection | Collection: New collection, Settings, Delete (Leave when shared with you). Selection: Select all, Move, Remove, Details, For trade (Mark for trade or Unmark for trade). Layout: Grid (Grid layout), Binder (Binder layout), List (List layout). Wishlist: Missing to wishlist. Share: Send, Sharing |
-| Decks | Deck: New deck, Open deck, Rename, Delete (Leave when shared with you). Build: Add to deck, Target zone ▾ (All zones, Commander, Main deck, Sideboard, Maybeboard), Link copies, Link owned copies, To collection (Add deck to collection...), Tags (Tags...), Edit as text (Edit as text...). Check: Format (Deck format...), Playtest, History (Deck history). Missing: Missing to wishlist. Share: Send, Sharing |
-| Trade | Open: Trade (Trade view, shown at all times). Trade: New trade (New trade...), Complete (Complete trade...), Send (Send trade...). Share: Copy list (Copy trade list), Share binder (Share trade binder...) |
-| Proxies | Open: Print list, Card maker. Add to print list: Print deck (Print a deck...), Print missing (Print missing cards...) |
-| View | Look: Theme ▾ (Light theme, Dark theme, System theme), Currency ▾ (Prices in US dollars, Prices in euros). Panels: Panels ▾ (Filters panel, Collections panel, Decks panel, Card panel, Deck list panel, Import review panel), Workspace ▾ (Save workspace..., Manage workspaces..., Reset panels). Ribbon: Button size ▾ (Large buttons, Compact buttons, Icons only), Customize. Card database: Update database |
-| Help | Help: Shortcuts, About |
+| File | New collection..., New deck..., Import..., Export..., Scan card..., Download backup, Restore backup..., Update card database (Update database, admins only), Sign out |
+| Edit | Undo, Redo, Find, Select all cards, Clear filters |
+| View | Light theme, Dark theme, System theme; Prices in US dollars, Prices in euros; Prices on pictures; Filters panel, Collections panel, Decks panel, Card panel, Deck list panel, Import review panel; every workspace (such as Deck building workspace); Save workspace..., Manage workspaces..., Reset panels |
+| Help | Keyboard shortcuts, About Mana Vault |
 
-Undo and Redo show the change they will reverse or repeat, for example "Undo Add Sol Ring". The **Workspace** button at the right end of the tab row shows the current workspace; it opens a list of every workspace (a check mark shows the one in use) followed by Save workspace..., Manage workspaces... and Reset panels.
+Undo and Redo show the change they will reverse or repeat, for example "Undo Add Sol Ring". **Import...** and **Export...** open the import and export windows; see [Import and export](/about/import-and-export).
+
+## Mode tabs
+
+Under the title bar, the mode tabs switch the program between its parts. The tab of the part in use is highlighted.
+
+| Tab | Opens | Key |
+|---|---|---|
+| Home | The Home view (Home) | |
+| Search | Card search (Card search) | 1 |
+| Collection | The open collection (Collection view) | 2 |
+| Decks | The open deck (Deck view) | 3 |
+| Trade | Trades (Trade view), with a count when trades wait for your answer | 4 |
+| Proxies | The print list and the card maker (Proxies view) | 5 |
 
 The views of a collection (Cards, Completion, Missing, Statistics) and of a deck (Cards, Ownership, Statistics, Playtest, Description, History) are the tabs in the header of that view.
 
-### Button size
+## Where other commands are
 
-**Button size** in the View tab sets how the ribbon looks, for your account:
+Commands for one collection, deck, card or trade are where that thing is shown: its header, its Options button, its right-click menu, or the Trade and Proxies views.
 
-| Choice | Ribbon |
+| Command | Where |
 |---|---|
-| Large buttons (the default) | An icon above a short label |
-| Compact buttons | A small icon beside the label, in rows |
-| Icons only | Icons without labels or group names |
-
-### Customize ribbon
-
-**Customize ribbon...** opens a window with four lists: Tabs, Groups, Buttons and All commands. Groups that show only in a context have it after their name.
-
-- Type a name in the Name box, then use **Add** or **Rename** under Tabs or Groups.
-- **Remove**, **Up** and **Down** remove or reorder the selected tab, group or button.
-- Select a command and choose **Add to group** (or double-click it) to add it to the selected group.
-- **Reset ribbon** restores the standard ribbon.
-
-Changes apply at once and are saved for your account. When Mana Vault is updated to a new version, the ribbon returns to the standard layout so new buttons appear.
-
-All commands also lists commands that are not on the standard ribbon but can be added to it. Their button labels are:
-
-| Command | Button | Also reached by |
-|---|---|---|
-| Scan card... | Scan card | The Scan card button on Home, the Scan tab on a phone |
-| Collection cards, Set completion, Missing cards, Collection statistics | Cards, Completion, Missing, Statistics | The tabs of the collection view, key 2 |
-| Deck cards, Deck ownership, Deck statistics | Cards, Ownership, Statistics | The tabs of the deck view, key 3 |
-| Cycle target zone | Cycle zone | Z, ZONE in the status bar |
-| Import collection..., Import decklist... | Import, Import list | Import... |
-| Export collection..., Export deck..., Export missing cards... | Export, Export missing | Export... |
-| Export missing deck cards (text) | Missing text | Export missing on the Ownership tab |
-| Mark for trade, Unmark for trade | For trade, Not for trade | The For trade button, the picked bar |
-| Inbox... | Inbox | The account menu |
-| Change password..., Devices..., Sign out | Password, Devices, Sign out | The account menu |
-| Administration... | Administration | The account menu, admins only |
+| Collection settings..., Rename..., Send..., Sharing..., Export..., Delete or Leave | Right-click menu of a collection in the Collections panel or the collection switcher. Delete collection... and Leave shared collection... ask first. Send collection... and Collection sharing... are the same commands for the open collection |
+| Rename..., Deck format..., Add deck to collection..., Send..., Sharing..., Export..., Delete or Leave | Right-click menu of a deck in the Decks panel or the deck switcher. Rename deck..., Delete deck..., Leave shared deck..., Send deck... and Deck sharing... are the same commands for the open deck |
+| Copy details..., Change printing..., Move..., Mark for trade or Unmark for trade, Add to print list, Reduce to 1, Remove | Right-click menu of a collection card; Move selected..., Remove selected... and Reduce to 1 also act on the picked cards (see [Collections](/about/collections)) |
+| Link copies..., Link owned copies, Tags..., Move to a zone, Remove from deck | Right-click menu of a deck card |
+| All zones, Commander, Main deck, Sideboard, Maybeboard (Cycle target zone, Cycle zone) | The zone buttons above the deck's cards and in the Deck list panel, Z, ZONE in the status bar |
+| Grid layout, Binder layout, List layout (Grid, Binder, List) | Options in the collection header, B |
+| Add missing cards to wishlist, Add missing deck cards to wishlist (Missing to wishlist) | The Missing tab of a collection, the Ownership tab of a deck |
+| Deck history, Playtest | The tabs of the deck view |
+| New trade..., Complete trade..., Send trade..., Copy trade list, Share trade binder... | The Trade view |
+| Print a deck..., Print missing cards... (Print deck, Print missing; From deck..., Missing cards...) | The Print tab of the Proxies view |
+| Print list, Card maker | The tabs of the Proxies view |
+| Collection cards, Set completion, Missing cards, Collection statistics (Cards, Completion, Missing, Statistics) | The tabs of the collection view |
+| Deck cards, Deck ownership, Deck statistics (Cards, Ownership, Statistics) | The tabs of the deck view |
+| Import collection..., Import decklist... (Import, Import list) | Import... |
+| Export collection..., Export deck..., Export missing cards... (Export, Export missing) | Export... |
+| Export missing deck cards (text) (Missing text) | Export missing on the Ownership tab |
+| Open deck... | Ctrl+O, the deck switcher |
+| Add to deck, Add to wishlist, Add as proxy | The Add buttons on search results and the Card panel, D, W |
+| Inbox..., Change password..., Devices..., Administration... (Inbox, Password, Devices, Administration) | The account menu |
 
 ## Right-click menus
 
@@ -170,18 +162,18 @@ A workspace is a saved panel layout and view. Three are built in:
 
 ## Phone layout
 
-Below 900 pixels wide, and always in the Android app, the title bar, ribbon, panels and status bar are replaced by:
+Below 900 pixels wide, and always in the Android app, the title bar, menus, mode tabs, panels and status bar are replaced by:
 
 - A top bar with the deck name, "Card", "Scan" or "Mana Vault", in the Android app the sync button (see [Android app](/about/android-app)), **Filters** in the collection, deck and trade views, **Trades** with a count when trades wait for your answer, an **Inbox** button with a count when offers are waiting, and the **Menu** button at the top right.
 - The current view, filling the screen. Phones open on Home. The card search adds a **Filters** button under the search box.
 - A bottom tab bar: **Home**, **Search**, **Collection**, **Decks**, **Trade**, **Proxies** and **Scan**. Search is card search. Decks shows the open deck, with the deck switcher at the top. Scan opens the camera scanner in place of the view (see [Scanning cards](/about/scanning-cards)).
 - Tapping a card opens its card page (except while picking rows).
-- **Menu** opens a sheet with one section per ribbon tab (Home, Collection, Decks, Trade, Proxies, View, Help). Tapping a section opens it; lists such as Backup or Theme open inside it. The last section, **Account**, is open and holds Inbox, Change password, Devices and Sign out; the Android app adds Sync now, Notifications and Check for updates. Commands that do not apply are not shown.
+- **Menu** opens a sheet with one section per menu (File, Edit, View, Help). Tapping a section opens it. The last section, **Account**, is open and holds Inbox, Change password, Devices and Sign out; the Android app adds Sync now, Notifications and Check for updates. Commands that do not apply are not shown.
 - Sheets that slide up from the bottom: **Filters**, **Menu** and the scanned list in the scanner. Close a sheet with **Close**, by tapping outside it, or with Esc.
 - In a collection, **Select several cards** in **Options** turns on checkboxes; tap rows to pick them and use the bar above the list to move or remove them.
 - Messages appear as a short banner above the tab bar.
 
-Panels (including the Collections panel), workspaces and ribbon customizing are desktop only; on the phone, switch collections and decks with the switcher at the top of the view, which opens as a full sheet. Choices made on one layout are kept for the other, except the collection layout and the search layout (Grid, Binder or List), which each layout remembers on its own.
+Panels (including the Collections panel) and workspaces are desktop only; on the phone, switch collections and decks with the switcher at the top of the view, which opens as a full sheet. Choices made on one layout are kept for the other, except the collection layout and the search layout (Grid, Binder or List), which each layout remembers on its own.
 
 ## Choice lists
 

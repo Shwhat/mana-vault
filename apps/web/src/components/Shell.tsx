@@ -4,7 +4,7 @@ import type { Action } from "../actions";
 import { type PanelId } from "../dock";
 import { Icon } from "../icons";
 import { CardPanel, CollectionsPanel, DeckListPanel, DecksPanel, FiltersPanel, ReviewPanel } from "../panels/Panels";
-import { ACCOUNT_MENU, APP_MENU, DEFAULT_RIBBON, DESKTOP_ONLY } from "../ribbon";
+import { ACCOUNT_MENU, APP_MENU, DESKTOP_ONLY, MENUS } from "../menus";
 import { useApp } from "../store";
 import { CardPage } from "../views/CardPage";
 import { CollectionView } from "../views/CollectionView";
@@ -18,7 +18,7 @@ import { AdminView } from "../views/AdminView";
 import CardScanner from "./CardScanner";
 import { ContextMenuHost } from "./ContextMenu";
 import { Dock } from "./Dock";
-import { Ribbon, TitleBar, useGroupShown } from "./Ribbon";
+import { ModeTabs, TitleBar, useWorkspaceActions } from "./MenuBar";
 import { StatusBar } from "./StatusBar";
 import { SyncChip } from "../android/AppScreens";
 import { isApp } from "../android/platform";
@@ -50,7 +50,7 @@ export function DesktopShell({ actions }: { actions: Record<string, Action> }) {
   return (
     <div id="app">
       <TitleBar actions={actions} />
-      <Ribbon actions={actions} />
+      <ModeTabs actions={actions} />
       <Dock renderPanel={renderPanel}>
         <CenterView actions={actions} />
       </Dock>
@@ -76,40 +76,28 @@ function Sheet({ title, onClose, children }: { title: string; onClose: () => voi
   );
 }
 
-/** The phone menu: one section per ribbon tab, opened one at a time, with lists of related commands nested inside. */
+/** The phone menu: the File, Edit, View and Help menus as sections opened one at a time, then the account. */
 function PhoneMenu({ actions, close }: { actions: Record<string, Action>; close: () => void }) {
   const store = useApp();
-  const shown = useGroupShown();
-  const usable = (id: string) => !DESKTOP_ONLY.test(id) && actions[id] && !actions[id]!.disabled;
+  const { all, expand } = useWorkspaceActions(actions);
+  const usable = (id: string) => !DESKTOP_ONLY.test(id) && all[id] && !all[id]!.disabled;
   const row = (id: string) => {
-    const action = actions[id]!;
+    const action = all[id]!;
     return (
       <button key={id} type="button" data-action={id} className={action.on ? "pmrow on" : "pmrow"} onClick={() => { close(); action.run(); }}>
         <Icon name={action.icon} /><span>{action.label}</span>
       </button>
     );
   };
-  const sections = DEFAULT_RIBBON.map((tab) => ({
-    name: tab.name,
-    rows: tab.groups.filter(shown).flatMap((group) => group.items).filter((id) => !DESKTOP_ONLY.test(id) && actions[id]),
-  })).filter((section) => section.rows.some((id) => (actions[id]!.items ? actions[id]!.items!.some(usable) : usable(id))));
+  // commands in the account section are not repeated in the menus above it
+  const sections = MENUS.map((menu) => ({ name: menu.name, rows: expand(menu.items).filter((id) => id !== "-" && usable(id) && !ACCOUNT_MENU.includes(id)) }))
+    .filter((section) => section.rows.length);
   return (
     <div className="pmenu">
       {sections.map((section) => (
         <details key={section.name} className="pmsection">
           <summary>{section.name}</summary>
-          {section.rows.map((id) => {
-            const action = actions[id]!;
-            if (!action.items) return usable(id) ? row(id) : null;
-            const items = action.items.filter(usable);
-            if (!items.length) return null;
-            return (
-              <details key={id} className="pmsub">
-                <summary><Icon name={action.icon} /><span>{action.label}</span></summary>
-                {items.map(row)}
-              </details>
-            );
-          })}
+          {section.rows.map(row)}
         </details>
       ))}
       <details className="pmsection" open>

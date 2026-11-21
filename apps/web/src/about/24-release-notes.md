@@ -2,6 +2,18 @@
 
 The installed version is shown at the top of this guide.
 
+## 0.14.0 (2026-11-20): Menu bar and mode tabs, card maker styles, reliable proxy pictures
+
+- The ribbon is replaced by the File, Edit, View and Help menus in the title bar. Customize ribbon and the button size setting are gone. Commands for one collection, deck, card or trade are in its right-click menu, header or view; collection and deck right-click menus gain Sharing....
+- Mode tabs Home, Search, Collection, Decks, Trade and Proxies under the title bar switch the program to that part. On a phone the bottom bar stays and the Menu has File, Edit, View and Help sections.
+- Prices on pictures (View menu, off by default) shows a price pip on card pictures in every picture view.
+- The print list has Sort (Order added, Name, Set, Mana value, Rarity, Color, Price, Count) and Options (List, Grid or Binder, card size). The preview, PDF and pictures follow its order.
+- Card pictures for proxies are fetched three at a time and tried twice, and the server uses the large or normal picture when the full-size one cannot be had. Cards still without a picture are listed before the file is made, with Try again and Make it anyway.
+- The card maker has a mana symbol picker for the mana cost and the rules text, and the Style choice: Classic, Borderless, Full art, Showcase and Nickname (with a Nickname field).
+- Fixed: on a phone the card maker's preview was cut off. The whole card now shows small at the top, and a tap shows it full size.
+- Fixed: deleting an account with Delete everything, or Move them, then delete, closed the second question at once and deleted nothing. Any window that asks a second question right after the first now stays open.
+- Fixed: a card picture that failed once in the print preview stayed missing and printed as a white card in the PDF.
+
 ## 0.13.1 (2026-11-20): Faster card search
 
 - Fixed: card search loaded slowly. A search that shows one result per card now reads the card database once instead of twice and sorts only the columns it needs, so results come back in about half the time.

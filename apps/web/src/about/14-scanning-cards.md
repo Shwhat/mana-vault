@@ -6,7 +6,7 @@ The scanner watches the camera continuously, recognizes each card held in front 
 
 | Where | How |
 |---|---|
-| Desktop | **Scan card** in the Search group of the Home ribbon tab, or **Scan cards** on Home. The scanner opens in a large window: the camera on the left, the scanned list on the right. Close it with **Close**, Esc, or by clicking outside it. |
+| Desktop | **Scan card...** in the File menu, or **Scan cards** on Home. The scanner opens in a large window: the camera on the left, the scanned list on the right. Close it with **Close**, Esc, or by clicking outside it. |
 | Phone | The **Scan** tab in the bottom tab bar. The camera fills the screen; the scanned list opens as a sheet. Choosing another tab leaves the scanner. |
 
 The browser asks for camera access the first time. The camera turns off when the scanner closes.

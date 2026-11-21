@@ -21,7 +21,7 @@ When one of these parts fails to download, what was stored before is kept and th
 
 ## Updating
 
-- **Update card database** (View ribbon tab, group Card database, for admins) starts an update. The button is unavailable while an update runs, and for accounts that are not admins.
+- **Update card database** (File menu, for admins) starts an update. The button is unavailable while an update runs, and for accounts that are not admins.
 - The status bar shows "Updating card database" during the update. When it ends, a message gives the number of printings imported, or the reason it failed.
 - An admin sets the hours between automatic updates in Administration, Card database (168 hours by default). Pointing at the card database item in the status bar shows the schedule.
 - An update never changes your collection or decks.

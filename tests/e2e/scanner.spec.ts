@@ -26,7 +26,7 @@ const listRow = (page: Page, name: string) => page.locator(".scanrow", { hasText
 test("the scanner reads cards continuously into the scanned list and adds them as one undo step", async ({ page }) => {
   await fakeReader(page);
   await signUp(page, "scan");
-  await page.locator('.rpanel [data-action="scan"]').click();
+  await menu(page, "File", "Scan card...");
   await expect(page.locator(".scanwin")).toBeVisible();
   await expect(page.locator(".scanlisthead")).toHaveText("0 cards scanned");
 
@@ -114,17 +114,17 @@ test("the scanner reads cards continuously into the scanned list and adds them a
 test("the scanned list stays after a reload and goes into a deck through a collection for it", async ({ page }) => {
   await fakeReader(page);
   await signUp(page, "scandeck");
-  await menu(page, "Decks", "New deck...");
+  await menu(page, "File", "New deck...");
   await page.keyboard.type("Burn");
   await page.locator(".dlgbtns .primary").click();
   await expect(status(page)).toContainText("Burn");
 
-  await menu(page, "Home", "Scan card...");
+  await menu(page, "File", "Scan card...");
   await show(page, { lines: ["Lightning Bolt"], info: "0161 C\nLEA EN Christopher Rush" });
   await expect(listRow(page, "Lightning Bolt")).toBeVisible();
   await page.reload();
   await page.waitForSelector("#titlebar");
-  await menu(page, "Home", "Scan card...");
+  await menu(page, "File", "Scan card...");
   await expect(listRow(page, "Lightning Bolt")).toContainText("1x Lightning Bolt");
 
   await page.getByRole("button", { name: "Add to..." }).click();
@@ -143,7 +143,7 @@ test("the scanned list stays after a reload and goes into a deck through a colle
   await expect(page.locator("#view-collection .row", { hasText: "Lightning Bolt" }).locator(".badge.deck")).toHaveText("Burn");
 
   // the next time, the deck's collection is filled in; Clear asks first
-  await menu(page, "Home", "Scan card...");
+  await menu(page, "File", "Scan card...");
   await show(page, { lines: ["Sol Ring"], info: "" });
   await expect(listRow(page, "Sol Ring")).toBeVisible();
   await page.getByRole("button", { name: "Add to..." }).click();

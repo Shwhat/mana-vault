@@ -8,7 +8,7 @@ import { formatDialog, tagsDialog } from "../components/DeckDialogs";
 import { linkDialog } from "../components/LibraryDialogs";
 import { choosePrinting } from "../components/PrintingDialog";
 import { addCard } from "../components/AddButtons";
-import { CountPip, FinishBadge, FinishPip, finishName, OwnedMarks, ownedVersions, removeCard, switchVersionDialog, linkExact, UpgradeBadge, wantedLabel } from "../components/CardMarks";
+import { CountPip, FinishBadge, FinishPip, finishName, OwnedMarks, PricePip, ownedVersions, removeCard, switchVersionDialog, linkExact, UpgradeBadge, wantedLabel } from "../components/CardMarks";
 import { Switcher } from "../components/Switcher";
 import { cardPrice, checkDeck, type Legality, MANA_COLORS, manaBalance, sections, shuffle, ZONE_ORDER } from "../deck-rules";
 import { Icon } from "../icons";
@@ -188,6 +188,7 @@ function Picture({ cards, flag, lines = false }: { cards: DeckCard[]; flag?: str
         onClick={() => pick(store, card)} {...cardMenu(store, card)}>
         {card.image_url ? <img src={card.image_url} alt={card.name} loading="lazy" draggable={false} /> : <span className="pocketname">{card.name}</span>}
         <CountPip count={total} />
+        <PricePip price={cardPrice(card, store.prefs.currency)} />
         <span className="dmarks">
           {cards.map((item) => <FinishBadge key={item.entry_id} finish={item.finish} promoTypes={item.promo_types} />)}
           {cards.map((item) => <UpgradeBadge key={item.entry_id} card={item} />)}

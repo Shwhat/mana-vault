@@ -56,7 +56,6 @@ Messages appear at the right end of the status bar (on the phone, in a banner ab
 | Filters cleared | Clear filters, for the open view |
 | Light theme, Dark theme, or System theme | Changing the theme |
 | Workspace name, Workspace name saved, Workspace name deleted | Using, saving or deleting a workspace |
-| Ribbon reset | Reset ribbon |
 | Prices in US dollars, or Prices in euros | Changing the currency |
 | Card name changed | Copy details |
 | Card name marked for trade, or N entries marked for trade | Mark for trade |
@@ -114,7 +113,6 @@ Messages appear at the right end of the status bar (on the phone, in a banner ab
 | Choose a supported deck format | A format Mana Vault does not know | Choose one from the list |
 | Enter a workspace name | Save workspace with an empty name | Type a name |
 | Name is a built-in workspace. Choose another name. | Saving under Search, Collection or Deck building | Use another name |
-| Type a name in the Name box first | Add or Rename in Customize ribbon with an empty Name box | Type the name, then choose Add or Rename |
 | Collection name is empty, so there is nothing to export | Export collection with no entries | Add cards first |
 | Create a collection first | Adding, importing or exporting with no collection | Create a collection |
 | Enter a collection name | New collection or Collection settings with an empty name | Type a name |

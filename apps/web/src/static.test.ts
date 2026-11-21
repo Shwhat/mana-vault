@@ -2,7 +2,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { DEFAULT_RIBBON } from "./ribbon";
+import { MENUS, MODE_TABS } from "./menus";
 import { PANELS, PRESET_NAMES } from "./dock";
 
 const root = join(__dirname, "..", "..", "..");
@@ -50,13 +50,14 @@ describe("About guide", () => {
     expect(notes.match(/^## (\S+) /m)?.[1]).toBe(version);
   });
 
-  it("mentions every command, ribbon tab, group, button, panel and workspace", () => {
+  it("mentions every command, menu, mode tab, button, panel and workspace", () => {
     const labels = [
       ...[...actionsSource.matchAll(/label: "([^"]+)"/g)].map((match) => match[1]!),
       ...[...actionsSource.matchAll(/theme\("\w+", "([^"]+)"/g)].map((match) => match[1]!),
       ...[...actionsSource.matchAll(/short: "([^"]+)"/g)].map((match) => match[1]!),
       ...Object.values(PANELS).flatMap((panel) => [panel.title, `${panel.title} panel`]),
-      ...DEFAULT_RIBBON.flatMap((tab) => [tab.name, ...tab.groups.map((group) => group.name)]),
+      ...MENUS.map((menu) => menu.name),
+      ...MODE_TABS.map((tab) => tab.name),
       ...PRESET_NAMES,
     ];
     const missing = [...new Set(labels)].filter((label) => !guide.includes(label));

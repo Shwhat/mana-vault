@@ -1,7 +1,7 @@
 // ---------- card marks shared by every view: finish badges, Upgrade wanted, owned versions of missing cards, Remove how many ----------
 import type { MouseEvent as ReactMouseEvent } from "react";
-import type { Store } from "../store";
-import { type Candidate, type DeckCard, type FinishCode, copyLabel, finishLabel } from "../types";
+import { type Store, useApp } from "../store";
+import { type Candidate, type DeckCard, type FinishCode, copyLabel, finishLabel, money } from "../types";
 import { closeDialog, customDialog, dialog } from "./Dialog";
 
 const FINISH_WORD: Record<FinishCode, string> = { 0: "regular", 1: "foil", 2: "etched" };
@@ -138,4 +138,14 @@ export function CountPip({ count }: { count: number }) {
 export function FinishPip({ finish, promoTypes }: { finish: FinishCode | number | undefined | null; promoTypes?: string | null }) {
   const code = Number(finish ?? 0);
   return code === 1 || code === 2 ? <FinishBadge finish={code} promoTypes={promoTypes} /> : <span className="badge regular">REGULAR</span>;
+}
+
+/**
+ * The price pip at the bottom right of a card picture, shown when View, Prices on pictures is on. The price is for the
+ * copy's finish where there is one, in the chosen currency. Used by every picture view.
+ */
+export function PricePip({ price }: { price: number | null | undefined }) {
+  const store = useApp();
+  if (!store.prefs.pricesOnPictures || price === null || price === undefined) return null;
+  return <span className="pricepip" title="Price">{money(price, store.prefs.currency)}</span>;
 }

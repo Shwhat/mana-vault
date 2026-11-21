@@ -4,7 +4,7 @@ Mana Vault reads collection files from Mana Vault, Moxfield, ManaBox, Archidekt,
 
 ## The Import window
 
-**Import...** (Files group of the Home ribbon tab, Import on Home, or the empty collection view) opens one window for every import. **Import collection...** and **Import decklist...** open it with Collection or Deck chosen.
+**Import...** (File menu, Import on Home, or the empty collection view) opens one window for every import. **Import collection...** and **Import decklist...** open it with Collection or Deck chosen.
 
 | Item | What it does |
 |---|---|
@@ -69,7 +69,7 @@ One card per line: a count, an optional "x", then the card name, for example `4 
 
 ## The Export window
 
-**Export...** (Files group of the Home ribbon tab) opens one window for every export. **Export collection...**, **Export deck...** and **Export missing cards...** open it with that choice made.
+**Export...** (File menu) opens one window for every export. **Export collection...**, **Export deck...** and **Export missing cards...** open it with that choice made.
 
 | Item | Choices |
 |---|---|

@@ -99,7 +99,7 @@ Shows the data folder, the size of the database, the size of the saved pictures 
 | **Delete** | Deletes a listed backup |
 | **Restore from a file...** | Restores a backup file from your computer |
 
-Restoring asks first: every account, collection and deck goes back to the backup and the server restarts. The current database is kept beside it, named with "before-restore" and the time. Reload the page after a minute. The account's own JSON backup on the Home ribbon tab is separate; see [Storage and backups](/about/storage-and-backups).
+Restoring asks first: every account, collection and deck goes back to the backup and the server restarts. The current database is kept beside it, named with "before-restore" and the time. Reload the page after a minute. The account's own JSON backup in the File menu is separate; see [Storage and backups](/about/storage-and-backups).
 
 ## Devices
 

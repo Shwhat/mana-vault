@@ -19,7 +19,7 @@ Card pictures downloaded to the server are kept in the picture folder: by defaul
 
 ## In-app backup
 
-**Download backup** (Backup list in the Files group of the Home ribbon tab) downloads mana-vault-backup.json with the signed-in account's own collections and decks. It contains:
+**Download backup** (File menu) downloads mana-vault-backup.json with the signed-in account's own collections and decks. It contains:
 
 | Part | Contents |
 |---|---|

@@ -140,7 +140,9 @@ export function DialogHost() {
       ref={element}
       style={spec?.width ? { width: spec.width, maxWidth: "94vw" } : undefined}
       onCancel={(event) => { event.preventDefault(); close(); }}
-      onClose={() => setSpec(null)}
+      // a close event can arrive after the next dialog has already opened (one question right after another); only a
+      // dialog that is really closed clears the spec
+      onClose={() => { if (!element.current?.open) setSpec(null); }}
     >
       {spec && (
         <form ref={form} method="dialog" onSubmit={(event) => { event.preventDefault(); void submit(); }}>

@@ -5,7 +5,7 @@ import { choose, menu, search, signUp, status, test, expect, takePrinting } from
 
 async function newDeck(page: Page, name: string, format = "modern") {
   // the ribbon, not Ctrl+N: Chromium can keep Ctrl+N for itself (new window) instead of passing it to the page
-  await menu(page, "Decks", "New deck...");
+  await menu(page, "File", "New deck...");
   await expect(page.locator("#f-name")).toBeFocused();
   await page.keyboard.type(name);
   await choose(page, page.locator("#f-format"), format);

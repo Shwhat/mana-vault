@@ -51,7 +51,7 @@ const webRoot = fileURLToPath(new URL("../../apps/web/dist", import.meta.url));
 // the test machine may not reach Scryfall: card pictures and mana symbols are never downloaded in the browser tests
 const fetcher = async () => { throw new Error("No internet in the browser tests"); };
 const app = await buildApp(database, webRoot, undefined, () => false, {
-  passwordIterations: 1000, addressAttemptLimit: 10_000, version: "test", fetcher, pictureDownloads: false, settingsEnv: { forced: {}, locks: {} },
+  passwordIterations: 1000, addressAttemptLimit: 10_000, version: "test", fetcher, pictureRetryDelay: 0, pictureDownloads: false, settingsEnv: { forced: {}, locks: {} },
 });
 // the tests start as if Setup was finished; the Setup test turns it back on
 app.serverSettings.set({ setupDone: true });

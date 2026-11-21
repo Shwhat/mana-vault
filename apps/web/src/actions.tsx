@@ -1,4 +1,4 @@
-// ---------- actions: every command is defined once and called by name from menus, ribbon and keys ----------
+// ---------- actions: every command is defined once and called by name from menus, tabs, buttons and keys ----------
 import { addCard } from "./components/AddButtons";
 import { useMemo } from "react";
 import { addFromDeckDialog } from "./views/ProxiesView";
@@ -7,7 +7,6 @@ import { checkForUpdate, DeviceList, signOutApp } from "./android/AppScreens";
 import { syncNow, syncStatus } from "./android/offline";
 import { appSettings, isApp, native, saveSettings } from "./android/platform";
 import { confirmDialog, customDialog, dialog } from "./components/Dialog";
-import { RibbonCustomize } from "./components/RibbonCustomize";
 import { completeTradeDialog, newTradeDialog, renameTradeDialog, sendTradeDialog, shareBinderDialog } from "./components/TradeDialogs";
 import { collectionDialog, copyDialog, inboxDialog, linkDialog, moveDialog, newDeckDialog, renameDeckDialog, sendDialog, sharingDialog } from "./components/LibraryDialogs";
 import { exportWindow, importWindow } from "./components/FileWindows";
@@ -15,21 +14,18 @@ import { addDeckToCollectionDialog } from "./components/ItemMenus";
 import { editTextDialog, formatDialog, tagsDialog } from "./components/DeckDialogs";
 import { entryKey } from "./library-state";
 import { isOpen, type PanelId, PANELS, PRESET_NAMES, removePanel } from "./dock";
-import { DEFAULT_RIBBON, RIBBON_MENUS, type RibbonSize } from "./ribbon";
 import { type Store, useApp, zoneLabel } from "./store";
 import { capitalize, type CollectionTab, type DeckTab, formatName, type Zone } from "./types";
 
 export type Action = {
   label: string;
-  /** Short label for ribbon buttons. */
+  /** Short label for buttons and tabs. */
   short?: string;
   icon: string;
   key?: string;
   run: () => void;
   on?: boolean;
   disabled?: boolean;
-  /** For a button that opens a list: the commands in the list. */
-  items?: string[];
 };
 
 /** Every keyboard shortcut, in the order the shortcut list shows them. */
@@ -104,10 +100,6 @@ export function useActions(store: Store): Record<string, Action> {
       label, icon, on: prefs.theme === value,
       run: () => { store.setPrefs({ theme: value }); store.flash(label); },
     });
-    const size = (value: RibbonSize, label: string): Action => ({
-      label, icon: "ribbon", on: prefs.ribbonSize === value,
-      run: () => store.setPrefs({ ribbonSize: value }),
-    });
     const allTrade = markable.length > 0 && markable.every((item) => item.trade >= item.quantity && !item.proxy);
     const deckCard = store.view === "deck" && store.selection?.view === "deck" ? deck?.cards.find((card) => String(card.entry_id) === store.selection?.key) ?? null : null;
 
@@ -132,20 +124,10 @@ export function useActions(store: Store): Record<string, Action> {
         label: "Link copies...", short: "Link copies", icon: "link", disabled: !deckCard,
         run: () => (deckCard ? void linkDialog(store, deckCard) : store.flash("Select a card in the deck first", "err")),
       },
-      "ribbon.large": size("large", "Large buttons"),
-      "ribbon.compact": size("compact", "Compact buttons"),
-      "ribbon.icons": size("icons", "Icons only"),
-      "menu.theme": { label: "Theme", short: "Theme", icon: prefs.theme === "dark" ? "theme" : prefs.theme === "system" ? "system" : "sun", run: () => undefined },
-      "menu.currency": { label: "Currency", short: prefs.currency.toUpperCase(), icon: prefs.currency, run: () => undefined },
-      "menu.panels": { label: "Panels", short: "Panels", icon: "panels", run: () => undefined },
-      "menu.workspace": { label: "Workspace", short: "Workspace", icon: "workspace", run: () => undefined },
-      "menu.zone": {
-        label: "Target zone", short: prefs.zone === "main" ? "Main deck" : capitalize(prefs.zone),
-        icon: prefs.zone === "sideboard" ? "zside" : prefs.zone === "commander" ? "zcmd" : prefs.zone === "maybeboard" ? "zmaybe" : "zmain",
-        disabled: !deck, run: () => undefined,
+      "prices.pictures": {
+        label: "Prices on pictures", short: "Prices", icon: prefs.currency, on: prefs.pricesOnPictures,
+        run: () => { store.setPrefs({ pricesOnPictures: !prefs.pricesOnPictures }); store.flash(prefs.pricesOnPictures ? "Prices on pictures off" : "Prices on pictures on"); },
       },
-      "menu.backup": { label: "Backup", short: "Backup", icon: "backup", run: () => undefined },
-      "menu.ribbonSize": { label: "Button size", short: "Button size", icon: "ribbon", run: () => undefined },
       "view.collection": { label: "Collection view", short: "Collection", icon: "collection", key: "2", on: store.view === "collection", run: () => store.setView("collection") },
       "collection.new": { label: "New collection...", short: "New collection", icon: "newcol", run: () => collectionDialog(store) },
       "collection.settings": {
@@ -404,10 +386,6 @@ export function useActions(store: Store): Record<string, Action> {
         label: "Reset panels", short: "Reset panels", icon: "panels",
         run: () => store.applyWorkspace(PRESET_NAMES.includes(prefs.workspace) ? prefs.workspace : "Deck building"),
       },
-      "ribbon.customize": {
-        label: "Customize ribbon...", short: "Customize", icon: "ribbon",
-        run: () => customDialog("Customize ribbon", () => <RibbonCustomize />, 900),
-      },
       shortcuts: {
         label: "Keyboard shortcuts", short: "Shortcuts", icon: "keyboard",
         run: () => customDialog("Keyboard shortcuts", () => <ShortcutList actions={actions} />, 460),
@@ -486,7 +464,6 @@ export function useActions(store: Store): Record<string, Action> {
         run: () => { void checkForUpdate(true); },
       },
     };
-    for (const [id, items] of Object.entries(RIBBON_MENUS)) if (actions[id]) actions[id]!.items = items;
     return actions;
   }, [store]);
 }
@@ -530,4 +507,3 @@ function WorkspaceList() {
   );
 }
 
-export const DEFAULT_RIBBON_IDS = DEFAULT_RIBBON.flatMap((tab) => tab.groups.flatMap((group) => group.items));

@@ -4,7 +4,7 @@ import { type Collection, type Deck, formatName, FORMATS } from "../types";
 import { rowMenu } from "./ContextMenu";
 import { dialog } from "./Dialog";
 import { exportWindow } from "./FileWindows";
-import { collectionDialog, sendDialog } from "./LibraryDialogs";
+import { collectionDialog, sendDialog, sharingDialog } from "./LibraryDialogs";
 
 /** Renames a collection, keeping its other settings. */
 export function renameCollectionDialog(store: Store, item: Collection) {
@@ -80,6 +80,7 @@ export function collectionMenu(store: Store, item: Collection) {
     owner && { label: "Rename...", run: () => renameCollectionDialog(store, item) },
     owner && { label: "Collection settings...", run: () => collectionDialog(store, item) },
     owner && { label: "Send...", run: () => void sendDialog(store, "collection", item) },
+    owner && { label: "Sharing...", run: () => { if (store.prefs.openCollection !== item.id) store.openCollection(item.id); sharingDialog(store, "collection"); } },
     { label: "Export...", run: () => exportWindow(store, "collection", item.id) },
     { label: owner ? "Delete" : "Leave", run: () => void store.deleteCollection(item) },
   ]);
@@ -103,6 +104,7 @@ export function deckMenu(store: Store, deck: Deck) {
     },
     { label: "Add deck to collection...", run: () => addDeckToCollectionDialog(store, deck) },
     owner && { label: "Send...", run: () => void sendDialog(store, "deck", deck) },
+    owner && { label: "Sharing...", run: () => withDeck(store, deck, () => sharingDialog(store, "deck")) },
     { label: "Export...", run: () => withDeck(store, deck, () => exportWindow(store, "deck")) },
     { label: owner ? "Delete" : "Leave", run: () => void store.deleteDeck(deck) },
   ]);
