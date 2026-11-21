@@ -6,7 +6,40 @@ export type Faces = "front" | "back" | "both";
 export type PrintCard = {
   id: string; oracle_id: string; name: string; type_line: string; set_code: string; set_name: string; collector_number: string;
   image_url: string | null; custom: boolean; hasBack: boolean;
+  /** Details for sorting and the price pip (0.14.0); lines added before the list is loaded again may lack them. */
+  mana_value?: number; rarity?: string; colors?: string; finishes?: string;
+  price_usd?: number | null; price_usd_foil?: number | null; price_usd_etched?: number | null; price_eur?: number | null; price_eur_foil?: number | null;
 };
+
+/** How the print list is ordered; the PDF and the pictures follow the same order. */
+export type PrintSort = "added" | "name" | "set" | "mv" | "rarity" | "color" | "price" | "count";
+export const PRINT_SORTS: Array<[PrintSort, string]> = [
+  ["added", "Order added"], ["name", "Name"], ["set", "Set"], ["mv", "Mana value"], ["rarity", "Rarity"], ["color", "Color"], ["price", "Price"], ["count", "Count"],
+];
+const RARITY_ORDER: Record<string, number> = { mythic: 0, rare: 1, uncommon: 2, common: 3 };
+const colorOrder = (colors = "") => {
+  const list = colors.replace(/[\s,]/g, "");
+  return !list ? 7 : list.length > 1 ? 6 : "WUBRG".indexOf(list) + 1;
+};
+export const printPrice = (card: PrintCard, currency: "usd" | "eur") => (currency === "eur"
+  ? card.price_eur ?? card.price_eur_foil ?? null
+  : card.price_usd ?? card.price_usd_foil ?? card.price_usd_etched ?? null);
+
+/** The print list in the chosen order (Order added keeps the list as it is), each sort falling back to the name. */
+export function sortPrintLines(lines: PrintLine[], sort: PrintSort, currency: "usd" | "eur"): PrintLine[] {
+  if (sort === "added") return lines;
+  const name = (a: PrintLine, b: PrintLine) => a.card.name.localeCompare(b.card.name);
+  const compare: Record<Exclude<PrintSort, "added">, (a: PrintLine, b: PrintLine) => number> = {
+    name,
+    set: (a, b) => a.card.set_name.localeCompare(b.card.set_name) || a.card.collector_number.localeCompare(b.card.collector_number, undefined, { numeric: true }) || name(a, b),
+    mv: (a, b) => (a.card.mana_value ?? 0) - (b.card.mana_value ?? 0) || name(a, b),
+    rarity: (a, b) => (RARITY_ORDER[a.card.rarity ?? ""] ?? 4) - (RARITY_ORDER[b.card.rarity ?? ""] ?? 4) || name(a, b),
+    color: (a, b) => colorOrder(a.card.colors) - colorOrder(b.card.colors) || name(a, b),
+    price: (a, b) => (printPrice(b.card, currency) ?? -1) - (printPrice(a.card, currency) ?? -1) || name(a, b),
+    count: (a, b) => b.count - a.count || name(a, b),
+  };
+  return [...lines].sort(compare[sort]);
+}
 export type PrintLine = { id: string; cardId: string; count: number; faces: Faces; card: PrintCard };
 
 export type Paper = "letter" | "a4" | "legal" | "custom";
@@ -101,18 +134,50 @@ export function layoutPages(lines: PrintLine[], sheet: SheetSettings): PageLayou
 
 // ---------- card pictures ----------
 const pictureCache = new Map<string, Promise<HTMLImageElement | null>>();
+/** Pictures are asked for a few at a time: asking for a whole sheet at once made some downloads fail. */
+const PICTURE_SLOTS = 3;
+let active = 0;
+const waiting: Array<() => void> = [];
+async function inTurn<T>(run: () => Promise<T>): Promise<T> {
+  if (active >= PICTURE_SLOTS) await new Promise<void>((go) => waiting.push(go));
+  active += 1;
+  try {
+    return await run();
+  } finally {
+    active -= 1;
+    waiting.shift()?.();
+  }
+}
 
-/** The full-size picture of a card face, through the server, or null when it cannot be had. */
+/**
+ * The full-size picture of a card face, through the server, or null when it cannot be had. A picture is tried twice; a
+ * failure is not remembered, so the next request (another preview, Try again, the PDF) asks again.
+ */
 export function cardPicture(cardId: string, face: "front" | "back"): Promise<HTMLImageElement | null> {
   const key = `${cardId}:${face}`;
   let promise = pictureCache.get(key);
   if (!promise) {
-    promise = fetchFile(`/api/card-images/${encodeURIComponent(cardId)}?face=${face}&size=png`)
+    const once = () => inTurn(() => fetchFile(`/api/card-images/${encodeURIComponent(cardId)}?face=${face}&size=png`)
       .then(async (response) => (response.ok ? loadImage(await response.blob()) : null))
-      .catch(() => null);
+      .catch(() => null));
+    promise = once().then((picture) => picture ?? once());
     pictureCache.set(key, promise);
+    void promise.then((picture) => { if (!picture && pictureCache.get(key) === promise) pictureCache.delete(key); });
   }
   return promise;
+}
+
+/** Loads the pictures of every face to print and returns the names of the cards whose picture could not be had. */
+export async function missingPictures(faces: Array<{ cardId: string; face: "front" | "back"; name: string }>, progress?: (done: number, total: number) => void): Promise<string[]> {
+  const distinct = [...new Map(faces.map((item) => [`${item.cardId}:${item.face}`, item])).values()];
+  let done = 0;
+  const results = await Promise.all(distinct.map(async (item) => {
+    const picture = await cardPicture(item.cardId, item.face);
+    done += 1;
+    progress?.(done, distinct.length);
+    return picture ? null : `${item.name}${item.face === "back" ? " (back)" : ""}`;
+  }));
+  return [...new Set(results.filter((name): name is string => !!name))];
 }
 
 function loadImage(blob: Blob): Promise<HTMLImageElement | null> {

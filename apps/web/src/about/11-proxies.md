@@ -1,6 +1,6 @@
 # Proxies and the card maker
 
-The Proxies view prints proxies of any card and makes custom cards. Open it with **Proxies view** (key 5), the **Proxies** ribbon tab or the Proxies tab on a phone. It has two tabs: **Print** and **Card maker**.
+The Proxies view prints proxies of any card and makes custom cards. Open it with the **Proxies** tab (key 5), or the Proxies tab on a phone. It has two tabs: **Print** and **Card maker**.
 
 ## The print list
 
@@ -8,8 +8,8 @@ The print list holds the cards to print. It is saved with your account on the se
 
 | Way to add cards | What it adds |
 |---|---|
-| **From deck...** (**Print a deck...** on the ribbon) | Every card of a deck in the commander zone, main deck and sideboard (not the maybeboard), or only its missing cards |
-| **Missing cards...** (**Print missing cards...** on the ribbon) | The cards of a deck that have no linked copy |
+| **From deck...** (Print a deck...) | Every card of a deck in the commander zone, main deck and sideboard (not the maybeboard), or only its missing cards |
+| **Missing cards...** (Print missing cards...) | The cards of a deck that have no linked copy |
 | **From collection...** | Every row of a collection, with its count |
 | **Selected cards** | The rows picked in the open collection |
 | **Paste list...** | Lines in the deck list format, such as `4 Lightning Bolt` or `1 Opt (XLN) 65 *F*`. Lines that match no card are listed after adding |
@@ -27,6 +27,27 @@ A card already listed with the same faces gets its count raised. Each line shows
 | **Remove** | Takes the line off the list |
 
 **Clear list** removes every line after asking. Count changes are saved a moment after the last change.
+
+### Sort and layout
+
+Above the lines, **Sort** orders the list and **Options** chooses the layout. Both are kept for your account. The preview, the PDF and the MakePlayingCards pictures follow the list's order.
+
+| Sort | Order |
+|---|---|
+| Order added | The order the cards were added (the default) |
+| Name | A to Z |
+| Set | By set name and collector number |
+| Mana value | Lowest first |
+| Rarity | Mythic, rare, uncommon, common |
+| Color | White, blue, black, red, green, then multicolor, then colorless |
+| Price | Highest first, in the chosen currency |
+| Count | Most copies first |
+
+| Layout | Shows |
+|---|---|
+| List (the default) | One line per card with its picture, set and number and the controls above |
+| Grid | Card pictures with the count on each, in Small, Medium or Large; minus, plus and **Remove** under each |
+| Binder | Nine pockets a page, with **Previous page** and **Next page** |
 
 ## Sheet settings
 
@@ -55,7 +76,15 @@ The page layout puts as many columns and rows on a page as fit inside the margin
 | **MakePlayingCards pictures** | makeplayingcards.zip | One picture per card face in list order, 822 x 1122 pixels (2.74 x 3.74 inches at 300 DPI, the card in the middle 750 x 1050 with bleed around it), named with the order, the count and the card, such as "003 4x Sol Ring.jpg", ready to upload to MakePlayingCards |
 | **MPC Autofill list** | mpc-autofill.txt, and custom-cards.zip when custom cards are listed | One line per card with its count, such as `4 Sol Ring`, for the card list box of MPC Autofill, which finds its own scans. Two-faced cards printed with one face are listed by that face's name. Custom cards are left out of the list and put in custom-cards.zip as MakePlayingCards pictures |
 
-Mana Vault makes every export itself and does not depend on MPC Autofill or download anything from it. Card pictures are downloaded from Scryfall through your server; a card whose picture cannot be downloaded prints as a white card with its name.
+Mana Vault makes every export itself and does not depend on MPC Autofill or download anything from it. Card pictures are downloaded from Scryfall through your server, three at a time, and a picture that fails is tried again. When the full-size picture cannot be had, the server uses the large picture (or the normal one), from its picture folder first.
+
+Before a PDF or a MakePlayingCards zip is made, every picture is loaded. If some cannot be had, **Some card pictures are missing** lists those cards:
+
+| Choice | What happens |
+|---|---|
+| **Try again** | Asks for the missing pictures again |
+| **Make it anyway** | Makes the file; each card without a picture prints as a white card with its name |
+| **Cancel** | Makes nothing |
 
 **After exporting, add the printed cards as proxies to** adds the printed cards, one per line count, after the export, as one step that can be undone. It is off by default.
 
@@ -94,16 +123,32 @@ The list on the left shows every custom card with its set, number, type and make
 | Artist | Shown on the card's information line as "Illus." |
 | Double-faced card | Adds a back face, edited the same way with the **Front face** and **Back face** tabs |
 | Kind | Normal, Creature, Planeswalker, Saga or Token |
+| Style | Classic (the default), Borderless, Full art, Showcase or Nickname; see the table below |
 | Frame | Automatic, White, Blue, Black, Red, Green, the ten two-color hybrids, Multicolor (gold), Artifact, Colorless or Land |
 | Legendary | Adds a crest over the name bar |
 | Name | Required |
-| Mana cost | Symbols in braces, such as {2}{R}. The buttons put a symbol at the cursor: {W} {U} {B} {R} {G} {C} {X} {S} {T} {Q}, and the Number (0 to 20), Hybrid and Phyrexian lists |
+| Nickname | Nickname style only: shown in the name bar, with the card's name in a small bar under it |
+| Mana cost | Symbols in braces, such as {2}{R}. **Symbols** beside it opens the mana symbol picker |
 | Type line | Required |
-| Rules text | One ability per line. Symbols in braces are drawn as mana symbols; text in parentheses is reminder text in italics. Planeswalker lines such as "+1: Draw a card." get a loyalty cost badge; saga lines such as "I: ..." or "II, III: ..." get a chapter badge |
+| Rules text | **Symbols** under it opens the mana symbol picker for the rules text. One ability per line. Symbols in braces are drawn as mana symbols; text in parentheses is reminder text in italics. Planeswalker lines such as "+1: Draw a card." get a loyalty cost badge; saga lines such as "I: ..." or "II, III: ..." get a chapter badge |
 | Rules text size, Flavor text size | 60 to 140 percent. Text that does not fit shrinks further |
 | Flavor text | In italics under a line |
 | Power, Toughness | Shown in a box at the bottom right |
 | Loyalty | For planeswalkers, in a shield at the bottom right |
+
+The mana symbol picker shows the symbols as they are drawn on the card, in groups: Numbers (0 to 20 and X), Colors (white, blue, black, red, green, colorless and snow), Phyrexian, Hybrid (the ten color pairs), Two or color (2/W to 2/G) and Other (tap, untap and energy). A click puts the symbol at the cursor of its field; **Symbols** again closes the picker.
+
+| Style | How the card is drawn |
+|---|---|
+| Classic | The frame, name bar, art box, type line and text box |
+| Borderless | The art fills the whole card; the bars and text box sit over it, a little see-through |
+| Full art | The art fills the frame behind the type line and text box, which sit over it |
+| Showcase | A gold-trimmed frame with a double gold line, a diamond at each corner and bars with cut corners |
+| Nickname | Classic, with the nickname in the name bar and the card's name in a small bar at the top of the art |
+
+Each style comes in every frame color. Dragging the art moves it inside the area the style gives it.
+
+On a phone the whole card shows small at the top while the fields scroll under it. A tap on it shows the card full size; **Close** or a tap closes it.
 
 The Automatic frame follows the mana cost and type: no colored symbols gives Artifact (for artifacts) or Colorless, a land without a mana cost gives Land, one color gives that color, two colors in hybrid symbols only gives that hybrid, and two or more colors otherwise give Multicolor (gold).
 

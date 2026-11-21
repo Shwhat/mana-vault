@@ -2,7 +2,7 @@
 import { type PointerEvent as ReactPointerEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { downloadBlob, fetchFile, pickFile, request, slugify } from "../api";
 import {
-  type Assets, blankFace, type CardKind, type FaceDesign, type Frame, frameName, FRAMES, HEIGHT, loadPicture, renderCard, SCALE, symbolFile, symbolsIn, WIDTH,
+  type Assets, blankFace, type CardKind, type FaceDesign, type Frame, frameName, FRAMES, FRAME_STYLE_NAMES, FRAME_STYLES, type FrameStyle, HEIGHT, loadPicture, renderCard, SCALE, symbolFile, symbolsIn, WIDTH,
 } from "../card-render";
 import { Icon } from "../icons";
 import { type Store, useApp } from "../store";
@@ -30,16 +30,22 @@ type Draft = {
 type Art = { image: HTMLImageElement | null; data: string | null; changed: boolean };
 
 const KIND_CHOICES: Choice[] = choices([["normal", "Normal"], ["creature", "Creature"], ["planeswalker", "Planeswalker"], ["saga", "Saga"], ["token", "Token"]]);
+const STYLE_CHOICES: Choice[] = FRAME_STYLES.map((style) => ({ value: style, label: FRAME_STYLE_NAMES[style] }));
 const FRAME_CHOICES: Choice[] = FRAMES.map((frame) => ({ value: frame, label: frameName(frame), group: frame.length === 2 ? "Hybrid" : undefined }));
 const RARITY_CHOICES: Choice[] = choices([["common", "Common"], ["uncommon", "Uncommon"], ["rare", "Rare"], ["mythic", "Mythic rare"], ["special", "Special"]]);
 const COLORS = ["W", "U", "B", "R", "G"] as const;
 const COLOR_NAMES: Record<string, string> = { W: "White", U: "Blue", B: "Black", R: "Red", G: "Green" };
 const FINISH_NAMES: Array<[string, string]> = [["nonfoil", "Regular"], ["foil", "Foil"], ["etched", "Etched"]];
 const LEGAL_FORMATS = FORMATS.filter((format) => format !== "casual");
-const BASIC_SYMBOLS = ["W", "U", "B", "R", "G", "C", "X", "S", "T", "Q"];
-const GENERIC = Array.from({ length: 21 }, (_, number) => String(number));
-const HYBRID = ["W/U", "W/B", "U/B", "U/R", "B/R", "B/G", "R/G", "R/W", "G/W", "G/U", "2/W", "2/U", "2/B", "2/R", "2/G"];
-const PHYREXIAN = ["W/P", "U/P", "B/P", "R/P", "G/P"];
+/** The mana symbol picker's sections, in order. */
+export const SYMBOL_GROUPS: Array<[string, string[]]> = [
+  ["Numbers", [...Array.from({ length: 21 }, (_, number) => String(number)), "X"]],
+  ["Colors", ["W", "U", "B", "R", "G", "C", "S"]],
+  ["Phyrexian", ["W/P", "U/P", "B/P", "R/P", "G/P"]],
+  ["Hybrid", ["W/U", "W/B", "U/B", "U/R", "B/R", "B/G", "R/G", "R/W", "G/W", "G/U"]],
+  ["Two or color", ["2/W", "2/U", "2/B", "2/R", "2/G"]],
+  ["Other", ["T", "Q", "E"]],
+];
 
 const newDraft = (setCode = ""): Draft => ({
   front: blankFace(), back: null, setCode, collectorNumber: "1", rarity: "common", artist: "", finishes: ["nonfoil"], priceUsd: "", priceEur: "",
@@ -60,6 +66,54 @@ function symbolPicture(code: string): Promise<HTMLImageElement | null> {
   }
   return promise;
 }
+/** One mana symbol, drawn from the same picture the card uses (a colored circle with its code while it loads). */
+function SymbolGlyph({ code }: { code: string }) {
+  const canvas = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    let live = true;
+    const draw = (picture: HTMLImageElement | null) => {
+      const ctx = canvas.current?.getContext("2d");
+      if (!ctx || !live) return;
+      ctx.clearRect(0, 0, 48, 48);
+      if (picture) ctx.drawImage(picture, 0, 0, 48, 48);
+      else {
+        ctx.fillStyle = "#cac5c0";
+        ctx.beginPath();
+        ctx.arc(24, 24, 22, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#111";
+        ctx.font = "700 18px Georgia, serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(code.replace("/", ""), 24, 25);
+      }
+    };
+    draw(null);
+    void symbolPicture(code).then(draw);
+    return () => { live = false; };
+  }, [code]);
+  return <canvas ref={canvas} width={48} height={48} className="symglyph" aria-hidden="true" />;
+}
+
+/** The mana symbol picker: a click puts the symbol at the cursor of the mana cost or rules text used last. */
+function SymbolPicker({ onPick, disabled }: { onPick: (code: string) => void; disabled: boolean }) {
+  return (
+    <div className="sympicker" role="group" aria-label="Mana symbols">
+      {SYMBOL_GROUPS.map(([name, codes]) => (
+        <div key={name} className="symgroup">
+          <div className="symname">{name}</div>
+          <div className="symrow">
+            {codes.map((code) => (
+              <button key={code} type="button" className="symbtn" title={`{${code}}`} aria-label={`Insert {${code}}`} disabled={disabled}
+                onMouseDown={(event) => event.preventDefault()} onClick={() => onPick(code)}><SymbolGlyph code={code} /></button>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 const setSymbolCache = new Map<string, Promise<HTMLImageElement | null>>();
 function setSymbolPicture(url: string): Promise<HTMLImageElement | null> {
   let promise = setSymbolCache.get(url);
@@ -272,6 +326,9 @@ export function CardMaker() {
   const canvas = useRef<HTMLCanvasElement>(null);
   const lastField = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null);
   const drag = useRef<{ x: number; y: number; art: FaceDesign["art"] } | null>(null);
+  const tap = useRef<{ x: number; y: number } | null>(null);
+  const moved = useRef(false);
+  const [full, setFull] = useState<string | null>(null);
   const mine = id === null || ownerId === store.user.id;
   const current = face === "back" && draft.back ? draft.back : draft.front;
 
@@ -479,8 +536,12 @@ export function CardMaker() {
   ), 720, "Cancel");
 
   // dragging in the art box moves the art
-  const artBox = () => ({ x: 58, y: 126, w: WIDTH - 116, h: current.kind === "token" ? 520 : 438 });
+  // the same art areas as the drawing: the whole card (Borderless), behind the bars (Full art), or the art box
+  const artBox = () => (current.style === "borderless" ? { x: 0, y: 0, w: WIDTH, h: HEIGHT - 44 }
+    : current.style === "fullart" ? { x: 40, y: 40, w: WIDTH - 80, h: HEIGHT - 124 }
+    : { x: 58, y: 126, w: WIDTH - 116, h: current.kind === "token" ? 520 : 438 });
   const pointerDown = (event: ReactPointerEvent<HTMLCanvasElement>) => {
+    tap.current = { x: event.clientX, y: event.clientY };
     if (!mine || !arts[face].image) return;
     const rect = event.currentTarget.getBoundingClientRect();
     const x = ((event.clientX - rect.left) / rect.width) * WIDTH;
@@ -498,7 +559,17 @@ export function CardMaker() {
     const dy = ((event.clientY - drag.current.y) / rect.height) * HEIGHT / box.h;
     changeFace({ art: { ...drag.current.art, x: drag.current.art.x + dx, y: drag.current.art.y + dy } });
   };
-  const pointerUp = () => { drag.current = null; };
+  // on the phone a tap (no drag) on the small preview shows the card full size
+  const pointerUp = (event: ReactPointerEvent<HTMLCanvasElement>) => {
+    drag.current = null;
+    const start = tap.current;
+    moved.current = !!start && Math.hypot(event.clientX - start.x, event.clientY - start.y) >= 8;
+    tap.current = null;
+  };
+  const showFull = () => {
+    if (store.phone && !moved.current && canvas.current) setFull(canvas.current.toDataURL("image/jpeg", 0.92));
+    moved.current = false;
+  };
 
   const words = term.trim().toLowerCase();
   const shown = (cards ?? []).filter((card) => `${card.name} ${card.setCode} ${card.typeLine}`.toLowerCase().includes(words));
@@ -507,17 +578,16 @@ export function CardMaker() {
       <input id={`cm-${key}`} data-field={key} value={current[key]} placeholder={placeholder} disabled={!mine}
         onFocus={(event) => { lastField.current = event.currentTarget; }} onChange={(event) => changeFace({ [key]: event.target.value } as Partial<FaceDesign>)} /></div>
   );
-  const symbolButtons = (
-    <div className="symbols" role="group" aria-label="Mana symbols">
-      {BASIC_SYMBOLS.map((code) => <button key={code} type="button" className="btn small sym" title={`Insert {${code}}`} disabled={!mine}
-        onMouseDown={(event) => event.preventDefault()} onClick={() => insertSymbol(code)}>{`{${code}}`}</button>)}
-      <Picker label="Generic mana" prefix="Number: " value="" options={[{ value: "", label: "Choose" }, ...GENERIC.map((code) => ({ value: code, label: `{${code}}` }))]}
-        onChange={(value) => { if (value) insertSymbol(value); }} disabled={!mine} />
-      <Picker label="Hybrid mana" prefix="Hybrid: " value="" options={[{ value: "", label: "Choose" }, ...HYBRID.map((code) => ({ value: code, label: `{${code}}` }))]}
-        onChange={(value) => { if (value) insertSymbol(value); }} disabled={!mine} />
-      <Picker label="Phyrexian mana" prefix="Phyrexian: " value="" options={[{ value: "", label: "Choose" }, ...PHYREXIAN.map((code) => ({ value: code, label: `{${code}}` }))]}
-        onChange={(value) => { if (value) insertSymbol(value); }} disabled={!mine} />
-    </div>
+  const [symbolsFor, setSymbolsFor] = useState<"manaCost" | "rulesText" | null>(null);
+  // the picker opens under the field it fills; a click inserts at that field's cursor
+  const symbolButton = (key: "manaCost" | "rulesText") => (
+    <button type="button" className={symbolsFor === key ? "btn small on" : "btn small"} aria-expanded={symbolsFor === key} disabled={!mine}
+      onMouseDown={(event) => event.preventDefault()}
+      onClick={() => {
+        const field = document.querySelector<HTMLInputElement | HTMLTextAreaElement>(`[data-field="${key}"]`);
+        if (field) lastField.current = field;
+        setSymbolsFor(symbolsFor === key ? null : key);
+      }}>Symbols</button>
   );
   const toggle = (list: string[], value: string, on: boolean) => (on ? [...new Set([...list, value])] : list.filter((item) => item !== value));
 
@@ -578,17 +648,28 @@ export function CardMaker() {
         <h4>{draft.back ? (face === "front" ? "Front face" : "Back face") : "Face"}</h4>
         <div className="prow"><label htmlFor="cm-kind">Kind</label>
           <Picker id="cm-kind" label="Kind" value={current.kind} options={KIND_CHOICES} disabled={!mine} onChange={(value) => changeFace({ kind: value as CardKind })} /></div>
+        <div className="prow"><label htmlFor="cm-style">Style</label>
+          <Picker id="cm-style" label="Style" value={current.style} options={STYLE_CHOICES} disabled={!mine} onChange={(value) => changeFace({ style: value as FrameStyle })} /></div>
         <div className="prow"><label htmlFor="cm-frame">Frame</label>
           <Picker id="cm-frame" label="Frame" value={current.frame} options={FRAME_CHOICES} disabled={!mine} onChange={(value) => changeFace({ frame: value as Frame })} /></div>
         <label className="ck"><input type="checkbox" checked={current.legendary} disabled={!mine} onChange={(event) => changeFace({ legendary: event.target.checked })} /> Legendary</label>
         {textField("name", "Name")}
-        {textField("manaCost", "Mana cost", "{2}{R}")}
-        {symbolButtons}
+        {current.style === "nickname" && (
+          <div className="prow"><label htmlFor="cm-nickname">Nickname</label>
+            <input id="cm-nickname" value={current.nickname} maxLength={100} disabled={!mine} placeholder="Shown in the name bar"
+              onChange={(event) => changeFace({ nickname: event.target.value })} /></div>
+        )}
+        <div className="prow"><label htmlFor="cm-manaCost">Mana cost</label>
+          <span className="withbtn"><input id="cm-manaCost" data-field="manaCost" value={current.manaCost} placeholder="{2}{R}" disabled={!mine}
+            onFocus={(event) => { lastField.current = event.currentTarget; }} onChange={(event) => changeFace({ manaCost: event.target.value })} />{symbolButton("manaCost")}</span></div>
+        {symbolsFor === "manaCost" && <SymbolPicker disabled={!mine} onPick={insertSymbol} />}
         {textField("typeLine", "Type line", current.kind === "token" ? "Token Creature - Goblin" : "Creature - Goblin")}
         <div className="prow top"><label htmlFor="cm-rules">Rules text</label>
           <textarea id="cm-rules" data-field="rulesText" rows={6} value={current.rulesText} disabled={!mine}
             placeholder={current.kind === "planeswalker" ? "+1: Draw a card.\n-3: Destroy target creature." : current.kind === "saga" ? "I: Create a 1/1 Soldier token.\nII, III: Draw a card." : "Flying\n{T}: Add {R}. (Reminder text is in parentheses.)"}
             onFocus={(event) => { lastField.current = event.currentTarget; }} onChange={(event) => changeFace({ rulesText: event.target.value })} /></div>
+        <div className="prow"><span />{symbolButton("rulesText")}</div>
+        {symbolsFor === "rulesText" && <SymbolPicker disabled={!mine} onPick={insertSymbol} />}
         <div className="prow"><label htmlFor="cm-textsize">Rules text size</label>
           <span className="numfield"><input id="cm-textsize" type="range" min={60} max={140} value={current.textSize} disabled={!mine} onChange={(event) => changeFace({ textSize: Number(event.target.value) })} /> {current.textSize}%</span></div>
         <div className="prow top"><label htmlFor="cm-flavor">Flavor text</label>
@@ -632,8 +713,14 @@ export function CardMaker() {
 
       <section className="makerpreview" aria-label="Card preview">
         <canvas ref={canvas} className="cardcanvas" width={WIDTH * SCALE} height={HEIGHT * SCALE} aria-label={`Preview of ${current.name || "the card"}`} role="img"
-          onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerUp} onPointerCancel={pointerUp} />
+          onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerUp} onPointerCancel={() => { drag.current = null; tap.current = null; }} onClick={showFull} />
       </section>
+      {full && (
+        <div className="cardfull" role="dialog" aria-modal="true" aria-label="Card full size" onClick={() => setFull(null)}>
+          <img src={full} alt={`${current.name || "The card"}, full size`} />
+          <button type="button" className="btn" onClick={() => setFull(null)}>Close</button>
+        </div>
+      )}
     </div>
   );
 }

@@ -4,7 +4,7 @@ import { menu, signUp, status, test, expect, useWorkspace, switchTo, choose, tak
 const rows = (page: Page) => page.locator("#view-collection .row");
 
 async function newCollection(page: Page, name: string, sets: string[] = []) {
-  await menu(page, "Collection", "New collection...");
+  await menu(page, "File", "New collection...");
   await expect(page.locator("#f-name")).toBeFocused();
   await expect(page.locator("#f-completion")).toHaveAttribute("data-value", "none");
   await page.keyboard.type(name);
@@ -73,7 +73,9 @@ test("collections link sets, show completion and missing cards", async ({ page }
   const file = await download;
   expect(file.suggestedFilename()).toBe("alpha-binder-missing.txt");
 
-  await menu(page, "Collection", "Collection settings...");
+  await page.locator('.tab[data-panel="collections"]').click();
+  await page.locator(".colitem", { hasText: "Alpha binder" }).first().dispatchEvent("contextmenu");
+  await page.locator("#ctxmenu .dd", { hasText: "Collection settings..." }).first().click();
   await choose(page, page.locator("#f-completion"), "all");
   await choose(page, page.locator("#f-finish"), "both");
   await page.locator(".dlgbtns .primary").click();
@@ -130,20 +132,23 @@ test("collections and decks can be sent to another account", async ({ page, brow
   await signUp(page, "owner");
   await addFromSearch(page, ["Sol Ring"]);
 
-  await menu(page, "Collection", "Send collection...");
+  await page.locator(".colitem", { hasText: "Main collection" }).first().dispatchEvent("contextmenu");
+  await page.locator("#ctxmenu .dd", { hasText: "Send..." }).first().click();
   await choose(page, page.locator("#f-to"), { label: other.name });
   await choose(page, page.locator("#f-mode"), "copy");
   await page.locator(".dlgbtns .primary").click();
   await expect(status(page)).toHaveText(`Sent to ${other.name}. It is added when they accept it.`);
   await expect(page.locator("dialog[open]")).toHaveCount(0);
 
-  // the menu, not Ctrl+N: Chromium can keep Ctrl+N for itself (new window) instead of passing it to the page
-  await menu(page, "Decks", "New deck...");
+  // File, New deck...
+  await menu(page, "File", "New deck...");
   await expect(page.locator("#f-name")).toBeFocused();
   await page.keyboard.type("Shared deck");
   await page.keyboard.press("Enter");
   await expect(page.locator("#docname")).toHaveText("Deck: Shared deck");
-  await menu(page, "Decks", "Send deck...");
+  await page.locator('.tab[data-panel="decks"]').click();
+  await page.locator(".navitem", { hasText: "Shared deck" }).first().dispatchEvent("contextmenu");
+  await page.locator("#ctxmenu .dd", { hasText: "Send..." }).first().click();
   await choose(page, page.locator("#f-to"), { label: other.name });
   await choose(page, page.locator("#f-mode"), "share");
   await page.locator(".dlgbtns .primary").click();
@@ -169,11 +174,14 @@ test("collections and decks can be sent to another account", async ({ page, brow
   await expect(other.page.locator("#view-deck, #docname").first()).toBeVisible();
   await expect(other.page.locator("#docname")).toHaveText("Deck: Shared deck");
 
-  await menu(page, "Decks", "Rename deck...");
+  await page.locator('.tab[data-panel="decks"]').click();
+  await page.locator(".navitem", { hasText: "Shared deck" }).first().dispatchEvent("contextmenu");
+  await page.locator("#ctxmenu .dd", { hasText: "Rename..." }).first().click();
   await page.locator("#f-name").fill("Renamed deck");
   await page.locator(".dlgbtns .primary").click();
   await expect(status(page)).toHaveText("Deck renamed to Renamed deck");
-  await menu(page, "Decks", "Delete deck...");
+  await page.locator(".navitem", { hasText: "Renamed deck" }).first().dispatchEvent("contextmenu");
+  await page.locator("#ctxmenu .dd", { hasText: "Delete" }).first().click();
   await expect(page.locator("dialog[open]")).toContainText(`It is shared with ${other.name}, who will lose it too.`);
   await page.getByRole("button", { name: "Delete deck" }).click();
   await expect(status(page)).toHaveText("Renamed deck deleted");

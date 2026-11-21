@@ -5,7 +5,7 @@ import type { Page } from "@playwright/test";
 import { choose, search, signUp, status, test, expect, takePrinting, menu } from "./fixtures";
 
 async function newDeck(page: Page, name: string, format = "commander") {
-  await menu(page, "Decks", "New deck...");
+  await menu(page, "File", "New deck...");
   await page.keyboard.type(name);
   await choose(page, page.locator("#f-format"), format);
   await page.keyboard.press("Enter");
@@ -134,7 +134,8 @@ test("the card maker saves a custom card to the card database, and the print lis
 
   await page.locator("#cm-name").fill("Goblin Tester");
   await page.locator("#cm-manaCost").fill("{1}");
-  await page.locator(".symbols").getByRole("button", { name: "{R}" }).click();
+  await page.locator(".makerform").getByRole("button", { name: "Symbols" }).first().click();
+  await page.locator(".sympicker").getByRole("button", { name: "Insert {R}" }).click();
   await expect(page.locator("#cm-manaCost")).toHaveValue("{1}{R}");
   await page.locator("#cm-typeLine").fill("Creature - Goblin");
   await page.locator("#cm-rules").fill("Haste (This creature can attack right away.)");
@@ -171,8 +172,14 @@ test("the card maker saves a custom card to the card database, and the print lis
   await expect(page.locator(".ppage")).toHaveCount(1);
   await expect(page.locator(".ppage .pslot")).toHaveCount(3);
 
-  const pdf = page.waitForEvent("download");
+  // the test server cannot reach Scryfall: the missing pictures are listed first (0.14.0); Try again asks again
   await page.getByRole("button", { name: "Export PDF" }).click();
+  await expect(page.locator("dialog[open] .dlghead")).toHaveText("Some card pictures are missing");
+  await expect(page.locator("dialog[open] .misslist")).toHaveText("Sol Ring");
+  await page.locator("dialog[open]").getByRole("button", { name: "Try again" }).click();
+  await expect(page.locator("dialog[open] .misslist")).toHaveText("Sol Ring");
+  const pdf = page.waitForEvent("download");
+  await page.locator("dialog[open]").getByRole("button", { name: "Make it anyway" }).click();
   const pdfFile = await pdf;
   expect(pdfFile.suggestedFilename()).toBe("proxies.pdf");
   expect(readFileSync(await pdfFile.path()).subarray(0, 5).toString()).toBe("%PDF-");

@@ -22,7 +22,7 @@ The Create account tab is hidden when sign-up is closed. An admin sets sign-up t
 
 ## What accounts share
 
-All accounts on one server share the card database. Each account has its own collections and decks; another account sees them only after you send or share them (see [Sending and sharing](/about/sending-and-sharing)). Each account also keeps its own preferences: theme, Add as foil, target zone, target collection, open collection, ribbon layout, panel layout, saved workspaces and the last open deck.
+All accounts on one server share the card database. Each account has its own collections and decks; another account sees them only after you send or share them (see [Sending and sharing](/about/sending-and-sharing)). Each account also keeps its own preferences: theme, Add as foil, target zone, target collection, open collection, panel layout, saved workspaces and the last open deck.
 
 When Mana Vault is updated from a version before 0.2.0, the collection and decks that everyone shared become the oldest account's, with the collection named Main collection. Every new account starts with an empty Main collection.
 

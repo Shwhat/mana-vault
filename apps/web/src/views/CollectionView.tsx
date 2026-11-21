@@ -4,7 +4,7 @@ import type { Action } from "../actions";
 import { rowMenu } from "../components/ContextMenu";
 import { collectionDialog, copyDialog, moveDialog } from "../components/LibraryDialogs";
 import { choosePrinting } from "../components/PrintingDialog";
-import { CountPip, FinishBadge, FinishPip, finishName, removeCard } from "../components/CardMarks";
+import { CountPip, FinishBadge, FinishPip, finishName, PricePip, removeCard } from "../components/CardMarks";
 import { Icon } from "../icons";
 import { entryKey } from "../library-state";
 import { type Store, useApp } from "../store";
@@ -250,6 +250,7 @@ function Stack({ entries }: { entries: CollectionEntry[] }) {
         onDoubleClick={() => copyDialog(store, first)} {...entryMenu(store, first)}>
         {first.image_url ? <img src={first.image_url} alt={first.name} loading="lazy" draggable={false} /> : <span className="pocketname">{first.name}</span>}
         <CountPip count={count} />
+        <PricePip price={copyPrice(first, store.prefs.currency)} />
         <span className="dmarks">{split ? entries.map((entry) => <FinishBadge key={entryKey(entry)} finish={entry.foil} promoTypes={entry.promo_types} />) : <CopyPips entry={first} />}</span>
       </div>
       {split && (

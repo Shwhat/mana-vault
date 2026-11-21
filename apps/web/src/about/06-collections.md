@@ -17,7 +17,7 @@ A new account starts with an empty collection named **Main collection** that is 
 
 ## Creating and changing collections
 
-1. **New collection...** (Collection ribbon tab, **New...** in the Collections panel, **New collection...** in the scanner's Add to window, or in the Import window) asks for every field above.
+1. **New collection...** (File menu, **New...** in the Collections panel, **New collection...** in the scanner's Add to window, or in the Import window) asks for every field above.
 2. To link sets, type part of a set name or code in **Linked sets**, then tick the sets in the list. Chosen sets appear as chips above the list; **×** on a chip removes it. Sets appear once the card database is loaded.
 3. **Create collection** creates it, opens it in the collection view and, when it is your only collection, makes it the target collection.
 4. **Collection settings...** changes any field of the open collection. Changing the rules or the linked sets never changes the cards in the collection.
@@ -69,7 +69,7 @@ Rows that are not regular, near mint or English show the difference after the se
 
 ## Copy details
 
-**Copy details...** (E, Collection ribbon tab, the details button on a row, the right-click menu, or a double-click in the binder) changes the selected row's Finish, Condition, Language, Proxy, For trade, Purchase price, Purchase currency, Date added, Misprint, Altered and Signed. All copies in the row change together. When another row already has the new finish, condition, language and proxy, the two rows are merged and their counts and numbers for trade are added together. Copies linked to decks stay linked. A change can be undone.
+**Copy details...** (E, the details button on a row, the right-click menu, or a double-click in the binder) changes the selected row's Finish, Condition, Language, Proxy, For trade, Purchase price, Purchase currency, Date added, Misprint, Altered and Signed. All copies in the row change together. When another row already has the new finish, condition, language and proxy, the two rows are merged and their counts and numbers for trade are added together. Copies linked to decks stay linked. A change can be undone.
 
 | Message | Cause |
 |---|---|
@@ -94,7 +94,7 @@ The change can be undone (undo changes the copies back; deck links removed by No
 
 ## The collection view
 
-Press **2** (or **Collection** on the Home ribbon tab) to open it. The header holds:
+Press **2** (or the **Collection** tab) to open it. The header holds:
 
 | Item | Use |
 |---|---|
@@ -151,7 +151,7 @@ Tags, the filter box and the Filters panel's collection filters stay when you op
 
 ## Card layouts
 
-The Cards tab shows the rows in the current sort and filter in one of three layouts. Each layout is kept for your account, separately for the desktop and the phone. New accounts start with Grid. Change it in **Options**, with **Grid layout**, **Binder layout** and **List layout** on the Collection ribbon tab, or with **B**, which switches between Binder and Grid.
+The Cards tab shows the rows in the current sort and filter in one of three layouts. Each layout is kept for your account, separately for the desktop and the phone. New accounts start with Grid. Change it in **Options**, or with **B**, which switches between Binder and Grid.
 
 | Layout | Shows |
 |---|---|
@@ -185,14 +185,14 @@ When more than one card is picked (or Select several cards is on), a bar above t
 
 - Minus at a count of 1 removes that entry at once.
 - The remove button on an entry, or **Remove** in its right-click menu, removes an entry with one copy at once. With more copies it asks **How many to remove** ("There are N copies."), with **Reduce to 1** and **Remove all**. Copies in no deck are removed first.
-- **Reduce to 1** (right-click menu of an entry with more than one copy, the Collection ribbon tab, or the picked bar) leaves one copy of each picked entry, for copies added by accident. It is one step that can be undone. With every picked entry at one copy it says "Each picked card has one copy already".
-- **Remove selected...** (Delete key, Collection ribbon tab, or **Remove...** in the picked bar) asks first, for example "Remove 37 entries (112 cards) from Binder?", with **Remove all** (every picked entry goes) and **Reduce to 1**.
+- **Reduce to 1** (right-click menu of an entry with more than one copy, or the picked bar) leaves one copy of each picked entry, for copies added by accident. It is one step that can be undone. With every picked entry at one copy it says "Each picked card has one copy already".
+- **Remove selected...** (Delete key, or **Remove...** in the picked bar) asks first, for example "Remove 37 entries (112 cards) from Binder?", with **Remove all** (every picked entry goes) and **Reduce to 1**.
 - To remove many cards of one kind, type in the filter box (for example a set name), press Ctrl+A, then Delete.
 
 ## Moving cards
 
 - The move button on a row opens **Move**: choose the collection to move to and, when the entry has more than one copy, how many copies to move.
-- **Move selected...** (Collection ribbon tab, or **Move...** in the picked bar) moves every copy of each picked entry to the chosen collection.
+- **Move selected...** (**Move...** in the picked bar or the right-click menu) moves every copy of each picked entry to the chosen collection.
 - Moved copies are added to the other collection's counts, in a row with the same finish, condition and language. A move needs at least two collections.
 - Copies marked for trade stay behind while enough copies are left; the rest of the marks move with the copies.
 - Copies in no deck move first. When more copies move than are free, the deck links move with them, so the decks keep their cards.

@@ -3,19 +3,23 @@ import { useEffect, useMemo, useState } from "react";
 import type { Action } from "../actions";
 import { downloadBlob, downloadText, request } from "../api";
 import { CardMaker } from "../components/CardMaker";
-import { confirmDialog, customDialog, dialog } from "../components/Dialog";
+import { choiceDialog, confirmDialog, customDialog, dialog } from "../components/Dialog";
 import { choosePrinting } from "../components/PrintingDialog";
 import { choices, type Choice, Picker } from "../components/Picker";
 import { parseQuickAdd } from "../deck-rules";
 import { Icon } from "../icons";
 import { entryKey } from "../library-state";
 import {
-  buildMpcZip, buildPdf, DEFAULT_SHEET, facesOf, type Faces, layoutPages, mpcAutofillList, type PrintLine, printSlots, type SheetSettings,
+  buildMpcZip, buildPdf, DEFAULT_SHEET, facesOf, missingPictures, type Faces, layoutPages, mpcAutofillList, PRINT_SORTS, type PrintLine, printPrice, printSlots,
+  type PrintSort, type SheetSettings, sortPrintLines,
 } from "../proxy-print";
 import type { CardForPrint } from "../proxy-state";
 import { type Store, useApp } from "../store";
 import type { Card, CollectionEntry, DeckDetail } from "../types";
 import { Quantity, Thumb } from "./Views";
+import { CountPip, PricePip } from "../components/CardMarks";
+import { LayoutRows, OptionsButton } from "../components/Options";
+import type { GridSize } from "../types";
 
 const FACE_CHOICES: Choice[] = choices([["front", "Front"], ["back", "Back"], ["both", "Both faces"]]);
 const PAPER_CHOICES: Choice[] = choices([["letter", "Letter (8.5 x 11 in)"], ["a4", "A4 (210 x 297 mm)"], ["legal", "Legal (8.5 x 14 in)"], ["custom", "Custom size"]]);
@@ -184,6 +188,70 @@ function LineRow({ line }: { line: PrintLine }) {
   );
 }
 
+const PRINT_WIDTHS: Record<GridSize, number> = { s: 110, m: 150, l: 210 };
+const PRINT_PHONE_COLUMNS: Record<GridSize, number> = { s: 4, m: 3, l: 2 };
+
+/** One print list line as a picture: the count and the price pips on it, and its count and Remove under it. */
+function LinePicture({ line }: { line: PrintLine }) {
+  const store = useApp();
+  return (
+    <div className="stackcell printcell">
+      <div className="pocket" title={`${line.card.name}, ${line.card.set_name} ${line.card.collector_number}`}>
+        {line.card.image_url ? <img src={line.card.image_url} alt={line.card.name} loading="lazy" draggable={false} /> : <span className="pocketname">{line.card.name}</span>}
+        <CountPip count={line.count} />
+        {line.card.custom && <span className="dmarks"><span className="badge custom">Custom</span></span>}
+        <PricePip price={printPrice(line.card, store.prefs.currency)} />
+      </div>
+      <div className="printctl">
+        <Quantity value={line.count} name={line.card.name} max={100} onChange={(count) => (count < 1 ? store.removePrintLine(line.id) : store.setPrintLine(line.id, { count: Math.min(100, count) }))} />
+        <button type="button" className="btn small" aria-label={`Remove ${line.card.name} from the print list`} onClick={() => store.removePrintLine(line.id)}>Remove</button>
+      </div>
+    </div>
+  );
+}
+
+/** The print list as List, Grid or Binder (nine pockets a page), in the sort chosen. */
+function PrintLines({ lines }: { lines: PrintLine[] }) {
+  const store = useApp();
+  const [page, setPage] = useState(0);
+  const layout = store.prefs.printLayout;
+  const size = store.prefs.printSize;
+  const pages = Math.max(1, Math.ceil(lines.length / 9));
+  useEffect(() => { if (page >= pages) setPage(pages - 1); }, [page, pages]);
+  if (layout === "list") return <>{lines.map((line) => <LineRow key={line.id} line={line} />)}</>;
+  const columns = layout === "binder" ? "repeat(3, minmax(0, 1fr))"
+    : store.phone ? `repeat(${PRINT_PHONE_COLUMNS[size]}, minmax(0, 1fr))` : `repeat(auto-fill, minmax(${PRINT_WIDTHS[size]}px, 1fr))`;
+  const shown = layout === "binder" ? lines.slice(page * 9, page * 9 + 9) : lines;
+  return (
+    <>
+      <div className={`cardgrid size-${size}${layout === "binder" ? " printbinder" : ""}`} aria-label="Print list" style={{ gridTemplateColumns: columns }}>
+        {shown.map((line) => <LinePicture key={line.id} line={line} />)}
+      </div>
+      {layout === "binder" && pages > 1 && (
+        <div className="btnrow pagerow">
+          <button type="button" className="btn small" disabled={page === 0} onClick={() => setPage(page - 1)}>Previous page</button>
+          <span className="sub">Page {page + 1} of {pages}</span>
+          <button type="button" className="btn small" disabled={page >= pages - 1} onClick={() => setPage(page + 1)}>Next page</button>
+        </div>
+      )}
+    </>
+  );
+}
+
+/** Sort and Options (layout and card size) for the print list, like the other card lists. */
+function PrintListBar() {
+  const store = useApp();
+  return (
+    <div className="navbar printbar">
+      <Picker label="Sort the print list" prefix="Sort: " value={store.prefs.printSort} options={choices(PRINT_SORTS)} onChange={(value) => store.setPrefs({ printSort: value as PrintSort })} />
+      <OptionsButton title="Print list options">
+        <LayoutRows name="Print list" layout={store.prefs.printLayout} size={store.prefs.printSize}
+          onLayout={(printLayout) => store.setPrefs({ printLayout })} onSize={(printSize) => store.setPrefs({ printSize })} />
+      </OptionsButton>
+    </div>
+  );
+}
+
 // ---------- settings, preview and exports ----------
 function NumberField({ label, value, min, max, step = 0.5, unit, onChange }: { label: string; value: number; min: number; max: number; step?: number; unit: string; onChange: (value: number) => void }) {
   const id = `ps-${label.toLowerCase().replace(/[^a-z]+/g, "-")}`;
@@ -279,9 +347,34 @@ function ExportPanel({ lines }: { lines: PrintLine[] }) {
     await store.addPrintedAsProxies([...counts.values()], { kind, id, collectionId: kind === "deck" ? holder : undefined });
   };
 
+  /**
+   * Loads every picture to print first. When some cannot be had, the cards are listed with Try again and Make anyway,
+   * instead of quietly printing them as white cards. Resolves false when the person stops.
+   */
+  const picturesReady = async (from: PrintLine[]): Promise<boolean> => {
+    for (;;) {
+      setBusy("Loading the card pictures");
+      const faces = from.flatMap((line) => facesOf(line).map((face) => ({ cardId: line.cardId, face, name: line.card.name })));
+      const missing = await missingPictures(faces, (done, total) => setBusy(`Loading the card pictures: ${done} of ${total}`));
+      setBusy("");
+      if (!missing.length) return true;
+      const answer = await choiceDialog("Some card pictures are missing", (
+        <>
+          The {missing.length === 1 ? "picture of this card" : `pictures of these ${missing.length} cards`} could not be downloaded.
+          Without a picture a card prints as a white card with its name.
+          <span className="misslist">{missing.join(", ")}</span>
+        </>
+      ), [["again", "Try again", true], ["anyway", "Make it anyway"]]);
+      if (answer === "anyway") return true;
+      if (answer !== "again") return false;
+    }
+  };
+
   const run = async (what: "pdf" | "mpc" | "autofill") => {
     if (!lines.length) return store.flash("Add cards to the print list first", "err");
     try {
+      if (what !== "autofill" && !(await picturesReady(lines))) return;
+      if (what === "autofill" && lines.some((line) => line.card.custom) && !(await picturesReady(lines.filter((line) => line.card.custom)))) return;
       if (what === "pdf") {
         setBusy("Making the PDF");
         const bytes = await buildPdf(lines, store.prefs.proxySheet, (done, total) => setBusy(`Making the PDF: card ${done} of ${total}`));
@@ -337,7 +430,7 @@ function PrintTab() {
   const store = useApp();
   const { printList, loadPrintList } = store;
   useEffect(() => { if (printList === null) void loadPrintList(); }, [printList, loadPrintList]);
-  const lines = printList ?? [];
+  const lines = useMemo(() => sortPrintLines(printList ?? [], store.prefs.printSort, store.prefs.currency), [printList, store.prefs.printSort, store.prefs.currency]);
   const total = lines.reduce((sum, line) => sum + line.count * facesOf(line).length, 0);
   return (
     <div className="proxybody">
@@ -351,10 +444,11 @@ function PrintTab() {
           <button type="button" className="btn small" onClick={() => void addTokens(store)}>Add tokens</button>
         </div>
         <PrintSearch />
+        {lines.length > 0 && <PrintListBar />}
         <div className="plines">
           {printList === null && <p className="note pad">Loading the print list</p>}
           {printList !== null && lines.length === 0 && <div className="empty compact"><Icon name="print" /><b>The print list is empty</b><span className="sub">Add a deck, a collection, or cards from the search</span></div>}
-          {lines.map((line) => <LineRow key={line.id} line={line} />)}
+          <PrintLines lines={lines} />
         </div>
         <div className="pfoot"><span className="sub">{lines.length} {lines.length === 1 ? "line" : "lines"}, {total} {total === 1 ? "card" : "cards"} to print</span>
           <button type="button" className="btn small" disabled={!lines.length} onClick={() => void confirmDialog("Clear the print list", "Remove every card from the print list?", "Clear")

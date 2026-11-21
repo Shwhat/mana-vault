@@ -10,9 +10,18 @@ export type Frame = (typeof FRAMES)[number];
 /** Where the art sits in the art box: offsets as parts of the box size, and the zoom (1 fills the box). */
 export type ArtPlace = { x: number; y: number; zoom: number };
 
+/** How the frame is drawn: Classic, Borderless (art fills the card), Full art (art behind the type line and text),
+ * Showcase (an ornate gold-trimmed frame) and Nickname (a nickname in the name bar, the card name under it). */
+export const FRAME_STYLES = ["classic", "borderless", "fullart", "showcase", "nickname"] as const;
+export type FrameStyle = (typeof FRAME_STYLES)[number];
+export const FRAME_STYLE_NAMES: Record<FrameStyle, string> = { classic: "Classic", borderless: "Borderless", fullart: "Full art", showcase: "Showcase", nickname: "Nickname" };
+
 export type FaceDesign = {
   kind: CardKind;
   frame: Frame;
+  style: FrameStyle;
+  /** The nickname shown in the name bar of the Nickname style. */
+  nickname: string;
   legendary: boolean;
   name: string;
   manaCost: string;
@@ -42,7 +51,7 @@ export const HEIGHT = 1040;
 export const SCALE = 2;
 
 export const blankFace = (): FaceDesign => ({
-  kind: "normal", frame: "auto", legendary: false, name: "", manaCost: "", typeLine: "", rulesText: "", flavorText: "",
+  kind: "normal", frame: "auto", style: "classic", nickname: "", legendary: false, name: "", manaCost: "", typeLine: "", rulesText: "", flavorText: "",
   power: "", toughness: "", loyalty: "", textSize: 100, flavorSize: 100, art: { x: 0, y: 0, zoom: 1 },
 });
 
@@ -88,6 +97,21 @@ export function frameOf(face: FaceDesign): Exclude<Frame, "auto"> {
   }
   return "gold";
 }
+
+/** A bar outline with cut corners, used by the Showcase style. */
+function chamfered(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
+  const c = Math.min(r, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + c, y);
+  ctx.lineTo(x + w - c, y);
+  ctx.lineTo(x + w, y + h / 2);
+  ctx.lineTo(x + w - c, y + h);
+  ctx.lineTo(x + c, y + h);
+  ctx.lineTo(x, y + h / 2);
+  ctx.closePath();
+}
+
+const GOLD = "#d9b860";
 
 function rounded(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
   ctx.beginPath();
@@ -320,16 +344,89 @@ export function renderCard(canvas: HTMLCanvasElement, face: FaceDesign, info: Ca
   const frame = frameOf(face);
   const palette = paletteOf(frame);
   const token = face.kind === "token";
+  const style: FrameStyle = FRAME_STYLES.includes(face.style) ? face.style : "classic";
+  // Borderless and Full art draw the art first and the bars over it, a little see-through
+  const overArt = style === "borderless" || style === "fullart";
+  const showcase = style === "showcase";
+  const shape = showcase ? chamfered : rounded;
+  const veil = overArt ? 0.86 : 1;
+  const drawArt = (box: { x: number; y: number; w: number; h: number }) => {
+    ctx.save();
+    ctx.fillStyle = "#2b2b2b";
+    ctx.fillRect(box.x, box.y, box.w, box.h);
+    if (assets.art) {
+      ctx.beginPath();
+      ctx.rect(box.x, box.y, box.w, box.h);
+      ctx.clip();
+      const source = assets.art as { width: number; height: number };
+      const cover = Math.max(box.w / source.width, box.h / source.height) * Math.max(0.2, face.art.zoom);
+      const drawWidth = source.width * cover;
+      const drawHeight = source.height * cover;
+      const left = box.x + (box.w - drawWidth) / 2 + face.art.x * box.w;
+      const top = box.y + (box.h - drawHeight) / 2 + face.art.y * box.h;
+      ctx.drawImage(assets.art, left, top, drawWidth, drawHeight);
+    } else {
+      ctx.fillStyle = "#8a8f96";
+      ctx.font = `400 26px ${SERIF}`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("Art", box.x + box.w / 2, box.y + (overArt ? 330 : box.h / 2));
+    }
+    ctx.restore();
+    if (!overArt) {
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = showcase ? GOLD : frameFill(ctx, frame, "dark", box.x, box.w);
+      ctx.strokeRect(box.x, box.y, box.w, box.h);
+    }
+  };
+  /** A name, type or power bar: filled with the frame's bar color and outlined, gold-trimmed for Showcase. */
+  const bar = (x: number, y: number, w: number, h: number, r: number) => {
+    ctx.save();
+    ctx.globalAlpha = veil;
+    shape(ctx, x, y, w, h, r);
+    ctx.fillStyle = frameFill(ctx, frame, "bar", x, w);
+    ctx.fill();
+    ctx.restore();
+    shape(ctx, x, y, w, h, r);
+    ctx.lineWidth = showcase ? 3.5 : 2.5;
+    ctx.strokeStyle = showcase ? GOLD : frameFill(ctx, frame, "dark", x, w);
+    ctx.stroke();
+  };
 
-  // the black border and the colored frame
+  // the black border and the colored frame (Borderless has no frame: the art reaches the edges)
   ctx.fillStyle = "#121212";
   ctx.fillRect(0, 0, WIDTH, HEIGHT);
-  rounded(ctx, 26, 26, WIDTH - 52, HEIGHT - 70, 18);
-  ctx.fillStyle = frameFill(ctx, frame, "base", 26, WIDTH - 52);
-  ctx.fill();
-  ctx.lineWidth = 3;
-  ctx.strokeStyle = frameFill(ctx, frame, "dark", 26, WIDTH - 52);
-  ctx.stroke();
+  if (style !== "borderless") {
+    rounded(ctx, 26, 26, WIDTH - 52, HEIGHT - 70, 18);
+    ctx.fillStyle = frameFill(ctx, frame, "base", 26, WIDTH - 52);
+    ctx.fill();
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = frameFill(ctx, frame, "dark", 26, WIDTH - 52);
+    ctx.stroke();
+  }
+  if (overArt) {
+    const box = style === "borderless" ? { x: 0, y: 0, w: WIDTH, h: HEIGHT - 44 } : { x: 40, y: 40, w: WIDTH - 80, h: HEIGHT - 124 };
+    drawArt(box);
+  }
+  // Showcase: a gold double line inside the frame with a diamond at each corner
+  if (showcase) {
+    ctx.save();
+    ctx.strokeStyle = GOLD;
+    ctx.lineWidth = 2;
+    rounded(ctx, 34, 34, WIDTH - 68, HEIGHT - 86, 14);
+    ctx.stroke();
+    ctx.lineWidth = 1;
+    rounded(ctx, 39, 39, WIDTH - 78, HEIGHT - 96, 11);
+    ctx.stroke();
+    ctx.fillStyle = GOLD;
+    for (const [x, y] of [[34, 34], [WIDTH - 34, 34], [34, HEIGHT - 52], [WIDTH - 34, HEIGHT - 52]] as const) {
+      ctx.beginPath();
+      ctx.moveTo(x, y - 9); ctx.lineTo(x + 9, y); ctx.lineTo(x, y + 9); ctx.lineTo(x - 9, y);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.restore();
+  }
 
   // a legendary crest over the name bar
   if (face.legendary) {
@@ -350,12 +447,7 @@ export function renderCard(canvas: HTMLCanvasElement, face: FaceDesign, info: Ca
 
   // name bar with the mana cost
   const nameBar = { x: 44, y: 56, w: WIDTH - 88, h: 62 };
-  rounded(ctx, nameBar.x, nameBar.y, nameBar.w, nameBar.h, 14);
-  ctx.fillStyle = frameFill(ctx, frame, "bar", nameBar.x, nameBar.w);
-  ctx.fill();
-  ctx.lineWidth = 2.5;
-  ctx.strokeStyle = frameFill(ctx, frame, "dark", nameBar.x, nameBar.w);
-  ctx.stroke();
+  bar(nameBar.x, nameBar.y, nameBar.w, nameBar.h, 14);
   const costSymbols = symbolsIn(face.manaCost);
   const symbolSize = 38;
   const costWidth = costSymbols.length * (symbolSize + 3);
@@ -380,45 +472,26 @@ export function renderCard(canvas: HTMLCanvasElement, face: FaceDesign, info: Ca
     nameLeft += 36;
   }
   const nameWidth = nameBar.w - 40 - costWidth - (nameLeft - nameBar.x - 20);
-  if (token) fitText(ctx, face.name || "Card name", WIDTH / 2, nameBar.y + nameBar.h / 2 + 2, nameWidth, 36, 700, palette.text, "center");
-  else fitText(ctx, face.name || "Card name", nameLeft, nameBar.y + nameBar.h / 2 + 2, nameWidth, 36, 700, palette.text);
+  // the Nickname style puts the nickname in the name bar and the card name in a small bar under it
+  const nickname = style === "nickname" && face.nickname.trim() ? face.nickname.trim() : "";
+  const shownName = nickname || face.name || "Card name";
+  if (token) fitText(ctx, shownName, WIDTH / 2, nameBar.y + nameBar.h / 2 + 2, nameWidth, 36, 700, palette.text, "center");
+  else fitText(ctx, shownName, nameLeft, nameBar.y + nameBar.h / 2 + 2, nameWidth, 36, 700, palette.text);
 
-  // the art box
-  const artBox = { x: 58, y: 126, w: WIDTH - 116, h: token ? 520 : 438 };
-  ctx.save();
-  ctx.fillStyle = "#2b2b2b";
-  ctx.fillRect(artBox.x, artBox.y, artBox.w, artBox.h);
-  if (assets.art) {
-    ctx.beginPath();
-    ctx.rect(artBox.x, artBox.y, artBox.w, artBox.h);
-    ctx.clip();
-    const source = assets.art as { width: number; height: number };
-    const cover = Math.max(artBox.w / source.width, artBox.h / source.height) * Math.max(0.2, face.art.zoom);
-    const drawWidth = source.width * cover;
-    const drawHeight = source.height * cover;
-    const left = artBox.x + (artBox.w - drawWidth) / 2 + face.art.x * artBox.w;
-    const top = artBox.y + (artBox.h - drawHeight) / 2 + face.art.y * artBox.h;
-    ctx.drawImage(assets.art, left, top, drawWidth, drawHeight);
-  } else {
-    ctx.fillStyle = "#8a8f96";
-    ctx.font = `400 26px ${SERIF}`;
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText("Art", artBox.x + artBox.w / 2, artBox.y + artBox.h / 2);
+  // the art: in its box (Classic, Showcase, Nickname), behind the type line and text (Full art), or over the whole card (Borderless)
+  const artBox = style === "borderless" ? { x: 0, y: 0, w: WIDTH, h: HEIGHT - 44 }
+    : style === "fullart" ? { x: 40, y: 40, w: WIDTH - 80, h: HEIGHT - 124 }
+    : { x: 58, y: 126, w: WIDTH - 116, h: token ? 520 : 438 };
+  if (!overArt) drawArt(artBox);
+  if (nickname) {
+    const sub = { x: 110, y: artBox.y + 8, w: WIDTH - 220, h: 42 };
+    bar(sub.x, sub.y, sub.w, sub.h, 12);
+    fitText(ctx, face.name || "Card name", WIDTH / 2, sub.y + sub.h / 2 + 1, sub.w - 24, 28, 600, palette.text, "center");
   }
-  ctx.restore();
-  ctx.lineWidth = 3;
-  ctx.strokeStyle = frameFill(ctx, frame, "dark", artBox.x, artBox.w);
-  ctx.strokeRect(artBox.x, artBox.y, artBox.w, artBox.h);
 
   // type bar with the set symbol
-  const typeBar = { x: 44, y: artBox.y + artBox.h + 8, w: WIDTH - 88, h: 56 };
-  rounded(ctx, typeBar.x, typeBar.y, typeBar.w, typeBar.h, 12);
-  ctx.fillStyle = frameFill(ctx, frame, "bar", typeBar.x, typeBar.w);
-  ctx.fill();
-  ctx.lineWidth = 2.5;
-  ctx.strokeStyle = frameFill(ctx, frame, "dark", typeBar.x, typeBar.w);
-  ctx.stroke();
+  const typeBar = { x: 44, y: (overArt ? 126 + (token ? 520 : 438) : artBox.y + artBox.h) + 8, w: WIDTH - 88, h: 56 };
+  bar(typeBar.x, typeBar.y, typeBar.w, typeBar.h, 12);
   fitText(ctx, face.typeLine || "Type", typeBar.x + 20, typeBar.y + typeBar.h / 2 + 1, typeBar.w - 90, 30, 700, palette.text);
   const symbolBox = { x: typeBar.x + typeBar.w - 58, y: typeBar.y + 8, s: 40 };
   if (assets.setSymbol) {
@@ -442,10 +515,13 @@ export function renderCard(canvas: HTMLCanvasElement, face: FaceDesign, info: Ca
 
   // text box
   const textBox = { x: 58, y: typeBar.y + typeBar.h + 8, w: WIDTH - 116, h: HEIGHT - 70 - (typeBar.y + typeBar.h + 8) - 20 };
+  ctx.save();
+  ctx.globalAlpha = veil;
   ctx.fillStyle = frameFill(ctx, frame, "box", textBox.x, textBox.w);
   ctx.fillRect(textBox.x, textBox.y, textBox.w, textBox.h);
-  ctx.lineWidth = 2.5;
-  ctx.strokeStyle = frameFill(ctx, frame, "dark", textBox.x, textBox.w);
+  ctx.restore();
+  ctx.lineWidth = showcase ? 3 : 2.5;
+  ctx.strokeStyle = showcase ? GOLD : frameFill(ctx, frame, "dark", textBox.x, textBox.w);
   ctx.strokeRect(textBox.x, textBox.y, textBox.w, textBox.h);
   const statBox = face.kind === "planeswalker" ? !!face.loyalty : !!(face.power || face.toughness);
   drawTextBox(ctx, face, { ...textBox, h: textBox.h - (statBox ? 26 : 0) }, palette, assets);
@@ -470,12 +546,7 @@ export function renderCard(canvas: HTMLCanvasElement, face: FaceDesign, info: Ca
       ctx.stroke();
       fitText(ctx, face.loyalty, x + 42, box.y + 27, 70, 36, 700, "#ffffff", "center");
     } else {
-      rounded(ctx, box.x, box.y, box.w, box.h, 12);
-      ctx.fillStyle = frameFill(ctx, frame, "bar", box.x, box.w);
-      ctx.fill();
-      ctx.lineWidth = 3;
-      ctx.strokeStyle = frameFill(ctx, frame, "dark", box.x, box.w);
-      ctx.stroke();
+      bar(box.x, box.y, box.w, box.h, 12);
       fitText(ctx, `${face.power}/${face.toughness}`, box.x + box.w / 2, box.y + box.h / 2 + 2, box.w - 16, 38, 700, palette.text, "center");
     }
     ctx.restore();

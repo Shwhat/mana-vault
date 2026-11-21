@@ -25,21 +25,21 @@ Every deck keeps the printing of each card. Each printing in a zone is its own r
 
 The **target zone** decides where Add to deck and Quick add put a card. It starts at Main deck and is kept for your account.
 
-The **All**, **Commander**, **Main**, **Sideboard** and **Maybe** buttons above the deck's cards and in the Deck list panel choose what the list shows and where cards go. A zone button shows only that zone and makes it the target zone. **All** shows every zone and makes Main deck the target zone. The same choice is in the Target zone list on the Decks ribbon tab and **Z** (All, Commander, Main, Sideboard, Maybe, then All again). The zone list beside Quick add and the ZONE item in the status bar change only the target zone. A zone with no cards shows "No cards in zone".
+The **All**, **Commander**, **Main**, **Sideboard** and **Maybe** buttons above the deck's cards and in the Deck list panel choose what the list shows and where cards go. A zone button shows only that zone and makes it the target zone. **All** shows every zone and makes Main deck the target zone. The same choice is on **Z** (All, Commander, Main, Sideboard, Maybe, then All again). The zone list beside Quick add and the ZONE item in the status bar change only the target zone. A zone with no cards shows "No cards in zone".
 
 ## Opening decks
 
 - **The deck switcher**: the button with the deck's name at the left of the deck view header (on a phone, at the top of the Decks tab). It opens a list of every deck with its cover card, commander, format and card count. Type to find a deck by name, commander or format; Up and Down move through the list, Enter opens the highlighted deck and Esc closes the list. One click on a deck makes it where new cards go and keeps the list open; a double click opens it. **Sort** orders the list by Recently opened, Name, Date created, Card count, Format or Commander; the choice is kept for your account. **New deck...** is at the bottom of the list.
 - **Decks panel**: decks are grouped by format, each with its card count and value. One click on a deck makes it where new cards go without leaving the view you are in (see [Collections](/about/collections)); a double click opens it in the deck view. The deck shows **Adding here** while it is where cards go. Right-click or long press a deck for its menu: Open, Rename..., Deck format..., Send..., Export..., Delete or Leave.
 - **Open deck...** (Ctrl+O) lists every deck with its format and card count.
-- **New deck...** (Decks ribbon tab, Decks panel, deck switcher) asks for the name and format. **Create deck** creates it and opens it.
+- **New deck...** (File menu, Decks panel, deck switcher) asks for the name and format. **Create deck** creates it and opens it.
 - **Add to...** in the scanner offers **New deck...** too (see [Scanning cards](/about/scanning-cards)).
 
 Opening a deck closes the About guide. The last deck you opened opens again the next time you sign in.
 
 ## Renaming and deleting decks
 
-- **Rename deck...** (Decks ribbon tab), or **Rename...** in a deck's right-click menu, changes the deck's name, 1 to 100 characters. Renaming a shared deck changes it for both people.
+- **Rename...** in a deck's right-click menu (Decks panel or deck switcher) changes the deck's name, 1 to 100 characters. Renaming a shared deck changes it for both people.
 - **Delete deck...** asks "Delete name and its N cards?" and removes the deck. A deck you share warns that the other people will lose it too. Deleting cannot be undone, and it clears the undo history. The copies stay in their collections.
 - For a deck shared with you, the command is **Leave shared deck...**: the deck stays with its owner and leaves your list.
 
@@ -97,7 +97,7 @@ A deck card with missing copies shows what you own of it, in every deck view:
 | **Owned, link** | Free copies of exactly this printing and finish are in your collections | Links them, from one collection, up to the number missing (also **Link owned copies** in the right-click menu) |
 | **Other version owned** | Free copies of another printing or finish are in your collections | Lists them with their collection and how many are free. **Switch** changes the missing cards to that version and links the copies (also **Switch to the version owned...** in the right-click menu) |
 
-**Link owned copies** (Decks ribbon tab, or the Ownership tab) links free copies of the exact printing and finish to every missing card in the deck at once, the deck's own collection first. The message reads "N owned copies linked to deck name", or "No free copies of the missing cards' exact printings are in your collections".
+**Link owned copies** (the Ownership tab, or a deck card's right-click menu) links free copies of the exact printing and finish to every missing card in the deck at once, the deck's own collection first. The message reads "N owned copies linked to deck name", or "No free copies of the missing cards' exact printings are in your collections".
 
 ### Upgrade wanted
 
@@ -110,7 +110,7 @@ The card shows an **Upgrade wanted** badge (the wanted version in its tooltip), 
 
 ### Link copies
 
-**Link copies...** (Decks ribbon tab, the link button on a deck card, or the right-click menu) lists the free copies of the card in your collections, each with its collection, set, number, finish, condition, language, proxy and how many are free. Choose a copy and **How many**, or **None (missing)**, then **Link**. The change can be undone.
+**Link copies...** (the link button on a deck card, or the right-click menu) lists the free copies of the card in your collections, each with its collection, set, number, finish, condition, language, proxy and how many are free. Choose a copy and **How many**, or **None (missing)**, then **Link**. The change can be undone.
 
 ## Building a deck
 
@@ -148,7 +148,7 @@ Each result has **+ Main**, **+ Side**, **+ Maybe** and **+ Commander**. A butto
 
 ### Edit as text
 
-**Edit as text...** (the Add tab, Options on the Cards tab, or the Decks ribbon tab) shows the whole deck as text, one line per card such as `1 Sol Ring (C21) 263`, under the headings Commander, Deck, Sideboard and Maybeboard (Main, Mainboard, Side, SB, Maybe and Considering are also understood).
+**Edit as text...** (the Add tab, or Options on the Cards tab) shows the whole deck as text, one line per card such as `1 Sol Ring (C21) 263`, under the headings Commander, Deck, Sideboard and Maybeboard (Main, Mainboard, Side, SB, Maybe and Considering are also understood).
 
 1. Change the text: add lines, change counts, delete lines.
 2. **Check** shows how many cards would be added, changed and removed, and lists the lines that did not match with their line number and the reason.
@@ -160,7 +160,7 @@ Lines with a set and collector number are linked to free copies of exactly that 
 
 ### Tags
 
-Tags are your own groups, such as Ramp or Card draw. **Tags...** (right-click menu, or the Decks ribbon tab with a card selected) asks for the card's tags, separated by commas, and lists the tags already used in the deck. A card has up to 12 tags of up to 40 characters. Tags show on the card's row; clicking one groups the deck by tag.
+Tags are your own groups, such as Ramp or Card draw. **Tags...** (right-click menu of a deck card) asks for the card's tags, separated by commas, and lists the tags already used in the deck. A card has up to 12 tags of up to 40 characters. Tags show on the card's row; clicking one groups the deck by tag.
 
 ## The deck view
 
@@ -295,7 +295,7 @@ Adding cards (by search, Quick add or the scanner), changing counts, moving betw
 
 ## Add deck to collection
 
-**Add deck to collection...** puts the deck's cards into a collection as copies, for example after building a deck with Edit as text from cards you have in hand. It is on the Decks ribbon tab (**To collection**), beside Edit as text on the Add tab, and in a deck's right-click menu in the Decks panel and the deck switcher.
+**Add deck to collection...** puts the deck's cards into a collection as copies, for example after building a deck with Edit as text from cards you have in hand. It is beside Edit as text on the Add tab (**To collection**), and in a deck's right-click menu in the Decks panel and the deck switcher.
 
 1. Choose **Add deck to collection...**.
 2. Pick the **Collection** (the deck's own collection or the target collection first). Wishlists are not offered.

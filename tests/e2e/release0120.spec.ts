@@ -64,6 +64,28 @@ test("Administration opens for an admin, Setup can be skipped, and invite codes 
 
   await page.locator(".abtoc a", { hasText: "Accounts" }).click();
   await expect(page.locator(".admtable tr", { hasText: name })).toBeVisible();
+  // 0.14.0: Delete everything asks again and deletes (the second question used to close at once)
+  await page.locator(".admtable tr", { hasText: name }).getByRole("button", { name: "Delete..." }).click();
+  await page.locator("dialog[open]").getByRole("button", { name: "Delete everything" }).click();
+  await expect(page.locator("dialog[open] .dlghead")).toHaveText(`Delete ${name}`);
+  await page.waitForTimeout(400);
+  await expect(page.locator("dialog[open] .dlgq")).toContainText("This cannot be undone.");
+  await page.locator("dialog[open]").getByRole("button", { name: "Delete", exact: true }).click();
+  await expect(status(page)).toHaveText(`${name} deleted`);
+  await expect(page.locator(".admtable tr", { hasText: name })).toHaveCount(0);
+  // Move them, then delete asks where the collections go, then deletes
+  await page.getByRole("button", { name: "New account..." }).click();
+  const second = `sam${Date.now().toString(36)}`;
+  await page.locator("#f-name").fill(second);
+  await page.keyboard.press("Enter");
+  await page.locator("dialog[open]").getByRole("button", { name: "Done" }).click();
+  await page.locator(".admtable tr", { hasText: second }).getByRole("button", { name: "Delete..." }).click();
+  await page.locator("dialog[open]").getByRole("button", { name: "Move them, then delete" }).click();
+  await page.waitForTimeout(400);
+  await expect(page.locator("dialog[open] .dlghead")).toHaveText(`Move ${second}'s collections and decks`);
+  await page.locator("dialog[open]").getByRole("button", { name: "Move and delete" }).click();
+  await expect(status(page)).toHaveText(`${second} deleted, collections and decks moved`);
+  await expect(page.locator(".admtable tr", { hasText: second })).toHaveCount(0);
   await page.request.put("/api/admin/settings", { headers: guard, data: { signup: "open" } });
   await page.locator(".abtoc a", { hasText: "Activity" }).click();
   await expect(page.locator(".admtable")).toContainText("Account created");

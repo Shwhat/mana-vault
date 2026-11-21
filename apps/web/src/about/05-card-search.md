@@ -101,7 +101,7 @@ The Filters panel filters the open view, and its first line names it:
 | Deck card search | The results on the deck's Add tab |
 | Trade, you give or Trade, you get | The trade search you last used |
 
-Each view keeps its own filters. A collection's filters stay when another collection opens, and a deck's filters stay when another deck opens. **Clear filters** (also on the Home ribbon tab) empties the filters of the open view only. Legal in uses each card's own legality, also in collections and decks. On a phone, **Filters** in the top bar opens the panel as a sheet for the collection, the deck and the trade view.
+Each view keeps its own filters. A collection's filters stay when another collection opens, and a deck's filters stay when another deck opens. **Clear filters** (also in the Edit menu) empties the filters of the open view only. Legal in uses each card's own legality, also in collections and decks. On a phone, **Filters** in the top bar opens the panel as a sheet for the collection, the deck and the trade view.
 
 ## Results
 

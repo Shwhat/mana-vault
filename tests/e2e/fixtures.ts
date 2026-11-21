@@ -81,28 +81,19 @@ export async function search(page: Page, text: string) {
 }
 
 /** Runs a ribbon command by its label: the tab is named first, then the button, or the list button that holds it. */
-export async function menu(page: Page, tabName: string, item: string) {
-  await page.locator(".rtab", { hasText: tabName }).first().click();
-  const button = page.locator(`.rpanel [data-label="${item}"]`);
-  if (await button.count()) {
-    await button.first().click();
-    return;
-  }
-  const list = page.locator(".rpanel [data-labels]").filter({ has: page.locator(":scope") });
-  for (let index = 0; index < await list.count(); index++) {
-    const labels = (await list.nth(index).getAttribute("data-labels")) ?? "";
-    if (!labels.split("\n").includes(item)) continue;
-    await list.nth(index).dispatchEvent("mousedown");
-    await page.locator("#dropdown .dd", { hasText: item }).first().click();
-    return;
-  }
-  throw new Error(`No ribbon command "${item}" on the ${tabName} tab`);
+export async function menu(page: Page, menuName: string, item: string) {
+  await page.locator(`#menubar .mbtn[data-menu="${menuName}"]`).dispatchEvent("mousedown");
+  await page.locator("#dropdown .dd", { hasText: item }).first().click();
 }
 
-/** Applies a workspace from the list at the end of the ribbon tabs. */
+/** Applies a workspace from the View menu. */
 export async function useWorkspace(page: Page, name: string) {
-  await page.locator(".wsbox .wsbtn").dispatchEvent("mousedown");
-  await page.locator("#dropdown .dd", { hasText: name }).first().click();
+  await menu(page, "View", `${name} workspace`);
+}
+
+/** Clicks a mode tab (Home, Search, Collection, Decks, Trade, Proxies). */
+export async function modeTab(page: Page, name: string) {
+  await page.locator("#modetabs .mtab", { hasText: name }).first().click();
 }
 
 /** Takes the printing shown selected in the printing chooser that adding a card opens (Enter in its find box). */

@@ -35,7 +35,7 @@ test("search shows pictures with owned counts, and the Filters panel filters the
   await expect(page.locator(".colhead .phpos")).toContainText("showing 1 of 2");
 
   // the filter stays when another collection opens, and All collections lists every row with its collection
-  await menu(page, "Collection", "New collection...");
+  await menu(page, "File", "New collection...");
   await page.locator("#f-name").fill("Binder");
   await page.keyboard.press("Enter");
   await expect(page.locator("dialog[open]")).toHaveCount(0);
@@ -56,7 +56,7 @@ test("search shows pictures with owned counts, and the Filters panel filters the
 
 test("the deck's Add tab searches cards and adds them to a zone, counting what is already in the deck", async ({ page }) => {
   await signUp(page, "v8deck");
-  await menu(page, "Decks", "New deck...");
+  await menu(page, "File", "New deck...");
   await page.keyboard.type("Elves");
   await choose(page, page.locator("#f-format"), "casual");
   await page.keyboard.press("Enter");

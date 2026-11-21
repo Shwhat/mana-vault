@@ -29,7 +29,7 @@ Card search is where cards are found. From a search result a card is added to th
 |---|---|
 | [Capabilities](/about/capabilities) | What Mana Vault can do today, and what is planned |
 | [Getting started](/about/getting-started) | First sign-in, loading the card database and adding the first cards |
-| [Screen layout](/about/screen-layout) | Menus, ribbon, panels, workspaces, status bar and the phone layout |
+| [Screen layout](/about/screen-layout) | Menus, mode tabs, panels, workspaces, status bar and the phone layout |
 | [Card search](/about/card-search) | The search box, filter syntax and the Filters panel |
 | [Collections](/about/collections) | Collections, where new cards go, copy details, filter tags, the binder layout, picking rows, removing and moving cards |
 | [Set completion](/about/set-completion) | Linking sets, completion and finish rules, missing cards and exports |

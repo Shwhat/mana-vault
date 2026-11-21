@@ -47,7 +47,7 @@ The Missing tab lists every card still needed, with its image, mana cost, type, 
 - Narrow the list by set, rarity or color (Colorless lists cards with no color). The count shows how many of the missing cards are listed.
 - **+ Collection** on a row adds one copy of that printing to the open collection, as foil when a foil is needed and regular when a regular is needed. The list and the completion update at once.
 - Click a row to see the card in the Card panel.
-- **Add all to wishlist** (or **Add missing cards to wishlist** on the Collection ribbon tab) adds one copy of every missing card to your wishlist, foil where a foil is needed, in one step that can be undone. It is not offered when the open collection is itself a wishlist. Etched copies count as foil for set completion.
+- **Add all to wishlist**  adds one copy of every missing card to your wishlist, foil where a foil is needed, in one step that can be undone. It is not offered when the open collection is itself a wishlist. Etched copies count as foil for set completion.
 
 ## Exporting the missing list
 

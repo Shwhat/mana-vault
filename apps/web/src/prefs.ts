@@ -2,8 +2,7 @@
 import { request, APP_VERSION } from "./api";
 import { isApp } from "./android/platform";
 import { DEFAULT_WORKSPACE, isOpen, openPanel, PRESETS, type Layout, type Workspace, validLayout } from "./dock";
-import type { RibbonSize, RibbonTab } from "./ribbon";
-import { DEFAULT_SHEET, readSheet, type SheetSettings } from "./proxy-print";
+import { DEFAULT_SHEET, PRINT_SORTS, type PrintSort, readSheet, type SheetSettings } from "./proxy-print";
 import { type CollectionLayout, type CollectionSort, type Currency, type DeckGroup, type DeckSort, type DeckView, type GridSize, SEARCH_SORTS, type SearchSort, type SortScope, type SwitchSort, type Zone } from "./types";
 
 export type Theme = "light" | "dark" | "system";
@@ -14,8 +13,6 @@ export type Prefs = {
   zone: Zone;
   /** The zone the deck list shows (0.13.0): all zones, or one zone, which is then also where Add puts cards. */
   deckZoneView: Zone | "all";
-  ribbon: RibbonTab[] | null;
-  ribbonTab: string;
   layout: Layout;
   workspace: string;
   workspaces: Record<string, Workspace>;
@@ -76,7 +73,12 @@ export type Prefs = {
   scanShowTotal: boolean;
   /** Scanner: show how many copies of the last card are already in your collections. */
   scanShowOwned: boolean;
-  ribbonSize: RibbonSize;
+  /** A price pip on card pictures (0.14.0), off by default. */
+  pricesOnPictures: boolean;
+  /** The print list's order, layout and card size (0.14.0). */
+  printSort: PrintSort;
+  printLayout: CollectionLayout;
+  printSize: GridSize;
   /** Proxies: the sheet settings for printing, and the tab shown (Print or Card maker). */
   proxySheet: SheetSettings;
   proxyTab: "print" | "maker";
@@ -86,14 +88,14 @@ export type Prefs = {
 export function defaultPrefs(): Prefs {
   const preset = PRESETS[DEFAULT_WORKSPACE]!();
   return {
-    theme: "light", foil: false, zone: "main", deckZoneView: "all", ribbon: null, ribbonTab: "home", layout: preset.layout,
+    theme: "light", foil: false, zone: "main", deckZoneView: "all", layout: preset.layout,
     workspace: DEFAULT_WORKSPACE, workspaces: {}, lastDeckId: null, targetCollection: null, addTo: "collection", openCollection: null,
     currency: "usd", collectionSort: "name", collectionLayout: "grid", collectionLayoutPhone: "grid", gridSize: "m",
     searchLayout: "grid", searchLayoutPhone: "grid", searchSize: "m", allWishlists: false, tradeAllCards: false, searchAllPrintings: false,
     searchSort: { cards: "best", deckAdd: "best", tradeGive: "best", tradeGet: "best" },
     collectionSwitchSort: "recent", deckSwitchSort: "recent", recent: {}, deckView: "list", deckGroup: "type", deckSort: "name",
     scanVibrate: true, scanFoil: false, scanCamera: "environment", scanQuick: false, scanSounds: true, scanSets: [], scanIgnorePromos: false,
-    scanProxy: false, scanCondition: "NM", scanLanguage: "en", scanShowTotal: false, scanShowOwned: false, ribbonSize: "large",
+    scanProxy: false, scanCondition: "NM", scanLanguage: "en", scanShowTotal: false, scanShowOwned: false, pricesOnPictures: false, printSort: "added", printLayout: "list", printSize: "m",
     proxySheet: DEFAULT_SHEET, proxyTab: "print", appVersion: APP_VERSION,
   };
 }
@@ -109,8 +111,6 @@ export function mergePrefs(saved: unknown): Prefs {
     foil: value.foil === true,
     zone: value.zone === "sideboard" || value.zone === "commander" || value.zone === "maybeboard" ? value.zone : "main",
     deckZoneView: (["all", "main", "sideboard", "commander", "maybeboard"] as const).find((item) => item === value.deckZoneView) ?? "all",
-    ribbon: sameVersion && Array.isArray(value.ribbon) ? value.ribbon : null,
-    ribbonTab: typeof value.ribbonTab === "string" ? value.ribbonTab : base.ribbonTab,
     // a new version adds the panels it introduced (Collections in 0.2.0) to a saved layout
     layout: validLayout(value.layout)
       ? (sameVersion || isOpen(value.layout, "collections") ? value.layout : openPanel(value.layout, "collections"))
@@ -158,7 +158,10 @@ export function mergePrefs(saved: unknown): Prefs {
     scanLanguage: typeof value.scanLanguage === "string" && /^[a-z]{2,3}$/.test(value.scanLanguage) ? value.scanLanguage : "en",
     scanShowTotal: value.scanShowTotal === true,
     scanShowOwned: value.scanShowOwned === true,
-    ribbonSize: value.ribbonSize === "compact" || value.ribbonSize === "icons" ? value.ribbonSize : "large",
+    pricesOnPictures: value.pricesOnPictures === true,
+    printSort: PRINT_SORTS.find(([sort]) => sort === value.printSort)?.[0] ?? "added",
+    printLayout: value.printLayout === "grid" || value.printLayout === "binder" ? value.printLayout : "list",
+    printSize: value.printSize === "s" || value.printSize === "l" ? value.printSize : "m",
     appVersion: APP_VERSION,
   };
 }

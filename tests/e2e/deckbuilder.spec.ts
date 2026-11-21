@@ -1,9 +1,9 @@
 // Browser tests for 0.7.0: the deck builder, the switcher, card views and the layout fixes.
 import type { Page } from "@playwright/test";
-import { menu, signUp, status, switchTo, test, expect, choose, takePrinting } from "./fixtures";
+import { menu, modeTab, signUp, status, switchTo, test, expect, choose, takePrinting } from "./fixtures";
 
 async function newDeck(page: Page, name: string, format = "commander") {
-  await menu(page, "Decks", "New deck...");
+  await menu(page, "File", "New deck...");
   await page.keyboard.type(name);
   await choose(page, page.locator("#f-format"), format);
   await page.keyboard.press("Enter");
@@ -139,7 +139,7 @@ test("the switcher opens collections and decks by search and keyboard, and one c
   await expect(page.locator("#docname")).toHaveText("Deck: Elves");
   await expect(page.locator(".swpop")).toHaveCount(0);
 
-  await menu(page, "Collection", "New collection...");
+  await menu(page, "File", "New collection...");
   await page.locator("#f-name").fill("Trade binder");
   await page.keyboard.press("Enter");
   await page.keyboard.press("2");
@@ -164,7 +164,7 @@ test("the switcher opens collections and decks by search and keyboard, and one c
 
 test("new accounts see a grid; binder pages; Options; the Trade tab and the card menu", async ({ page }) => {
   await signUp(page, "grid", true);
-  await menu(page, "Trade", "Trade view");
+  await modeTab(page, "Trade");
   await expect(page.locator("#view-trade, .tradegrid").first()).toBeVisible();
   for (const name of ["Sol Ring", "Counterspell", "Dark Ritual"]) {
     await page.keyboard.press("1");

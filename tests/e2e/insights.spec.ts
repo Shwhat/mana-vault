@@ -96,7 +96,7 @@ test("tags and statistics bars filter the collection, and the binder shows pages
 test("deck cards are linked to collection copies, and missing cards go to a wishlist", async ({ page }) => {
   await signUp(page);
   await add(page, ["Counterspell"]);
-  await menu(page, "Decks", "New deck...");
+  await menu(page, "File", "New deck...");
   await page.keyboard.type("Blue deck");
   await page.locator(".dlgbtns .primary").click();
   await expect(status(page)).toHaveText("Blue deck created");
@@ -135,8 +135,8 @@ test("a saved trade: give trade cards, get from search, change a price, complete
   await signUp(page);
   await add(page, ["Shivan Dragon", "Dark Ritual"]);
   await openCollection(page);
-  await rows(page).filter({ hasText: "Shivan Dragon" }).locator(".rowtitle").click();
-  await menu(page, "Collection", "Mark for trade");
+  await rows(page).filter({ hasText: "Shivan Dragon" }).first().dispatchEvent("contextmenu");
+  await page.locator("#ctxmenu .dd", { hasText: "Mark for trade" }).click();
   await expect(status(page)).toHaveText("Shivan Dragon marked for trade");
   await page.keyboard.press("4");
   await expect(page.locator("#view-trade .empty.compact")).toContainText("No trades yet");
@@ -184,7 +184,7 @@ test("the Moxfield export keeps condition, language, finish and trade counts", a
   await page.fill("#f-trade", "1");
   await page.locator(".dlgbtns .primary").click();
   await expect(status(page)).toHaveText("Atraxa, Praetors' Voice changed");
-  await menu(page, "Home", "Export...");
+  await menu(page, "File", "Export...");
   await choose(page, page.locator("#ex-format"), "moxfield");
   const download = page.waitForEvent("download");
   await page.locator("dialog[open]").getByRole("button", { name: "Export", exact: true }).click();

@@ -17,9 +17,9 @@ A wishlist is a collection with **Wishlist** ticked in its settings. It works li
 
 | From | Command |
 |---|---|
-| A selected card | **Add to wishlist** (W, Home ribbon tab, Card panel, card page), or **+ Wishlist** on a search result. Adds one copy, foil when Add as foil is on |
-| The Missing tab of a collection linked to sets | **Add missing cards to wishlist** (Collection ribbon tab), or **Add all to wishlist** above the list. Adds one copy of every missing card, foil where foil is missing |
-| A deck | **Add missing deck cards to wishlist** (Decks ribbon tab), **Add missing to wishlist** on the Ownership tab, or **+ Wishlist** on a missing deck card. Adds the missing number of copies of each card |
+| A selected card | **Add to wishlist** (W, Card panel, card page), or **+ Wishlist** on a search result. Adds one copy, foil when Add as foil is on |
+| The Missing tab of a collection linked to sets | **Add all to wishlist** above the Missing list. Adds one copy of every missing card, foil where foil is missing |
+| A deck | **Add missing to wishlist** on the Ownership tab, or **+ Wishlist** on a missing deck card. Adds the missing number of copies of each card |
 
 These commands use your first wishlist. When you have none, a wishlist named **Wishlist** is created. Copies already on the wishlist are added to. Each command undoes as one step, for example "Undo Add missing cards of Blue deck to Wishlist".
 
@@ -40,7 +40,7 @@ Any copy in a collection you own can be marked for trade, except proxies. The nu
 
 | To | Do |
 |---|---|
-| Mark every copy of the picked rows | **Mark for trade** (Collection ribbon tab, For trade button), **For trade** in the picked bar, or the right-click menu |
+| Mark every copy of the picked rows | **Mark for trade** (For trade button), **For trade** in the picked bar, or the right-click menu |
 | Clear the marks of the picked rows | **Unmark for trade**, or **Not for trade** in the picked bar |
 | Mark some copies of one row | **Copy details...** (E), field For trade |
 | Show only rows with copies for trade | **For trade only** in the collection's Options |
@@ -51,7 +51,7 @@ The cards marked for trade are what the **You give** search of a trade shows, wh
 
 ## The trade view
 
-Press **4**, choose **Trade view** (Views group of the Home ribbon tab, or the Trade ribbon tab), or tap **Trade** in the phone's bottom bar. The header holds:
+Press **4**, click the **Trade** tab, or tap **Trade** in the phone's bottom bar. The header holds:
 
 | Item | Use |
 |---|---|

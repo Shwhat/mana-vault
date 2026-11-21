@@ -5,6 +5,7 @@ import { Icon } from "../icons";
 import { type Store, useApp } from "../store";
 import { anyPrice, capitalize, type CollectionLayout, type Filters, type GridSize, money, pricesOf, SEARCH_SORTS, type SearchSort, type SortScope } from "../types";
 import { choices, Picker } from "./Picker";
+import { PricePip } from "./CardMarks";
 import { Thumb } from "../views/Views";
 import { rowMenu } from "./ContextMenu";
 
@@ -98,6 +99,7 @@ function ResultPicture({ card, props, store }: { card: FoundCard; props: ResultP
         onClick={() => props.onPick(card)} onDoubleClick={() => props.onOpen(card)} {...rowMenu(store, card.name, () => props.menu(card))}>
         {card.image_url ? <img src={card.image_url} alt={card.name} loading="lazy" draggable={false} /> : <span className="pocketname">{card.name}</span>}
         <PrintingsBadge card={card} className="pocketfoil" />
+        <PricePip price={anyPrice(pricesOf(card), currency)} />
         {!!card.owned && <span className="dmarks" title={ownedLine(card)}><OwnedPips card={card} /></span>}
       </div>
       {props.buttons && <div className="resbtns">{props.buttons(card)}</div>}

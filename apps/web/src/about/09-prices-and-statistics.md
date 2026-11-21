@@ -14,7 +14,7 @@ Each card database update also saves the day's prices of every printing whose pr
 
 **Prices** chooses the currency for every price and value on screen: US dollars or euros. The choice is kept for your account.
 
-- Change it with **Prices in US dollars** or **Prices in euros** (the Currency list on the View ribbon tab), with PRICES in the status bar, or with **Show in euros** or **Show in US dollars** on a Statistics tab.
+- Change it with **Prices in US dollars** or **Prices in euros** (View menu), with PRICES in the status bar, or with **Show in euros** or **Show in US dollars** on a Statistics tab.
 - Values are never converted between currencies. A printing with a dollar price but no euro price has no value in euros.
 
 ## The price of a copy

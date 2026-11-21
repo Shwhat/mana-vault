@@ -75,7 +75,7 @@ test("search, filters and adding to the collection with undo", async ({ page }) 
 
 test("deck building with zones, moves and undo", async ({ page }) => {
   await signUp(page);
-  await menu(page, "Decks", "New deck...");
+  await menu(page, "File", "New deck...");
   await expect(page.locator("dialog[open] .dlghead")).toHaveText("New deck");
   await expect(page.locator("#f-name")).toBeFocused();
   await page.keyboard.press("Enter");
@@ -83,9 +83,8 @@ test("deck building with zones, moves and undo", async ({ page }) => {
   await page.keyboard.type("Burn test");
   await page.keyboard.press("Enter");
   await expect(page.locator("#docname")).toHaveText("Deck: Burn test");
-  // an open deck adds its groups to the Decks tab
-  await expect(page.locator(".rtab.active")).toHaveText("Decks");
-  await expect(page.locator(".rgroup.ctx", { hasText: "Build" })).toBeVisible();
+  // a new deck is open while card search stays in front
+  await expect(page.locator("#modetabs .mtab.active")).toHaveText("Search");
 
   await search(page, "Lightning Bolt");
   await row(page, "Lightning Bolt").click();
@@ -119,7 +118,7 @@ test("deck building with zones, moves and undo", async ({ page }) => {
   await page.keyboard.press("Control+z");
   await expect(page.locator("#view-deck .boardhead")).toHaveText(["Main deck 2", "Sideboard 1"]);
 
-  await menu(page, "Home", "Export...");
+  await menu(page, "File", "Export...");
   await choose(page, page.locator("#ex-what"), "deck");
   await choose(page, page.locator("#ex-format"), "text");
   const download = page.waitForEvent("download");
@@ -130,7 +129,7 @@ test("deck building with zones, moves and undo", async ({ page }) => {
 
 test("collection CSV import shows the detected format, a preview and the review panel", async ({ page }) => {
   await signUp(page);
-  await menu(page, "Home", "Import...");
+  await menu(page, "File", "Import...");
   const chooser = page.waitForEvent("filechooser");
   await page.getByRole("button", { name: "Choose file..." }).click();
   await (await chooser).setFiles({
@@ -151,12 +150,12 @@ test("collection CSV import shows the detected format, a preview and the review 
 
 test("decklist import into a deck", async ({ page }) => {
   await signUp(page);
-  await menu(page, "Decks", "New deck...");
+  await menu(page, "File", "New deck...");
   await expect(page.locator("#f-name")).toBeFocused();
   await page.keyboard.type("Imported");
   await page.keyboard.press("Enter");
   await expect(page.locator("#docname")).toHaveText("Deck: Imported");
-  await menu(page, "Home", "Import...");
+  await menu(page, "File", "Import...");
   await page.locator("dialog[open]").getByRole("button", { name: "Deck", exact: true }).click();
   const chooser = page.waitForEvent("filechooser");
   await page.getByRole("button", { name: "Choose file..." }).click();
@@ -214,31 +213,36 @@ test("panels close, reopen, float and workspaces apply", async ({ page }) => {
   await expect(page.locator(".dfloat")).toHaveCount(0);
   await expect(page.locator('.dgroup:has(.tab[data-panel="card"]) .tab[data-panel="filters"]')).toBeVisible();
 
-  await page.locator(".wsbox .wsbtn").dispatchEvent("mousedown");
-  await page.locator("#dropdown .dd", { hasText: "Collection" }).click();
+  await menu(page, "View", "Collection workspace");
   await expect(status(page)).toHaveText("Collection workspace");
   await expect(page.locator("#view-collection")).toBeVisible();
   await expect(page.locator(".dfloat")).toHaveCount(0);
   await expect(page.locator('.dtabs .tab[data-panel="review"]')).toBeVisible();
 });
 
-test("ribbon can be customized and reset", async ({ page }) => {
+test("the menu bar opens menus and switches between them; the mode tabs switch the program", async ({ page }) => {
   await signUp(page);
-  await expect(page.locator('.rpanel [data-action="scan"]')).toBeVisible();
-  await menu(page, "View", "Customize ribbon...");
-  await page.locator(".cz-row", { hasText: "Scan card..." }).first().click();
-  await page.locator(".cz > div").nth(2).getByRole("button", { name: "Remove" }).click();
-  await page.locator(".dlgbtns .primary").click();
-  await page.locator(".rtab", { hasText: "Home" }).click();
-  await expect(page.locator('.rpanel [data-action="scan"]')).toHaveCount(0);
-  await menu(page, "View", "Customize ribbon...");
-  await page.getByRole("button", { name: "Reset ribbon" }).click();
-  await page.locator(".dlgbtns .primary").click();
-  await page.locator(".rtab", { hasText: "Home" }).click();
-  await expect(page.locator('.rpanel [data-action="scan"]')).toBeVisible();
-  // the button size is chosen in the View tab
-  await menu(page, "View", "Icons only");
-  await expect(page.locator("#toolbar")).toHaveClass(/rsize-icons/);
+  await expect(page.locator("#toolbar, .rtab, .rpanel")).toHaveCount(0);
+  await expect(page.locator("#menubar .mbtn")).toHaveText(["File", "Edit", "View", "Help"]);
+  await page.locator('#menubar .mbtn[data-menu="File"]').dispatchEvent("mousedown");
+  await expect(page.locator("#dropdown")).toContainText("New collection...");
+  await expect(page.locator("#dropdown")).toContainText("Scan card...");
+  // moving to another menu while one is open opens that one
+  await page.locator('#menubar .mbtn[data-menu="View"]').hover();
+  await expect(page.locator("#dropdown")).toContainText("Dark theme");
+  await expect(page.locator("#dropdown")).toContainText("Prices on pictures");
+  await expect(page.locator("#dropdown")).not.toContainText("Customize ribbon");
+  await page.keyboard.press("Escape");
+  await expect(page.locator("#dropdown")).toHaveCount(0);
+  // tabs switch the program
+  await expect(page.locator("#modetabs .mtab")).toHaveText(["Home", "Search", "Collection", "Decks", "Trade", "Proxies"]);
+  for (const [name, view] of [["Proxies", "#view-proxies"], ["Trade", "#view-trade"], ["Collection", "#view-collection"], ["Search", "#view-cards"]] as const) {
+    await page.locator("#modetabs .mtab", { hasText: name }).click();
+    await expect(page.locator(view)).toBeVisible();
+    await expect(page.locator("#modetabs .mtab.active")).toHaveText(name);
+  }
+  await menu(page, "Edit", "Find");
+  await expect(page.getByRole("textbox", { name: "Search cards" })).toBeFocused();
 });
 
 test("About guide opens, navigates and closes", async ({ page }) => {
@@ -264,11 +268,11 @@ test("About guide opens, navigates and closes", async ({ page }) => {
 test("backup downloads and restores after a confirmation", async ({ page }) => {
   await signUp(page);
   const download = page.waitForEvent("download");
-  await menu(page, "Home", "Download backup");
+  await menu(page, "File", "Download backup");
   const file = await download;
   const path = await file.path();
   const chooser = page.waitForEvent("filechooser");
-  await menu(page, "Home", "Restore backup...");
+  await menu(page, "File", "Restore backup...");
   await (await chooser).setFiles(path);
   await expect(page.locator("dialog[open] .dlghead")).toHaveText("Restore backup");
   await expect(page.locator("dialog[open]")).toContainText("A restore cannot be undone.");
@@ -311,9 +315,9 @@ test.describe("phone layout", () => {
     await expect(page.locator("#pmain")).toContainText("New deck...");
     await page.getByRole("button", { name: "Menu" }).click();
     await expect(page.locator(".pmrow", { hasText: "Sign out" })).toBeVisible();
-    await expect(page.locator(".pmsection > summary")).toContainText(["Home", "Collection", "Decks"]);
-    await page.locator(".pmsection > summary", { hasText: "Home" }).first().click();
-    await expect(page.locator(".pmsub > summary", { hasText: "Backup" })).toBeVisible();
+    await expect(page.locator(".pmsection > summary")).toContainText(["File", "Edit", "View", "Help"]);
+    await page.locator(".pmsection > summary", { hasText: "File" }).first().click();
+    await expect(page.locator(".pmrow", { hasText: "Download backup" })).toBeVisible();
     await expect(page.locator(".pmrow", { hasText: "Customize ribbon" })).toHaveCount(0);
     const box = await page.locator(".pmrow").first().boundingBox();
     expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
