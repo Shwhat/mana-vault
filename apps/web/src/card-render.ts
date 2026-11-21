@@ -42,6 +42,8 @@ export type CardInfo = { rarity: string; artist: string; setCode: string; collec
 export type Assets = {
   art: CanvasImageSource | null;
   setSymbol: CanvasImageSource | null;
+  /** Colors a one-color set symbol (an SVG) by the card's rarity, with a light outline (0.15.0). */
+  setSymbolTint?: boolean;
   /** Mana symbol pictures by code without slashes (W, 2, WU, WP, T). A missing symbol is drawn as a colored circle. */
   symbols: Map<string, CanvasImageSource | null>;
 };
@@ -495,7 +497,8 @@ export function renderCard(canvas: HTMLCanvasElement, face: FaceDesign, info: Ca
   fitText(ctx, face.typeLine || "Type", typeBar.x + 20, typeBar.y + typeBar.h / 2 + 1, typeBar.w - 90, 30, 700, palette.text);
   const symbolBox = { x: typeBar.x + typeBar.w - 58, y: typeBar.y + 8, s: 40 };
   if (assets.setSymbol) {
-    ctx.drawImage(assets.setSymbol, symbolBox.x, symbolBox.y, symbolBox.s, symbolBox.s);
+    const picture = assets.setSymbolTint ? tintedSymbol(assets.setSymbol, info.rarity, symbolBox.s) : assets.setSymbol;
+    ctx.drawImage(picture, symbolBox.x, symbolBox.y, symbolBox.s, symbolBox.s);
   } else {
     ctx.save();
     ctx.beginPath();
@@ -573,4 +576,42 @@ export function loadPicture(source: Blob | string): Promise<HTMLImageElement | n
     image.onerror = () => resolve(null);
     image.src = url;
   });
+}
+
+/** The colors of a set symbol by rarity, from edge to middle to edge. */
+const RARITY_TINT: Record<string, string[]> = {
+  common: ["#111111", "#111111"], uncommon: ["#5f717a", "#dbe7ee", "#5f717a"], rare: ["#8a6d1d", "#f4d58d", "#8a6d1d"],
+  mythic: ["#b4361b", "#f6a03a", "#b4361b"], special: ["#5b2a86", "#c59be6", "#5b2a86"], bonus: ["#5b2a86", "#c59be6", "#5b2a86"],
+};
+
+/** A set symbol filled with its rarity's colors and outlined in white, the way printed cards show it. */
+export function tintedSymbol(symbol: CanvasImageSource, rarity: string, size: number): HTMLCanvasElement {
+  const scale = 4;
+  const s = size * scale;
+  const pad = 2 * scale;
+  const shape = document.createElement("canvas");
+  shape.width = s;
+  shape.height = s;
+  const sctx = shape.getContext("2d")!;
+  sctx.drawImage(symbol, pad, pad, s - pad * 2, s - pad * 2);
+  // the light outline: the shape in white, drawn around itself
+  const outline = document.createElement("canvas");
+  outline.width = s;
+  outline.height = s;
+  const octx = outline.getContext("2d")!;
+  for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 8) octx.drawImage(shape, Math.cos(angle) * pad * 0.7, Math.sin(angle) * pad * 0.7);
+  octx.globalCompositeOperation = "source-in";
+  octx.fillStyle = "#ffffff";
+  octx.fillRect(0, 0, s, s);
+  // the shape filled with the rarity's colors
+  sctx.globalCompositeOperation = "source-in";
+  const stops = RARITY_TINT[rarity] ?? RARITY_TINT.common!;
+  const gradient = sctx.createLinearGradient(0, s, s, 0);
+  stops.forEach((color, index) => gradient.addColorStop(stops.length === 1 ? 0 : index / (stops.length - 1), color));
+  sctx.fillStyle = gradient;
+  sctx.fillRect(0, 0, s, s);
+  // the shape keeps a dark edge so light colors stay visible on the white outline
+  octx.globalCompositeOperation = "source-over";
+  octx.drawImage(shape, 0, 0);
+  return outline;
 }

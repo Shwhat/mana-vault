@@ -47,7 +47,7 @@ let plugin: ManaVaultNative | null = null;
 
 /** True inside the Android app (or a browser test standing in for it). */
 export function isApp(): boolean {
-  return Capacitor.isNativePlatform() || !!window.__manaVaultApp;
+  return Capacitor.isNativePlatform() || (typeof window !== "undefined" && !!window.__manaVaultApp);
 }
 
 export function native(): ManaVaultNative {

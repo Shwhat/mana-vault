@@ -2,7 +2,7 @@
 import { randomUUID } from "node:crypto";
 import type { FastifyInstance, FastifyReply } from "fastify";
 import type { DatabaseSync } from "node:sqlite";
-import { listSets } from "./sets.js";
+import { listSets, type SetDetails, setDetails } from "./sets.js";
 import { type CopyExtras, type CopyKey, type Currency, NO_EXTRAS, PRICE_COLUMNS, priceSql, readCopyExtras, readCopyKey } from "./copies.js";
 import { alignDeckCard, collectionLinks, dropLinks, linkedCount, moveLinks, rowKey, trimLinks } from "./links.js";
 import { finishOffered, readDeckFinish } from "./decks.js";
@@ -60,7 +60,7 @@ type Printing = {
 };
 type Need = "any" | "regular" | "foil";
 export type MissingCard = Omit<Printing, "finishes" | "promo" | "variation" | "oracle_id"> & { oracle_id: string; needs: Need };
-export type SetProgress = { code: string; name: string; owned: number; total: number; printedSize: number | null; known: boolean };
+export type SetProgress = { code: string; name: string; owned: number; total: number; printedSize: number | null; known: boolean } & SetDetails;
 
 const collectorNumber = (value: string) => (/^\d+$/.test(value) ? Number(value) : null);
 
@@ -153,7 +153,7 @@ export function collectionCompletion(database: DatabaseSync, collectionId: strin
         }
       }
     }
-    sets.push({ code, name, owned: setOwned, total: setTotal, printedSize, known: !!info });
+    sets.push({ code, name, owned: setOwned, total: setTotal, printedSize, known: !!info, ...setDetails(database, code) });
   }
   const overall = sets.reduce((sum, set) => ({ owned: sum.owned + set.owned, total: sum.total + set.total }), { owned: 0, total: 0 });
   return { completion, finish, sets, overall, missing };
@@ -266,7 +266,7 @@ export function createCollection(database: DatabaseSync, ownerId: number, input:
 }
 
 export const ENTRY_COLUMNS = `c.id, c.oracle_id, c.name, c.mana_cost, c.mana_value, c.type_line, c.set_code, c.set_name, c.collector_number, c.rarity,
-  c.image_url, c.colors, c.legalities, c.custom, c.promo_types, ${PRICE_COLUMNS}, i.quantity, i.foil, i.condition, i.language, i.proxy, i.trade,
+  c.image_url, c.colors, c.legalities, c.custom, c.promo_types, c.removed, ${PRICE_COLUMNS}, i.quantity, i.foil, i.condition, i.language, i.proxy, i.trade,
   i.purchase_price, i.price_currency, i.added_at, i.misprint, i.altered, i.signed`;
 const KEY_WHERE = "card_id = ? AND foil = ? AND condition = ? AND language = ? AND proxy = ?";
 const KEY_CONFLICT = "ON CONFLICT(collection_id, card_id, foil, condition, language, proxy)";
@@ -282,7 +282,7 @@ export function toEntry(row: Record<string, unknown>) {
   const { legalities, ...rest } = row;
   return {
     ...rest, legal: legalFormats(legalities), proxy: Number(row.proxy) === 1, misprint: Number(row.misprint) === 1, altered: Number(row.altered) === 1,
-    signed: Number(row.signed) === 1, custom: Number(row.custom ?? 0) === 1,
+    signed: Number(row.signed) === 1, custom: Number(row.custom ?? 0) === 1, removed: Number(row.removed ?? 0) === 1,
   };
 }
 

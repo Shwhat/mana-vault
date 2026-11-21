@@ -1,18 +1,22 @@
 // ---------- the card maker: custom cards with a live preview, saved to the card database for every account ----------
 import { type PointerEvent as ReactPointerEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { downloadBlob, fetchFile, pickFile, request, slugify } from "../api";
+import { refreshCardSearches } from "../card-search";
+import { forgetCardPicture } from "../proxy-print";
 import {
   type Assets, blankFace, type CardKind, type FaceDesign, type Frame, frameName, FRAMES, FRAME_STYLE_NAMES, FRAME_STYLES, type FrameStyle, HEIGHT, loadPicture, renderCard, SCALE, symbolFile, symbolsIn, WIDTH,
 } from "../card-render";
 import { Icon } from "../icons";
 import { type Store, useApp } from "../store";
 import { type Card, FORMATS, formatName } from "../types";
+import { ArtLibrary, type ArtItem } from "./ArtLibrary";
+import { blobToData, type CustomSet, SetManager } from "./CustomSets";
 import { confirmDialog, customDialog } from "./Dialog";
 import { choices, type Choice, Picker } from "./Picker";
+import { Suggest } from "./Suggest";
+import { symbolPicture, SymbolWindow } from "./SymbolPicker";
 
-export type CustomSet = {
-  code: string; name: string; releasedAt: string | null; ownerId: number | null; ownerName: string; hasSymbol: boolean; cardCount: number; symbolUrl: string | null;
-};
+export type { CustomSet };
 export type CustomCardSummary = {
   id: string; ownerId: number | null; ownerName: string; updatedAt: string; name: string; setCode: string; setName: string; collectorNumber: string;
   rarity: string; typeLine: string; imageUrl: string; hasBack: boolean;
@@ -37,83 +41,13 @@ const COLORS = ["W", "U", "B", "R", "G"] as const;
 const COLOR_NAMES: Record<string, string> = { W: "White", U: "Blue", B: "Black", R: "Red", G: "Green" };
 const FINISH_NAMES: Array<[string, string]> = [["nonfoil", "Regular"], ["foil", "Foil"], ["etched", "Etched"]];
 const LEGAL_FORMATS = FORMATS.filter((format) => format !== "casual");
-/** The mana symbol picker's sections, in order. */
-export const SYMBOL_GROUPS: Array<[string, string[]]> = [
-  ["Numbers", [...Array.from({ length: 21 }, (_, number) => String(number)), "X"]],
-  ["Colors", ["W", "U", "B", "R", "G", "C", "S"]],
-  ["Phyrexian", ["W/P", "U/P", "B/P", "R/P", "G/P"]],
-  ["Hybrid", ["W/U", "W/B", "U/B", "U/R", "B/R", "B/G", "R/G", "R/W", "G/W", "G/U"]],
-  ["Two or color", ["2/W", "2/U", "2/B", "2/R", "2/G"]],
-  ["Other", ["T", "Q", "E"]],
-];
-
 const newDraft = (setCode = ""): Draft => ({
   front: blankFace(), back: null, setCode, collectorNumber: "1", rarity: "common", artist: "", finishes: ["nonfoil"], priceUsd: "", priceEur: "",
   legal: [], colorsAuto: true, colors: [], identityAuto: true, identity: [], tokens: [],
 });
 const noArt = (): Art => ({ image: null, data: null, changed: false });
 
-// ---------- pictures: mana symbols and set symbols are loaded once ----------
-const symbolCache = new Map<string, Promise<HTMLImageElement | null>>();
-function symbolPicture(code: string): Promise<HTMLImageElement | null> {
-  const file = symbolFile(code);
-  let promise = symbolCache.get(file);
-  if (!promise) {
-    promise = fetchFile(`/api/symbols/${encodeURIComponent(code.toUpperCase())}`)
-      .then(async (response) => (response.ok ? loadPicture(await response.blob()) : null))
-      .catch(() => null);
-    symbolCache.set(file, promise);
-  }
-  return promise;
-}
-/** One mana symbol, drawn from the same picture the card uses (a colored circle with its code while it loads). */
-function SymbolGlyph({ code }: { code: string }) {
-  const canvas = useRef<HTMLCanvasElement>(null);
-  useEffect(() => {
-    let live = true;
-    const draw = (picture: HTMLImageElement | null) => {
-      const ctx = canvas.current?.getContext("2d");
-      if (!ctx || !live) return;
-      ctx.clearRect(0, 0, 48, 48);
-      if (picture) ctx.drawImage(picture, 0, 0, 48, 48);
-      else {
-        ctx.fillStyle = "#cac5c0";
-        ctx.beginPath();
-        ctx.arc(24, 24, 22, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = "#111";
-        ctx.font = "700 18px Georgia, serif";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText(code.replace("/", ""), 24, 25);
-      }
-    };
-    draw(null);
-    void symbolPicture(code).then(draw);
-    return () => { live = false; };
-  }, [code]);
-  return <canvas ref={canvas} width={48} height={48} className="symglyph" aria-hidden="true" />;
-}
-
-/** The mana symbol picker: a click puts the symbol at the cursor of the mana cost or rules text used last. */
-function SymbolPicker({ onPick, disabled }: { onPick: (code: string) => void; disabled: boolean }) {
-  return (
-    <div className="sympicker" role="group" aria-label="Mana symbols">
-      {SYMBOL_GROUPS.map(([name, codes]) => (
-        <div key={name} className="symgroup">
-          <div className="symname">{name}</div>
-          <div className="symrow">
-            {codes.map((code) => (
-              <button key={code} type="button" className="symbtn" title={`{${code}}`} aria-label={`Insert {${code}}`} disabled={disabled}
-                onMouseDown={(event) => event.preventDefault()} onClick={() => onPick(code)}><SymbolGlyph code={code} /></button>
-            ))}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
+// ---------- set symbols are loaded once ----------
 const setSymbolCache = new Map<string, Promise<HTMLImageElement | null>>();
 function setSymbolPicture(url: string): Promise<HTMLImageElement | null> {
   let promise = setSymbolCache.get(url);
@@ -123,13 +57,6 @@ function setSymbolPicture(url: string): Promise<HTMLImageElement | null> {
   }
   return promise;
 }
-const blobToData = (blob: Blob): Promise<string> => new Promise((resolve, reject) => {
-  const reader = new FileReader();
-  reader.onload = () => resolve(String(reader.result));
-  reader.onerror = () => reject(new Error("The picture could not be read"));
-  reader.readAsDataURL(blob);
-});
-
 /** The card data sent to the server from the card maker's fields. */
 function cardData(draft: Draft) {
   const face = (design: FaceDesign) => ({
@@ -151,96 +78,6 @@ function pictureData(face: FaceDesign, info: Parameters<typeof renderCard>[2], a
   const canvas = document.createElement("canvas");
   renderCard(canvas, face, info, assets);
   return canvas.toDataURL("image/jpeg", 0.9);
-}
-
-// ---------- custom sets ----------
-function SetManager({ store, onChange }: { store: Store; onChange: () => void }) {
-  const [sets, setSets] = useState<CustomSet[] | null>(null);
-  const [code, setCode] = useState("");
-  const [name, setName] = useState("");
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
-  const [symbol, setSymbol] = useState<string | null>(null);
-  const [error, setError] = useState("");
-  const load = useCallback(async () => setSets(await request<CustomSet[]>("/api/custom/sets")), []);
-  useEffect(() => { void load().catch((reason: unknown) => setError(reason instanceof Error ? reason.message : "Could not load the sets.")); }, [load]);
-  const pickSymbol = async (apply: (data: string) => void) => {
-    const file = await pickFile("image/png,image/jpeg,image/webp");
-    if (!file) return;
-    if (file.size > 512 * 1024) return setError("A set symbol can be up to 512 KB");
-    apply(await blobToData(file));
-  };
-  const create = async () => {
-    setError("");
-    try {
-      await request("/api/custom/sets", { method: "POST", body: JSON.stringify({ code, name, releasedAt: date, symbol }) });
-      setCode(""); setName(""); setSymbol(null);
-      await load();
-      onChange();
-      store.flash(`Custom set ${code.toUpperCase()} created`);
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Could not create the set.");
-    }
-  };
-  const change = async (set: CustomSet, body: Record<string, unknown>, done: string) => {
-    setError("");
-    try {
-      await request(`/api/custom/sets/${encodeURIComponent(set.code)}`, { method: "PATCH", body: JSON.stringify(body) });
-      setSymbolCache.clear();
-      await load();
-      onChange();
-      store.flash(done);
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Could not change the set.");
-    }
-  };
-  const remove = async (set: CustomSet) => {
-    if (!(await confirmDialog("Delete custom set", `Delete the custom set ${set.name} (${set.code.toUpperCase()})?`, "Delete set"))) return;
-    try {
-      await request(`/api/custom/sets/${encodeURIComponent(set.code)}`, { method: "DELETE" });
-      await load();
-      onChange();
-      store.flash(`${set.name} deleted`);
-    } catch (reason) {
-      store.fail(reason, "Could not delete the set.");
-    }
-  };
-  return (
-    <div className="setmanager">
-      {error && <p className="note err">{error}</p>}
-      <table className="dtable">
-        <thead><tr><th>Code</th><th>Name</th><th>Released</th><th>Cards</th><th>Made by</th><th /></tr></thead>
-        <tbody>
-          {sets?.length === 0 && <tr><td colSpan={6} className="sub">No custom sets yet</td></tr>}
-          {sets?.map((set) => {
-            const mine = set.ownerId === store.user.id;
-            return (
-              <tr key={set.code}>
-                <td><b>{set.code.toUpperCase()}</b></td>
-                <td>{mine ? <input aria-label={`Name of ${set.code.toUpperCase()}`} defaultValue={set.name}
-                  onBlur={(event) => { if (event.target.value.trim() && event.target.value.trim() !== set.name) void change(set, { name: event.target.value }, "Set renamed"); }} /> : set.name}</td>
-                <td>{mine ? <input type="date" aria-label={`Release date of ${set.code.toUpperCase()}`} defaultValue={set.releasedAt ?? ""}
-                  onBlur={(event) => { if (event.target.value && event.target.value !== set.releasedAt) void change(set, { releasedAt: event.target.value }, "Release date changed"); }} /> : set.releasedAt}</td>
-                <td>{set.cardCount}</td>
-                <td>{set.ownerName}</td>
-                <td className="btnrow">{mine && <>
-                  <button type="button" className="btn small" onClick={() => void pickSymbol((data) => void change(set, { symbol: data }, "Set symbol changed"))}>{set.hasSymbol ? "Change symbol..." : "Add symbol..."}</button>
-                  <button type="button" className="btn small" disabled={set.cardCount > 0} title={set.cardCount ? "Delete or move its cards first" : undefined} onClick={() => void remove(set)}>Delete</button>
-                </>}</td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-      <h4>New custom set</h4>
-      <div className="prow"><label htmlFor="cs-code">Set code</label><input id="cs-code" value={code} maxLength={6} placeholder="XXX" onChange={(event) => setCode(event.target.value.replace(/[^A-Za-z0-9]/g, ""))} /></div>
-      <div className="prow"><label htmlFor="cs-name">Set name</label><input id="cs-name" value={name} maxLength={100} onChange={(event) => setName(event.target.value)} /></div>
-      <div className="prow"><label htmlFor="cs-date">Release date</label><input id="cs-date" type="date" value={date} onChange={(event) => setDate(event.target.value)} /></div>
-      <div className="prow"><label>Set symbol</label>
-        <span className="btnrow"><button type="button" className="btn small" onClick={() => void pickSymbol(setSymbol)}>{symbol ? "Change..." : "Choose picture..."}</button>
-          {symbol && <img className="setsym" src={symbol} alt="Set symbol" />}</span></div>
-      <div className="btnrow end"><button type="button" className="btn primary" disabled={code.length < 2 || !name.trim()} onClick={() => void create()}>Create set</button></div>
-    </div>
-  );
 }
 
 /** Chooses the art of any card in the card database. */
@@ -337,7 +174,9 @@ export function CardMaker() {
       const [cardList, setList] = await Promise.all([request<CustomCardSummary[]>("/api/custom/cards"), request<CustomSet[]>("/api/custom/sets")]);
       setCards(cardList);
       setSets(setList);
-      setDraft((value) => (value.setCode || !setList.length ? value : { ...value, setCode: setList.find((set) => set.ownerId === store.user.id)?.code ?? setList[0]!.code }));
+      // a set whose code changed (Edit set) or that was deleted is replaced by one of your sets
+      setDraft((value) => ((value.setCode && setList.some((set) => set.code === value.setCode)) || !setList.length ? value
+        : { ...value, setCode: setList.find((set) => set.ownerId === store.user.id)?.code ?? setList[0]!.code }));
     } catch (reason) {
       store.fail(reason, "Could not load the custom cards.");
     }
@@ -369,7 +208,7 @@ export function CardMaker() {
   }, [set?.symbolUrl, set?.hasSymbol]);
 
   const info = (which: "front" | "back") => ({ rarity: draft.rarity, artist: draft.artist, setCode: draft.setCode || "XXX", collectorNumber: draft.collectorNumber, back: !!draft.back, face: which });
-  const assets = (which: "front" | "back"): Assets => ({ art: arts[which].image, setSymbol, symbols });
+  const assets = (which: "front" | "back"): Assets => ({ art: arts[which].image, setSymbol, symbols, setSymbolTint: !!set?.rarityColors && set.symbolType === "image/svg+xml" });
 
   // the preview is drawn again after every change
   useEffect(() => {
@@ -386,20 +225,21 @@ export function CardMaker() {
     setDirty(true);
   };
 
-  /** Puts a symbol code at the cursor of the mana cost or rules text field used last. */
+  /** Puts a symbol code at the cursor of the mana cost or rules text field used last (the mana cost before any is used). */
   const insertSymbol = (code: string) => {
-    const field = lastField.current;
+    const field = lastField.current?.dataset.field === "rulesText" || lastField.current?.dataset.field === "manaCost" ? lastField.current : null;
     const text = `{${code}}`;
     const key = field?.dataset.field === "rulesText" ? "rulesText" : "manaCost";
     const value = current[key];
-    const start = field && field.dataset.field === key ? field.selectionStart ?? value.length : value.length;
-    const end = field && field.dataset.field === key ? field.selectionEnd ?? value.length : value.length;
+    const start = field ? field.selectionStart ?? value.length : value.length;
+    const end = field ? field.selectionEnd ?? value.length : value.length;
     changeFace({ [key]: value.slice(0, start) + text + value.slice(end) } as Partial<FaceDesign>);
     window.setTimeout(() => {
-      if (field && field.dataset.field === key) {
-        field.focus();
-        field.setSelectionRange(start + text.length, start + text.length);
-      }
+      const target = field ?? document.querySelector<HTMLInputElement>('[data-field="manaCost"]');
+      if (!target) return;
+      lastField.current = target;
+      if (!store.phone) target.focus();
+      target.setSelectionRange(start + text.length, start + text.length);
     }, 0);
   };
 
@@ -413,6 +253,15 @@ export function CardMaker() {
   const startNew = async () => {
     if (!(await confirmLeave())) return;
     const code = draft.setCode || sets[0]?.code || "";
+    setId(null); setOwnerId(store.user.id); setFace("front");
+    setDraft({ ...newDraft(code), collectorNumber: nextNumber(code, null) });
+    setArts({ front: noArt(), back: noArt() });
+    setDirty(false);
+  };
+
+  /** A new card in a chosen custom set, numbered after its last card. */
+  const newInSet = async (code: string) => {
+    if (!(await confirmLeave())) return;
     setId(null); setOwnerId(store.user.id); setFace("front");
     setDraft({ ...newDraft(code), collectorNumber: nextNumber(code, null) });
     setArts({ front: noArt(), back: noArt() });
@@ -475,8 +324,11 @@ export function CardMaker() {
       setArts((value) => ({ front: { ...value.front, changed: false }, back: { ...value.back, changed: false } }));
       setDirty(false);
       store.flash(`${saved.name} saved to the card database`);
+      // every place that shows the card shows the new version: searches, the print list and printed pictures
+      forgetCardPicture(saved.id);
+      refreshCardSearches();
       await loadLists();
-      await store.refreshAfterChange();
+      await Promise.all([store.refreshAfterChange(), store.loadPrintList()]);
     } catch (reason) {
       store.fail(reason, "Could not save the card.");
     } finally {
@@ -535,6 +387,17 @@ export function CardMaker() {
     }} />
   ), 720, "Cancel");
 
+  const useLibraryArt = async (art: ArtItem) => {
+    const response = await fetchFile(art.url);
+    if (!response.ok) return store.flash("That art could not be loaded", "err");
+    const blob = await response.blob();
+    setArt(face, await blobToData(blob), await loadPicture(blob));
+    store.flash(`${art.name} used on the card`);
+  };
+  const artFromLibrary = () => customDialog("Art library", (close) => (
+    <ArtLibrary store={store} canUse={mine} onUse={(art) => { close(); void useLibraryArt(art); }} />
+  ), 760);
+
   // dragging in the art box moves the art
   // the same art areas as the drawing: the whole card (Borderless), behind the bars (Full art), or the art box
   const artBox = () => (current.style === "borderless" ? { x: 0, y: 0, w: WIDTH, h: HEIGHT - 44 }
@@ -576,19 +439,17 @@ export function CardMaker() {
   const textField = (key: "name" | "manaCost" | "typeLine" | "power" | "toughness" | "loyalty", label: string, placeholder = "") => (
     <div className="prow"><label htmlFor={`cm-${key}`}>{label}</label>
       <input id={`cm-${key}`} data-field={key} value={current[key]} placeholder={placeholder} disabled={!mine}
-        onFocus={(event) => { lastField.current = event.currentTarget; }} onChange={(event) => changeFace({ [key]: event.target.value } as Partial<FaceDesign>)} /></div>
+        onFocus={(event) => focusField(event.currentTarget)} onChange={(event) => changeFace({ [key]: event.target.value } as Partial<FaceDesign>)} /></div>
   );
-  const [symbolsFor, setSymbolsFor] = useState<"manaCost" | "rulesText" | null>(null);
-  // the picker opens under the field it fills; a click inserts at that field's cursor
-  const symbolButton = (key: "manaCost" | "rulesText") => (
-    <button type="button" className={symbolsFor === key ? "btn small on" : "btn small"} aria-expanded={symbolsFor === key} disabled={!mine}
-      onMouseDown={(event) => event.preventDefault()}
-      onClick={() => {
-        const field = document.querySelector<HTMLInputElement | HTMLTextAreaElement>(`[data-field="${key}"]`);
-        if (field) lastField.current = field;
-        setSymbolsFor(symbolsFor === key ? null : key);
-      }}>Symbols</button>
-  );
+  const [symbolsOpen, setSymbolsOpen] = useState(false);
+  const [symbolTarget, setSymbolTarget] = useState<"manaCost" | "rulesText">("manaCost");
+  const focusField = (element: HTMLInputElement | HTMLTextAreaElement) => {
+    lastField.current = element;
+    if (element.dataset.field === "manaCost" || element.dataset.field === "rulesText") setSymbolTarget(element.dataset.field);
+  };
+  const openSets = () => customDialog("Custom sets", (close) => (
+    <SetManager store={store} onChange={() => void loadLists()} onNewCard={(code) => { close(); void newInSet(code); }} />
+  ), 760);
   const toggle = (list: string[], value: string, on: boolean) => (on ? [...new Set([...list, value])] : list.filter((item) => item !== value));
 
   return (
@@ -598,7 +459,7 @@ export function CardMaker() {
           <input className="search" value={term} onChange={(event) => setTerm(event.target.value)} placeholder="Find a custom card" aria-label="Find a custom card" />
           <button type="button" className="btn small" onClick={() => void startNew()}>New card</button>
         </div>
-        <div className="navbar"><button type="button" className="btn small grow" onClick={() => customDialog("Custom sets", () => <SetManager store={store} onChange={() => void loadLists()} />, 760)}>Custom sets...</button></div>
+        <div className="navbar"><button type="button" className="btn small grow" onClick={() => openSets()}>Custom sets...</button></div>
         {cards === null && <p className="note pad">Loading custom cards</p>}
         {cards?.length === 0 && <p className="note pad">No custom cards yet</p>}
         {shown.map((card) => (
@@ -627,7 +488,7 @@ export function CardMaker() {
             ? <Picker id="cm-set" label="Custom set" value={draft.setCode} disabled={!mine}
               options={sets.map((item) => ({ value: item.code, label: `${item.name} (${item.code.toUpperCase()})` }))}
               onChange={(value) => change({ setCode: value, collectorNumber: id ? draft.collectorNumber : nextNumber(value, id) })} />
-            : <button type="button" className="btn small" onClick={() => customDialog("Custom sets", () => <SetManager store={store} onChange={() => void loadLists()} />, 760)}>Create a custom set...</button>}
+            : <button type="button" className="btn small" onClick={() => openSets()}>Create a custom set...</button>}
         </div>
         <div className="prow"><label htmlFor="cm-number">Collector number</label>
           <input id="cm-number" value={draft.collectorNumber} maxLength={10} disabled={!mine} onChange={(event) => change({ collectorNumber: event.target.value })} /></div>
@@ -645,7 +506,9 @@ export function CardMaker() {
           </div>
         )}
 
-        <h4>{draft.back ? (face === "front" ? "Front face" : "Back face") : "Face"}</h4>
+        <div className="facehead"><h4>{draft.back ? (face === "front" ? "Front face" : "Back face") : "Face"}</h4>
+          <button type="button" className={symbolsOpen ? "btn small on" : "btn small"} aria-expanded={symbolsOpen} disabled={!mine}
+            onMouseDown={(event) => event.preventDefault()} onClick={() => setSymbolsOpen(!symbolsOpen)}>Symbols</button></div>
         <div className="prow"><label htmlFor="cm-kind">Kind</label>
           <Picker id="cm-kind" label="Kind" value={current.kind} options={KIND_CHOICES} disabled={!mine} onChange={(value) => changeFace({ kind: value as CardKind })} /></div>
         <div className="prow"><label htmlFor="cm-style">Style</label>
@@ -653,23 +516,25 @@ export function CardMaker() {
         <div className="prow"><label htmlFor="cm-frame">Frame</label>
           <Picker id="cm-frame" label="Frame" value={current.frame} options={FRAME_CHOICES} disabled={!mine} onChange={(value) => changeFace({ frame: value as Frame })} /></div>
         <label className="ck"><input type="checkbox" checked={current.legendary} disabled={!mine} onChange={(event) => changeFace({ legendary: event.target.checked })} /> Legendary</label>
-        {textField("name", "Name")}
+        <div className="prow"><label htmlFor="cm-name">Name</label>
+          <Suggest id="cm-name" data-field="name" mode="name" value={current.name} disabled={!mine}
+            onFocus={(event) => focusField(event.currentTarget)} onValue={(value) => changeFace({ name: value })} /></div>
         {current.style === "nickname" && (
           <div className="prow"><label htmlFor="cm-nickname">Nickname</label>
             <input id="cm-nickname" value={current.nickname} maxLength={100} disabled={!mine} placeholder="Shown in the name bar"
               onChange={(event) => changeFace({ nickname: event.target.value })} /></div>
         )}
         <div className="prow"><label htmlFor="cm-manaCost">Mana cost</label>
-          <span className="withbtn"><input id="cm-manaCost" data-field="manaCost" value={current.manaCost} placeholder="{2}{R}" disabled={!mine}
-            onFocus={(event) => { lastField.current = event.currentTarget; }} onChange={(event) => changeFace({ manaCost: event.target.value })} />{symbolButton("manaCost")}</span></div>
-        {symbolsFor === "manaCost" && <SymbolPicker disabled={!mine} onPick={insertSymbol} />}
-        {textField("typeLine", "Type line", current.kind === "token" ? "Token Creature - Goblin" : "Creature - Goblin")}
+          <input id="cm-manaCost" data-field="manaCost" value={current.manaCost} placeholder="{2}{R}" disabled={!mine}
+            onFocus={(event) => focusField(event.currentTarget)} onChange={(event) => changeFace({ manaCost: event.target.value })} /></div>
+        <div className="prow"><label htmlFor="cm-typeLine">Type line</label>
+          <Suggest id="cm-typeLine" data-field="typeLine" mode="typeLine" value={current.typeLine} disabled={!mine}
+            placeholder={current.kind === "token" ? "Token Creature - Goblin" : "Creature - Goblin"}
+            onFocus={(event) => focusField(event.currentTarget)} onValue={(value) => changeFace({ typeLine: value })} /></div>
         <div className="prow top"><label htmlFor="cm-rules">Rules text</label>
-          <textarea id="cm-rules" data-field="rulesText" rows={6} value={current.rulesText} disabled={!mine}
+          <Suggest multiline id="cm-rules" data-field="rulesText" mode="rules" rows={6} value={current.rulesText} disabled={!mine}
             placeholder={current.kind === "planeswalker" ? "+1: Draw a card.\n-3: Destroy target creature." : current.kind === "saga" ? "I: Create a 1/1 Soldier token.\nII, III: Draw a card." : "Flying\n{T}: Add {R}. (Reminder text is in parentheses.)"}
-            onFocus={(event) => { lastField.current = event.currentTarget; }} onChange={(event) => changeFace({ rulesText: event.target.value })} /></div>
-        <div className="prow"><span />{symbolButton("rulesText")}</div>
-        {symbolsFor === "rulesText" && <SymbolPicker disabled={!mine} onPick={insertSymbol} />}
+            onFocus={(event) => focusField(event.currentTarget)} onValue={(value) => changeFace({ rulesText: value })} /></div>
         <div className="prow"><label htmlFor="cm-textsize">Rules text size</label>
           <span className="numfield"><input id="cm-textsize" type="range" min={60} max={140} value={current.textSize} disabled={!mine} onChange={(event) => changeFace({ textSize: Number(event.target.value) })} /> {current.textSize}%</span></div>
         <div className="prow top"><label htmlFor="cm-flavor">Flavor text</label>
@@ -681,6 +546,7 @@ export function CardMaker() {
         <h4>Art</h4>
         <div className="btnrow">
           <button type="button" className="btn small" disabled={!mine} onClick={() => void uploadArt()}>Upload art...</button>
+          <button type="button" className="btn small" disabled={!mine} onClick={artFromLibrary}>Art library...</button>
           <button type="button" className="btn small" disabled={!mine} onClick={artFromCard}>Art of a card...</button>
           <button type="button" className="btn small" disabled={!mine || !arts[face].image} onClick={() => setArt(face, null, null)}>Remove art</button>
         </div>
@@ -715,6 +581,8 @@ export function CardMaker() {
         <canvas ref={canvas} className="cardcanvas" width={WIDTH * SCALE} height={HEIGHT * SCALE} aria-label={`Preview of ${current.name || "the card"}`} role="img"
           onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerUp} onPointerCancel={() => { drag.current = null; tap.current = null; }} onClick={showFull} />
       </section>
+      {symbolsOpen && <SymbolWindow phone={store.phone} disabled={!mine} onPick={insertSymbol} onClose={() => setSymbolsOpen(false)}
+        target={symbolTarget === "rulesText" ? "the rules text" : "the mana cost"} />}
       {full && (
         <div className="cardfull" role="dialog" aria-modal="true" aria-label="Card full size" onClick={() => setFull(null)}>
           <img src={full} alt={`${current.name || "The card"}, full size`} />

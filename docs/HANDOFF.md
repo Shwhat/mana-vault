@@ -22,12 +22,27 @@ Mana Vault is Devon's self-hosted Magic: The Gathering collection and deck manag
 - Every change gets tests; `npm run test:all` must pass before delivery. Where Playwright cannot download its browser, run it with an installed Chrome: `PW_CHANNEL=chrome npm run test:all`.
 - Deployment follows the docker-server-setup skill: Dockhand only, no Watchtower, absolute data path, UID 65532, no cloudflared or reverse proxy in the stack.
 
-## Next (0.15.0)
+## Next (0.16.0)
 
-- A purchase history section (moved from 0.13.0 and 0.14.0). Ask Devon how to build it before starting 0.15.0.
-- Follow-ups to ask Devon: whether exact-printing auto-link (0.11.0) works the way Devon wants, whether the single Adding here mark and the Add to name button with the printing chooser work as wanted (0.12.0), whether one click to pick and a double click to open, and the pips on pictures, work as wanted (0.13.0), and whether the menu bar, the mode tabs and the five card maker styles look right (0.14.0).
+- Purchase history, specified in `docs/SPEC-0.15.0.md` (project doc): a Purchases mode tab (key 6), entries for purchases, card and product sales and trades, product lines with tax and shipping spread over them, openings of sealed product tied to the cards pulled, sealed values with history, imported purchase prices, Spent, Received, Value now and Gain or loss, CSV export, backups version 7. `mergeHooks` in `scryfall-extras.ts` is where purchase ties follow merged printings.
+- Follow-ups to ask Devon: whether the pip bar, one tap to open in the app, the Symbols window, the art library and the custom set menu work as wanted (0.15.0).
 
-## Decisions (0.14.0 menu bar and mode tabs, account delete, card maker, proxy pictures, print list)
+## Decisions (0.15.0 pip bar, custom sets, symbols, art library, Scryfall extras, card languages)
+
+- Pips sit in `PipBar` (`.pipbar`, CardMarks.tsx) after the picture (before it in deck Stacks, where the top strip stays visible). `CountPip` shows "Nx".
+- Android app: `PickOpen` opens on one tap when `isApp()`; browsers keep pick and double click.
+- Custom card save calls `forgetCardPicture` (a `?v=` version per card in proxy-print.ts), `refreshCardSearches` and reloads the print list.
+- Custom sets: `CustomSets.tsx` (`SetManager`, `EditSet`, symbol chooser with an inline Scryfall symbol list, since the single `dialog#dlg` cannot stack windows). PATCH `/api/custom/sets/:code` takes `code` (moves sets, custom_sets and the cards), `rarityColors`, `symbolFrom` (a saved Scryfall symbol). Undo PATCHes the old values back, with the old symbol as a data address. `svg.ts` `cleanSvg` cleans every SVG; SVGs are served with `SVG_HEADERS` (no scripts). Rarity colors: `tintedSymbol` in card-render.ts (shape filled with a rarity gradient over a white outline).
+- Symbols: one `SymbolWindow` (SymbolPicker.tsx), floating on desktop and a sheet on phones, inserting at `lastField` (mana cost or rules text, mana cost by default). Groups come from `/api/symbology` once loaded. `SymbolText` draws `{X}` symbols in rules text with hidden text kept for copying.
+- Right-click menus inside an open window are portalled into `dialog#dlg` (a modal dialog makes everything outside it inert).
+- Art library: table `art_library` per user, routes `/api/art`; custom card saves add their art (`addToArtLibrary`, same bytes kept once); `importCustomArt` runs once (catalog_metadata `art_library_imported`). Pictures load with `fetchFile` (blob addresses) so the app's token is sent.
+- Scryfall extras (`scryfall-extras.ts`, called at the end of `importCatalogExtras`): set symbols (only changed addresses, 6 at a time, one download per file), symbology (`symbology` table plus pictures in `symbols`), migrations (newest first until an applied id, then applied oldest first; merge moves collection_cards, deck_links, deck_cards, want_card_id, trade_lines, print_lists, price_history and sets `removed`; delete sets `cards.removed`), catalogs, the standard card back (`card_backs` id `standard`; uploaded backs are `user:<id>`). `removed` printings are left out of search, grouped counts, printings lists and set lists, and sorted last wherever a name picks a printing.
+- Suggestions: `Suggest.tsx` (`partAt` finds the word being typed per mode) and `/api/catalog/suggest?list=names|types|keywords|artists|watermarks`. In card search Tab moves into the suggestions so Down still reaches the results. The app answers offline from its card list and a kept copy of `/api/catalog/lists`.
+- Card languages: settings `cardLanguages` (official codes) and `languagePictures`; `languageRule` keeps official languages chosen and unofficial ones when `extraLanguages`; `removeUnusedLanguages` drops printings no one holds. The estimate uses Scryfall's bulk-data size, stored counts or rough counts per language, and the bytes per printing of the database.
+- Card backs: sheet setting `cardBacks`; with a back, `printSlots` pairs a two-faced card's faces, and `buildPdf` adds a mirrored back page (`reversePage`) after each page. The MPC zip always gets back.jpg when a back is available.
+- Backups are version 6 (art library and uploaded card back; SVG custom set symbols are cleaned on restore).
+
+## Decisions (0.14.0## Decisions (0.14.0 menu bar and mode tabs, account delete, card maker, proxy pictures, print list)
 
 - Specification: `docs/SPEC-0.14.0.md` in the claude.ai project. Devon's answers: symbol picker and more frame styles from the other card maker's screenshots; price pip as an option (off by default); a small pinned preview on the phone; phones keep the bottom bar. Devon said "build it".
 - Account delete: the shared dialog's `onClose` cleared the spec even when a second dialog had opened right after the first (the native close event arrives after the next `showModal`), so choiceDialog followed by confirmDialog or dialog closed the second at once. `DialogHost` now clears only when the element is really closed. This fixes every "question after a question".
@@ -228,7 +243,11 @@ Devon said "build all of it now" for the seven proposals without a question roun
 | `apps/server/src/insights.ts` | `summarize` (stat tiles and buckets), `deckOwnership`, routes `/api/collections/:id/stats`, `/api/decks/:id/stats`, `/api/decks/:id/ownership`, `/api/trade` |
 | `apps/server/src/copies.ts` | Copy key parsing (`readCopyKey`, `readCondition`, `readLanguage`, `readFinish`), conditions and languages, `priceSql` per currency |
 | `apps/server/src/scan.ts` | Scan matching: `NameMatcher` (in-memory trigram index of names, front faces and flavor names, rebuilt when the catalog changes), `readInfoLine`, `matchScan`; routes `POST /api/scan/match` and `GET /api/cards/:cardId/printings` |
-| `apps/server/src/sets.ts` | Scryfall set list storage (`saveSets`) and set search (`listSets`) |
+| `apps/server/src/sets.ts` | Scryfall set list storage (`saveSets`, with symbol address and details), set search (`listSets`), `setDetails`, `setsWithSymbols` |
+| `apps/server/src/scryfall-extras.ts` | Set symbols, symbology, migrations (`applyMigrations`, `mergePrinting`, `mergeHooks`), catalogs and `suggest`, card back, `importScryfallExtras` |
+| `apps/server/src/extras.ts` | Routes for set symbols, symbology, suggestions and lists, card backs, the art library and Administration's card database parts and language estimate; `importCustomArt`, `addToArtLibrary` |
+| `apps/server/src/svg.ts` | `cleanSvg` and `SVG_HEADERS` |
+| `apps/web/src/components/CustomSets.tsx`, `SymbolPicker.tsx`, `ArtLibrary.tsx`, `Suggest.tsx` | Custom sets window and Edit set; Symbols window, `SymbolGlyph`, `SymbolText`; art library window; text fields with suggestions |
 | `apps/server/src/auth.ts` | Users (admin, disabled, must change), sessions (token hashes), prefs table, PBKDF2, rate limiter, cookie helpers |
 | `apps/server/src/settings.ts` | Server settings with defaults, input checks, environment locks (`settingsFromEnvironment`) |
 | `apps/server/src/admin.ts` | Administration routes (`/api/admin/...`): overview, settings, accounts, invites, devices, activity, server check and log, folder browser, server backups and restore; `logActivity`, `startBackupSchedule`, `applyPendingRestore` |
@@ -303,8 +322,8 @@ None known.
 - Price change alerts (price history is kept since 0.12.0).
 - A built-in demo document (program-design-guide section 6) was not part of the 0.1.0 specification.
 - Optional command line (program-design-guide section 3) was not built.
-- Card maker: real fonts for card text (the frames use Georgia or the system serif), more frame styles, set symbols colored by rarity from one picture, art for saga and split layouts; printing both faces of a custom card on a double-sided MPC order.
-- Proxies: a card back picture for MPC orders, saving several named print lists.
+- Card maker: real fonts for card text (the frames use Georgia or the system serif), more frame styles, art for saga and split layouts; printing both faces of a custom card on a double-sided MPC order.
+- Proxies: saving several named print lists; a preview of the back pages.
 
 ## Known limits
 
@@ -323,7 +342,8 @@ None known.
 - Imports up to 5 MB and 5,000 rows; backups up to 250 MB.
 - Printing proxies and the card maker's mana symbols need the server to reach Scryfall (cards.scryfall.io, svgs.scryfall.io); without it cards print as white cards with names and symbols are drawn circles. Two-faced cards print their back only after the first card database update with 0.9.0.
 - MPC Autofill's own XML order files point to images in its online index, so Mana Vault writes a card list instead. The MPC Autofill list format and the MakePlayingCards picture size (822 x 1122) have not been tried with a real order.
-- A Scryfall set that later takes the code of a custom set would rename that set on the next update (custom codes are checked only when made).
+- A Scryfall set that later takes the code of a custom set would rename that set on the next update (custom codes are checked only when made or changed).
+- Set symbols, symbols, printing changes, suggestions lists, the card back and other card languages arrive with the first card database update with 0.15.0; until then the Symbols window uses its built-in groups and suggestions are empty. The language size estimate uses rough counts until a language has been downloaded once. The Scryfall endpoints for migrations, catalogs and card backs could not be called from the workspace (no internet); they were tested with stand-in answers.
 - Custom card pictures are made in the browser; a card saved from a browser without a font named Georgia uses the system serif.
 - The print list saves count changes 400 ms after the last change; a change made just before closing is sent while the page closes.
 - Card pictures not downloaded to the server load from Scryfall through it. Scryfall's Art Tags and Oracle Tags bulk file names could not be checked from the workspace (no internet); the importer finds them by type or name, and a missing file only leaves tags empty.
@@ -332,4 +352,4 @@ None known.
 
 ## Where work stopped
 
-0.1.0 to 0.14.0 are merged to main (0.14.0 in the pull request for branch `v0.14.0`). All checks pass (`PW_CHANNEL=chrome npm run test:all`: typecheck, 175 server tests, 34 web tests, 51 browser tests). The debug APK for 0.14.0 comes from the `Android app` workflow on the merge to main (Debug build pre-release). Next: ask Devon the follow-ups listed under Next, then ask how to build purchase history before starting 0.15.0. Still to check from earlier versions: run a card database update on the server (back faces, and with 0.12.0 tags, special foils, unofficial languages and price history; check that the Art and Oracle tag files were found), tick picture sizes and watch the download, print a test sheet and check the PDF scale and cut lines on paper, try an MPC Autofill list and a MakePlayingCards upload, make a custom card on a phone, check the scanner light and outline on a phone, try double tap to open on the phone, try trading between two accounts, then create the release key and the four repository secrets and tag a release.
+0.1.0 to 0.15.0 are merged to main (0.15.0 in the pull request for branch `v0.15.0`). All checks pass (`PW_CHANNEL=chrome npm run test:all`: typecheck, 198 server tests, 35 web tests, 58 browser tests). The debug APK for 0.15.0 comes from the `Android app` workflow on the merge to main (Debug build pre-release). Next: 0.16.0 purchase history (`docs/SPEC-0.15.0.md`, approved with "build everything"). Still to check from earlier versions: run a card database update on the server (back faces, tags, special foils, languages, price history, and with 0.15.0 set symbols, symbols, printing changes, lists and the card back), tick picture sizes and watch the download, print a test sheet with card backs on both sides and check the PDF scale, cut lines and back alignment on paper, try an MPC Autofill list and a MakePlayingCards upload with back.jpg, make a custom card on a phone, check the scanner light and outline on a phone, try one tap to open in the app, try trading between two accounts, then create the release key and the four repository secrets and tag a release.

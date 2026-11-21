@@ -54,7 +54,8 @@ The first account on a new server can always be created. **New invite code...** 
 Shows the number of printings, the last update and its error, skipped cards, the number of Art and Role tags, the printings per language and how many days of price history are saved. **Update now** starts an update.
 
 - **Update every** sets the hours between automatic updates (0 turns them off). The default is 168 hours (one week).
-- **Also keep printings in Scryfall's unofficial languages** (on by default) reads Scryfall's All Cards file with each update to add printings such as Phyrexian. Official translations (Spanish, Japanese and so on) are not added.
+- **Card languages**: English and unofficial languages (the default), All languages, or Chosen languages with a checkbox for each, with the number of printings, the download and the database growth shown before **Save languages**. **Pictures of other languages** (off by default) also downloads their pictures. See [Card languages](/about/card-database#card-languages).
+- **Parts** lists each part of the card database with its count and when it was last updated: card printings, sets, set symbols, symbols, rulings, art tags, oracle tags, printing changes, name and keyword lists, the card back and the price history, then the printing changes of the last update and how many removed printings are still held.
 
 See [Card database](/about/card-database) for what an update downloads.
 

@@ -26,7 +26,7 @@ This page lists what Mana Vault does in the current version, followed by what is
 - Keep any number of collections per account, each with a name and description. Every account starts with a Main collection.
 - Add any printing as a regular, foil or etched copy with Enter, a double-click or one add button that names where the card goes (+ name) and opens the printing chooser with the shown printing selected; a card with one printing and one finish is added at once.
 - See where cards go: an Adding here mark in the Collections and Decks panels, and ADDING TO in the status bar, which switches between the open deck and the target collection. Cycle the collections with C.
-- See one picture per printing in Grid and Binder, with pips on the picture for the count, FOIL or ETCHED, condition, language, Proxy and the number for trade. A printing held as more than one kind of copy gets a line under the picture for each, with its pips and count. Card pictures show no prices; the List layout has them.
+- See one picture per printing in Grid and Binder, with a pip bar under the picture for the count, FOIL or ETCHED, condition, language, Proxy and the number for trade, so the pips never cover the card. A printing held as more than one kind of copy gets a line under the picture for each, with its pips and count. Card pictures show no prices; the List layout has them.
 - Change the printing or finish of all or some copies (such as one of two copies to the foil version), keeping their count, condition, language, trade marks and details, and choose whether the decks they fill change too or keep their version.
 - Right-click or long press a collection (panel or switcher) to open, rename, change settings, send, export, delete or leave it.
 - Record each copy's finish (regular, foil or etched), condition (Mint to Damaged) and language with Copy details.
@@ -176,6 +176,20 @@ This page lists what Mana Vault does in the current version, followed by what is
 - Scan with the phone's own text recognition, matched against the card list on the phone when offline.
 - Notifications for new offers in the Inbox, checked in the background about every 15 minutes, optionally only on Wi-Fi.
 - The Back button, the Android share sheet for exports and backups, and a daily check for a newer app.
+
+### 0.15.0 additions
+
+- A pip bar under every card picture (above each picture in deck Stacks) holds all the pips, so nothing covers the card.
+- In the Android app one tap opens a collection or deck.
+- Custom sets have a right-click menu (Edit set..., Show its cards, New card in this set, Delete...); Edit set changes the name, code, release date and symbol, with undo. Set symbols can be SVG, a Scryfall set symbol or a picture, drawn in rarity colors.
+- One Symbols window in the card maker puts symbols at the cursor of the mana cost or rules text, with Scryfall's full symbol list and names.
+- An art library per account for the card maker.
+- Set symbols and block, parent set and digital details in filters, set pickers, set completion, the card page and the printing chooser.
+- Rules text and mana costs on the card page show symbols as pictures.
+- Scryfall's printing changes are applied: merged printings move every copy, deck card and list line; removed printings show Printing removed.
+- Suggestions for card names, types, keywords and artists in card search, Quick add, the scanner and the card maker.
+- Card backs for proxies: mirrored back pages in the PDF, and back.jpg in the MakePlayingCards zip.
+- Card languages in Administration: English and unofficial, all, or chosen languages, with a size estimate.
 
 ### 0.14.0 additions
 

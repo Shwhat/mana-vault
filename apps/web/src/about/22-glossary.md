@@ -5,6 +5,14 @@
 | Card | A card by name, such as Lightning Bolt, across all its printings |
 | Printing | One version of a card in one set, with its own set code, collector number, rarity and artwork |
 | Card database | The local catalog of every printing, downloaded from Scryfall |
+| Art library | The pictures an account keeps for the card maker |
+| Block | A group of sets released together (such as Ice Age), used to group sets in set completion |
+| Card back | The picture printed on the reverse of proxies: the standard Magic back or an uploaded one |
+| Pip bar | The strip under a card picture (above it in deck Stacks) that holds the card's pips |
+| Printing removed | A printing Scryfall deleted; copies keep it until Change printing moves them |
+| Printing change | A merge or removal of a printing published by Scryfall and applied by the card database update |
+| Rarity colors | Drawing an SVG set symbol in the colors of the card's rarity |
+| Suggestions | Names, types, keywords or artists offered under a text field while typing |
 | Card list | The smaller copy of the card database that the Android app keeps on the phone for offline search and scanning |
 | Device | A phone signed in with the Android app, listed in Devices... |
 | Offline | The state of the Android app when the server cannot be reached; it works from its copy of the library |

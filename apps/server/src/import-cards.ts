@@ -10,6 +10,7 @@ import { DatabaseSync } from "node:sqlite";
 import { initializeDatabase } from "./database.js";
 import { saveSets } from "./sets.js";
 import { importBulkFile, OFFICIAL_LANGUAGES } from "./import-bulk.js";
+import { importScryfallExtras } from "./scryfall-extras.js";
 import { chain } from "stream-chain";
 import { parser } from "stream-json";
 import { streamArray } from "stream-json/streamers/stream-array.js";
@@ -240,19 +241,24 @@ export function snapshotPrices(database: DatabaseSync, day = new Date().toISOStr
  * turned on), the Art and Oracle tag files, and a price snapshot. Each part that fails keeps what was stored before.
  */
 export async function importCatalogExtras(database: DatabaseSync, dataPath: string, options: ImportCardOptions = {}): Promise<void> {
-  const setting = database.prepare("SELECT value FROM server_settings WHERE key = 'extraLanguages'").get();
-  const extraLanguages = setting ? String(setting.value) !== "false" : true;
+  const keepLanguage = languageRule(database);
   const extraPath = `${dataPath}.extra`;
-  if (extraLanguages) {
+  if (keepLanguage.any) {
     try {
       await downloadBulkData(extraPath, { ...options, bulk: "all_cards" });
-      const kept = await importBulkFile(extraPath, database, undefined, { keep: (lang) => lang !== "en" && !OFFICIAL_LANGUAGES.has(lang), metadata: false });
-      console.log(`Saved ${kept.toLocaleString()} printings in unofficial languages`);
+      const kept = await importBulkFile(extraPath, database, undefined, { keep: keepLanguage.keep, metadata: false });
+      console.log(`Saved ${kept.toLocaleString()} printings in other languages`);
     } catch (error) {
-      console.warn(`Could not update the unofficial languages: ${error instanceof Error ? error.message : String(error)}`);
+      console.warn(`Could not update the other languages: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
       await rm(extraPath, { force: true });
     }
+  }
+  try {
+    const removed = removeUnusedLanguages(database, keepLanguage.keep);
+    if (removed) console.log(`Removed ${removed.toLocaleString()} printings in languages no longer chosen`);
+  } catch (error) {
+    console.warn(`Could not remove the languages no longer chosen: ${error instanceof Error ? error.message : String(error)}`);
   }
   for (const kind of ["art", "oracle"] as const) {
     const path = `${dataPath}.${kind}-tags`;
@@ -272,6 +278,49 @@ export async function importCatalogExtras(database: DatabaseSync, dataPath: stri
   } catch (error) {
     console.warn(`Could not save the price history: ${error instanceof Error ? error.message : String(error)}`);
   }
+  await importScryfallExtras(database, (options.fetcher ?? fetch) as unknown as Parameters<typeof importScryfallExtras>[1]);
+}
+
+const savedSetting = (database: DatabaseSync, key: string): unknown => {
+  try {
+    const row = database.prepare("SELECT value FROM server_settings WHERE key = ?").get(key);
+    return row ? JSON.parse(String(row.value)) : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
+/**
+ * Which languages other than English the card database keeps (Administration, Card database, Card languages):
+ * unofficial languages (Phyrexian, Ancient Greek and others) when "extraLanguages" is on, and each official language
+ * listed in "cardLanguages".
+ */
+export function languageRule(database: DatabaseSync): { keep: (lang: string) => boolean; any: boolean } {
+  const extra = savedSetting(database, "extraLanguages");
+  const extraLanguages = extra === undefined ? true : extra !== false && extra !== "false";
+  const listed = savedSetting(database, "cardLanguages");
+  const chosen = new Set(Array.isArray(listed) ? listed.filter((item): item is string => typeof item === "string") : []);
+  return {
+    keep: (lang) => lang !== "en" && (OFFICIAL_LANGUAGES.has(lang) ? chosen.has(lang) : extraLanguages),
+    any: extraLanguages || chosen.size > 0,
+  };
+}
+
+/** Removes printings in languages no longer kept, except printings that copies, decks, trades or lists still use. */
+export function removeUnusedLanguages(database: DatabaseSync, keep: (lang: string) => boolean): number {
+  const languages = (database.prepare("SELECT DISTINCT lang FROM cards WHERE lang != 'en' AND custom = 0").all() as Array<{ lang: string }>)
+    .map((row) => String(row.lang)).filter((lang) => !keep(lang));
+  let removed = 0;
+  for (const lang of languages) {
+    removed += Number(database.prepare(
+      `DELETE FROM cards WHERE lang = ? AND custom = 0
+         AND NOT EXISTS (SELECT 1 FROM collection_cards WHERE card_id = cards.id)
+         AND NOT EXISTS (SELECT 1 FROM deck_cards WHERE printing_id = cards.id OR want_card_id = cards.id)
+         AND NOT EXISTS (SELECT 1 FROM trade_lines WHERE card_id = cards.id)
+         AND NOT EXISTS (SELECT 1 FROM print_lists WHERE lines LIKE '%' || cards.id || '%')`,
+    ).run(lang).changes);
+  }
+  return removed;
 }
 
 /** Downloads Scryfall's rulings file and replaces the stored rulings. Returns how many were saved. */

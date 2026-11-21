@@ -12,12 +12,45 @@ Each update also keeps, for use without the internet:
 |---|---|---|
 | The full record of every printing | Default Cards | Kept as Scryfall sends it, compressed, so every field is on the server |
 | Treatments | Default Cards | Language, special foils and other promo types (Surge foil, Galaxy foil...), frame, frame effects, border, full art, keywords and printed name, used by card marks and filters |
-| Printings in unofficial languages | Scryfall's All Cards file (several hundred MB) | Printings such as Phyrexian, when **Also keep printings in Scryfall's unofficial languages** is on in Administration (on by default). Official translations are not added. Search prefers the English printing |
+| Printings in other languages | Scryfall's All Cards file (several hundred MB) | The languages chosen in **Card languages** in Administration: by default the unofficial languages (Phyrexian, Quenya and others); also any of Spanish, French, German, Italian, Portuguese, Japanese, Korean, Russian, Simplified and Traditional Chinese. See [Card languages](#card-languages) |
 | Art Tags | Scryfall's Art Tags file | What a card's art shows (cat, dog, bird...), for the Art shows filter and `art:` |
 | Oracle Tags | Scryfall's Oracle Tags file | What a card does (ramp, removal...), for the Role filter and `role:` |
 | Price history | The day's prices | One entry per printing for each day its price changed; see [Prices and statistics](/about/prices-and-statistics) |
+| Set symbols | Scryfall's set list and its SVG symbol files | The symbol of every set, with its parent set, block, and whether it is digital only, foil only or regular only. Shown in card search filters, set pickers, set completion, the card page and the printing chooser, and offered for custom sets. A symbol is downloaded again only when Scryfall changes it |
+| Symbols | Scryfall's symbol list | Every mana and card symbol with its name, mana value and colors, and its picture. Used by the card maker's Symbols window, the colors and mana value of custom cards, and the symbols drawn in rules text on the card page |
+| Printing changes | Scryfall's list of printing changes | Printings Scryfall merged into another or removed; see [Printing changes](#printing-changes) |
+| Name and keyword lists | Scryfall's catalogs | Card names, artist names, creature, planeswalker, land, artifact, enchantment and spell types, keyword abilities, keyword actions, ability words and watermarks, for suggestions while typing |
+| Card back | Scryfall's card back picture | The standard Magic card back, downloaded once in full size, for printing proxies |
 
-When one of these parts fails to download, what was stored before is kept and the rest of the update goes on. Tags, special foils, unofficial languages and price history appear after the first card database update with version 0.12.0.
+When one of these parts fails to download, what was stored before is kept and the rest of the update goes on. Tags, special foils, unofficial languages and price history appear after the first card database update with version 0.12.0; set symbols, symbols, printing changes, name and keyword lists, the card back and the other card languages after the first update with version 0.15.0.
+
+## Card languages
+
+**Card languages** in Administration, Card database chooses which printed languages the card database keeps besides English:
+
+| Choice | Keeps |
+|---|---|
+| English and unofficial languages (the default) | English printings, and the unofficial languages such as Phyrexian and Quenya |
+| All languages | Every language Scryfall has: Spanish, French, German, Italian, Portuguese, Japanese, Korean, Russian, Simplified and Traditional Chinese, and the unofficial ones |
+| Chosen languages | A checkbox for each language, and one for the unofficial languages |
+
+- Before the choice is saved, it shows about how many printings are kept besides English, the download (Scryfall's All Cards file, downloaded with each update while any language other than English is kept) and about how much the database grows.
+- The next card database update adds the printings of the languages chosen. Taking a language out removes its printings at the next update, except printings that copies, deck cards, trade lines or print lists use, which stay.
+- **Pictures of other languages** (off by default) also downloads the pictures of those printings in the picture sizes chosen in Administration, Pictures; the estimate shows the space first. When it is off, their pictures load from Scryfall through the server.
+- Card search keeps English first: a search that shows one result per card picks the English printing, and `lang:` (such as `lang:ja`) finds other languages. The printing chooser lists every language of a card with a language pip, such as JA.
+- A copy's Language (in Copy details) is the language of the card you hold. **Change printing...** offers the printings in other languages; copies stay as they are until changed.
+- The scanner reads English text only.
+
+## Printing changes
+
+Scryfall sometimes merges a printing into another (two entries for the same card) or removes one. Each update reads the changes made since the last one, oldest first:
+
+| Change | What happens |
+|---|---|
+| Merge | Everything that holds the old printing moves to the new one: copies in collections and wishlists (joining a copy of the same finish, condition, language and proxy mark), deck cards and their linked copies, upgrade choices, trade lines, print list lines and the price history. The old printing is no longer found by search |
+| Removal | The printing stays for the copies and deck cards that hold it, shows a **Printing removed** pip, and is no longer found by search. A click on the pip opens **Change printing...** |
+
+The message at the end of the update and the status bar give "N printings merged, N removed", counting only changes to printings that were held. Each change is written to Administration, Activity.
 
 ## Updating
 
@@ -38,6 +71,7 @@ When one of these parts fails to download, what was stored before is kept and th
 | Updating card database | An update is running |
 | Last update failed | The last update failed; click it to see the reason |
 | N skipped | Cards left out of the last update because their record failed a check; click it to see their names |
+| N printings merged, N removed | Printing changes from Scryfall applied by the last update to printings that were held; click it to open Administration, Activity |
 
 ## Messages
 

@@ -1,6 +1,6 @@
 // ---------- offline use in the Android app: a copy of the library on the phone, queued changes and sync ----------
 import type { CardDetail, Collection, CollectionEntry, DeckCard, DeckDetail, Deck, DeckLink, FinishCode } from "../types";
-import { compactCard, matchOnPhone, printingsOf, refreshCatalog, refreshRulings, rulingsOf, searchCards } from "./catalog";
+import { compactCard, matchOnPhone, printingsOf, refreshCatalog, refreshRulings, rulingsOf, searchCards, suggestOnPhone } from "./catalog";
 import { idbAll, idbDelete, idbGet, idbSet } from "./idb";
 import { appFetch, OfflineError, readJson, SignedOutError } from "./net";
 
@@ -35,7 +35,7 @@ function setStatus(change: Partial<SyncStatus>) {
 // ---------- the copy on the phone ----------
 
 /** Answers that are kept for offline use: everything under /api except these. */
-const NOT_KEPT = /^\/api\/(cards\?|cards\/[^/]+\/printings|catalog\/|backup|sync|devices|users|scan\/|health|config)/;
+const NOT_KEPT = /^\/api\/(cards\?|cards\/[^/]+\/printings|catalog\/(?!lists$)|backup|sync|devices|users|scan\/|health|config)/;
 const keep = (url: string) => url.startsWith("/api/") && !NOT_KEPT.test(url);
 const getCopy = <T>(url: string) => idbGet<T>("cache", url);
 const setCopy = (url: string, value: unknown) => idbSet("cache", url, value);
@@ -335,6 +335,7 @@ async function detailOnPhone(id: string): Promise<CardDetail> {
 async function answerOnPhone(url: string): Promise<unknown> {
   const [path, query = ""] = url.split("?") as [string, string?];
   if (path === "/api/cards") return searchCards(new URLSearchParams(query));
+  if (path === "/api/catalog/suggest") return suggestOnPhone(new URLSearchParams(query), await getCopy<Record<string, string[]>>("/api/catalog/lists"));
   let match: RegExpExecArray | null;
   if ((match = /^\/api\/cards\/([^/]+)\/printings$/.exec(path))) return printingsOf(decodeURIComponent(match[1]!));
   if ((match = /^\/api\/cards\/([^/]+)\/rulings$/.exec(path))) return rulingsOf(decodeURIComponent(match[1]!));

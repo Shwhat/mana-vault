@@ -299,7 +299,7 @@ describe("backups", () => {
     await call("ann", "PUT", `/api/collections/${main}/cards`, { items: [{ cardId: "t1", foil: 2, condition: "HP", language: "de", quantity: 2, trade: 1 }] });
     const backup = (await call("ann", "GET", "/api/backup")).body;
     const parsed = JSON.parse(backup);
-    expect(parsed.version).toBe(5);
+    expect(parsed.version).toBe(6);
     expect(parsed.collectionCards[0]).toMatchObject({ foil: 2, condition: "HP", language: "de", trade: 1 });
     const headers = "application/vnd.mana-vault.backup+json";
     expect((await call("ann", "POST", "/api/backup/restore", backup, headers)).statusCode).toBe(200);

@@ -1,8 +1,9 @@
 // ---------- card marks shared by every view: finish badges, Upgrade wanted, owned versions of missing cards, Remove how many ----------
-import type { MouseEvent as ReactMouseEvent } from "react";
+import type { MouseEvent as ReactMouseEvent, ReactNode } from "react";
 import { type Store, useApp } from "../store";
 import { type Candidate, type DeckCard, type FinishCode, copyLabel, finishLabel, money } from "../types";
 import { closeDialog, customDialog, dialog } from "./Dialog";
+import { apiUrl } from "../android/platform";
 
 const FINISH_WORD: Record<FinishCode, string> = { 0: "regular", 1: "foil", 2: "etched" };
 export const finishWord = (finish: FinishCode | undefined | null) => FINISH_WORD[(finish ?? 0) as FinishCode];
@@ -126,9 +127,18 @@ export function removeCard(store: Store, name: string, quantity: number, apply: 
   ));
 }
 
-/** The count on a card picture, top right, when more than one copy is shown. Used by every picture view. */
+/** The count in a picture's pip bar, when more than one copy is shown. Used by every picture view. */
 export function CountPip({ count }: { count: number }) {
-  return count > 1 ? <span className="pocketqty" title={`${count} copies`}>{count}</span> : null;
+  return count > 1 ? <span className="badge pipcount" title={`${count} copies`}>{count}x</span> : null;
+}
+
+/**
+ * The pip bar under a card picture (0.15.0): the count, finish, copy details, deck marks and the price sit here instead
+ * of on the picture, so nothing covers the card. In the deck's Stacks view the bar sits above each card, where it stays
+ * in view while the cards overlap.
+ */
+export function PipBar({ children, label }: { children: ReactNode; label?: string }) {
+  return <div className="pipbar" aria-label={label}>{children}</div>;
 }
 
 /**
@@ -148,4 +158,22 @@ export function PricePip({ price }: { price: number | null | undefined }) {
   const store = useApp();
   if (!store.prefs.pricesOnPictures || price === null || price === undefined) return null;
   return <span className="pricepip" title="Price">{money(price, store.prefs.currency)}</span>;
+}
+
+/** A set's symbol (its Scryfall symbol, or a custom set's own), hidden when the set has none. */
+export function SetIcon({ code, big = false }: { code: string; big?: boolean }) {
+  return <img className={big ? "setico big" : "setico"} src={apiUrl(`/api/set-symbols/${encodeURIComponent(code.toLowerCase())}`)} alt="" loading="lazy"
+    onError={(event) => { event.currentTarget.style.display = "none"; }} />;
+}
+
+/** The language of a printing other than English, as a pip (JA, DE, PH...). */
+export function LanguagePip({ lang }: { lang?: string | null }) {
+  if (!lang || lang === "en") return null;
+  return <span className="badge langpip" title={`Printed in ${lang.toUpperCase()}`}>{lang.toUpperCase()}</span>;
+}
+
+/** A printing Scryfall removed: the copy keeps its name, and Change printing moves it to another printing. */
+export function RemovedPip({ onChange }: { onChange: () => void }) {
+  return <button type="button" className="badge removedpip" title="Scryfall removed this printing. Change printing..."
+    onClick={(event) => { event.stopPropagation(); onChange(); }}>Printing removed</button>;
 }

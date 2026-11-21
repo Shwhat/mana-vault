@@ -61,6 +61,7 @@ Above the lines, **Sort** orders the list and **Options** chooses the layout. Bo
 | Bleed | 0 to 3 mm around each card, filled with the edges of the card picture | 0 mm |
 | Cutting guides | Cut lines (lines through the whole page along every card edge), Corner marks (3 mm marks outside each corner), None | Cut lines |
 | Background | Any color for the page | White |
+| Card backs | None, Standard back (the standard Magic card back, downloaded by the card database update) or Uploaded back (**Upload back...**, a JPEG, PNG or WebP picture up to 6 MB, kept with your account) | None |
 
 **Reset sheet** returns every setting to its default. The settings are kept with your preferences.
 
@@ -68,12 +69,14 @@ The page layout puts as many columns and rows on a page as fit inside the margin
 
 **Preview** shows every page with the cards in their places, the number of pages and the cards per page.
 
+With a card back chosen, the PDF adds a back page after each page of fronts. The backs are mirrored left to right, so they line up with the fronts when the sheet is printed on both sides (flip on the long edge). A two-faced card printed with both faces takes one place, with its back face on the reverse; every other card has the chosen card back on the reverse. For example, 9 cards on Letter paper make one page of fronts and one page of backs.
+
 ## Exports
 
 | Export | File | Contents |
 |---|---|---|
 | **Export PDF** | proxies.pdf | The pages with the sheet settings. Each card face is drawn once at 300 DPI from its full-size picture (745 x 1040 pixels from Scryfall, or the custom card's picture) |
-| **MakePlayingCards pictures** | makeplayingcards.zip | One picture per card face in list order, 822 x 1122 pixels (2.74 x 3.74 inches at 300 DPI, the card in the middle 750 x 1050 with bleed around it), named with the order, the count and the card, such as "003 4x Sol Ring.jpg", ready to upload to MakePlayingCards |
+| **MakePlayingCards pictures** | makeplayingcards.zip | One picture per card face in list order, 822 x 1122 pixels (2.74 x 3.74 inches at 300 DPI, the card in the middle 750 x 1050 with bleed around it), named with the order, the count and the card, such as "003 4x Sol Ring.jpg", ready to upload to MakePlayingCards. The zip also holds back.jpg, the card back in the same size (the uploaded back when Card backs is Uploaded back, otherwise the standard back), for the back of the order |
 | **MPC Autofill list** | mpc-autofill.txt, and custom-cards.zip when custom cards are listed | One line per card with its count, such as `4 Sol Ring`, for the card list box of MPC Autofill, which finds its own scans. Two-faced cards printed with one face are listed by that face's name. Custom cards are left out of the list and put in custom-cards.zip as MakePlayingCards pictures |
 
 Mana Vault makes every export itself and does not depend on MPC Autofill or download anything from it. Card pictures are downloaded from Scryfall through your server, three at a time, and a picture that fails is tried again. When the full-size picture cannot be had, the server uses the large picture (or the normal one), from its picture folder first.
@@ -126,17 +129,19 @@ The list on the left shows every custom card with its set, number, type and make
 | Style | Classic (the default), Borderless, Full art, Showcase or Nickname; see the table below |
 | Frame | Automatic, White, Blue, Black, Red, Green, the ten two-color hybrids, Multicolor (gold), Artifact, Colorless or Land |
 | Legendary | Adds a crest over the name bar |
-| Name | Required |
+| Name | Required. Card names from the card database are suggested while typing |
 | Nickname | Nickname style only: shown in the name bar, with the card's name in a small bar under it |
-| Mana cost | Symbols in braces, such as {2}{R}. **Symbols** beside it opens the mana symbol picker |
-| Type line | Required |
-| Rules text | **Symbols** under it opens the mana symbol picker for the rules text. One ability per line. Symbols in braces are drawn as mana symbols; text in parentheses is reminder text in italics. Planeswalker lines such as "+1: Draw a card." get a loyalty cost badge; saga lines such as "I: ..." or "II, III: ..." get a chapter badge |
+| Mana cost | Symbols in braces, such as {2}{R} |
+| Type line | Required. Card types, supertypes and subtypes are suggested while typing |
+| Rules text | One ability per line. Keywords are suggested at the start of a line or after a comma. Symbols in braces are drawn as mana symbols; text in parentheses is reminder text in italics. Planeswalker lines such as "+1: Draw a card." get a loyalty cost badge; saga lines such as "I: ..." or "II, III: ..." get a chapter badge |
 | Rules text size, Flavor text size | 60 to 140 percent. Text that does not fit shrinks further |
 | Flavor text | In italics under a line |
 | Power, Toughness | Shown in a box at the bottom right |
 | Loyalty | For planeswalkers, in a shield at the bottom right |
 
-The mana symbol picker shows the symbols as they are drawn on the card, in groups: Numbers (0 to 20 and X), Colors (white, blue, black, red, green, colorless and snow), Phyrexian, Hybrid (the ten color pairs), Two or color (2/W to 2/G) and Other (tap, untap and energy). A click puts the symbol at the cursor of its field; **Symbols** again closes the picker.
+**Symbols**, on the face heading line, opens the Symbols window. A click on a symbol puts it at the cursor of the mana cost or the rules text, whichever was used last (the mana cost before either is used); the window's title says which. On a desktop the window floats over the card maker and moves by its title bar; on a phone it is a sheet at the bottom of the screen. **Close**, **Symbols** again or Esc closes it.
+
+The window shows the symbols as they are drawn on the card, in groups: Numbers, Colors (white, blue, black, red, green, colorless and snow), Phyrexian, Hybrid, Two or color and Other (tap, untap, energy and the rest). Once the card database update has loaded Scryfall's symbol list, the groups hold every symbol in it (except the ones from joke sets), and pointing at a symbol shows its name, such as "one white or blue mana". Before that, the groups are Numbers (0 to 20 and X), the seven colors, the five Phyrexian symbols, the ten hybrid pairs, 2/W to 2/G, and tap, untap and energy.
 
 | Style | How the card is drawn |
 |---|---|
@@ -158,7 +163,8 @@ The frames are Mana Vault's own designs, with the parts of a card in their usual
 
 | Control | What it does |
 |---|---|
-| **Upload art...** | A JPEG, PNG or WebP picture up to 10 MB |
+| **Upload art...** | A JPEG, PNG or WebP picture up to 10 MB. Saving the card also keeps the art in your art library |
+| **Art library...** | Opens your art library to choose art for this face |
 | **Art of a card...** | Searches the card database and uses the chosen card's art |
 | **Remove art** | Clears the art |
 | Zoom | 50 to 300 percent |
@@ -175,18 +181,43 @@ The frames are Mana Vault's own designs, with the parts of a card in their usual
 | Legal in | The formats the card is legal in. New cards are legal in Casual only |
 | Tokens it makes | Tokens from the card database, found by name |
 
+Colors from the mana cost, Color identity and the mana value use Scryfall's symbol list once the card database update has loaded it: {W/U} is white and blue, {2/R} counts 2, and {R/P} is red. Before that, numbers count as themselves, X as 0, a hybrid symbol as its larger part and every other symbol as 1.
+
+### Art library
+
+Your art library keeps pictures for the card maker. It belongs to your account and is part of your account backups.
+
+| Command | What it does |
+|---|---|
+| **Upload art...** (in the window) | Adds a JPEG, PNG or WebP picture up to 10 MB, named after its file |
+| A click on a picture | Uses it on the face being edited |
+| Right-click (long press) menu | **Use on this card**, **Rename...**, **Delete...** |
+| Find art by name | Shows only the pictures whose name holds the words |
+
+Art uploaded on a card or chosen with **Art of a card...** is added to the library when the card is saved; the same picture is kept once. The first start of 0.15.0 adds the art of every custom card you made. Deleting a picture from the library leaves the cards that use it unchanged.
+
 ### Custom sets
 
-The **Custom sets** window lists every custom set with its code, name, release date, card count and maker.
+The **Custom sets** window lists every custom set with its symbol, code, name, release date, card count and maker. A right-click (a long press on a phone, or the menu key) on a set opens its menu; a double click on your own set opens **Edit set...**.
+
+| Command | What it does |
+|---|---|
+| **Edit set...** | Your own sets: the Edit set window |
+| **Show its cards** | Card search for `set:` and the set's code |
+| **New card in this set** | Starts a new card in the set, numbered after its last card |
+| **Delete...** | Your own sets without cards: asks, then deletes the set |
 
 | Field | Notes |
 |---|---|
 | Set code | 2 to 6 letters or digits, such as XXX. A code used by a Scryfall set or another custom set cannot be taken |
-| Set name | Required. The maker can rename it in the list |
-| Release date | The maker can change it in the list. Cards of the set get the date |
-| Set symbol | A picture up to 512 KB, shown on the type line (**Add symbol...**, **Change symbol...**) |
+| Set name | Required |
+| Release date | Cards of the set get the date |
+| Set symbol | **Upload symbol...** (SVG, PNG, JPEG or WebP up to 512 KB), **Scryfall set symbol...** (the symbol of any Scryfall set, from the symbols the card database update saved, found by name or code) or **Remove symbol**. The symbol is shown on the type line |
+| Rarity colors (SVG symbols) | On by default. An SVG symbol is drawn in the card's rarity colors with a white outline: black for common, silver for uncommon, gold for rare, orange for mythic rare and purple for special. Off: the symbol keeps its own colors |
 
-**Create set** adds the set. **Delete** removes a set that has no cards.
+**Create set** adds the set with the fields under New custom set. **Save** in Edit set saves every change at once. A new code moves every card of the set to it, and is checked the same way as a new set's code. Edit set changes can be undone and redone (Edit, Undo and Redo).
+
+SVG symbols are cleaned when they are saved: scripts, event handlers, links to other files and embedded pages are removed, and an SVG without any drawing left is refused with "This SVG has no drawing Mana Vault can use".
 
 ### Rules
 

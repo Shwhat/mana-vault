@@ -116,7 +116,8 @@ test("card search groups printings, adding opens the chooser, and the collection
   await bolt.getByRole("button", { name: "Add Lightning Bolt to Main collection" }).click();
   await page.locator("dialog[open]").getByRole("button", { name: "Foil M10 146" }).click();
   await expect(status(page)).toHaveText("Lightning Bolt (foil) added to Main collection");
-  await expect(bolt.locator(".pocket .dmarks")).toHaveText("OWNED 1FOIL 1");
+  await expect(bolt.locator(".pipbar .pipgroup")).toHaveText("OWNED 1FOIL 1");
+  await expect(bolt.locator(".pocket .badge")).toHaveCount(0);
 
   // the collection grid shows one picture with pips and a line per finish with pips and counts, no prices
   await page.keyboard.press("Escape");
@@ -126,8 +127,8 @@ test("card search groups printings, adding opens the chooser, and the collection
   await expect(lines).toHaveCount(2);
   await expect(lines.nth(0)).toHaveText("REGULAR1");
   await expect(lines.nth(1)).toHaveText("FOIL1");
-  await expect(page.locator(".cardgrid .pocket .pocketqty")).toHaveText("2");
-  await expect(page.locator(".cardgrid .pocket .dmarks")).toHaveText("FOIL");
+  await expect(page.locator(".cardgrid .pipbar .pipcount")).toHaveText("2x");
+  await expect(page.locator(".cardgrid .pipbar .badge.foil")).toHaveText("FOIL");
   // clicking a line selects that copy
   await lines.nth(1).click();
   await expect(lines.nth(1)).toHaveClass(/active/);

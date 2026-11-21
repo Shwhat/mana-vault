@@ -11,9 +11,9 @@ export type ScanCard = {
 };
 export type ScanMatch = { card: ScanCard | null; score: number; by: "printing" | "name" | null; read: string };
 
-const CARD_COLUMNS = "id, oracle_id, name, set_code, set_name, collector_number, rarity, image_url, finishes, released_at, promo_types";
+const CARD_COLUMNS = "id, oracle_id, name, set_code, set_name, collector_number, rarity, image_url, finishes, released_at, promo_types, lang";
 // newest first; regular printings before promos and variants
-const NEWEST = "ORDER BY lang != 'en', released_at IS NULL, released_at DESC, promo, variation, length(collector_number), collector_number";
+const NEWEST = "ORDER BY removed, lang != 'en', released_at IS NULL, released_at DESC, promo, variation, length(collector_number), collector_number";
 
 /** An in-memory index of card names (and front face names), rebuilt when the card database changes. */
 export class NameMatcher {
@@ -85,7 +85,7 @@ export function registerScanRoutes(app: FastifyInstance, database: DatabaseSync)
     const card = database.prepare("SELECT oracle_id FROM cards WHERE id = ?").get(request.params.cardId);
     if (!card) return reply.code(404).send({ error: "Card printing not found" });
     return database.prepare(
-      `SELECT ${CARD_COLUMNS}, promo, variation, price_usd, price_usd_foil, price_usd_etched, price_eur, price_eur_foil FROM cards WHERE oracle_id = ? ${NEWEST}`,
-    ).all(String(card.oracle_id));
+      `SELECT ${CARD_COLUMNS}, promo, variation, price_usd, price_usd_foil, price_usd_etched, price_eur, price_eur_foil FROM cards WHERE oracle_id = ? AND (removed = 0 OR id = ?) ${NEWEST}`,
+    ).all(String(card.oracle_id), request.params.cardId);
   });
 }

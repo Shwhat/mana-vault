@@ -1,5 +1,6 @@
 // ---------- right-click and long-press menus on cards and rows ----------
 import { useEffect, useRef, type MouseEvent, type PointerEvent } from "react";
+import { createPortal } from "react-dom";
 import { type ContextMenu, type Store, useApp } from "../store";
 
 type Item = { label: string; run: () => void };
@@ -69,7 +70,9 @@ export function ContextMenuHost() {
   const width = 240;
   const x = Math.max(4, Math.min(menu.x, window.innerWidth - width - 4));
   const y = Math.max(4, Math.min(menu.y, window.innerHeight - (menu.items.length * 40 + 40)));
-  return (
+  // inside an open window (a modal dialog) the menu is put in the window, so it can be used there
+  const host = document.querySelector<HTMLDialogElement>("dialog#dlg[open]");
+  const content = (
     <div id="ctxmenu" ref={element} role="menu" aria-label={menu.title} style={{ left: x, top: y, width }}>
       <div className="ctxtitle">{menu.title}</div>
       {menu.items.map((item) => (
@@ -79,4 +82,5 @@ export function ContextMenuHost() {
       ))}
     </div>
   );
+  return host ? createPortal(content, host) : content;
 }

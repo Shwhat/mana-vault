@@ -22,6 +22,13 @@ export type CardSearch = {
 
 export const SEARCH_PAGE = 60;
 
+/** Every open card search, so a change to the card database (a saved custom card) can run them again. */
+const openSearches = new Set<() => void>();
+/** Runs every open card search again, keeping its filters. */
+export function refreshCardSearches() {
+  for (const refresh of openSearches) refresh();
+}
+
 /** Searches the card database with the filters while enabled. A new filter starts again at the top. */
 export function useCardSearch(filters: Filters, enabled: boolean, options: { group?: boolean; currency?: Currency; sort?: SearchSort } = {}): CardSearch {
   const [cards, setCards] = useState<FoundCard[]>([]);
@@ -83,6 +90,10 @@ export function useCardSearch(filters: Filters, enabled: boolean, options: { gro
   }, []);
 
   const refresh = useCallback(() => setRound((value) => value + 1), []);
+  useEffect(() => {
+    openSearches.add(refresh);
+    return () => { openSearches.delete(refresh); };
+  }, [refresh]);
   // a grouped result counts the copies of every printing of its card; the finish keeps the counts by finish right
   const owned = useCallback((id: string, change: number, finish: FinishCode = 0, oracleId?: string | null) =>
     setCards((list) => list.map((card) => {

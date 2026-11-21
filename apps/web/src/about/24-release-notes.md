@@ -2,6 +2,23 @@
 
 The installed version is shown at the top of this guide.
 
+## 0.15.0 (2026-11-21): Pip bar, custom set editing, art library, Scryfall extras and card languages
+
+- Pip bar: every card picture has a bar under it (above each picture in deck Stacks) holding the count, finish, condition, language, Proxy, trade, Missing, owned marks and price pips, so pips no longer cover the card.
+- Android app: one tap opens a collection or deck from the panels and switchers; the open one is where new cards go. Browsers are unchanged.
+- Fixed: a custom card saved again in the card maker now shows the new picture in the print list, card search and printed pictures without reloading.
+- Custom sets: right-click menu with Edit set..., Show its cards, New card in this set and Delete.... Edit set changes the name, code (the cards move to the new code), release date and symbol, and can be undone.
+- Set symbols can be uploaded as SVG (cleaned of scripts and links), chosen from Scryfall's set symbols, or removed. SVG symbols are drawn in rarity colors (on by default, per set).
+- Card maker: one Symbols button on the face heading line opens a floating Symbols window (a sheet on phones) that puts the symbol at the cursor of the mana cost or rules text used last. Fixed: symbols chosen for the rules text went into the mana cost.
+- Art library: each account keeps art for the card maker; upload, use, rename and delete. Art used on custom cards is added, including the art of every custom card made before.
+- The card database update also saves set symbols and set details (parent set, block, digital, foil only), Scryfall's symbol list, printing changes, name and keyword lists and the card back. Administration, Card database lists each part with its count and date.
+- Set symbols show in the Filters panel, set pickers, set completion (grouped by block), the card page and the printing chooser. Rules text and mana costs on the card page show symbols as pictures.
+- Printing changes: merged printings move copies, deck cards, links, upgrade choices, trade lines, print list lines and price history; removed printings show Printing removed with Change printing. The update reports "N printings merged, N removed" and writes each change to Activity.
+- Suggestions while typing: card names, t: types, kw: keywords and a: artists in card search; names in Quick add and the scanner's Add a card; names, types and keywords in the card maker; types, keywords and artists in the Filters panel. They work offline in the Android app.
+- Card backs (print list sheet settings): None, Standard back or an uploaded back. The PDF adds a mirrored back page after each page; the MakePlayingCards zip includes back.jpg.
+- Card languages (Administration, Card database): English and unofficial languages (default), All languages or Chosen languages, with the download and database growth shown first; Pictures of other languages is off by default. The printing chooser shows a language pip.
+- Account backups are version 6 and include the art library and the uploaded card back.
+
 ## 0.14.0 (2026-11-20): Menu bar and mode tabs, card maker styles, reliable proxy pictures
 
 - The ribbon is replaced by the File, Edit, View and Help menus in the title bar. Customize ribbon and the button size setting are gone. Commands for one collection, deck, card or trade are in its right-click menu, header or view; collection and deck right-click menus gain Sharing....

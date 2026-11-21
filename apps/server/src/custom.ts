@@ -3,6 +3,8 @@ import { randomUUID } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import type { DatabaseSync } from "node:sqlite";
 import { FORMATS } from "./decks.js";
+import { addToArtLibrary } from "./extras.js";
+import { cleanSvg, SVG_HEADERS } from "./svg.js";
 
 const LEGALITY_FORMATS = FORMATS.filter((format) => format !== "casual");
 const RARITIES = ["common", "uncommon", "rare", "mythic", "special"];
@@ -26,11 +28,34 @@ function readPicture(value: unknown, limit: number): Picture | null | string {
   return { bytes: new Uint8Array(bytes), type: match[1]! };
 }
 
+const SVG_PATTERN = /^data:image\/svg\+xml;base64,([A-Za-z0-9+/=]+)$/;
+
+/** A set symbol: a picture like readPicture, or an SVG file (0.15.0), which is cleaned so only its drawing is kept. */
+function readSymbol(value: unknown): Picture | null | string {
+  if (typeof value === "string" && value.startsWith("data:image/svg+xml")) {
+    const match = SVG_PATTERN.exec(value);
+    if (!match) return "Symbols must be SVG, JPEG, PNG or WebP";
+    const bytes = Buffer.from(match[1]!, "base64");
+    if (bytes.length > MAX_SYMBOL) return "Symbols can be up to 512 KB";
+    const svg = cleanSvg(bytes.toString("utf8"));
+    if (!svg) return "This SVG has no drawing Mana Vault can use";
+    return { bytes: new Uint8Array(Buffer.from(svg, "utf8")), type: "image/svg+xml" };
+  }
+  const picture = readPicture(value, MAX_SYMBOL);
+  return picture === "Pictures must be JPEG, PNG or WebP" ? "Symbols must be SVG, JPEG, PNG or WebP" : picture;
+}
+
 /** The mana value of a mana cost: numbers count as themselves, X as 0, hybrid like {2/W} as its larger part, every other symbol as 1. */
-export function manaValueOf(cost: string): number {
+export function manaValueOf(cost: string, known?: Map<string, { manaValue: number | null; colors: string }>): number {
   let total = 0;
   for (const [, symbol] of cost.matchAll(/\{([^}]+)\}/g)) {
     const upper = symbol!.toUpperCase();
+    // Scryfall's symbol list gives each symbol's mana value when it is loaded (0.15.0)
+    const listed = known?.get(`{${upper}}`);
+    if (listed && listed.manaValue !== null) {
+      total += listed.manaValue;
+      continue;
+    }
     if (/^\d+$/.test(upper)) total += Number(upper);
     else if (upper === "X" || upper === "Y" || upper === "Z") continue;
     else if (upper.includes("/")) total += Math.max(...upper.split("/").map((part) => (/^\d+$/.test(part) ? Number(part) : 1)));
@@ -40,9 +65,14 @@ export function manaValueOf(cost: string): number {
 }
 
 /** The colors named by mana symbols in a text, in WUBRG order. */
-export function colorsIn(text: string): string[] {
+export function colorsIn(text: string, known?: Map<string, { manaValue: number | null; colors: string }>): string[] {
   const found = new Set<string>();
   for (const [, symbol] of text.matchAll(/\{([^}]+)\}/g)) {
+    const listed = known?.get(`{${symbol!.toUpperCase()}}`);
+    if (listed) {
+      for (const color of listed.colors) if (COLORS.includes(color)) found.add(color);
+      continue;
+    }
     for (const part of symbol!.toUpperCase().split("/")) if (COLORS.includes(part)) found.add(part);
   }
   return COLORS.filter((color) => found.has(color));
@@ -141,8 +171,10 @@ function writeCardRow(database: DatabaseSync, id: string, oracleId: string, inpu
   const oracle = faces.map((face) => [face.oracleText, face.loyalty ? `Loyalty: ${face.loyalty}` : ""].filter(Boolean).join("\n")).join("\n//\n");
   const manaCost = faces.map((face) => face.manaCost).filter(Boolean).join(" // ");
   const allText = faces.map((face) => `${face.manaCost} ${face.oracleText}`).join(" ");
-  const colors = input.colors ?? colorsIn(input.front.manaCost);
-  const identity = input.colorIdentity ?? colorsIn(allText);
+  const known = new Map((database.prepare("SELECT symbol, mana_value, colors FROM symbology").all() as Array<{ symbol: string; mana_value: number | null; colors: string }>)
+    .map((row) => [String(row.symbol).toUpperCase(), { manaValue: row.mana_value === null ? null : Number(row.mana_value), colors: String(row.colors) }]));
+  const colors = input.colors ?? colorsIn(input.front.manaCost, known);
+  const identity = input.colorIdentity ?? colorsIn(allText, known);
   const image = `/api/custom/cards/${id}/picture?v=${version}`;
   database.prepare(
     `INSERT INTO cards (id, oracle_id, name, mana_cost, mana_value, type_line, oracle_text, colors, color_identity, legalities, set_code, set_name,
@@ -152,7 +184,7 @@ function writeCardRow(database: DatabaseSync, id: string, oracleId: string, inpu
        oracle_text = excluded.oracle_text, colors = excluded.colors, color_identity = excluded.color_identity, legalities = excluded.legalities,
        set_code = excluded.set_code, set_name = excluded.set_name, collector_number = excluded.collector_number, rarity = excluded.rarity,
        image_url = excluded.image_url, released_at = excluded.released_at, artist = excluded.artist, custom = 1`,
-  ).run(id, oracleId, name, manaCost || null, manaValueOf(input.front.manaCost), typeLine, oracle || null, colors.join(""), identity.join(""),
+  ).run(id, oracleId, name, manaCost || null, manaValueOf(input.front.manaCost, known), typeLine, oracle || null, colors.join(""), identity.join(""),
     JSON.stringify(input.legalities), input.setCode, String(set?.name ?? input.setCode.toUpperCase()), input.collectorNumber, input.rarity, image,
     (set?.released_at as string | null) ?? null, input.artist || null);
   database.prepare("UPDATE cards SET finishes = ?, promo = 0, variation = 0 WHERE id = ?").run(input.finishes.join(","), id);
@@ -177,13 +209,14 @@ function transaction<T>(database: DatabaseSync, work: () => T): T {
 /** Custom sets with their maker and card count. */
 export function listCustomSets(database: DatabaseSync) {
   return database.prepare(
-    `SELECT cs.code, s.name, s.released_at, cs.owner_id, u.name AS owner_name, cs.symbol IS NOT NULL AS has_symbol,
+    `SELECT cs.code, s.name, s.released_at, cs.owner_id, u.name AS owner_name, cs.symbol IS NOT NULL AS has_symbol, cs.symbol_type, cs.rarity_colors, length(cs.symbol) AS symbol_size,
             (SELECT COUNT(*) FROM cards c WHERE c.set_code = cs.code AND c.custom = 1) AS card_count
      FROM custom_sets cs JOIN sets s ON s.code = cs.code LEFT JOIN users u ON u.id = cs.owner_id ORDER BY s.name`,
   ).all().map((row) => ({
     code: String(row.code), name: String(row.name), releasedAt: (row.released_at as string | null) ?? null, ownerId: (row.owner_id as number | null) ?? null,
     ownerName: String(row.owner_name ?? ""), hasSymbol: Number(row.has_symbol) === 1, cardCount: Number(row.card_count),
-    symbolUrl: Number(row.has_symbol) === 1 ? `/api/custom/sets/${String(row.code)}/symbol` : null,
+    symbolUrl: Number(row.has_symbol) === 1 ? `/api/custom/sets/${String(row.code)}/symbol?v=${Number(row.symbol_size)}` : null,
+    symbolType: (row.symbol_type as string | null) ?? null, rarityColors: Number(row.rarity_colors) === 1,
   }));
 }
 
@@ -221,7 +254,7 @@ export function registerCustomRoutes(app: FastifyInstance, database: DatabaseSyn
     if (database.prepare("SELECT 1 FROM sets WHERE code = ? UNION SELECT 1 FROM cards WHERE set_code = ? LIMIT 1").get(code, code)) {
       return reply.code(409).send({ error: `The set code ${code.toUpperCase()} is already used by another set` });
     }
-    const symbol = readPicture(request.body?.symbol, MAX_SYMBOL);
+    const symbol = request.body?.symbolFrom !== undefined ? scryfallSymbol(request.body.symbolFrom) : readSymbol(request.body?.symbol);
     if (typeof symbol === "string") return reply.code(400).send({ error: symbol });
     transaction(database, () => {
       database.prepare("INSERT INTO sets (code, name, set_type, released_at, printed_size, card_count) VALUES (?, ?, 'custom', ?, NULL, NULL)").run(code, name, releasedAt);
@@ -232,6 +265,14 @@ export function registerCustomRoutes(app: FastifyInstance, database: DatabaseSyn
   });
 
   const ownSet = (code: string) => database.prepare("SELECT owner_id FROM custom_sets WHERE code = ?").get(code.toLowerCase());
+  /** A Scryfall set's symbol, kept by the card database update, as a set symbol. */
+  const scryfallSymbol = (value: unknown): Picture | string => {
+    const row = typeof value === "string" ? database.prepare("SELECT svg FROM set_symbols WHERE code = ?").get(value.toLowerCase()) : undefined;
+    if (!row) return "That set has no symbol yet. Update the card database to load the set symbols";
+    const svg = cleanSvg(String(row.svg));
+    if (!svg) return "This SVG has no drawing Mana Vault can use";
+    return { bytes: new Uint8Array(Buffer.from(svg, "utf8")), type: "image/svg+xml" };
+  };
 
   app.patch<{ Params: { code: string }; Body: Record<string, unknown> }>("/api/custom/sets/:code", async (request, reply) => {
     const code = request.params.code.toLowerCase();
@@ -242,21 +283,37 @@ export function registerCustomRoutes(app: FastifyInstance, database: DatabaseSyn
     if (name === "") return reply.code(400).send({ error: "Give the set a name" });
     const releasedAt = request.body?.releasedAt === undefined ? null : text(request.body.releasedAt, 10);
     if (releasedAt !== null && !/^\d{4}-\d{2}-\d{2}$/.test(releasedAt)) return reply.code(400).send({ error: "The release date must be a date such as 2026-11-19" });
-    const symbol = request.body?.symbol === undefined ? undefined : readPicture(request.body.symbol, MAX_SYMBOL);
+    const symbol = request.body?.symbolFrom !== undefined ? scryfallSymbol(request.body.symbolFrom)
+      : request.body?.symbol === undefined ? undefined : readSymbol(request.body.symbol);
     if (typeof symbol === "string") return reply.code(400).send({ error: symbol });
+    const rarityColors = typeof request.body?.rarityColors === "boolean" ? request.body.rarityColors : undefined;
+    // a new set code: free of Scryfall sets and other custom sets, and moved onto every card of the set (0.15.0)
+    const newCode = request.body?.code === undefined ? code : text(request.body.code, 6).toLowerCase();
+    if (newCode !== code) {
+      if (!/^[a-z0-9]{2,6}$/.test(newCode)) return reply.code(400).send({ error: "A set code has 2 to 6 letters or digits, such as XXX" });
+      if (database.prepare("SELECT 1 FROM sets WHERE code = ? UNION SELECT 1 FROM cards WHERE set_code = ? LIMIT 1").get(newCode, newCode)) {
+        return reply.code(409).send({ error: `The set code ${newCode.toUpperCase()} is already used by another set` });
+      }
+    }
     transaction(database, () => {
+      if (newCode !== code) {
+        database.prepare("UPDATE sets SET code = ? WHERE code = ?").run(newCode, code);
+        database.prepare("UPDATE custom_sets SET code = ? WHERE code = ?").run(newCode, code);
+        database.prepare("UPDATE cards SET set_code = ? WHERE set_code = ? AND custom = 1").run(newCode, code);
+      }
+      if (rarityColors !== undefined) database.prepare("UPDATE custom_sets SET rarity_colors = ? WHERE code = ?").run(rarityColors ? 1 : 0, newCode);
       if (name) {
-        database.prepare("UPDATE sets SET name = ? WHERE code = ?").run(name, code);
-        database.prepare("UPDATE cards SET set_name = ? WHERE set_code = ? AND custom = 1").run(name, code);
+        database.prepare("UPDATE sets SET name = ? WHERE code = ?").run(name, newCode);
+        database.prepare("UPDATE cards SET set_name = ? WHERE set_code = ? AND custom = 1").run(name, newCode);
       }
       if (releasedAt) {
-        database.prepare("UPDATE sets SET released_at = ? WHERE code = ?").run(releasedAt, code);
-        database.prepare("UPDATE cards SET released_at = ? WHERE set_code = ? AND custom = 1").run(releasedAt, code);
+        database.prepare("UPDATE sets SET released_at = ? WHERE code = ?").run(releasedAt, newCode);
+        database.prepare("UPDATE cards SET released_at = ? WHERE set_code = ? AND custom = 1").run(releasedAt, newCode);
       }
-      if (symbol !== undefined) database.prepare("UPDATE custom_sets SET symbol = ?, symbol_type = ? WHERE code = ?").run(symbol?.bytes ?? null, symbol?.type ?? null, code);
+      if (symbol !== undefined) database.prepare("UPDATE custom_sets SET symbol = ?, symbol_type = ? WHERE code = ?").run(symbol?.bytes ?? null, symbol?.type ?? null, newCode);
     });
     onChange();
-    return listCustomSets(database).find((item) => item.code === code);
+    return listCustomSets(database).find((item) => item.code === newCode);
   });
 
   app.delete<{ Params: { code: string } }>("/api/custom/sets/:code", async (request, reply) => {
@@ -279,6 +336,7 @@ export function registerCustomRoutes(app: FastifyInstance, database: DatabaseSyn
   app.get<{ Params: { code: string } }>("/api/custom/sets/:code/symbol", async (request, reply) => {
     const row = database.prepare("SELECT symbol, symbol_type FROM custom_sets WHERE code = ?").get(request.params.code.toLowerCase());
     if (!row?.symbol) return reply.code(404).send({ error: "This set has no symbol" });
+    if (String(row.symbol_type) === "image/svg+xml") reply.headers(SVG_HEADERS);
     return reply.header("cache-control", "private, max-age=300").type(String(row.symbol_type)).send(Buffer.from(row.symbol as Uint8Array));
   });
 
@@ -325,6 +383,12 @@ export function registerCustomRoutes(app: FastifyInstance, database: DatabaseSyn
     return { input, picture, backPicture, art, backArt, design };
   };
 
+  /** Art used on a card is also kept in the maker's art library (0.15.0); the same picture is kept once. */
+  const keepArt = (userId: number, name: string, parts: { art?: Picture | null; backArt?: Picture | null }) => {
+    if (parts.art) addToArtLibrary(database, userId, name, parts.art);
+    if (parts.backArt) addToArtLibrary(database, userId, `${name} (back)`, parts.backArt);
+  };
+
   app.post<{ Body: Record<string, unknown> }>("/api/custom/cards", big, async (request, reply) => {
     const parts = readSave(request.body, null);
     if (typeof parts === "string") return reply.code(400).send({ error: parts });
@@ -337,6 +401,7 @@ export function registerCustomRoutes(app: FastifyInstance, database: DatabaseSyn
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       ).run(id, userOf(request), parts.design, parts.picture!.bytes, parts.picture!.type, parts.backPicture?.bytes ?? null, parts.backPicture?.type ?? null,
         parts.art?.bytes ?? null, parts.art?.type ?? null, parts.backArt?.bytes ?? null, parts.backArt?.type ?? null);
+      keepArt(userOf(request), parts.input.front.name, parts);
     });
     onChange();
     return reply.code(201).send(listCustomCards(database).find((card) => card.id === id));
@@ -362,6 +427,7 @@ export function registerCustomRoutes(app: FastifyInstance, database: DatabaseSyn
       if (parts.backArt !== undefined) database.prepare("UPDATE custom_cards SET back_art = ?, back_art_type = ? WHERE id = ?").run(parts.backArt?.bytes ?? null, parts.backArt?.type ?? null, id);
       database.prepare("UPDATE collections SET updated_at = strftime('%Y-%m-%d %H:%M:%f', 'now') WHERE id IN (SELECT collection_id FROM collection_cards WHERE card_id = ?)").run(id);
       database.prepare("UPDATE decks SET updated_at = strftime('%Y-%m-%d %H:%M:%f', 'now') WHERE id IN (SELECT deck_id FROM deck_cards WHERE printing_id = ?)").run(id);
+      keepArt(userOf(request), parts.input.front.name, parts);
     });
     onChange();
     return listCustomCards(database).find((card) => card.id === id);

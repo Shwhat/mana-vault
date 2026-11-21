@@ -8,7 +8,7 @@ import { apiUrl, isApp, saveBlob } from "./android/platform";
  * symbols, such as /api/custom/cards/.../picture, and card pictures under /pictures/) are made full addresses on the server.
  */
 export function withServerPictures<T>(value: T): T {
-  if (typeof value === "string") return (value.startsWith("/api/custom/") || value.startsWith("/pictures/") ? apiUrl(value) : value) as T;
+  if (typeof value === "string") return (value.startsWith("/api/custom/") || value.startsWith("/api/set-symbols/") || value.startsWith("/api/art/") || value.startsWith("/pictures/") ? apiUrl(value) : value) as T;
   if (Array.isArray(value)) return value.map((item) => withServerPictures(item)) as T;
   if (value && typeof value === "object") {
     let changed = false;

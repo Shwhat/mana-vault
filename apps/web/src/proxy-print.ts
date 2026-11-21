@@ -44,15 +44,17 @@ export type PrintLine = { id: string; cardId: string; count: number; faces: Face
 
 export type Paper = "letter" | "a4" | "legal" | "custom";
 export type Marks = "lines" | "corners" | "none";
+/** What prints on the reverse of the cards (0.15.0): nothing, the standard Magic back, or the account's uploaded back. */
+export type CardBacks = "none" | "standard" | "mine";
 export type SheetSettings = {
   paper: Paper; pageWidth: number; pageHeight: number; margin: number;
   cardSize: "standard" | "custom"; cardWidth: number; cardHeight: number; scale: number;
-  gap: number; bleed: number; marks: Marks; background: string;
+  gap: number; bleed: number; marks: Marks; background: string; cardBacks: CardBacks;
 };
 
 export const DEFAULT_SHEET: SheetSettings = {
   paper: "letter", pageWidth: 215.9, pageHeight: 279.4, margin: 6, cardSize: "standard", cardWidth: 63, cardHeight: 88, scale: 100,
-  gap: 0, bleed: 0, marks: "lines", background: "#ffffff",
+  gap: 0, bleed: 0, marks: "lines", background: "#ffffff", cardBacks: "none",
 };
 
 export const PAPERS: Record<Exclude<Paper, "custom">, [number, number]> = { letter: [215.9, 279.4], a4: [210, 297], legal: [215.9, 355.6] };
@@ -80,11 +82,16 @@ export function readSheet(value: unknown): SheetSettings {
     bleed: clamp(raw.bleed, 0, 3, DEFAULT_SHEET.bleed),
     marks,
     background: typeof raw.background === "string" && /^#[0-9a-f]{6}$/i.test(raw.background) ? raw.background : DEFAULT_SHEET.background,
+    cardBacks: raw.cardBacks === "standard" || raw.cardBacks === "mine" ? raw.cardBacks : "none",
   };
 }
 
 /** One card on a page: which card and face, and where (millimetres from the top left of the page, the cut size). */
-export type Slot = { cardId: string; face: "front" | "back"; name: string; x: number; y: number; width: number; height: number };
+export type Slot = {
+  cardId: string; face: "front" | "back"; name: string; x: number; y: number; width: number; height: number;
+  /** With card backs: what prints on the reverse, the card's own back face or the card back. */
+  reverse?: { cardId: string; face: "front" | "back" } | "cardback";
+};
 export type PageLayout = { width: number; height: number; columns: number; rows: number; pages: Slot[][]; perPage: number };
 
 /** The faces printed for a line, in order: front, back, or both (a card without a back face prints its front). */
@@ -93,9 +100,24 @@ export function facesOf(line: Pick<PrintLine, "faces"> & { card: Pick<PrintCard,
   return line.faces === "both" ? ["front", "back"] : [line.faces];
 }
 
-/** Every card printed, in list order. */
-export function printSlots(lines: PrintLine[]): Array<{ cardId: string; face: "front" | "back"; name: string }> {
-  return lines.flatMap((line) => Array.from({ length: line.count }, () => facesOf(line).map((face) => ({ cardId: line.cardId, face, name: line.card.name }))).flat());
+type PrintSlot = { cardId: string; face: "front" | "back"; name: string; reverse?: Slot["reverse"] };
+
+/**
+ * Every card printed, in list order. With card backs, a two-faced card printed with both faces is one card with its back
+ * face on the reverse, and every other card has the card back on the reverse.
+ */
+export function printSlots(lines: PrintLine[], backs = false): PrintSlot[] {
+  return lines.flatMap((line) => Array.from({ length: line.count }, (): PrintSlot[] => {
+    if (backs && line.card.hasBack && line.faces === "both") {
+      return [{ cardId: line.cardId, face: "front", name: line.card.name, reverse: { cardId: line.cardId, face: "back" } }];
+    }
+    return facesOf(line).map((face) => ({ cardId: line.cardId, face, name: line.card.name, ...(backs ? { reverse: "cardback" as const } : {}) }));
+  }).flat());
+}
+
+/** The reverse page of a page: every card's reverse at the mirrored place, so the two sides line up when printed on both sides. */
+export function reversePage(slots: Slot[], pageWidth: number): Array<Slot & { show: { cardId: string; face: "front" | "back" } | "cardback" }> {
+  return slots.filter((slot) => slot.reverse).map((slot) => ({ ...slot, x: pageWidth - slot.x - slot.width, show: slot.reverse! }));
 }
 
 /** Places the cards on pages: as many columns and rows as fit inside the margins, the grid centered on the page. */
@@ -117,7 +139,7 @@ export function layoutPages(lines: PrintLine[], sheet: SheetSettings): PageLayou
   const top = (height - gridHeight) / 2;
   const perPage = columns * rows;
   const pages: Slot[][] = [];
-  printSlots(lines).forEach((slot, index) => {
+  printSlots(lines, sheet.cardBacks !== "none").forEach((slot, index) => {
     const page = Math.floor(index / perPage);
     const place = index % perPage;
     const column = place % columns;
@@ -132,8 +154,32 @@ export function layoutPages(lines: PrintLine[], sheet: SheetSettings): PageLayou
   return { width, height, columns, rows, pages, perPage };
 }
 
+// ---------- the card back ----------
+const backCache = new Map<string, Promise<HTMLImageElement | null>>();
+/** The standard card back or the account's uploaded back, loaded once (null when there is none). */
+export function cardBackPicture(which: Exclude<CardBacks, "none">): Promise<HTMLImageElement | null> {
+  let promise = backCache.get(which);
+  if (!promise) {
+    promise = fetchFile(`/api/card-backs/${which}`).then(async (response) => (response.ok ? loadImage(await response.blob()) : null)).catch(() => null);
+    backCache.set(which, promise);
+    const kept = promise;
+    void kept.then((picture) => { if (!picture && backCache.get(which) === kept) backCache.delete(which); });
+  }
+  return promise;
+}
+/** Forgets the uploaded back after a new one is uploaded. */
+export const forgetCardBack = () => backCache.delete("mine");
+
 // ---------- card pictures ----------
 const pictureCache = new Map<string, Promise<HTMLImageElement | null>>();
+/** A number per card raised each time the card changes, so its picture address changes and nothing old is reused. */
+const pictureVersions = new Map<string, number>();
+/** Forgets the printed pictures of a card that changed (a custom card saved again). */
+export function forgetCardPicture(cardId: string) {
+  pictureVersions.set(cardId, (pictureVersions.get(cardId) ?? 0) + 1);
+  pictureCache.delete(`${cardId}:front`);
+  pictureCache.delete(`${cardId}:back`);
+}
 /** Pictures are asked for a few at a time: asking for a whole sheet at once made some downloads fail. */
 const PICTURE_SLOTS = 3;
 let active = 0;
@@ -157,7 +203,8 @@ export function cardPicture(cardId: string, face: "front" | "back"): Promise<HTM
   const key = `${cardId}:${face}`;
   let promise = pictureCache.get(key);
   if (!promise) {
-    const once = () => inTurn(() => fetchFile(`/api/card-images/${encodeURIComponent(cardId)}?face=${face}&size=png`)
+    const version = pictureVersions.get(cardId);
+    const once = () => inTurn(() => fetchFile(`/api/card-images/${encodeURIComponent(cardId)}?face=${face}&size=png${version ? `&v=${version}` : ""}`)
       .then(async (response) => (response.ok ? loadImage(await response.blob()) : null))
       .catch(() => null));
     promise = once().then((picture) => picture ?? once());
@@ -261,8 +308,32 @@ export async function buildPdf(lines: PrintLine[], sheet: SheetSettings, progres
     done += 1;
     progress?.(done, distinct.length);
   }
+  // the reverse of each card: its back face, or the card back
+  let back: Awaited<ReturnType<typeof pdf.embedJpg>> | null = null;
+  if (sheet.cardBacks !== "none") {
+    const picture = await cardBackPicture(sheet.cardBacks);
+    if (!picture) throw new Error(sheet.cardBacks === "mine" ? "Upload a card back first, or choose another card back" : "The card back is not downloaded yet. An admin can update the card database to download it");
+    back = await pdf.embedJpg(await toJpeg(drawPrint(picture, "Card back", px(layout.pages[0]?.[0]?.width ?? 63), px(layout.pages[0]?.[0]?.height ?? 88), px(sheet.bleed))));
+    for (const slot of layout.pages.flat()) {
+      if (!slot.reverse || slot.reverse === "cardback") continue;
+      const key = `${slot.reverse.cardId}:${slot.reverse.face}`;
+      if (embedded.has(key)) continue;
+      const picture = await cardPicture(slot.reverse.cardId, slot.reverse.face);
+      embedded.set(key, await pdf.embedJpg(await toJpeg(drawPrint(picture, slot.name, px(slot.width), px(slot.height), px(sheet.bleed)))));
+    }
+  }
   const [red, green, blue] = hexColor(sheet.background);
   const markColor = rgb(0.55, 0.55, 0.55);
+  const placeOn = (page: ReturnType<typeof pdf.addPage>, slot: Slot, image: Awaited<ReturnType<typeof pdf.embedJpg>>) => page.drawImage(image, {
+    x: (slot.x - sheet.bleed) * PT, y: (layout.height - slot.y - slot.height - sheet.bleed) * PT,
+    width: (slot.width + sheet.bleed * 2) * PT, height: (slot.height + sheet.bleed * 2) * PT,
+  });
+  const addReverse = (slots: Slot[]) => {
+    if (!back) return;
+    const page = pdf.addPage([layout.width * PT, layout.height * PT]);
+    if (sheet.background.toLowerCase() !== "#ffffff") page.drawRectangle({ x: 0, y: 0, width: layout.width * PT, height: layout.height * PT, color: rgb(red, green, blue) });
+    for (const slot of reversePage(slots, layout.width)) placeOn(page, slot, slot.show === "cardback" ? back : embedded.get(`${slot.show.cardId}:${slot.show.face}`)!);
+  };
   for (const slots of layout.pages) {
     const page = pdf.addPage([layout.width * PT, layout.height * PT]);
     if (sheet.background.toLowerCase() !== "#ffffff") page.drawRectangle({ x: 0, y: 0, width: layout.width * PT, height: layout.height * PT, color: rgb(red, green, blue) });
@@ -289,6 +360,7 @@ export async function buildPdf(lines: PrintLine[], sheet: SheetSettings, progres
         }
       }
     }
+    addReverse(slots);
   }
   return pdf.save();
 }
@@ -300,7 +372,7 @@ export const MPC_SIZE = { width: 822, height: 1122, cutWidth: 750, cutHeight: 10
 const safeName = (text: string) => text.replace(/[\\/:*?"<>|]+/g, "").replace(/\s+/g, " ").trim().slice(0, 80) || "card";
 
 /** One picture per card face in print order, named with the order and the count, such as "003 4x Sol Ring.jpg". */
-export async function buildMpcZip(lines: PrintLine[], progress?: (done: number, total: number) => void): Promise<Uint8Array> {
+export async function buildMpcZip(lines: PrintLine[], progress?: (done: number, total: number) => void, backs: CardBacks = "none"): Promise<Uint8Array> {
   const files: Record<string, Uint8Array> = {};
   const faces = lines.flatMap((line) => facesOf(line).map((face) => ({ line, face })));
   let done = 0;
@@ -313,6 +385,10 @@ export async function buildMpcZip(lines: PrintLine[], progress?: (done: number, 
     done += 1;
     progress?.(done, faces.length);
   }
+  // the card back for every card, chosen in MakePlayingCards as the back of the order
+  const back = await cardBackPicture(backs === "mine" ? "mine" : "standard");
+  const fallback = backs === "mine" && !back ? await cardBackPicture("standard") : back;
+  if (fallback) files["back.jpg"] = await toJpeg(drawPrint(fallback, "Card back", MPC_SIZE.cutWidth, MPC_SIZE.cutHeight, (MPC_SIZE.width - MPC_SIZE.cutWidth) / 2), 0.95);
   return zipSync(files, { level: 0 });
 }
 

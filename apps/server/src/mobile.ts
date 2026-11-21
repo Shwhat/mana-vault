@@ -222,7 +222,7 @@ export function registerMobileRoutes(app: FastifyInstance, database: DatabaseSyn
       const rows = database.prepare(
         `SELECT id, oracle_id, name, mana_cost, mana_value, type_line, colors, set_code, set_name, collector_number, rarity,
                 image_url, released_at, finishes, flavor_name, promo, variation, oracle_text, power, toughness
-         FROM cards ORDER BY name, released_at DESC`,
+         FROM cards WHERE removed = 0 OR id IN (SELECT card_id FROM collection_cards) ORDER BY name, released_at DESC`,
       ).all();
       const fields = ["id", "oracle_id", "name", "mana_cost", "mana_value", "type_line", "colors", "set_code", "set_name", "collector_number",
         "rarity", "image_url", "released_at", "finishes", "flavor_name", "promo", "variation", "oracle_text", "power", "toughness"];

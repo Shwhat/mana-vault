@@ -7,7 +7,8 @@
 | Interface | React and TypeScript, built with Vite into static files |
 | Server | Node.js 22 with Fastify, serving the interface and a JSON API |
 | Database | SQLite (built into Node.js), one file in the data folder |
-| Card data | Scryfall Default Cards, All Cards (unofficial languages), Art Tags, Oracle Tags and rulings bulk files, read as streams. The full record of every printing is kept gzip-compressed in the database |
+| Card data | Scryfall Default Cards, All Cards (other card languages), Art Tags, Oracle Tags and rulings bulk files, read as streams, and Scryfall's set list, set symbols, symbol list, migrations, catalogs and card back. The full record of every printing is kept gzip-compressed in the database |
+| SVG symbols | Set symbols (Scryfall's and uploaded ones) are cleaned on the server: scripts, event handlers, outside links and embedded pages are removed, and they are sent with a content security policy that allows no scripts |
 | Card pictures | Downloaded from cards.scryfall.io into the picture folder, six at a time, keyed by Scryfall's picture address and its change stamp. Every picture address the server sends is rewritten to /pictures/, which sends the saved file or redirects to Scryfall |
 | Server backups | SQLite VACUUM INTO a new file; a restore is put in place when the server starts again |
 | Card text recognition | Tesseract.js with the English model, running in the browser; its files are served by Mana Vault from /ocr. In the Android app, Google ML Kit text recognition on the phone |

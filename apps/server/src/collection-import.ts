@@ -167,7 +167,7 @@ export function importCollectionCsv(database: DatabaseSync, text: string, commit
      WHERE (name = ? COLLATE NOCASE OR flavor_name = ? COLLATE NOCASE OR name LIKE ? ESCAPE '\\')
        AND (? = '' OR lower(set_code) = lower(?) OR set_name = ? COLLATE NOCASE)
        AND (? = '' OR collector_number = ?)
-     ORDER BY lang != 'en', name = ? COLLATE NOCASE DESC, released_at DESC, set_code, collector_number
+     ORDER BY removed, lang != 'en', name = ? COLLATE NOCASE DESC, released_at DESC, set_code, collector_number
      LIMIT 1`,
   );
   const byId = database.prepare("SELECT id FROM cards WHERE id = ?");

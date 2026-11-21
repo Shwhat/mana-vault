@@ -8,8 +8,9 @@ import { formatDialog, tagsDialog } from "../components/DeckDialogs";
 import { linkDialog } from "../components/LibraryDialogs";
 import { choosePrinting } from "../components/PrintingDialog";
 import { addCard } from "../components/AddButtons";
-import { CountPip, FinishBadge, FinishPip, finishName, OwnedMarks, PricePip, ownedVersions, removeCard, switchVersionDialog, linkExact, UpgradeBadge, wantedLabel } from "../components/CardMarks";
+import { CountPip, FinishBadge, FinishPip, finishName, OwnedMarks, PipBar, PricePip, RemovedPip, ownedVersions, removeCard, switchVersionDialog, linkExact, UpgradeBadge, wantedLabel } from "../components/CardMarks";
 import { Switcher } from "../components/Switcher";
+import { Suggest } from "../components/Suggest";
 import { cardPrice, checkDeck, type Legality, MANA_COLORS, manaBalance, sections, shuffle, ZONE_ORDER } from "../deck-rules";
 import { Icon } from "../icons";
 import { type Store, useApp, zoneLabel } from "../store";
@@ -181,21 +182,28 @@ function Picture({ cards, flag, lines = false }: { cards: DeckCard[]; flag?: str
   const total = cards.reduce((sum, item) => sum + item.quantity, 0);
   const missing = cards.reduce((sum, item) => sum + (item.missing ?? 0), 0);
   const split = lines && cards.length > 1;
+  // Grid: the pip bar under the picture; Stacks: above it, in the strip that stays in view while the cards overlap
+  const pips = (
+    <PipBar>
+        <CountPip count={total} />
+        {cards.map((item) => <FinishBadge key={item.entry_id} finish={item.finish} promoTypes={item.promo_types} />)}
+        {cards.map((item) => <UpgradeBadge key={item.entry_id} card={item} />)}
+        {missing > 0 && <span className="badge miss">{missing < total ? `Missing ${missing}` : "Missing"}</span>}
+        {cards.filter((item) => item.removed).slice(0, 1).map((item) => <RemovedPip key="removed" onChange={() => choosePrinting(item.name, item.card_id, item.card_id, { finish: item.finish ?? 0, currency: store.prefs.currency, quantity: item.quantity },
+          (printing, finish, count) => void store.changeDeckPrinting(item, printing, finish, undefined, count))} />)}
+        {cards.map((item) => <OwnedMarks key={item.entry_id} store={store} card={item} compact />)}
+        <PricePip price={cardPrice(card, store.prefs.currency)} />
+    </PipBar>
+  );
   return (
     <div className={lines ? "stackcell dstack" : "dstack"}>
+      {!lines && pips}
       <div data-key={split ? undefined : String(card.entry_id)} role={split ? undefined : "option"} aria-selected={split ? undefined : active}
         className={`dcard${active ? " active" : ""}${flag ? " bad" : ""}`} title={flag ? `${card.name}: ${flag}` : card.name}
         onClick={() => pick(store, card)} {...cardMenu(store, card)}>
         {card.image_url ? <img src={card.image_url} alt={card.name} loading="lazy" draggable={false} /> : <span className="pocketname">{card.name}</span>}
-        <CountPip count={total} />
-        <PricePip price={cardPrice(card, store.prefs.currency)} />
-        <span className="dmarks">
-          {cards.map((item) => <FinishBadge key={item.entry_id} finish={item.finish} promoTypes={item.promo_types} />)}
-          {cards.map((item) => <UpgradeBadge key={item.entry_id} card={item} />)}
-          {missing > 0 && <span className="badge miss">{missing < total ? `Missing ${missing}` : "Missing"}</span>}
-          {cards.map((item) => <OwnedMarks key={item.entry_id} store={store} card={item} compact />)}
-        </span>
       </div>
+      {lines && pips}
       {split && (
         <div className="slines" role="group" aria-label={`${card.name} (${card.set_code.toUpperCase()}) ${card.collector_number}`}>
           {cards.map((item) => {
@@ -266,24 +274,8 @@ function Board({ zone, cards, legality, onHover }: { zone: Zone; cards: DeckCard
 function QuickAdd() {
   const store = useApp();
   const [text, setText] = useState("");
-  const [names, setNames] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const zone = store.prefs.zone;
-  useEffect(() => {
-    const name = text.replace(/^\s*\d+\s*x?\s+/i, "").replace(/\s*[[(].*$/, "").trim();
-    if (name.length < 2) {
-      setNames([]);
-      return;
-    }
-    const controller = new AbortController();
-    const timer = window.setTimeout(() => {
-      request<Array<{ name: string }>>(`/api/cards?q=${encodeURIComponent(name)}`, { signal: controller.signal })
-        .then((found) => setNames([...new Set(found.map((card) => card.name))].slice(0, 8)))
-        .catch(() => undefined);
-    }, 200);
-    return () => { window.clearTimeout(timer); controller.abort(); };
-  }, [text]);
-  const count = /^\s*(\d+)\s*x?\s+/i.exec(text)?.[1];
   const submit = async () => {
     if (!text.trim() || busy) return;
     setBusy(true);
@@ -292,9 +284,7 @@ function QuickAdd() {
   };
   return (
     <form className="quickadd" onSubmit={(event) => { event.preventDefault(); void submit(); }}>
-      <input id="quickadd" list="quicknames" value={text} onChange={(event) => setText(event.target.value)} placeholder="Add a card: 2 Sol Ring" aria-label="Quick add"
-        autoComplete="off" />
-      <datalist id="quicknames">{names.map((name) => <option key={name} value={count ? `${count} ${name}` : name} />)}</datalist>
+      <Suggest id="quickadd" mode="quick" value={text} onValue={setText} placeholder="Add a card: 2 Sol Ring" aria-label="Quick add" autoComplete="off" />
       <Picker id="quickzone" label="Add to zone" value={zone} onChange={(value) => store.setPrefs({ zone: value as Zone })} options={ZONE_CHOICES} />
       <button type="submit" className="btn small primary" disabled={busy || !text.trim()}>Add</button>
     </form>

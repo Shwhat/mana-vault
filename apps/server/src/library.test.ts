@@ -163,7 +163,7 @@ describe("set completion", () => {
 
   it("main set counts the printed numbers only", async () => {
     const result = await progress("main", "any", [{ cardId: "t1", foil: false, quantity: 1 }, { cardId: "t4", foil: false, quantity: 1 }]);
-    expect(result.sets).toEqual([{ code: "tst", name: "Test Set", owned: 1, total: 3, printedSize: 3, known: true }]);
+    expect(result.sets).toMatchObject([{ code: "tst", name: "Test Set", owned: 1, total: 3, printedSize: 3, known: true }]);
     expect(result.missing.map((card: { id: string }) => card.id)).toEqual(["t2", "t3"]);
   });
 
@@ -324,7 +324,7 @@ describe("backups per account", () => {
     await call("ann", "POST", `/api/collections/${col}/cards`, { cardId: "t1", quantity: 2, foil: true });
     await call("bob", "POST", "/api/collections", { name: "Bob's" });
     const backup = (await call("ann", "GET", "/api/backup")).body;
-    expect(JSON.parse(backup)).toMatchObject({ version: 5, collections: [{ name: "Binder", sets: ["tst"], completion: "names", finish: "both" }] });
+    expect(JSON.parse(backup)).toMatchObject({ version: 6, collections: [{ name: "Binder", sets: ["tst"], completion: "names", finish: "both" }] });
     await call("ann", "DELETE", `/api/collections/${col}`);
     const raw = (url: string, user: string) => app.inject({
       method: "POST", url, payload: backup,

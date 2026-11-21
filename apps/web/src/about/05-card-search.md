@@ -6,6 +6,8 @@ Card search finds cards in the local card database, one result per card name unl
 
 - Press **/** (or **Find**) to jump to the search box. Press Down to move from the box into the results.
 - Results update a quarter of a second after you stop typing.
+- Suggestions appear under the box while typing: card names for plain words, card types after `t:`, keywords after `kw:` and artists after `a:`. **Tab** moves through them (Shift+Tab back), **Enter** or a click takes one, and **Esc** closes them; Down still moves into the results. A name with spaces after a filter is put in quotes. The suggestions come from the name and keyword lists the card database update keeps, and also work offline in the Android app.
+- Printings Scryfall removed are not found (see [Printing changes](/about/card-database#printing-changes)).
 - A plain word matches a card whose name, flavor name, type line or rules text contains it. Several words must all match. A flavor name is the other name some printings carry, such as a Godzilla series name; results show it as "Also printed as".
 - Put words in double quotes to search for a phrase, for example `"draw a card"`.
 - Results are sorted by name, and load as you scroll.
@@ -40,7 +42,7 @@ A filter is a key, an operator and a value with no spaces, such as `t:dragon`. P
 | `kw:` or `keyword:` | The card has the keyword ability | `kw:flying` |
 | `frame:` | Frame year (1993, 1997, 2003, 2015, future) or frame effect (showcase, extendedart, etched...) | `frame:1993` |
 | `border:` | Border color: black, white, borderless, silver or gold | `border:white` |
-| `lang:` | Printing language. English, plus unofficial languages such as Phyrexian (`ph`) | `lang:ph` |
+| `lang:` | Printing language: `en`, the languages chosen in Card languages (`es`, `fr`, `de`, `it`, `pt`, `ja`, `ko`, `ru`, `zhs`, `zht`) and unofficial languages such as Phyrexian (`ph`) | `lang:ja` |
 | `usd`, `eur` | Price compared with =, :, <, >, <= or >=. The regular price, or the foil price for printings only in foil. Printings without a price never match | `usd<1`, `eur>=20` |
 
 Colors are W (white), U (blue), B (black), R (red) and G (green), or a color name. Mana values run from 0 to 100.
@@ -69,15 +71,15 @@ Colors are W (white), U (blue), B (black), R (red) and G (green), or a color nam
 | Field | Default | Effect |
 |---|---|---|
 | Type | Empty | Type line contains the text |
-| Set code | Empty | Set code is exactly the text, or set name contains it |
+| Set code | Empty | Set code is exactly the text, or set name contains it. The set's symbol shows beside a code it knows |
 | Color | Any color | Card has the chosen color |
 | Rarity | Any rarity | Common, Uncommon, Rare or Mythic |
 | Legal in | Any format | Commander, Standard, Pioneer, Modern, Legacy, Pauper or Vintage |
 | Name | Empty | Card name or flavor name contains the text |
 | Card text | Empty | Rules text contains the text |
-| Creature type | Empty | Type line contains the creature type |
-| Keyword | Empty | The card has the keyword ability |
-| Artist | Empty | Artist name contains the text |
+| Creature type | Empty | Type line contains the creature type. Types are suggested while typing |
+| Keyword | Empty | The card has the keyword ability. Keywords are suggested while typing |
+| Artist | Empty | Artist name contains the text. Artists are suggested while typing |
 | Art shows | Empty | What the art shows (Art Tags), with suggestions from the card database as you type |
 | Role | Empty | What the card does (Oracle Tags), with suggestions as you type |
 | Power, Toughness | Empty | Min and Max for each |
@@ -136,7 +138,7 @@ The desktop and phones each remember their own layout. The deck's Add tab and bo
 
 | Layout | Each result shows |
 |---|---|
-| Grid, Binder | The card picture, an **N printings** badge when the card has more than one printing, and pips on the picture for the copies you own by finish (OWNED with the regular count, FOIL and ETCHED counts); the buttons are under the picture (in Binder, under the selected one). Pictures show no price; the List layout has it |
+| Grid, Binder | The card picture, an **N printings** badge when the card has more than one printing, and a pip bar under the picture for the copies you own by finish (OWNED with the regular count, FOIL and ETCHED counts); the buttons are under the picture (in Binder, under the selected one). Pictures show no price; the List layout has it |
 | List | The image, name, mana cost, type line, set, set code, collector number, rarity, price and an OWNED badge with your copies. Clicking the set code fills the Set code filter; clicking the rarity sets the Rarity filter |
 
 The add button names where the card goes: **+ name** of the collection or deck selected last, then **+ Wishlist**. It opens the printing chooser titled "Add card name to name" with the printing shown already selected and the finish set by Add as foil, so Enter adds it; another printing or finish can be picked first. A card made in only one printing and one finish is added at once. Owned counts are real copies in your collections and collections shared with you, not wishlists or proxies.

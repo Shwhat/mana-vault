@@ -82,16 +82,19 @@ test("Edit as text links exact printings, finish badges show in every view, and 
   // a line without a set stays missing although nothing is owned of it
   await expect(page.locator("#view-deck .row", { hasText: "Counterspell" }).locator(".badge.miss")).toHaveText("Missing");
 
-  for (const [view, selector] of [["Text", ".tline"], ["Stacks", ".stack .dcard"]] as const) {
+  for (const [view, selector] of [["Text", ".tline"], ["Stacks", ".stack .dstack"]] as const) {
     await deckOptions(page, () => page.getByRole("group", { name: "Show cards as" }).getByRole("button", { name: view }).click());
     await expect(page.locator(`#view-deck ${selector}`, { hasText: view === "Text" ? "Lightning Bolt" : "" }).locator(".badge.foil").first()).toHaveText("FOIL");
   }
   // Grid: one picture per printing with pips for the count, the finish and Missing; one finish needs no lines; no prices
   await deckOptions(page, () => page.getByRole("group", { name: "Show cards as" }).getByRole("button", { name: "Grid" }).click());
   const picture = page.locator('#view-deck .dgrid .dcard[title^="Lightning Bolt"]');
-  await expect(picture.locator(".pocketqty")).toHaveText("3");
-  await expect(picture.locator(".dmarks .badge.foil")).toHaveText("FOIL");
-  await expect(picture.locator(".dmarks .badge.miss")).toHaveText("Missing 1");
+  await expect(picture).toBeVisible();
+  const bar = page.locator("#view-deck .dgrid .stackcell", { has: page.locator('.dcard[title^="Lightning Bolt"]') }).locator(".pipbar");
+  await expect(bar.locator(".pipcount")).toHaveText("3x");
+  await expect(bar.locator(".badge.foil")).toHaveText("FOIL");
+  await expect(bar.locator(".badge.miss")).toHaveText("Missing 1");
+  await expect(picture.locator(".badge")).toHaveCount(0);
   await expect(page.locator("#view-deck .dgrid .sline")).toHaveCount(0);
   await deckOptions(page, () => page.getByRole("group", { name: "Show cards as" }).getByRole("button", { name: "List" }).click());
 

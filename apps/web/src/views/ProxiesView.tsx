@@ -1,7 +1,8 @@
 // ---------- proxies view: the print list, sheet settings with a page preview, and the exports; the card maker in its own tab ----------
 import { useEffect, useMemo, useState } from "react";
 import type { Action } from "../actions";
-import { downloadBlob, downloadText, request } from "../api";
+import { downloadBlob, downloadText, pickFile, request } from "../api";
+import { blobToData } from "../components/CustomSets";
 import { CardMaker } from "../components/CardMaker";
 import { choiceDialog, confirmDialog, customDialog, dialog } from "../components/Dialog";
 import { choosePrinting } from "../components/PrintingDialog";
@@ -10,20 +11,21 @@ import { parseQuickAdd } from "../deck-rules";
 import { Icon } from "../icons";
 import { entryKey } from "../library-state";
 import {
-  buildMpcZip, buildPdf, DEFAULT_SHEET, facesOf, missingPictures, type Faces, layoutPages, mpcAutofillList, PRINT_SORTS, type PrintLine, printPrice, printSlots,
+  buildMpcZip, buildPdf, DEFAULT_SHEET, forgetCardBack, facesOf, missingPictures, type Faces, layoutPages, mpcAutofillList, PRINT_SORTS, type PrintLine, printPrice, printSlots,
   type PrintSort, type SheetSettings, sortPrintLines,
 } from "../proxy-print";
 import type { CardForPrint } from "../proxy-state";
 import { type Store, useApp } from "../store";
 import type { Card, CollectionEntry, DeckDetail } from "../types";
 import { Quantity, Thumb } from "./Views";
-import { CountPip, PricePip } from "../components/CardMarks";
+import { CountPip, PipBar, PricePip } from "../components/CardMarks";
 import { LayoutRows, OptionsButton } from "../components/Options";
 import type { GridSize } from "../types";
 
 const FACE_CHOICES: Choice[] = choices([["front", "Front"], ["back", "Back"], ["both", "Both faces"]]);
 const PAPER_CHOICES: Choice[] = choices([["letter", "Letter (8.5 x 11 in)"], ["a4", "A4 (210 x 297 mm)"], ["legal", "Legal (8.5 x 14 in)"], ["custom", "Custom size"]]);
 const MARK_CHOICES: Choice[] = choices([["lines", "Cut lines"], ["corners", "Corner marks"], ["none", "None"]]);
+const BACK_CHOICES: Choice[] = choices([["none", "None"], ["standard", "Standard back"], ["mine", "Uploaded back"]]);
 const SIZE_CHOICES: Choice[] = choices([["standard", "Standard (63 x 88 mm)"], ["custom", "Custom size"]]);
 
 // ---------- adding cards ----------
@@ -198,10 +200,12 @@ function LinePicture({ line }: { line: PrintLine }) {
     <div className="stackcell printcell">
       <div className="pocket" title={`${line.card.name}, ${line.card.set_name} ${line.card.collector_number}`}>
         {line.card.image_url ? <img src={line.card.image_url} alt={line.card.name} loading="lazy" draggable={false} /> : <span className="pocketname">{line.card.name}</span>}
-        <CountPip count={line.count} />
-        {line.card.custom && <span className="dmarks"><span className="badge custom">Custom</span></span>}
-        <PricePip price={printPrice(line.card, store.prefs.currency)} />
       </div>
+      <PipBar>
+        <CountPip count={line.count} />
+        {line.card.custom && <span className="badge custom">Custom</span>}
+        <PricePip price={printPrice(line.card, store.prefs.currency)} />
+      </PipBar>
       <div className="printctl">
         <Quantity value={line.count} name={line.card.name} max={100} onChange={(count) => (count < 1 ? store.removePrintLine(line.id) : store.setPrintLine(line.id, { count: Math.min(100, count) }))} />
         <button type="button" className="btn small" aria-label={`Remove ${line.card.name} from the print list`} onClick={() => store.removePrintLine(line.id)}>Remove</button>
@@ -263,6 +267,20 @@ function NumberField({ label, value, min, max, step = 0.5, unit, onChange }: { l
   );
 }
 
+/** Uploads the account's own card back, used when Card backs is Uploaded back. */
+async function uploadBack(store: Store) {
+  const file = await pickFile("image/jpeg,image/png,image/webp");
+  if (!file) return;
+  if (file.size > 6 * 1024 * 1024) return store.flash("A card back can be up to 6 MB", "err");
+  try {
+    await request("/api/card-backs/mine", { method: "PUT", body: JSON.stringify({ picture: await blobToData(file) }) });
+    forgetCardBack();
+    store.flash("Card back uploaded");
+  } catch (reason) {
+    store.fail(reason, "Could not upload the card back.");
+  }
+}
+
 function SheetPanel() {
   const store = useApp();
   const sheet = store.prefs.proxySheet;
@@ -290,6 +308,10 @@ function SheetPanel() {
         <Picker id="ps-marks" label="Cutting guides" value={sheet.marks} options={MARK_CHOICES} onChange={(value) => set({ marks: value as SheetSettings["marks"] })} /></div>
       <div className="prow"><label htmlFor="ps-bg">Background</label>
         <input id="ps-bg" type="color" value={sheet.background} onChange={(event) => set({ background: event.target.value })} /></div>
+      <div className="prow"><label htmlFor="ps-backs">Card backs</label>
+        <Picker id="ps-backs" label="Card backs" value={sheet.cardBacks} options={BACK_CHOICES} onChange={(value) => set({ cardBacks: value as SheetSettings["cardBacks"] })} /></div>
+      {sheet.cardBacks === "mine" && <div className="prow"><span />
+        <span className="btnrow"><button type="button" className="btn small" onClick={() => void uploadBack(store)}>Upload back...</button></span></div>}
       <div className="btnrow"><button type="button" className="btn small" onClick={() => store.setPrefs({ proxySheet: DEFAULT_SHEET })}>Reset sheet</button></div>
     </section>
   );
@@ -379,10 +401,10 @@ function ExportPanel({ lines }: { lines: PrintLine[] }) {
         setBusy("Making the PDF");
         const bytes = await buildPdf(lines, store.prefs.proxySheet, (done, total) => setBusy(`Making the PDF: card ${done} of ${total}`));
         downloadBlob("proxies.pdf", new Blob([bytes as BlobPart], { type: "application/pdf" }));
-        store.flash(`PDF with ${cardCount} cards on ${layoutPages(lines, store.prefs.proxySheet).pages.length} pages saved`);
+        store.flash(`PDF with ${cardCount} cards on ${layoutPages(lines, store.prefs.proxySheet).pages.length * (store.prefs.proxySheet.cardBacks === "none" ? 1 : 2)} pages saved`);
       } else if (what === "mpc") {
         setBusy("Making the pictures");
-        const bytes = await buildMpcZip(lines, (done, total) => setBusy(`Making the pictures: ${done} of ${total}`));
+        const bytes = await buildMpcZip(lines, (done, total) => setBusy(`Making the pictures: ${done} of ${total}`), store.prefs.proxySheet.cardBacks);
         downloadBlob("makeplayingcards.zip", new Blob([bytes as BlobPart], { type: "application/zip" }));
         store.flash("MakePlayingCards pictures saved");
       } else {
@@ -391,7 +413,7 @@ function ExportPanel({ lines }: { lines: PrintLine[] }) {
         if (text) downloadText("mpc-autofill.txt", text, "text/plain");
         if (custom.length) {
           setBusy("Making the pictures of custom cards");
-          const bytes = await buildMpcZip(custom, (done, total) => setBusy(`Making the pictures of custom cards: ${done} of ${total}`));
+          const bytes = await buildMpcZip(custom, (done, total) => setBusy(`Making the pictures of custom cards: ${done} of ${total}`), store.prefs.proxySheet.cardBacks);
           downloadBlob("custom-cards.zip", new Blob([bytes as BlobPart], { type: "application/zip" }));
         }
         store.flash(custom.length ? "MPC Autofill list and custom card pictures saved" : "MPC Autofill list saved");

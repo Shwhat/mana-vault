@@ -7,6 +7,7 @@ import { linkDialog } from "../components/LibraryDialogs";
 import { AddButtons, addCard, addMenuItems } from "../components/AddButtons";
 import { finishWord, UpgradeBadge, wantedLabel } from "../components/CardMarks";
 import { Icon } from "../icons";
+import { Suggest } from "../components/Suggest";
 import { sortDeck, type Store, useApp, zoneLabel } from "../store";
 import { copyLabel, type DeckCard, type DeckTab, money, ZONES, type Zone } from "../types";
 import { StatsPanel } from "./StatsView";
@@ -54,10 +55,11 @@ export function CardsView({ actions, onFilters }: { actions: Record<string, Acti
         <span className="phname">Card search</span>
         <label className="searchbox">
           <Icon name="find" className="nicon" />
-          <input
-            ref={(node) => { store.searchInput.current = node; }}
+          <Suggest
+            ref={(node) => { store.searchInput.current = node as HTMLInputElement | null; }}
+            mode="search"
             value={filters.query}
-            onChange={(event) => store.setFilters({ query: event.target.value })}
+            onValue={(value) => store.setFilters({ query: value })}
             onKeyDown={(event) => {
               if (event.key === "ArrowDown") { event.preventDefault(); store.moveSelection(1); (event.target as HTMLInputElement).blur(); }
               if (event.key === "Escape") (event.target as HTMLInputElement).blur();

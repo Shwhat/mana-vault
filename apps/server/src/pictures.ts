@@ -155,7 +155,8 @@ export function registerPictureRoutes(app: FastifyInstance, options: {
     status.lastError = null;
     wanted = false;
     try {
-      const cards = database.prepare("SELECT image_url, back_image_url FROM cards WHERE custom = 0 AND image_url IS NOT NULL").all();
+      // pictures of other languages only when "Pictures of other languages" is on (Administration, Card database)
+      const cards = database.prepare(`SELECT image_url, back_image_url FROM cards WHERE custom = 0 AND image_url IS NOT NULL${settings.get().languagePictures ? "" : " AND lang = 'en'"}`).all();
       const save = database.prepare("INSERT INTO pictures (path, stamp, bytes) VALUES (?, ?, ?) ON CONFLICT(path) DO UPDATE SET stamp = excluded.stamp, bytes = excluded.bytes");
       for (const size of sizes) {
         if (stopped || status.paused || !settings.get().pictureSizes.includes(size)) break;
@@ -214,8 +215,9 @@ export function registerPictureRoutes(app: FastifyInstance, options: {
     for (const row of database.prepare("SELECT substr(path, 1, instr(path, '/') - 1) AS size, COUNT(*) AS files, COALESCE(SUM(bytes), 0) AS bytes FROM pictures GROUP BY size").all()) {
       if (sizes[String(row.size)]) sizes[String(row.size)] = { files: Number(row.files), bytes: Number(row.bytes) };
     }
-    const printings = Number(database.prepare("SELECT COUNT(*) AS n FROM cards WHERE custom = 0 AND image_url IS NOT NULL").get()?.n ?? 0)
-      + Number(database.prepare("SELECT COUNT(*) AS n FROM cards WHERE custom = 0 AND back_image_url IS NOT NULL").get()?.n ?? 0);
+    const only = settings.get().languagePictures ? "" : " AND lang = 'en'";
+    const printings = Number(database.prepare(`SELECT COUNT(*) AS n FROM cards WHERE custom = 0 AND image_url IS NOT NULL${only}`).get()?.n ?? 0)
+      + Number(database.prepare(`SELECT COUNT(*) AS n FROM cards WHERE custom = 0 AND back_image_url IS NOT NULL${only}`).get()?.n ?? 0);
     return {
       folder: folder(), defaultFolder: defaultFolder(), available: available(), locked: settings.locks.picturesDir ?? null,
       drive: driveSpace(folder()), sizes, printings, estimates: settings.get().pictureEstimates, status: { ...status }, moving,
