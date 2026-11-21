@@ -2,11 +2,12 @@
 import { addCard } from "./components/AddButtons";
 import { useMemo } from "react";
 import { addFromDeckDialog } from "./views/ProxiesView";
+import { exportPurchases, newEntry, saleCopies } from "./views/PurchasesView";
 import { request } from "./api";
 import { checkForUpdate, DeviceList, signOutApp } from "./android/AppScreens";
 import { syncNow, syncStatus } from "./android/offline";
 import { appSettings, isApp, native, saveSettings } from "./android/platform";
-import { confirmDialog, customDialog, dialog } from "./components/Dialog";
+import { choiceDialog, confirmDialog, customDialog, dialog } from "./components/Dialog";
 import { completeTradeDialog, newTradeDialog, renameTradeDialog, sendTradeDialog, shareBinderDialog } from "./components/TradeDialogs";
 import { collectionDialog, copyDialog, inboxDialog, linkDialog, moveDialog, newDeckDialog, renameDeckDialog, sendDialog, sharingDialog } from "./components/LibraryDialogs";
 import { exportWindow, importWindow } from "./components/FileWindows";
@@ -36,6 +37,7 @@ export const SHORTCUTS: Array<[group: string, key: string, action: string]> = [
   ["Search", "3", "view.deck"],
   ["Search", "4", "view.trade"],
   ["Search", "5", "view.proxies"],
+  ["Search", "6", "view.purchases"],
   ["Search", "Up, Down", "Select the previous or next row"],
   ["Adding cards", "Enter", "addCollection"],
   ["Adding cards", "Shift+Enter", "addDeck"],
@@ -174,6 +176,17 @@ export function useActions(store: Store): Record<string, Action> {
       "view.deck": { label: "Deck view", short: "Deck", icon: "deck", key: "3", on: store.view === "deck", run: () => store.setView("deck") },
       "view.trade": { label: "Trade view", short: "Trade", icon: "trade", key: "4", on: store.view === "trade", run: () => store.setView("trade") },
       "view.proxies": { label: "Proxies view", short: "Proxies", icon: "print", key: "5", on: store.view === "proxies", run: () => store.setView("proxies") },
+      "view.purchases": { label: "Purchases view", short: "Purchases", icon: "usd", key: "6", on: store.view === "purchases", run: () => store.setView("purchases") },
+      "purchases.new": { label: "New purchase...", short: "New purchase", icon: "usd", run: () => newEntry(store, "purchase", (entry) => { store.setView("purchases"); void entry; }) },
+      "purchases.sale": {
+        label: picked ? "Sell selected cards..." : "New card sale...", short: "Sell", icon: "usd",
+        run: () => newEntry(store, "card_sale", () => store.setView("purchases"), picked && store.view === "collection" ? saleCopies(store) : []),
+      },
+      "purchases.export": {
+        label: "Export purchase history...", short: "Export purchases", icon: "csv",
+        run: () => void choiceDialog("Export purchase history", "Export one row per entry, or one row per product and card.", [["entries", "Entries"], ["lines", "Lines"]])
+          .then((what) => { if (what) void exportPurchases(store, what); }),
+      },
       "proxies.print": {
         label: "Print list", short: "Print list", icon: "print", on: store.view === "proxies" && prefs.proxyTab === "print",
         run: () => { store.setPrefs({ proxyTab: "print" }); store.setView("proxies"); },

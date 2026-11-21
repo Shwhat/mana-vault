@@ -24,6 +24,7 @@ function ImportWindow({ initial }: { initial: ImportKind }) {
   const [report, setReport] = useState<ImportReport | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [purchases, setPurchases] = useState<"one" | "date" | "none">("one");
 
   const choose = async () => {
     const picked = await pickFile(".csv,.txt,text/csv,text/plain");
@@ -69,11 +70,12 @@ function ImportWindow({ initial }: { initial: ImportKind }) {
       }
       const url = kind === "deck"
         ? `/api/decks/${encodeURIComponent(target)}/import`
-        : `/api/collections/${encodeURIComponent(target)}/import${format || detected ? `?format=${format || detected}` : ""}`;
+        : `/api/collections/${encodeURIComponent(target)}/import?purchases=${report.pricedCopies ? purchases : "none"}${format || detected ? `&format=${format || detected}` : ""}`;
       const result = await request<ImportReport>(url, { method: "POST", headers: { "content-type": "text/csv" }, body: file.text });
       const where = kind === "deck" ? store.deck?.name ?? "the deck" : store.collectionName(target);
       store.showReview(`Import into ${where}: ${file.name}`, result, true);
-      store.flash(`Imported ${result.importedQuantity} cards from ${result.matchedRows} lines into ${where}`);
+      const made = result.purchases?.length ?? 0;
+      store.flash(`Imported ${result.importedQuantity} cards from ${result.matchedRows} lines into ${where}${made ? `, ${made} ${made === 1 ? "purchase" : "purchases"} recorded` : ""}`);
       closeDialog();
       await store.refreshAfterChange();
     } catch (reason) {
@@ -116,6 +118,14 @@ function ImportWindow({ initial }: { initial: ImportKind }) {
       {report && (
         <div className="dlgtext">
           <p>{report.matchedRows} lines ({report.importedQuantity} cards) match. {report.unmatched.length} lines are skipped.</p>
+          {kind === "collection" && !!report.pricedCopies && (
+            <div className="radios" role="radiogroup" aria-label="Purchase prices">
+              <span>{report.pricedCopies} cards have a purchase price:</span>
+              <label className="check"><input type="radio" name="iopurchase" checked={purchases === "one"} onChange={() => setPurchases("one")} /> One purchase for this import</label>
+              <label className="check"><input type="radio" name="iopurchase" checked={purchases === "date"} onChange={() => setPurchases("date")} /> One purchase per date added</label>
+              <label className="check"><input type="radio" name="iopurchase" checked={purchases === "none"} onChange={() => setPurchases("none")} /> Do not record a purchase</label>
+            </div>
+          )}
           {report.unmatched.length > 0 && (
             <div className="msglist">
               {report.unmatched.slice(0, 8).map((item) => (

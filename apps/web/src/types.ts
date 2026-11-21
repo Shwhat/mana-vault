@@ -218,6 +218,9 @@ export type ImportReport = {
   matchedRows: number;
   importedQuantity: number;
   unmatched: Array<{ row: number; name: string; reason: string }>;
+  /** Copies with a purchase price, and the purchases recorded from them (0.16.0). */
+  pricedCopies?: number;
+  purchases?: string[];
 };
 
 export type CatalogStatus = {
@@ -248,7 +251,7 @@ export type BackupSummary = {
 
 export type User = { id: number; name: string; admin?: boolean; mustChange?: boolean };
 
-export type View = "home" | "cards" | "collection" | "deck" | "trade" | "proxies" | "about" | "admin";
+export type View = "home" | "cards" | "collection" | "deck" | "trade" | "proxies" | "purchases" | "about" | "admin";
 export type CollectionTab = "cards" | "completion" | "missing" | "stats";
 export type DeckTab = "cards" | "add" | "ownership" | "stats" | "playtest" | "description" | "history";
 export type DeckView = "list" | "text" | "stacks" | "grid";

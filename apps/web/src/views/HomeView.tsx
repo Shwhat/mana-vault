@@ -32,6 +32,7 @@ export function HomeView({ actions }: { actions: Record<string, Action> }) {
           <button type="button" className="btn primary" onClick={actions.scan?.run}><Icon name="scan" /> Scan cards</button>
           <button type="button" className="btn" onClick={actions.find?.run}><Icon name="find" /> Search</button>
           <button type="button" className="btn" onClick={actions["io.import"]?.run}><Icon name="csvin" /> Import</button>
+          <button type="button" className="btn" onClick={actions["view.purchases"]?.run}><Icon name="usd" /> Purchases</button>
         </div>
         {offers.length > 0 && (
           <section className="homesec">

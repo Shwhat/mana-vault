@@ -63,6 +63,7 @@ The full user guide is built into the app: Help tab, **About Mana Vault**. The p
 - Suggestions while typing in card search (names, `t:`, `kw:`, `a:`), Quick add, the scanner and the Filters panel, also offline in the app. Android app: one tap opens a collection or deck.
 - Preferences (theme, foil, target zone, where new cards go and the open collection, proxy sheet settings, currency, collection sort, layout and card size, switcher sorting and recently opened items, deck view, groups and sort, print list sort and layout, prices on pictures, panels, workspaces, last deck) saved per account on the server.
 - Android app (Android 8.0 or newer, APK on the GitHub releases page): every phone feature, sign-in per phone with a device list, offline use of collections, decks, card search and scanning (including new collections and decks) with sync when the connection returns and a Sync now button, the phone's own text recognition for scanning, and notifications for new Inbox offers.
+- Purchase history (Purchases tab): purchases of products and single cards with tax and shipping spread over the lines, openings that tie pulled cards, sealed values over time, card and product sales, trades recorded when completed, imported purchase prices, and Spent, Received, Value now and Gain or loss with a chart and CSV export.
 - Built-in About guide with release notes.
 
 ## Keyboard shortcuts
@@ -70,7 +71,7 @@ The full user guide is built into the app: Help tab, **About Mana Vault**. The p
 | Key | Action |
 |---|---|
 | / | Find card |
-| 1, 2, 3, 4, 5 | Card search, collection, deck, trade, proxies view |
+| 1, 2, 3, 4, 5, 6 | Card search, collection, deck, trade, proxies, purchases view |
 | Up, Down | Previous or next row |
 | Enter | Add the selected card to the collection or deck selected last |
 | Shift+Enter | Add the selected card to the open deck |

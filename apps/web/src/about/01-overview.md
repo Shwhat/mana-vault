@@ -8,6 +8,7 @@ Mana Vault is a self-hosted Magic: The Gathering collection and deck manager for
 | **Collections** | The printings you own, kept in as many collections as you like (binders, boxes, sets you are completing), with finish, condition, language, prices and set completion. Wishlists hold the cards you want |
 | **Decks** | Your decks, built with Quick add, text editing, tags, views and format checks, with cards in the commander zone, main deck, sideboard or maybeboard, linked to the collection copies that fill them |
 | **Trade** | Saved trades: what you give and what you get with prices and a balance, completed in one step or sent to another account, wishlist matches and a public trade binder |
+| **Purchases** | Everything bought, sold and traded, with Spent, Received, Value now and Gain or loss over time |
 | **Proxies** | A print list of proxies with sheet settings, a page preview and PDF and MakePlayingCards exports, and the card maker for custom cards that join the card database |
 | **Card database** | The local copy of the card catalog, with prices, price history, tags, the full Scryfall records and, optionally, card pictures, that search, imports and decks match against |
 | **Administration** | Server settings for admins: accounts, sign-up, the card database, pictures, backups, devices, security and the server |
@@ -37,6 +38,7 @@ Card search is where cards are found. From a search result a card is added to th
 | [Prices and statistics](/about/prices-and-statistics) | Prices, values, currency, sorting by price and the Statistics tabs |
 | [Wishlists and trading](/about/wishlists-and-trading) | Wishlists, cards for trade, saved trades, trading with other accounts, matches and the trade binder |
 | [Proxies and the card maker](/about/proxies) | The print list, sheet settings, PDF and MPC exports, and making custom cards and custom sets |
+| [Purchases](/about/purchases) | Purchases, openings and pulled cards, sealed values, sales, trades, imported prices and the gain or loss |
 | [Sending and sharing](/about/sending-and-sharing) | Sending collections and decks as copies, shares or transfers, and the Inbox |
 | [Import and export](/about/import-and-export) | Every file format in and out, with column tables |
 | [Scanning cards](/about/scanning-cards) | Scanning cards with the camera into a scanned list, and adding them to a collection or deck |

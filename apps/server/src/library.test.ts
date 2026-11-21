@@ -324,7 +324,7 @@ describe("backups per account", () => {
     await call("ann", "POST", `/api/collections/${col}/cards`, { cardId: "t1", quantity: 2, foil: true });
     await call("bob", "POST", "/api/collections", { name: "Bob's" });
     const backup = (await call("ann", "GET", "/api/backup")).body;
-    expect(JSON.parse(backup)).toMatchObject({ version: 6, collections: [{ name: "Binder", sets: ["tst"], completion: "names", finish: "both" }] });
+    expect(JSON.parse(backup)).toMatchObject({ version: 7, collections: [{ name: "Binder", sets: ["tst"], completion: "names", finish: "both" }] });
     await call("ann", "DELETE", `/api/collections/${col}`);
     const raw = (url: string, user: string) => app.inject({
       method: "POST", url, payload: backup,

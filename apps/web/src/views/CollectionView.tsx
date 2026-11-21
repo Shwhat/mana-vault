@@ -1,4 +1,5 @@
 // ---------- collection view: cards, set completion and missing cards ----------
+import { newEntry } from "./PurchasesView";
 import { SetIcon } from "../components/CardMarks";
 import type { SetProgress } from "../types";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -68,6 +69,16 @@ function Tags({ entry }: { entry: CollectionEntry }) {
   );
 }
 
+/** Sell...: a card sale of this copy, at today's price. */
+const sellEntry = (store: Store, entry: CollectionEntry) => {
+  const collectionId = entry.collection_id ?? store.prefs.openCollection ?? "";
+  newEntry(store, "card_sale", () => store.setView("purchases"), [{
+    collectionId, collectionName: entry.collection_name ?? store.collectionName(collectionId), cardId: entry.id, foil: entry.foil, condition: entry.condition,
+    language: entry.language, proxy: false, quantity: entry.quantity, name: entry.name, setCode: entry.set_code, collectorNumber: entry.collector_number,
+    count: "1", price: String(copyPrice(entry, store.prefs.currency) ?? 0),
+  }]);
+};
+
 /** Change printing... for a copy. */
 const changeEntryPrinting = (store: Store, entry: CollectionEntry) => choosePrinting(entry.name, entry.id, entry.id, { finish: entry.foil, currency: store.prefs.currency, quantity: entry.quantity },
   (printing, finish, count) => void store.changeCopyPrinting(entry, printing, finish, count));
@@ -83,6 +94,7 @@ function entryMenu(store: Store, entry: CollectionEntry) {
     !entry.proxy && { label: entry.trade >= entry.quantity ? "Unmark for trade" : "Mark for trade", run: () => void store.markTrade([entry], entry.trade < entry.quantity) },
     !!store.deck && { label: `Add to ${store.deck.name}`, run: () => void store.addToDeck(entry.id, entry.name, undefined, { finish: finishName(entry.foil) }) },
     { label: "Add to print list", run: () => void store.addToPrintList([{ card: entry, count: entry.quantity }], entry.name) },
+    !entry.proxy && { label: "Sell...", run: () => sellEntry(store, entry) },
     entry.quantity > 1 && { label: "Reduce to 1", run: () => void store.setCollectionQuantity(entry, 1) },
     { label: "Remove", run: () => removeCard(store, entry.name, entry.quantity, (left) => void store.setCollectionQuantity(entry, left)) },
   ]);

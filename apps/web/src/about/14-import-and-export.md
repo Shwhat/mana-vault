@@ -14,6 +14,7 @@ Mana Vault reads collection files from Mana Vault, Moxfield, ManaBox, Archidekt,
 | Collection | The collection to import into (the open collection by default), or **New collection...** with a Name |
 | Deck | The open deck |
 | Preview | "N rows (N cards) match. N rows are skipped." and up to eight skipped rows with their reasons |
+| Purchase prices | When the file has purchase prices: **One purchase for this import** (the default), **One purchase per date added** or **Do not record a purchase**; see [Purchases](/about/purchases) |
 | Import | Adds the matched rows. Skipped rows are never imported |
 
 1. Choose what to import into and the file. Mana Vault checks every row without changing anything and shows the preview.

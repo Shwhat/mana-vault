@@ -18,6 +18,8 @@ import { registerDeckBuilderRoutes } from "./deck-builder.js";
 import { registerTradeRoutes } from "./trades.js";
 import { CUSTOM_PUBLIC, registerCustomRoutes } from "./custom.js";
 import { EXTRAS_PUBLIC, registerExtrasRoutes } from "./extras.js";
+import { copiesAdded } from "./copy-events.js";
+import { initializePurchases, purchasesFromPrices, registerPurchaseRoutes } from "./purchases.js";
 import { type Fetcher, registerProxyRoutes } from "./proxies.js";
 import { deviceUser, handleCrossOrigin, registerMobileRoutes, Revision } from "./mobile.js";
 import { access, createCollection, forgetItem, itemSharing, registerLibraryRoutes } from "./library.js";
@@ -196,6 +198,8 @@ export async function buildApp(
   registerDeckRoutes(app, database);
   registerDeckBuilderRoutes(app, database);
   registerTradeRoutes(app, database);
+  initializePurchases(database);
+  registerPurchaseRoutes(app, database);
   registerInsightRoutes(app, database);
   registerScanRoutes(app, database);
   registerCustomRoutes(app, database);
@@ -654,18 +658,26 @@ export async function buildApp(
       return reply.code(400).send({ error: "Upload a non-empty file" });
     }
     try {
-      return importCollectionCsv(database, request.body, false, request.params.collectionId, readImportFormat(request.query.format));
+      const { additions: _additions, ...preview } = importCollectionCsv(database, request.body, false, request.params.collectionId, readImportFormat(request.query.format));
+      return preview;
     } catch (error) {
       return reply.code(400).send({ error: error instanceof Error ? error.message : "Could not preview collection CSV" });
     }
   });
 
-  app.post<{ Params: { collectionId: string }; Querystring: { format?: string }; Body: string }>("/api/collections/:collectionId/import", async (request, reply) => {
+  app.post<{ Params: { collectionId: string }; Querystring: { format?: string; purchases?: string }; Body: string }>("/api/collections/:collectionId/import", async (request, reply) => {
     if (typeof request.body !== "string" || !request.body.trim()) {
       return reply.code(400).send({ error: "Upload a non-empty file" });
     }
     try {
-      return importCollectionCsv(database, request.body, true, request.params.collectionId, readImportFormat(request.query.format));
+      const { additions, ...result } = importCollectionCsv(database, request.body, true, request.params.collectionId, readImportFormat(request.query.format));
+      // copies added while an opening is where pulled cards go are tied to it; imported prices can become purchases (0.16.0)
+      const userId = request.user?.id;
+      copiesAdded(database, userId, request.params.collectionId, (additions ?? []).map((item) => ({ key: item.key, quantity: item.quantity })));
+      const mode = request.query.purchases === "one" || request.query.purchases === "date" ? request.query.purchases : null;
+      const purchases = mode && userId && additions?.length
+        ? purchasesFromPrices(database, userId, mode, { collectionId: request.params.collectionId, items: additions, source: `${result.formatName.replace(/ CSV$/, "")} import` }) : [];
+      return { ...result, purchases };
     } catch (error) {
       return reply.code(400).send({ error: error instanceof Error ? error.message : "Could not import CSV" });
     }

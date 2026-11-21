@@ -2,6 +2,20 @@
 
 The installed version is shown at the top of this guide.
 
+## 0.16.0 (2026-11-21): Purchase history
+
+- Purchases mode tab (key 6; on phones a Home button and Purchases view in the Menu) with Summary, History and entry pages.
+- Purchases with one line per product (boosters, boxes, bundles, decks, kits, Secret Lairs, single cards, other), set, quantity, cost each or total, packs in it; tax and shipping spread over the lines by cost.
+- Single cards bought go into a chosen collection with their purchase price, tied to the purchase.
+- Open... turns part of a line into an opening: cards added to its collection from search, Quick add, the scanner, pasted lists and imports are tied to it until Done opening. OPENING shows in the status bar. Openings show the value pulled and per pack.
+- Set current value... keeps a dated value for sealed product.
+- Card sales (Sell... on a collection card, Sell selected cards..., or a find box) remove the copies sold; product sales take sealed product. Deleting a sale puts them back.
+- Completed trades are recorded as Trade entries for each account; undo of a trade removes the entry.
+- Imports with purchase prices ask One purchase for this import, One purchase per date added or Do not record a purchase; Make purchases from imported prices... does the same for copies already imported.
+- Spent, Received, Value now and Gain or loss for a period, and a chart of money spent against the value of what it bought, using the saved price history.
+- History with find, kind, product, set, date range and sort; CSV export of entries or lines (Export purchase history... in the File menu).
+- Every change to the purchase history can be undone. Account backups are version 7 and include it.
+
 ## 0.15.0 (2026-11-21): Pip bar, custom set editing, art library, Scryfall extras and card languages
 
 - Pip bar: every card picture has a bar under it (above each picture in deck Stacks) holding the count, finish, condition, language, Proxy, trade, Missing, owned marks and price pips, so pips no longer cover the card.

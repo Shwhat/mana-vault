@@ -14,9 +14,9 @@ Click a menu to open it. While a menu is open, pointing at another menu opens th
 
 | Menu | Commands |
 |---|---|
-| File | New collection..., New deck..., Import..., Export..., Scan card..., Download backup, Restore backup..., Update card database (Update database, admins only), Sign out |
+| File | New collection..., New deck..., Import..., Export..., Export purchase history... (Export purchases), New purchase..., New card sale... or Sell selected cards... when cards are picked in a collection (Sell), Scan card..., Download backup, Restore backup..., Update card database (Update database, admins only), Sign out |
 | Edit | Undo, Redo, Find, Select all cards, Clear filters |
-| View | Light theme, Dark theme, System theme; Prices in US dollars, Prices in euros; Prices on pictures; Filters panel, Collections panel, Decks panel, Card panel, Deck list panel, Import review panel; every workspace (such as Deck building workspace); Save workspace..., Manage workspaces..., Reset panels |
+| View | Purchases view (Purchases); Light theme, Dark theme, System theme; Prices in US dollars, Prices in euros; Prices on pictures; Filters panel, Collections panel, Decks panel, Card panel, Deck list panel, Import review panel; every workspace (such as Deck building workspace); Save workspace..., Manage workspaces..., Reset panels |
 | Help | Keyboard shortcuts, About Mana Vault |
 
 Undo and Redo show the change they will reverse or repeat, for example "Undo Add Sol Ring". **Import...** and **Export...** open the import and export windows; see [Import and export](/about/import-and-export).
@@ -33,6 +33,7 @@ Under the title bar, the mode tabs switch the program between its parts. The tab
 | Decks | The open deck (Deck view) | 3 |
 | Trade | Trades (Trade view), with a count when trades wait for your answer | 4 |
 | Proxies | The print list and the card maker (Proxies view) | 5 |
+| Purchases | Purchase history (Purchases view); see [Purchases](/about/purchases) | 6 |
 
 The views of a collection (Cards, Completion, Missing, Statistics) and of a deck (Cards, Ownership, Statistics, Playtest, Description, History) are the tabs in the header of that view.
 
@@ -44,7 +45,7 @@ Commands for one collection, deck, card or trade are where that thing is shown: 
 |---|---|
 | Collection settings..., Rename..., Send..., Sharing..., Export..., Delete or Leave | Right-click menu of a collection in the Collections panel or the collection switcher. Delete collection... and Leave shared collection... ask first. Send collection... and Collection sharing... are the same commands for the open collection |
 | Rename..., Deck format..., Add deck to collection..., Send..., Sharing..., Export..., Delete or Leave | Right-click menu of a deck in the Decks panel or the deck switcher. Rename deck..., Delete deck..., Leave shared deck..., Send deck... and Deck sharing... are the same commands for the open deck |
-| Copy details..., Change printing..., Move..., Mark for trade or Unmark for trade, Add to print list, Reduce to 1, Remove | Right-click menu of a collection card; Move selected..., Remove selected... and Reduce to 1 also act on the picked cards (see [Collections](/about/collections)) |
+| Copy details..., Change printing..., Move..., Mark for trade or Unmark for trade, Add to print list, Sell..., Reduce to 1, Remove | Right-click menu of a collection card; Move selected..., Remove selected... and Reduce to 1 also act on the picked cards (see [Collections](/about/collections)) |
 | Link copies..., Link owned copies, Tags..., Move to a zone, Remove from deck | Right-click menu of a deck card |
 | All zones, Commander, Main deck, Sideboard, Maybeboard (Cycle target zone, Cycle zone) | The zone buttons above the deck's cards and in the Deck list panel, Z, ZONE in the status bar |
 | Grid layout, Binder layout, List layout (Grid, Binder, List) | Options in the collection header, B |
@@ -53,6 +54,7 @@ Commands for one collection, deck, card or trade are where that thing is shown: 
 | New trade..., Complete trade..., Send trade..., Copy trade list, Share trade binder... | The Trade view |
 | Print a deck..., Print missing cards... (Print deck, Print missing; From deck..., Missing cards...) | The Print tab of the Proxies view |
 | Print list, Card maker | The tabs of the Proxies view |
+| Sell... | Right-click menu of a collection card; see [Purchases](/about/purchases) |
 | Collection cards, Set completion, Missing cards, Collection statistics (Cards, Completion, Missing, Statistics) | The tabs of the collection view |
 | Deck cards, Deck ownership, Deck statistics (Cards, Ownership, Statistics) | The tabs of the deck view |
 | Import collection..., Import decklist... (Import, Import list) | Import... |
