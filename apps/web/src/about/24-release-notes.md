@@ -2,6 +2,11 @@
 
 The installed version is shown at the top of this guide.
 
+## 0.13.1 (2026-11-20): Faster card search
+
+- Fixed: card search loaded slowly. A search that shows one result per card now reads the card database once instead of twice and sorts only the columns it needs, so results come back in about half the time.
+- Fixed: the Owned first sort counted your copies again for every matching card; it now counts them once per search.
+
 ## 0.13.0 (2026-11-20): Select with one click, search sorting, zone views and Add deck to collection
 
 - One click (or tap) on a collection or deck in the Collections panel, the Decks panel or a switcher makes it where new cards go without opening it, so a card search stays open. A double click (or double tap) opens it. The switcher list stays open after one click and marks the chosen one Adding here.
