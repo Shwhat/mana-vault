@@ -23,6 +23,7 @@ test("the card maker: symbol picker, frame styles and a nickname", async ({ page
   await picker.getByRole("button", { name: "Insert {R/P}" }).click();
   await expect(page.locator("#cm-manaCost")).toHaveValue("{2}{R/G}{R/P}");
   // the same picker fills the rules text once it is used
+  await page.locator("#cm-rules").click();
   await page.locator("#cm-rules").fill("Pay ");
   await page.locator("#cm-rules").press("End");
   await page.locator(".sympicker").getByRole("button", { name: "Insert {T}" }).click();

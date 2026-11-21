@@ -237,6 +237,9 @@ export function CardMaker() {
     window.setTimeout(() => {
       const target = field ?? document.querySelector<HTMLInputElement>('[data-field="manaCost"]');
       if (!target) return;
+      // a field chosen since the click keeps the focus
+      const active = document.activeElement;
+      if (active && active !== target && active !== document.body && (active.tagName === "INPUT" || active.tagName === "TEXTAREA")) return;
       lastField.current = target;
       if (!store.phone) target.focus();
       target.setSelectionRange(start + text.length, start + text.length);
@@ -526,7 +529,7 @@ export function CardMaker() {
         )}
         <div className="prow"><label htmlFor="cm-manaCost">Mana cost</label>
           <input id="cm-manaCost" data-field="manaCost" value={current.manaCost} placeholder="{2}{R}" disabled={!mine}
-            onFocus={(event) => focusField(event.currentTarget)} onChange={(event) => changeFace({ manaCost: event.target.value })} /></div>
+            onFocus={(event) => focusField(event.currentTarget)} onSelect={(event) => focusField(event.currentTarget)} onChange={(event) => changeFace({ manaCost: event.target.value })} /></div>
         <div className="prow"><label htmlFor="cm-typeLine">Type line</label>
           <Suggest id="cm-typeLine" data-field="typeLine" mode="typeLine" value={current.typeLine} disabled={!mine}
             placeholder={current.kind === "token" ? "Token Creature - Goblin" : "Creature - Goblin"}
@@ -534,7 +537,7 @@ export function CardMaker() {
         <div className="prow top"><label htmlFor="cm-rules">Rules text</label>
           <Suggest multiline id="cm-rules" data-field="rulesText" mode="rules" rows={6} value={current.rulesText} disabled={!mine}
             placeholder={current.kind === "planeswalker" ? "+1: Draw a card.\n-3: Destroy target creature." : current.kind === "saga" ? "I: Create a 1/1 Soldier token.\nII, III: Draw a card." : "Flying\n{T}: Add {R}. (Reminder text is in parentheses.)"}
-            onFocus={(event) => focusField(event.currentTarget)} onValue={(value) => changeFace({ rulesText: value })} /></div>
+            onFocus={(event) => focusField(event.currentTarget)} onSelect={(event) => focusField(event.currentTarget)} onValue={(value) => changeFace({ rulesText: value })} /></div>
         <div className="prow"><label htmlFor="cm-textsize">Rules text size</label>
           <span className="numfield"><input id="cm-textsize" type="range" min={60} max={140} value={current.textSize} disabled={!mine} onChange={(event) => changeFace({ textSize: Number(event.target.value) })} /> {current.textSize}%</span></div>
         <div className="prow top"><label htmlFor="cm-flavor">Flavor text</label>

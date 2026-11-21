@@ -67,6 +67,7 @@ test("one Symbols window fills the field used last, and suggestions fill the typ
   await page.keyboard.press("ArrowDown");
   await page.keyboard.press("Enter");
   await expect(page.locator("#cm-typeLine")).toHaveValue("Creature - Elf");
+  await page.locator("#cm-rules").click();
   await page.locator("#cm-rules").press("End");
   await page.locator("#cm-rules").pressSequentially("\nFly");
   await expect(list.locator(".suggestitem")).toHaveText(["Flying"]);
