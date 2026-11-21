@@ -27,12 +27,13 @@ These commands use your first wishlist. When you have none, a wishlist named **W
 
 The count of a wishlist row is the number of copies wanted. Adding copies of a card to a collection (Add to collection, the scanner's Add to, and Add as proxy excepted) lowers the wishlist rows of the same card, in any printing, by one per copy added:
 
-- The row added to a wishlist first is lowered first, across all your wishlists.
+- When a card is on only one wishlist, its rows there are lowered, the row added first lowered first.
+- When a card is on more than one wishlist, a window asks which wishlist each card should lower, with **None** to lower nothing. A batch (a pasted list, a deck added to a collection, the scanner) asks once for all its cards. The message reads "N wishlist entries lowered".
 - A row lowered to zero is removed.
 - Proxies lower nothing, and imports and moves lower nothing.
 - Undo of the add puts the wants back.
 
-Example: Wants holds 2 Lightning Bolt (added first) and More wants holds 1. Adding 3 Lightning Bolt to Main collection empties both.
+Example: Wants holds 2 Lightning Bolt and More wants holds 1. Adding 2 Lightning Bolt to Main collection asks "Lower which wishlist?"; choosing Wants empties it and leaves More wants at 1.
 
 ## The trade list
 

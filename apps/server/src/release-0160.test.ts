@@ -48,7 +48,7 @@ describe("purchases", () => {
     const list = (await call("GET", "/api/purchases")).json();
     expect(list.summary).toMatchObject({ spent: 44, received: 0 });
     expect(list.summary.gain).toBe(list.summary.value - 44);
-    expect(list.places).toEqual(["Local shop"]);
+    expect(list.places.map((place: { name: string }) => place.name)).toEqual(["Local shop"]);
     expect(list.entries[0].description).toBe("6 Play booster, HOC; 1 Bundle, HOB");
   });
 

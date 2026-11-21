@@ -11,6 +11,7 @@ import { CONDITIONS, type CardDetail, LANGUAGES, money, priceOf, type SetInfo } 
 import { closeDialog, confirmDialog, customDialog, dialog, isDialogOpen } from "./Dialog";
 import { Suggest } from "./Suggest";
 import { SetIcon } from "./CardMarks";
+import { deliverPurchaseScan, finishPurchaseScan, scanningForPurchase } from "./PurchaseDialogs";
 
 type Capabilities = MediaTrackCapabilities & { torch?: boolean; focusMode?: string[]; pointsOfInterest?: unknown };
 const advanced = (value: Record<string, unknown>) => ({ advanced: [value] }) as unknown as MediaTrackConstraints;
@@ -220,6 +221,8 @@ export function allowedPrintings(options: ScanCard[], sets: string[], ignoreProm
 export default function CardScanner({ phone = false, onClose }: { phone?: boolean; onClose: () => void }) {
   const store = useApp();
   const { prefs } = store;
+  // a scanner opened from a purchase window gives the purchase window back when it closes
+  useEffect(() => () => finishPurchaseScan(), []);
   const camera = useCamera(prefs.scanCamera);
   const frame = useRef<HTMLDivElement>(null);
   const [hint, setHint] = useState("Loading text recognition");
@@ -383,7 +386,6 @@ export default function CardScanner({ phone = false, onClose }: { phone?: boolea
   const last = store.scanItems[0] ?? null;
   const total = useMemo(() => store.scanItems.reduce((sum, item) => sum + (item.proxy ? 0 : (priceOf({
     price_usd: item.card.price_usd ?? null, price_usd_foil: item.card.price_usd_foil ?? null, price_usd_etched: item.card.price_usd_etched ?? null,
-    price_eur: item.card.price_eur ?? null, price_eur_foil: item.card.price_eur_foil ?? null,
   }, finishCode(item), prefs.currency) ?? 0) * item.quantity), 0), [store.scanItems, prefs.currency]);
 
   const view = (
@@ -690,6 +692,7 @@ function ScanList({ onClose }: { onClose?: () => void }) {
 }
 
 const NEW_COLLECTION = "new-collection";
+const PURCHASE = "purchase:this";
 const NEW_DECK = "new-deck";
 const DECK_COLLECTION = "deck-collection";
 
@@ -703,7 +706,8 @@ function AddToWindow({ items, done }: { items: ScanItem[]; done: () => void }) {
   const owned = collections.filter((item) => item.kind === "collection");
   const preferred = collections.find((item) => item.id === store.prefs.targetCollection)?.id ?? collections[0]?.id ?? NEW_COLLECTION;
   // the collection or deck selected last is filled in
-  const [target, setTarget] = useState(store.prefs.addTo === "deck" && store.deck ? `deck:${store.deck.id}` : `collection:${preferred}`);
+  const forPurchase = scanningForPurchase();
+  const [target, setTarget] = useState(forPurchase ? PURCHASE : store.prefs.addTo === "deck" && store.deck ? `deck:${store.deck.id}` : `collection:${preferred}`);
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const [kind, id] = target.split(":") as ["collection" | "deck", string];
@@ -716,6 +720,12 @@ function AddToWindow({ items, done }: { items: ScanItem[]; done: () => void }) {
 
   const run = async () => {
     if (busy) return;
+    if (target === PURCHASE) {
+      closeDialog();
+      deliverPurchaseScan(store, items);
+      done();
+      return;
+    }
     setBusy(true);
     try {
       let destination: ScanDestination;
@@ -757,6 +767,7 @@ function AddToWindow({ items, done }: { items: ScanItem[]; done: () => void }) {
     <div className="iowin">
       <div className="prow"><label htmlFor="add-target">Add {count} to</label>
         <Picker id="add-target" label={`Add ${count} to`} value={target} onChange={setTarget} options={[
+          ...(forPurchase ? [{ value: PURCHASE, label: "This purchase", group: "Purchase" }] : []),
           ...collections.map((item) => ({ value: `collection:${item.id}`, label: item.kind === "wishlist" ? `Wishlist: ${item.name}` : item.name, group: "Collections" })),
           { value: `collection:${NEW_COLLECTION}`, label: "New collection...", group: "Collections" },
           ...store.decks.map((item) => ({ value: `deck:${item.id}`, label: item.name, group: "Decks" })),

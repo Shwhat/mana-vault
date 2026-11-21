@@ -8,7 +8,7 @@ import { formatDialog, tagsDialog } from "../components/DeckDialogs";
 import { linkDialog } from "../components/LibraryDialogs";
 import { choosePrinting } from "../components/PrintingDialog";
 import { addCard } from "../components/AddButtons";
-import { CountPip, FinishBadge, FinishPip, finishName, OwnedMarks, PipBar, PricePip, RemovedPip, ownedVersions, removeCard, switchVersionDialog, linkExact, UpgradeBadge, wantedLabel } from "../components/CardMarks";
+import { InDeckMarks, CountPip, FinishBadge, FinishPip, finishName, OwnedMarks, PipBar, PricePip, RemovedPip, ownedVersions, removeCard, switchVersionDialog, linkExact, UpgradeBadge, wantedLabel } from "../components/CardMarks";
 import { Switcher } from "../components/Switcher";
 import { Suggest } from "../components/Suggest";
 import { cardPrice, checkDeck, type Legality, MANA_COLORS, manaBalance, sections, shuffle, ZONE_ORDER } from "../deck-rules";
@@ -27,12 +27,11 @@ import { CardResults, countLine, SortPicker, useViewSearch } from "../components
 import { OptionsButton, Segments } from "../components/Options";
 import { choices, type Choice, Picker } from "../components/Picker";
 import { filterCount, matchesFilters, useServerMatch } from "../filters";
+import { EntryMenuButton, GroupedList, ListOptionRows, ManaCost } from "../components/GroupedList";
 
 type Hover = { url: string; x: number; y: number } | null;
 type HoverProps = { onHover?: (url: string | null, event?: ReactMouseEvent) => void };
 
-const GROUPS: Array<[DeckGroup, string]> = [["type", "Type"], ["mana", "Mana value"], ["color", "Color"], ["rarity", "Rarity"], ["tag", "Tag"], ["none", "None"]];
-const SORTS: Array<[DeckSort, string]> = [["name", "Name"], ["mana", "Mana value"], ["price", "Price"]];
 const VIEWS: Array<[DeckViewKind, string]> = [["list", "List"], ["text", "Text"], ["stacks", "Stacks"], ["grid", "Grid"]];
 const ZONE_CHOICES: Choice[] = ZONES.map((zone) => ({ value: zone.id, label: zone.label }));
 
@@ -98,7 +97,7 @@ function ListRow({ card, flag, onHover }: { card: DeckCard; flag?: string } & Ho
       <Thumb url={card.image_url} />
       <div className="rowmain" {...hoverHandlers(card, onHover)}>
         <div className="rowtitle"><b>{card.name}</b>{card.custom && <span className="badge custom">Custom</span>}
-          <FinishBadge finish={card.finish} promoTypes={card.promo_types} /><UpgradeBadge card={card} /><span className="mana">{card.mana_cost}</span><Flag text={flag} /></div>
+          <FinishBadge finish={card.finish} promoTypes={card.promo_types} /><UpgradeBadge card={card} /><ManaCost cost={card.mana_cost} /><Flag text={flag} /></div>
         <div className="rowsub">{card.type_line}</div>
         <div className="rowmeta">{card.set_name} <span className="badge">{card.set_code.toUpperCase()}</span> {card.collector_number}
           {card.want_card_id && <span className="muted">, wanted {wantedLabel(card)}</span>}</div>
@@ -123,6 +122,7 @@ function ListRow({ card, flag, onHover }: { card: DeckCard; flag?: string } & Ho
               }}>+ Wishlist</button>
           )}
           <OwnedMarks store={store} card={card} />
+          <InDeckMarks store={store} card={card} />
         </div>
       </div>
       <span className="price">{money(price === null ? null : price * card.quantity, currency)}</span>
@@ -137,6 +137,7 @@ function ListRow({ card, flag, onHover }: { card: DeckCard; flag?: string } & Ho
       </span>
       <button type="button" className="btn small icon-only" title={`Remove ${card.name}`} aria-label={`Remove ${card.name} from deck`}
         onClick={(event) => { event.stopPropagation(); removeCard(store, card.name, card.quantity, (left) => void store.setDeckQuantity(card, left)); }}><Icon name="del" /></button>
+      <EntryMenuButton menu={cardMenu(store, card)} name={card.name} />
     </div>
   );
 }
@@ -153,8 +154,9 @@ function TextRow({ card, flag, onHover }: { card: DeckCard; flag?: string } & Ho
       <span className="tq">{card.quantity}</span>
       <span className="tn">{card.name}</span>
       <FinishBadge finish={card.finish} promoTypes={card.promo_types} className="tmark" /><UpgradeBadge card={card} className="tmark" />
-      <span className="mana">{card.mana_cost}</span>
+      <ManaCost cost={card.mana_cost} />
       <span className="tp">{money(price === null ? null : price * card.quantity, currency)}</span>
+      <EntryMenuButton menu={cardMenu(store, card)} name={card.name} />
     </div>
   );
 }
@@ -187,11 +189,12 @@ function Picture({ cards, flag, lines = false }: { cards: DeckCard[]; flag?: str
     <PipBar>
         <CountPip count={total} />
         {cards.map((item) => <FinishBadge key={item.entry_id} finish={item.finish} promoTypes={item.promo_types} />)}
-        {cards.map((item) => <UpgradeBadge key={item.entry_id} card={item} />)}
-        {missing > 0 && <span className="badge miss">{missing < total ? `Missing ${missing}` : "Missing"}</span>}
+        {cards.map((item) => <UpgradeBadge key={item.entry_id} card={item} compact />)}
+        {missing > 0 && <span className="badge miss">{missing < total ? `MISSING ${missing}` : "MISSING"}</span>}
         {cards.filter((item) => item.removed).slice(0, 1).map((item) => <RemovedPip key="removed" onChange={() => choosePrinting(item.name, item.card_id, item.card_id, { finish: item.finish ?? 0, currency: store.prefs.currency, quantity: item.quantity },
           (printing, finish, count) => void store.changeDeckPrinting(item, printing, finish, undefined, count))} />)}
         {cards.map((item) => <OwnedMarks key={item.entry_id} store={store} card={item} compact />)}
+        {cards.map((item) => <InDeckMarks key={`d${item.entry_id}`} store={store} card={item} compact />)}
         <PricePip price={cardPrice(card, store.prefs.currency)} />
     </PipBar>
   );
@@ -251,21 +254,13 @@ function Board({ zone, cards, legality, onHover }: { zone: Zone; cards: DeckCard
         </div>
       ))}
       {view === "text" && (
-        <div className="tcols">
-          {list.map((section) => (
-            <div className="tgroup" key={section.key}>
-              {headed && <div className="grouphead">{section.label} <span className="cnt">{section.count}</span></div>}
-              {section.cards.map((card) => <TextRow key={card.entry_id} card={card} flag={flag(card)} onHover={onHover} />)}
-            </div>
-          ))}
-        </div>
+        <GroupedList view={`deck-${zone}`} sections={list} headed={headed} className="text" label={zoneLabel(zone)}
+          render={(card) => <TextRow key={card.entry_id} card={card} flag={flag(card)} onHover={onHover} />} />
       )}
-      {view === "list" && list.map((section) => (
-        <div key={section.key}>
-          {headed && <div className="grouphead">{section.label} <span className="cnt">{section.count}</span></div>}
-          {section.cards.map((card) => <ListRow key={card.entry_id} card={card} flag={flag(card)} onHover={onHover} />)}
-        </div>
-      ))}
+      {view === "list" && (
+        <GroupedList view={`deck-${zone}`} sections={list} headed={headed} label={zoneLabel(zone)}
+          render={(card) => <ListRow key={card.entry_id} card={card} flag={flag(card)} onHover={onHover} />} />
+      )}
     </section>
   );
 }
@@ -352,10 +347,8 @@ function DeckOptions({ actions }: { actions: Record<string, Action> }) {
   return (
     <OptionsButton title="Deck options" count={filterCount(store.filterSets.deck, true)}>
       <div className="prow"><label>View</label><Segments label="Show cards as" value={view} options={VIEWS} onChange={(deckView) => store.setPrefs({ deckView })} /></div>
-      <div className="prow"><label htmlFor="deck-group">Group</label>
-        <Picker id="deck-group" label="Group by" value={deckGroup} onChange={(value) => store.setPrefs({ deckGroup: value as DeckGroup })} options={choices(GROUPS)} /></div>
-      <div className="prow"><label htmlFor="deck-sort">Sort</label>
-        <Picker id="deck-sort" label="Sort by" value={deckSort} onChange={(value) => store.setPrefs({ deckSort: value as DeckSort })} options={choices(SORTS)} /></div>
+      <ListOptionRows id="deck" group={deckGroup} onGroup={(value: DeckGroup) => store.setPrefs({ deckGroup: value })} sort={deckSort}
+        onSort={(value: DeckSort) => store.setPrefs({ deckSort: value })} tags />
       {filterCount(store.filterSets.deck, true) > 0 && (
         <div className="prow"><label>Filters</label><button type="button" className="btn small" onClick={() => store.clearFilters("deck")}>Clear filters</button></div>
       )}

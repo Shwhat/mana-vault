@@ -1,4 +1,7 @@
 // ---------- proxies view: the print list, sheet settings with a page preview, and the exports; the card maker in its own tab ----------
+import { EntryMenuButton, GroupedList, ListOptionRows, ManaCost } from "../components/GroupedList";
+import { rowMenu } from "../components/ContextMenu";
+import { groupList } from "../list-groups";
 import { useEffect, useMemo, useState } from "react";
 import type { Action } from "../actions";
 import { downloadBlob, downloadText, pickFile, request } from "../api";
@@ -51,6 +54,55 @@ export function addFromDeckDialog(store: Store, onlyMissing = false) {
     }
   }, "Add");
 }
+
+/**
+ * Send to print list... from a deck's right-click menu (0.17.0): the whole deck, only its missing cards, or chosen zones,
+ * each card in its deck printing and count, as one undo step.
+ */
+function SendDeckToPrint({ store, deck, close }: { store: Store; deck: { id: string; name: string }; close: () => void }) {
+  const [what, setWhat] = useState<"all" | "missing" | "zones">("all");
+  const [zones, setZones] = useState<Set<string>>(new Set(["commander", "main"]));
+  const [error, setError] = useState("");
+  const send = async () => {
+    setError("");
+    try {
+      const detail = await request<DeckDetail>(`/api/decks/${encodeURIComponent(deck.id)}`);
+      const cards = detail.cards
+        .filter((card) => (what === "zones" ? zones.has(card.zone) : card.zone !== "maybeboard"))
+        .map((card) => ({ card: { ...card, id: card.card_id } as CardForPrint, count: what === "missing" ? card.missing ?? 0 : card.quantity }))
+        .filter((item) => item.count > 0);
+      if (!cards.length) { setError(what === "missing" ? `${deck.name} has no missing cards` : "No cards to send"); return; }
+      close();
+      await store.addToPrintList(cards, what === "missing" ? `The missing cards of ${deck.name}` : deck.name);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Could not load the deck.");
+    }
+  };
+  const zoneLabels: Array<[string, string]> = [["commander", "Commander"], ["main", "Main deck"], ["sideboard", "Sideboard"], ["maybeboard", "Maybeboard"]];
+  return (
+    <div className="purchaseedit">
+      {error && <p className="note err">{error}</p>}
+      <div className="radios" role="radiogroup" aria-label="Cards to send">
+        <label className="check"><input type="radio" name="sdp" checked={what === "all"} onChange={() => setWhat("all")} /> The whole deck (not the maybeboard)</label>
+        <label className="check"><input type="radio" name="sdp" checked={what === "missing"} onChange={() => setWhat("missing")} /> Missing cards only</label>
+        <label className="check"><input type="radio" name="sdp" checked={what === "zones"} onChange={() => setWhat("zones")} /> Chosen zones</label>
+      </div>
+      {what === "zones" && (
+        <div className="btnrow">{zoneLabels.map(([zone, label]) => (
+          <label key={zone} className="check"><input type="checkbox" checked={zones.has(zone)} onChange={(event) => {
+            const next = new Set(zones);
+            if (event.target.checked) next.add(zone); else next.delete(zone);
+            setZones(next);
+          }} /> {label}</label>
+        ))}</div>
+      )}
+      <div className="btnrow end"><button type="button" className="btn primary" disabled={what === "zones" && !zones.size} onClick={() => void send()}>Send to print list</button></div>
+    </div>
+  );
+}
+
+export const sendDeckToPrintDialog = (store: Store, deck: { id: string; name: string }) =>
+  customDialog(`Send ${deck.name} to the print list`, (close) => <SendDeckToPrint store={store} deck={deck} close={close} />, 480, "Cancel");
 
 function addFromCollectionDialog(store: Store) {
   const list = store.collections ?? [];
@@ -175,7 +227,7 @@ function LineRow({ line }: { line: PrintLine }) {
     <div className="row pline">
       <Thumb url={line.card.image_url} small />
       <div className="rowmain">
-        <div className="rowtitle"><b>{line.card.name}</b>{line.card.custom && <span className="badge custom">Custom</span>}</div>
+        <div className="rowtitle"><b>{line.card.name}</b><ManaCost cost={line.card.mana_cost} />{line.card.custom && <span className="badge custom">Custom</span>}</div>
         <div className="rowmeta">{line.card.set_name} <span className="badge">{line.card.set_code.toUpperCase()}</span> {line.card.collector_number}
           <button type="button" className="lnk" onClick={() => choosePrinting(line.card.name, line.cardId, line.cardId, { currency: store.prefs.currency }, (printing) => {
             store.setPrintLine(line.id, { cardId: printing.id, card: { ...line.card, id: printing.id, set_code: printing.set_code, set_name: printing.set_name, collector_number: printing.collector_number, image_url: printing.image_url } });
@@ -186,6 +238,14 @@ function LineRow({ line }: { line: PrintLine }) {
       {line.card.hasBack && <Picker label={`Faces of ${line.card.name}`} value={line.faces} options={FACE_CHOICES} onChange={(value) => store.setPrintLine(line.id, { faces: value as Faces })} />}
       <Quantity value={line.count} name={line.card.name} max={100} onChange={(count) => (count < 1 ? store.removePrintLine(line.id) : store.setPrintLine(line.id, { count: Math.min(100, count) }))} />
       <button type="button" className="btn small" aria-label={`Remove ${line.card.name} from the print list`} onClick={() => store.removePrintLine(line.id)}>Remove</button>
+      <EntryMenuButton menu={rowMenu(store, line.card.name, () => [
+        { label: "Card page", run: () => store.setCardPage(line.cardId) },
+        { label: "Change printing...", run: () => choosePrinting(line.card.name, line.cardId, line.cardId, { currency: store.prefs.currency }, (printing) => {
+          store.setPrintLine(line.id, { cardId: printing.id, card: { ...line.card, id: printing.id, set_code: printing.set_code, set_name: printing.set_name, collector_number: printing.collector_number, image_url: printing.image_url } });
+          void store.loadPrintList();
+        }) },
+        { label: "Remove from the print list", run: () => store.removePrintLine(line.id) },
+      ])} name={line.card.name} />
     </div>
   );
 }
@@ -222,7 +282,12 @@ function PrintLines({ lines }: { lines: PrintLine[] }) {
   const size = store.prefs.printSize;
   const pages = Math.max(1, Math.ceil(lines.length / 9));
   useEffect(() => { if (page >= pages) setPage(pages - 1); }, [page, pages]);
-  if (layout === "list") return <>{lines.map((line) => <LineRow key={line.id} line={line} />)}</>;
+  const group = store.prefs.listGroups.print;
+  if (layout === "list") {
+    return <GroupedList view="print" headed={group !== "none"} label="Print list" render={(line) => <LineRow key={line.id} line={line} />}
+      sections={groupList(lines.map((line) => ({ ...line.card, line })), group, null, (item) => printPrice(item, store.prefs.currency), (item) => item.line.count)
+        .map((section) => ({ ...section, cards: section.cards.map((item) => item.line) }))} />;
+  }
   const columns = layout === "binder" ? "repeat(3, minmax(0, 1fr))"
     : store.phone ? `repeat(${PRINT_PHONE_COLUMNS[size]}, minmax(0, 1fr))` : `repeat(auto-fill, minmax(${PRINT_WIDTHS[size]}px, 1fr))`;
   const shown = layout === "binder" ? lines.slice(page * 9, page * 9 + 9) : lines;
@@ -249,6 +314,7 @@ function PrintListBar() {
     <div className="navbar printbar">
       <Picker label="Sort the print list" prefix="Sort: " value={store.prefs.printSort} options={choices(PRINT_SORTS)} onChange={(value) => store.setPrefs({ printSort: value as PrintSort })} />
       <OptionsButton title="Print list options">
+        <ListOptionRows id="print-opt" group={store.prefs.listGroups.print} onGroup={(group) => store.setPrefs({ listGroups: { ...store.prefs.listGroups, print: group } })} />
         <LayoutRows name="Print list" layout={store.prefs.printLayout} size={store.prefs.printSize}
           onLayout={(printLayout) => store.setPrefs({ printLayout })} onSize={(printSize) => store.setPrefs({ printSize })} />
       </OptionsButton>

@@ -1,4 +1,5 @@
 // ---------- scan state: the scanned list, kept on this device until it is added or cleared ----------
+import { askWishlists, type WishAsk } from "./components/WishlistAsk";
 import { useCallback, useEffect, useState, type MutableRefObject } from "react";
 import { request } from "./api";
 import type { Counts, WishChange } from "./library-state";
@@ -128,10 +129,11 @@ export function useScanState(deps: ScanDeps) {
       const added = items.map((item) => ({
         cardId: item.card.id, foil: finishCode(item), condition: item.condition ?? "NM", language: item.language ?? "en", proxy: !!item.proxy, quantity: item.quantity,
       }));
-      const result = await request<{ before: Counts; after: Counts; wishlist?: WishChange[] }>(`/api/collections/${encodeURIComponent(collectionId)}/cards/add`, {
+      const result = await request<{ before: Counts; after: Counts; wishlist?: WishChange[]; wishAsk?: WishAsk[] }>(`/api/collections/${encodeURIComponent(collectionId)}/cards/add`, {
         method: "POST", body: JSON.stringify({ items: added }),
       });
       const wishes = result.wishlist ?? [];
+      askWishlists(result.wishAsk);
       if (target.kind === "collection") {
         pushUndo({
           label,

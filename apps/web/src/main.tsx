@@ -8,7 +8,10 @@ import { onSignedOut } from "./android/net";
 import { PROBLEM_EVENT, startSync, SYNCED_EVENT, type SyncProblem } from "./android/offline";
 import { clearSettings, isApp, loadSettings, native, signedIn, watchBackButton } from "./android/platform";
 import CardScanner from "./components/CardScanner";
-import { closeDialog, DialogHost, isDialogOpen } from "./components/Dialog";
+import { choiceDialog, closeDialog, DialogHost, isDialogOpen } from "./components/Dialog";
+import { importWindow } from "./components/FileWindows";
+import { WishAskHost } from "./components/WishlistAsk";
+import { purchaseFromReceipt } from "./components/PurchaseDialogs";
 import { DesktopShell, PhoneShell } from "./components/Shell";
 import { applyTheme, loadPrefs, type Prefs, watchSystemTheme } from "./prefs";
 import { type Store, StoreContext, useStoreState } from "./store";
@@ -104,6 +107,7 @@ function App({ user, prefs }: { user: User; prefs: Prefs }) {
     <StoreContext.Provider value={store}>
       {narrow ? <PhoneShell actions={actions} /> : <DesktopShell actions={actions} />}
       <DialogHost />
+      <WishAskHost />
       {store.scannerOpen && !narrow && !store.cardPage && <CardScanner onClose={() => store.setScannerOpen(false)} />}
     </StoreContext.Provider>
   );
@@ -142,15 +146,37 @@ function useAppFeatures(store: Store, actions: Record<string, Action>) {
     let offerHandle: { remove: () => Promise<void> } | null = null;
     void native().addListener("offer", () => { void live.current.reloadOffers().then(() => liveActions.current.inbox?.run()); })
       .then((handle) => { offerHandle = handle; }).catch(() => undefined);
+    // 0.17.0: a CSV or text list shared into the app opens the Import window; a picture or PDF can be read as a receipt
+    const takeShared = () => void native().takeSharedFile?.().then(({ file }) => { if (file) void openShared(live.current, file); }).catch(() => undefined);
+    takeShared();
+    let sharedHandle: { remove: () => Promise<void> } | null = null;
+    void native().addListener("shared", takeShared).then((handle) => { sharedHandle = handle; }).catch(() => undefined);
     void checkForUpdate();
     return () => {
       stopBack();
       void offerHandle?.remove();
+      void sharedHandle?.remove();
       window.removeEventListener(SYNCED_EVENT, synced);
       window.removeEventListener(PROBLEM_EVENT, problems);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+}
+
+/** Opens a file shared into the app: lists go to the Import window, pictures and PDFs can be read as receipts. */
+async function openShared(store: Store, file: { name: string; type: string; data: string }) {
+  const bytes = Uint8Array.from(atob(file.data), (char) => char.charCodeAt(0));
+  const lower = file.name.toLowerCase();
+  if (file.type.startsWith("text/") || file.type.includes("csv") || lower.endsWith(".csv") || lower.endsWith(".txt")) {
+    importWindow(store, "collection", { name: file.name, text: new TextDecoder().decode(bytes) });
+    return;
+  }
+  if (file.type.startsWith("image/") || file.type === "application/pdf") {
+    const answer = await choiceDialog("Shared file", <>What do you want to do with {file.name}?</>, [["receipt", "Read receipt...", true], ["cancel", "Cancel"]]);
+    if (answer === "receipt") await purchaseFromReceipt(store, new File([bytes], file.name, { type: file.type }));
+    return;
+  }
+  store.flash(`${file.name} cannot be opened in Mana Vault`, "err");
 }
 
 /** The Android app: the sign-in screen until this phone is signed in, then the app with sync. */

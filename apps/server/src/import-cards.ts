@@ -228,7 +228,7 @@ export function snapshotPrices(database: DatabaseSync, day = new Date().toISOStr
     `INSERT INTO price_history (card_id, day, usd, usd_foil, usd_etched, eur, eur_foil)
      SELECT c.id, ?, c.price_usd, c.price_usd_foil, c.price_usd_etched, c.price_eur, c.price_eur_foil FROM cards c
      LEFT JOIN price_history h ON h.card_id = c.id AND h.day = (SELECT MAX(day) FROM price_history x WHERE x.card_id = c.id AND x.day < ?)
-     WHERE c.custom = 0 AND COALESCE(c.price_usd, c.price_usd_foil, c.price_usd_etched, c.price_eur, c.price_eur_foil) IS NOT NULL
+     WHERE c.custom = 0 AND COALESCE(c.price_usd, c.price_usd_foil, c.price_usd_etched) IS NOT NULL
        AND (h.card_id IS NULL OR h.usd IS NOT c.price_usd OR h.usd_foil IS NOT c.price_usd_foil OR h.usd_etched IS NOT c.price_usd_etched
             OR h.eur IS NOT c.price_eur OR h.eur_foil IS NOT c.price_eur_foil)
      ON CONFLICT(card_id, day) DO UPDATE SET usd = excluded.usd, usd_foil = excluded.usd_foil, usd_etched = excluded.usd_etched,

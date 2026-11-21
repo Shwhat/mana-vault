@@ -175,7 +175,7 @@ export function useTradeState(deps: TradeDeps) {
       side: "give", cardId: entry.id, foil: entry.foil, condition: entry.condition, language: entry.language, quantity, price: null,
       collectionId: collectionId ?? null, collectionName: collectionId ? collectionName(collectionId) : null, name: entry.name, set_code: entry.set_code,
       set_name: entry.set_name, collector_number: entry.collector_number, image_url: entry.image_url, rarity: entry.rarity,
-      price_usd: entry.price_usd, price_usd_foil: entry.price_usd_foil, price_usd_etched: entry.price_usd_etched, price_eur: entry.price_eur, price_eur_foil: entry.price_eur_foil,
+      price_usd: entry.price_usd, price_usd_foil: entry.price_usd_foil, price_usd_etched: entry.price_usd_etched
     });
   }, [addLine, live, collectionName]);
 

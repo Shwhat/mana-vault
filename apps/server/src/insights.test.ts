@@ -145,7 +145,7 @@ describe("prices", () => {
       initializeDatabase(database);
       await importBulkFile(path, database);
       expect(database.prepare("SELECT price_usd, price_usd_foil, price_usd_etched, price_eur, price_eur_foil, flavor_name FROM cards").get())
-        .toEqual({ price_usd: 1.5, price_usd_foil: null, price_usd_etched: 9.99, price_eur: 1.2, price_eur_foil: null, flavor_name: "Nickname" });
+        .toEqual({ price_usd: 1.5, price_usd_foil: null, price_usd_etched: 9.99, price_eur: null, price_eur_foil: null, flavor_name: "Nickname" });
       database.close();
     } finally {
       await rm(directory, { recursive: true, force: true });

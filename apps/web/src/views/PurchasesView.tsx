@@ -1,12 +1,15 @@
 // ---------- Purchases: the summary with its chart, the history of every entry, and one entry in full ----------
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { fetchFile, request } from "../api";
+import { downloadBlob, fetchFile, request } from "../api";
+import { isApp } from "../android/platform";
 import type { Action } from "../actions";
 import { SetIcon } from "../components/CardMarks";
 import { rowMenu } from "../components/ContextMenu";
 import { choiceDialog, confirmDialog } from "../components/Dialog";
 import { choices, Picker } from "../components/Picker";
-import { entryDialog, fromPricesDialog, openDialog, type SaleCopy, useProductOptions, valueDialog } from "../components/PurchaseDialogs";
+import {
+  entryDialog, fromPricesDialog, keepReceipt, openDialog, pickReceipt, placesDialog, purchaseFromReceipt, removeReceipt, type SaleCopy, tieCopiesDialog, useProductOptions, valueDialog,
+} from "../components/PurchaseDialogs";
 import {
   type ChartPoint, type Entry, type EntryKind, type EntrySummary, KIND_LABELS, type PurchaseList, reloadOpening, setActiveOpening, useActiveOpening,
 } from "../purchase-state";
@@ -28,7 +31,7 @@ const gainClass = (value: number) => (value > 0 ? "gain up" : value < 0 ? "gain 
 
 /** New entry commands, shared by the view and the menus. */
 export function newEntry(store: Store, kind: EntryKind, onSaved?: (entry: Entry) => void, sale: SaleCopy[] = []) {
-  void request<PurchaseList>(`/api/purchases?currency=${store.prefs.currency}`).then((list) => entryDialog(store, list, kind, null, (entry) => {
+  void request<PurchaseList>("/api/purchases").then((list) => entryDialog(store, list, kind, null, (entry) => {
     onSaved?.(entry);
     window.setTimeout(() => window.dispatchEvent(new CustomEvent("mana-vault:purchases", { detail: entry.id })), 0);
   }, sale)).catch((reason: unknown) => store.fail(reason, "Could not open purchase history."));
@@ -42,7 +45,7 @@ export function saleCopies(store: Store): SaleCopy[] {
     return {
       collectionId, collectionName: entry.collection_name ?? store.collections?.find((item) => item.id === collectionId)?.name ?? "", cardId: entry.id, foil: entry.foil,
       condition: entry.condition, language: entry.language, proxy: !!entry.proxy, quantity: entry.quantity, name: entry.name, setCode: entry.set_code,
-      collectorNumber: entry.collector_number, count: String(entry.quantity), price: String(copyPrice(entry, store.prefs.currency) ?? 0),
+      collectorNumber: entry.collector_number, count: String(entry.quantity), price: String(copyPrice(entry, "usd") ?? 0),
     };
   });
 }
@@ -52,7 +55,6 @@ export async function exportPurchases(store: Store, what: "entries" | "lines") {
     const response = await fetchFile(`/api/purchases/export${what === "lines" ? "?what=lines" : ""}`);
     if (!response.ok) throw new Error("Could not export the purchase history");
     const blob = await response.blob();
-    const { downloadBlob } = await import("../api");
     downloadBlob(what === "lines" ? "mana-vault-purchase-lines.csv" : "mana-vault-purchases.csv", blob);
     store.flash(what === "lines" ? "Purchase lines exported" : "Purchase history exported");
   } catch (reason) {
@@ -72,7 +74,7 @@ function SpendChart({ currency }: { currency: Currency }) {
     return () => { live = false; };
   }, [currency]);
   if (!data) return <p className="note">Loading the chart</p>;
-  if (data.points.length < 1) return <p className="note">The chart shows once there is an entry in {currency.toUpperCase()}.</p>;
+  if (data.points.length < 1) return <p className="note">The chart shows once there is an entry.</p>;
   const points = data.points;
   const WIDTH = 640; const HEIGHT = 220; const PAD = { left: 70, right: 70, top: 14, bottom: 26 };
   const top = Math.max(1, ...points.map((point) => Math.max(point.spent, point.value))) * 1.1;
@@ -199,7 +201,7 @@ function History({ list, currency, onOpen }: { list: PurchaseList; currency: Cur
           ))}
         </tbody>
       </table>
-      {list.summary.otherCurrency > 0 && <p className="note">{list.summary.otherCurrency} {list.summary.otherCurrency === 1 ? "entry is" : "entries are"} in {currency === "usd" ? "EUR" : "USD"} and not counted in the summary.</p>}
+
     </div>
   );
 }
@@ -265,18 +267,49 @@ function EntryPage({ id, list, onClose, onChanged }: { id: string; list: Purchas
       store.fail(reason, "Could not untie the card.");
     }
   };
+  const addReceipt = async () => {
+    const file = await pickReceipt();
+    if (!file) return;
+    try {
+      await keepReceipt(store, entry.id, file, changed);
+      changed();
+      store.flash(`Receipt kept with the ${entry.kindLabel.toLowerCase()} of ${entry.date}`);
+    } catch (reason) {
+      store.fail(reason, "Could not keep the receipt.");
+    }
+  };
+  const goAdd = (opening: Entry["openings"][number], scan: boolean) => {
+    if (opening.collectionId) store.setTargetCollection(opening.collectionId);
+    store.setPrefs({ addTo: "collection" });
+    if (scan) store.setScannerOpen(true);
+    else store.setView("cards");
+    store.flash(`Adding to ${opening.name}`);
+  };
   const figure = (label: string, value: string, className = "") => <div className="pfig"><span className="sub">{label}</span><b className={className}>{value}</b></div>;
   return (
     <div className="purchaseentry">
       <div className="btnrow pehead">
         <button type="button" className="btn small" onClick={onClose}>Back to history</button>
         <span className={`badge kind-${entry.kind}`}>{entry.kindLabel}</span>
-        <b>{entry.date}</b>{entry.place && <span>{entry.place}</span>}{entry.note && <span className="sub">{entry.note}</span>}
+        <b>{entry.date}</b>{entry.place && <span>{entry.place}</span>}{entry.note && !(entry.kind === "trade" && /^Trade \d{1,2}\/\d{1,2}\/\d{2,4}$/.test(entry.note)) && <span className="sub">{entry.note}</span>}
         <span className="grow" />
         <button type="button" className="btn small" onClick={() => entryDialog(store, list, entry.kind, entry, changed)}>Edit...</button>
         <button type="button" className="btn small" onClick={() => void remove()}>Delete...</button>
       </div>
-      <div className="pfigs">
+      {entry.trade && (
+        <div className="pfigs">
+          {figure("Gave", money(entry.trade.gave, currency))}
+          {figure("Got", money(entry.trade.got, currency))}
+          {figure("Net", signed(entry.trade.net, currency), gainClass(entry.trade.net))}
+          {figure("Original cost of cards given", money(entry.trade.originalCost, currency))}
+          {figure("Value now", money(entry.value, currency))}
+          {figure("Gain or loss", signed(entry.gain, currency), gainClass(entry.gain))}
+        </div>
+      )}
+      {entry.trade && entry.trade.noCost.length > 0 && (
+        <p className="note">{entry.trade.noCost.length} {entry.trade.noCost.length === 1 ? "card given has" : "cards given have"} no recorded cost and {entry.trade.noCost.length === 1 ? "counts" : "count"} at {entry.trade.noCost.length === 1 ? "its" : "their"} trade value ({money(entry.trade.noCostValue, currency)}): {entry.trade.noCost.join(", ")}.</p>
+      )}
+      {!entry.trade && <div className="pfigs">
         {entry.kind === "purchase" && figure("Cost", money(entry.out, currency))}
         {entry.kind === "purchase" && entry.tax + entry.shipping > 0 && figure("Tax and shipping", money(entry.tax + entry.shipping, currency))}
         {entry.kind !== "purchase" && figure("Money in", money(entry.in, currency))}
@@ -284,7 +317,23 @@ function EntryPage({ id, list, onClose, onChanged }: { id: string; list: Purchas
         {figure("Value now", money(entry.value, currency))}
         {entry.kind === "purchase" && figure("Sold for", money(entry.pulledIncome, currency))}
         {figure("Gain or loss", signed(entry.gain, currency), gainClass(entry.gain))}
-      </div>
+      </div>}
+      {entry.kind !== "trade" && entry.kind !== "purchase" && entry.shipping > 0 && (
+        <p className="note">{entry.shippingBy === "buyer" ? `Shipping of ${money(entry.shipping, currency)} was paid by the buyer and is not counted.` : `Shipping of ${money(entry.shipping, currency)} was paid by you and lowers the money in.`}</p>
+      )}
+      <section className="receiptbox">
+        <h4>Receipt</h4>
+        {entry.receipt ? (
+          <div className="btnrow">
+            <span>{entry.receipt.name} <span className="sub">{Math.max(1, Math.round(entry.receipt.bytes / 1024))} KB</span></span>
+            <button type="button" className="btn small" onClick={() => void viewReceipt(store, entry.id, entry.receipt!.name)}>View receipt</button>
+            <button type="button" className="btn small" onClick={() => void addReceipt()}>Replace...</button>
+            <button type="button" className="btn small" onClick={() => void removeReceipt(store, entry.id, changed).then(changed).catch((reason: unknown) => store.fail(reason, "Could not remove the receipt."))}>Remove</button>
+          </div>
+        ) : (
+          <div className="btnrow"><span className="sub">No receipt kept</span><button type="button" className="btn small" onClick={() => void addReceipt()}>Add receipt...</button></div>
+        )}
+      </section>
       {entry.lines.length > 0 && (
         <section>
           <h4>Products</h4>
@@ -315,8 +364,20 @@ function EntryPage({ id, list, onClose, onChanged }: { id: string; list: Purchas
           {entry.openings.map((opening) => (
             <div key={opening.id} className="wsrow">
               <span><b>{opening.name}</b> <span className="sub">{opening.cards} cards, {money(opening.valuePulled, currency)} pulled, {money(opening.perPack, currency)} per pack</span></span>
-              {opening.active ? <button type="button" className="btn small primary" onClick={() => void setOpening(opening.id, false)}>Done opening</button>
-                : <button type="button" className="btn small" onClick={() => void setOpening(opening.id, true)}>Continue opening</button>}
+              {opening.active ? (
+                <span className="btnrow">
+                  <span className="badge opening">Adding here</span>
+                  <button type="button" className="btn small" onClick={() => goAdd(opening, false)}>Add cards</button>
+                  <button type="button" className="btn small" onClick={() => goAdd(opening, true)}>Scan</button>
+                  <button type="button" className="btn small" onClick={() => tieCopiesDialog(store, opening.id, changed)}>Add existing copies...</button>
+                  <button type="button" className="btn small primary" onClick={() => void setOpening(opening.id, false)}>Done opening</button>
+                </span>
+              ) : (
+                <span className="btnrow">
+                  <button type="button" className="btn small" onClick={() => tieCopiesDialog(store, opening.id, changed)}>Add existing copies...</button>
+                  <button type="button" className="btn small" onClick={() => void setOpening(opening.id, true)}>Continue opening</button>
+                </span>
+              )}
             </div>
           ))}
         </section>
@@ -325,7 +386,7 @@ function EntryPage({ id, list, onClose, onChanged }: { id: string; list: Purchas
         <section>
           <h4>{entry.kind === "trade" ? "Cards got" : "Cards from this purchase"}</h4>
           <table className="dtable">
-            <thead><tr><th>Card</th><th>Set</th><th className="numcell">Count</th><th className="numcell">Still held</th><th className="numcell">Price now</th><th /></tr></thead>
+            <thead><tr><th>Card</th><th>Set</th><th className="numcell">Count</th><th className="numcell">Still held</th>{entry.kind === "trade" && <th className="numcell">Trade price</th>}<th className="numcell">Price now</th><th /></tr></thead>
             <tbody>
               {entry.ties.map((tie) => (
                 <tr key={tie.id}>
@@ -333,6 +394,7 @@ function EntryPage({ id, list, onClose, onChanged }: { id: string; list: Purchas
                   <td><SetIcon code={tie.setCode} />{tie.setCode.toUpperCase()} #{tie.collectorNumber}</td>
                   <td className="numcell">{tie.quantity}</td>
                   <td className="numcell">{tie.held}</td>
+                  {entry.kind === "trade" && <td className="numcell">{money(tie.tradePrice, currency)}</td>}
                   <td className="numcell">{money(tie.price, currency)}</td>
                   <td>{tie.openingId && <button type="button" className="btn small" onClick={() => void untie(tie.id, tie.name)}>Untie</button>}</td>
                 </tr>
@@ -345,16 +407,24 @@ function EntryPage({ id, list, onClose, onChanged }: { id: string; list: Purchas
         <section>
           <h4>{entry.kind === "trade" ? "Cards given" : "Sold"}</h4>
           <table className="dtable">
-            <thead><tr><th>{entry.kind === "product_sale" ? "Product" : "Card"}</th><th className="numcell">Count</th><th className="numcell">Price</th><th>From</th></tr></thead>
+            <thead><tr><th>{entry.kind === "product_sale" ? "Product" : "Card"}</th><th className="numcell">Count</th><th className="numcell">{entry.kind === "trade" ? "Trade value" : "Price"}</th>
+              {entry.trade && <th className="numcell">Original cost</th>}<th>From</th></tr></thead>
             <tbody>
-              {entry.sales.map((sale) => (
-                <tr key={sale.id}>
-                  <td>{sale.name}{sale.setCode ? <span className="sub"> {sale.setCode.toUpperCase()}</span> : null}{sale.foil ? <span className="badge foil">{sale.foil === 1 ? "FOIL" : "ETCHED"}</span> : null}</td>
-                  <td className="numcell">{sale.quantity}</td>
-                  <td className="numcell">{money(sale.price, currency)}</td>
-                  <td>{sale.sourceEntryId ? <button type="button" className="lnk" onClick={() => window.dispatchEvent(new CustomEvent("mana-vault:purchases", { detail: sale.sourceEntryId }))}>Its purchase</button> : null}</td>
-                </tr>
-              ))}
+              {entry.sales.map((sale) => {
+                const given = entry.trade?.given.find((row) => row.saleId === sale.id);
+                const from = given?.from;
+                return (
+                  <tr key={sale.id}>
+                    <td>{sale.name}{sale.setCode ? <span className="sub"> {sale.setCode.toUpperCase()}</span> : null}{sale.foil ? <span className="badge foil">{sale.foil === 1 ? "FOIL" : "ETCHED"}</span> : null}</td>
+                    <td className="numcell">{sale.quantity}</td>
+                    <td className="numcell">{money(sale.price, currency)}</td>
+                    {entry.trade && <td className="numcell">{given?.cost === null || given?.cost === undefined ? <span className="sub">Not recorded</span> : money(given.cost, currency)}</td>}
+                    <td>{from ? <button type="button" className="lnk" onClick={() => window.dispatchEvent(new CustomEvent("mana-vault:purchases", { detail: from.entryId }))}>Purchase of {from.date}: {from.description}</button>
+                      : sale.sourceEntryId ? <button type="button" className="lnk" onClick={() => window.dispatchEvent(new CustomEvent("mana-vault:purchases", { detail: sale.sourceEntryId }))}>Its purchase</button>
+                      : <span className="sub">No purchase recorded</span>}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </section>
@@ -363,9 +433,25 @@ function EntryPage({ id, list, onClose, onChanged }: { id: string; list: Purchas
   );
 }
 
+/** Shows a kept receipt: pictures and PDFs open in a new tab (in the app, the share sheet). */
+async function viewReceipt(store: Store, entryId: string, name: string) {
+  try {
+    const response = await fetchFile(`/api/purchases/${entryId}/receipt`);
+    if (!response.ok) throw new Error("Could not load the receipt");
+    const blob = await response.blob();
+    if (isApp()) { downloadBlob(name, blob); return; }
+    const url = URL.createObjectURL(blob);
+    const opened = window.open(url, "_blank", "noopener");
+    if (!opened) downloadBlob(name, blob);
+    window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  } catch (reason) {
+    store.fail(reason, "Could not show the receipt.");
+  }
+}
+
 export function PurchasesView({ actions: _actions }: { actions: Record<string, Action> }) {
   const store = useApp();
-  const currency = store.prefs.currency;
+  const currency: Currency = "usd";
   const [tab, setTab] = useState<"summary" | "history">("summary");
   const [period, setPeriod] = useState<Period>("all");
   const [list, setList] = useState<PurchaseList | null>(null);
@@ -375,14 +461,14 @@ export function PurchasesView({ actions: _actions }: { actions: Record<string, A
   const load = useCallback(async () => {
     try {
       const from = fromOf(period);
-      const result = await request<PurchaseList>(`/api/purchases?currency=${currency}${from ? `&from=${from}` : ""}`);
+      const result = await request<PurchaseList>(`/api/purchases${from ? `?from=${from}` : ""}`);
       setList(result);
       setActiveOpening(result.activeOpening);
       setError("");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Could not load the purchase history.");
     }
-  }, [currency, period]);
+  }, [period]);
   useEffect(() => { void load(); }, [load]);
   useEffect(() => {
     const show = (event: Event) => { const id = (event as CustomEvent<string>).detail; void load(); if (id) setOpen(id); };
@@ -406,8 +492,10 @@ export function PurchasesView({ actions: _actions }: { actions: Record<string, A
         <button type="button" className="btn small primary" disabled={!list}
           onClick={() => void choiceDialog("New entry", "What do you want to record?", kinds).then((kind) => { if (list && kind) entryDialog(store, list, kind, null, saved); })}>New entry...</button>
         <button type="button" className="btn small" onClick={() => fromPricesDialog(store, () => void load())}>Make purchases from imported prices...</button>
+        <button type="button" className="btn small" onClick={() => void pickReceipt().then((file) => { if (file) void purchaseFromReceipt(store, file, saved); })}>Read receipt...</button>
+        <button type="button" className="btn small" onClick={() => placesDialog(store)}>Places...</button>
         <button type="button" className="btn small" onClick={() => void exportPurchases(store, "entries")}>Export...</button>
-        {opening && <span className="badge opening" title="Cards added to the collection are tied to this opening">Opening: {opening.name}</span>}
+        {opening && <button type="button" className="badge opening openingchip" title="Cards added to its collection are tied to this opening. Click to open its purchase" onClick={() => setOpen(opening.entryId)}>Opening: {opening.name}</button>}
       </div>
       <div className="list purchasewrap">
         {error && <p className="note err">{error}</p>}

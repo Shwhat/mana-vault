@@ -43,7 +43,7 @@ A filter is a key, an operator and a value with no spaces, such as `t:dragon`. P
 | `frame:` | Frame year (1993, 1997, 2003, 2015, future) or frame effect (showcase, extendedart, etched...) | `frame:1993` |
 | `border:` | Border color: black, white, borderless, silver or gold | `border:white` |
 | `lang:` | Printing language: `en`, the languages chosen in Card languages (`es`, `fr`, `de`, `it`, `pt`, `ja`, `ko`, `ru`, `zhs`, `zht`) and unofficial languages such as Phyrexian (`ph`) | `lang:ja` |
-| `usd`, `eur` | Price compared with =, :, <, >, <= or >=. The regular price, or the foil price for printings only in foil. Printings without a price never match | `usd<1`, `eur>=20` |
+| `usd` | Price compared with =, :, <, >, <= or >=. The regular price, or the foil price for printings only in foil. Printings without a price never match | `usd<1`, `usd>=20` |
 
 Colors are W (white), U (blue), B (black), R (red) and G (green), or a color name. Mana values run from 0 to 100.
 
@@ -62,7 +62,7 @@ Colors are W (white), U (blue), B (black), R (red) and G (green), or a color nam
 | Invalid color filter "x" | The value contains something other than W, U, B, R, G or a color name |
 | Mana value needs a comparison operator | `mv` was followed by something other than =, :, <, >, <= or >= |
 | Mana value must be from 0 to 100 | The number is outside the range |
-| usd needs a comparison operator (or eur) | `usd` or `eur` was followed by something other than =, :, <, >, <= or >= |
+| usd needs a comparison operator | `usd` was followed by something other than =, :, <, >, <= or >= |
 | Prices must be a number of 0 or more | The price is not a number, or is below 0 |
 | Invalid format "x" | The format name has characters other than letters, digits or dashes |
 
@@ -84,7 +84,7 @@ Colors are W (white), U (blue), B (black), R (red) and G (green), or a color nam
 | Role | Empty | What the card does (Oracle Tags), with suggestions as you type |
 | Power, Toughness | Empty | Min and Max for each |
 | Mana value From and To | Empty | Mana value at least From and at most To (0 to 100, in steps of 0.5). From cannot be more than To |
-| Price | Empty | Min and Max, in the chosen currency |
+| Price | Empty | Min and Max, in US dollars |
 | Made in | Any finish | Printings made in Foil, Etched or Regular |
 | Foil type | Any foil | Printings made in a special foil, such as Surge foil or Galaxy foil |
 | Frame | Any frame | Full art, Borderless, Showcase, Extended art or Promo |
@@ -116,7 +116,7 @@ The count line after the search box shows the number of matching cards (or print
 | Best match | The default. Cards named exactly as the search words come first (a search for sol ring puts Sol Ring at the top), then names that start with the words, then names that hold every word, then the rest, each by name |
 | Name | A to Z |
 | Newest, Oldest | By release date |
-| Price, high to low; Price, low to high | By the price in the chosen currency; cards with no price last |
+| Price, high to low; Price, low to high | By the price in US dollars; cards with no price last |
 | Mana value | Lowest first |
 | Rarity | Mythic, rare, uncommon, common |
 | Color | White, blue, black, red, green, then multicolor, then colorless |

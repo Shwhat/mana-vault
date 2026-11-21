@@ -45,7 +45,7 @@
 | Filtering | The line at the top of the Filters panel naming the view it filters |
 | Price | Scryfall's price for a printing on the day of the last card database update |
 | Value | Price times count, added up for a row, collection or deck |
-| Currency | US dollars or euros, the unit for every price and value on screen |
+| Currency | US dollars, the unit for every price and value on screen |
 | Filter tag | A narrowing of the collection list chosen by clicking a set code, rarity or Statistics bar |
 | Binder layout | The collection shown as pages of nine card images |
 | Grid layout | The collection shown as card pictures that fill the width, loading more while scrolling |

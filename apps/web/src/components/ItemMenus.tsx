@@ -1,4 +1,5 @@
 // ---------- right-click and long-press menus on collections and decks, wherever they are listed ----------
+import { sendDeckToPrintDialog } from "../views/ProxiesView";
 import { type Store } from "../store";
 import { type Collection, type Deck, formatName, FORMATS } from "../types";
 import { rowMenu } from "./ContextMenu";
@@ -103,6 +104,7 @@ export function deckMenu(store: Store, deck: Deck) {
       }, "Save"),
     },
     { label: "Add deck to collection...", run: () => addDeckToCollectionDialog(store, deck) },
+    { label: "Send to print list...", run: () => sendDeckToPrintDialog(store, deck) },
     owner && { label: "Send...", run: () => void sendDialog(store, "deck", deck) },
     owner && { label: "Sharing...", run: () => withDeck(store, deck, () => sharingDialog(store, "deck")) },
     { label: "Export...", run: () => withDeck(store, deck, () => exportWindow(store, "deck")) },

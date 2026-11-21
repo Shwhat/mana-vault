@@ -4,7 +4,7 @@ import { createPortal } from "react-dom";
 import { usePhone } from "../narrow";
 
 /** A choice: its value, its text, and optionally a second line and a group heading. */
-export type Choice = { value: string; label: string; detail?: string; group?: string; disabled?: boolean };
+export type Choice = { value: string; label: string; detail?: string; group?: string; disabled?: boolean; icon?: ReactNode };
 export const choices = (list: Array<[string, string]>): Choice[] => list.map(([value, label]) => ({ value, label }));
 
 /**
@@ -29,7 +29,7 @@ export function Picker({ id, label, value, options, onChange, className, prefix,
           const form = event.currentTarget.closest("form");
           if (event.key === "Enter" && form) { event.preventDefault(); form.requestSubmit(); }
         }}>
-        <span className="pkval">{prefix}{current?.label ?? ""}</span><span className="pkcaret" aria-hidden="true">▾</span>
+        <span className="pkval">{current?.icon}{prefix}{current?.label ?? ""}</span><span className="pkcaret" aria-hidden="true">▾</span>
       </button>
       {open && <PickerList label={label} value={value} options={options} anchor={button.current}
         onChoose={(next) => { setOpen(false); button.current?.focus(); if (next !== value) onChange(next); }} onClose={() => { setOpen(false); button.current?.focus(); }} />}
@@ -102,7 +102,7 @@ export function PickerList({ label, value, options, anchor, onChoose, onClose, f
                 onMouseEnter={() => { if (!item.disabled) setIndex(position); }}
                 onClick={() => { if (!item.disabled) onChoose(item.value); }}>
                 <span className="pkck" aria-hidden="true">{item.value === value ? "✓" : ""}</span>
-                <span className="pktext"><span>{item.label}</span>{item.detail && <span className="pkdetail">{item.detail}</span>}</span>
+                <span className="pktext"><span>{item.icon}{item.label}</span>{item.detail && <span className="pkdetail">{item.detail}</span>}</span>
               </div>
             </div>
           );

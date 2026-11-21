@@ -17,7 +17,8 @@ test("a purchase with tax spread over its lines, opened with pulled cards tied t
   const editor = await newPurchase(page);
   await editor.locator("#pe-date").fill("2026-11-01");
   await editor.locator("#pe-place").fill("Local shop");
-  await editor.getByRole("textbox", { name: "Set of line 1" }).fill("lea");
+  await editor.getByRole("button", { name: "Add product" }).click();
+  await choose(page, editor.getByRole("button", { name: /^Set of line 1/ }), "lea");
   await editor.getByRole("spinbutton", { name: "Quantity of line 1" }).fill("6");
   await editor.getByRole("textbox", { name: "Cost each of line 1" }).fill("5");
   await expect(editor.getByRole("textbox", { name: "Total of line 1" })).toHaveValue("30");

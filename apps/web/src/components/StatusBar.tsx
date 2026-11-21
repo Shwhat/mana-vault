@@ -1,5 +1,5 @@
 // ---------- status bar ----------
-import { setActiveOpening, useActiveOpening } from "../purchase-state";
+import { openOpeningEntry, useActiveOpening } from "../purchase-state";
 import { request } from "../api";
 import type { Action } from "../actions";
 import { customDialog } from "./Dialog";
@@ -67,10 +67,8 @@ export function StatusBar({ actions }: { actions: Record<string, Action> }) {
         </span>
       )}
       {opening && (
-        <span id="st-opening" className="pt on" role="button" title="Cards added to the collection are tied to this opening. Click for Done opening"
-          onClick={() => void request(`/api/purchases/openings/${opening.id}/active`, { method: "POST", body: JSON.stringify({ active: false }) })
-            .then(() => { setActiveOpening(null); store.flash("Done opening"); window.dispatchEvent(new CustomEvent("mana-vault:purchases", { detail: "" })); })
-            .catch((reason: unknown) => store.fail(reason, "Could not end the opening."))}>
+        <span id="st-opening" className="pt on" role="button" title="Cards added to the collection are tied to this opening. Click to open its purchase"
+          onClick={() => openOpeningEntry(store, opening.entryId)}>
           OPENING: {opening.name.toUpperCase()}
         </span>
       )}
@@ -84,11 +82,9 @@ export function StatusBar({ actions }: { actions: Record<string, Action> }) {
             store.setPrefs({ addTo: next });
             store.flash(`Adding to ${next === "deck" ? store.deck.name : target?.name ?? "the target collection"}`);
           }}>
-          ADDING TO: {deckTarget ? `DECK ${deckTarget.name.toUpperCase()}` : target ? target.name.toUpperCase() : "NO COLLECTION"}
+          ADDING TO: {deckTarget ? `DECK ${deckTarget.name.toUpperCase()}` : opening && target && opening.collectionId === target.id ? opening.name.toUpperCase() : target ? target.name.toUpperCase() : "NO COLLECTION"}
         </span>
         <span className={`pt${store.prefs.foil ? " on" : ""}`} role="button" title={actions.foil?.label} onClick={actions.foil?.run}>FOIL</span>
-        <span className="pt on-plain" role="button" title="Currency for prices and values (click to switch)"
-          onClick={actions[store.prefs.currency === "usd" ? "currency.eur" : "currency.usd"]?.run}>PRICES: {store.prefs.currency.toUpperCase()}</span>
         <span className="pt on-plain" role="button" title="Target zone for Add to deck (Z cycles it)" onClick={actions["zone.cycle"]?.run}>
           ZONE: {zoneLabel(store.prefs.zone).toUpperCase()}
         </span>

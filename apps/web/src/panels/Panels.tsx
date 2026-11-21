@@ -243,9 +243,9 @@ export function CardPanel({ actions }: { actions: Record<string, Action> }) {
       </div>
       <div className="pgrp">
         <h4>Prices</h4>
-        <div className="prow"><label>Regular</label><span>{money(currency === "usd" ? prices?.usd : prices?.eur, currency)}</span></div>
-        <div className="prow"><label>Foil</label><span>{money(currency === "usd" ? prices?.usd_foil : prices?.eur_foil, currency)}</span></div>
-        {currency === "usd" && prices?.usd_etched !== null && prices?.usd_etched !== undefined && (
+        <div className="prow"><label>Regular</label><span>{money(prices?.usd, currency)}</span></div>
+        <div className="prow"><label>Foil</label><span>{money(prices?.usd_foil, currency)}</span></div>
+        {prices?.usd_etched !== null && prices?.usd_etched !== undefined && (
           <div className="prow"><label>Etched</label><span>{money(prices.usd_etched, currency)}</span></div>)}
         {card.pricesUpdatedAt && <p className="note">{new Date(card.pricesUpdatedAt).toLocaleDateString()}</p>}
       </div>

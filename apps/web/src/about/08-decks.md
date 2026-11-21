@@ -30,7 +30,7 @@ The **All**, **Commander**, **Main**, **Sideboard** and **Maybe** buttons above 
 ## Opening decks
 
 - **The deck switcher**: the button with the deck's name at the left of the deck view header (on a phone, at the top of the Decks tab). It opens a list of every deck with its cover card, commander, format and card count. Type to find a deck by name, commander or format; Up and Down move through the list, Enter opens the highlighted deck and Esc closes the list. One click on a deck makes it where new cards go and keeps the list open; a double click opens it. In the Android app one tap opens the deck, and the open deck is where new cards go; browsers work as described here. **Sort** orders the list by Recently opened, Name, Date created, Card count, Format or Commander; the choice is kept for your account. **New deck...** is at the bottom of the list.
-- **Decks panel**: decks are grouped by format, each with its card count and value. One click on a deck makes it where new cards go without leaving the view you are in (see [Collections](/about/collections)); a double click opens it in the deck view. The deck shows **Adding here** while it is where cards go. Right-click or long press a deck for its menu: Open, Rename..., Deck format..., Send..., Export..., Delete or Leave.
+- **Decks panel**: decks are grouped by format, each with its card count and value. One click on a deck makes it where new cards go without leaving the view you are in (see [Collections](/about/collections)); a double click opens it in the deck view. The deck shows **Adding here** while it is where cards go. Right-click or long press a deck for its menu: Open, Rename..., Deck format..., Send to print list..., Send..., Export..., Delete or Leave. **Send to print list...** asks each time what to send: **The whole deck (not the maybeboard)**, **Missing cards only**, or **Chosen zones** (Commander, Main deck, Sideboard, Maybeboard). Each card goes in its deck printing and count, as one step that can be undone.
 - **Open deck...** (Ctrl+O) lists every deck with its format and card count.
 - **New deck...** (File menu, Decks panel, deck switcher) asks for the name and format. **Create deck** creates it and opens it.
 - **Add to...** in the scanner offers **New deck...** too (see [Scanning cards](/about/scanning-cards)).
@@ -75,7 +75,7 @@ Scanned cards added to a deck are new physical cards, so they go into a collecti
 2. Free copies of the new printing in the chosen finish in your collections are linked, up to the card's count. When free copies are in more than one collection, Mana Vault asks which collection's copies to link (or None, missing).
 3. Cards without a copy show as missing. Maybeboard cards are not linked.
 
-With more than one card, the chooser starts with **How many to change** (all by default). Only that many cards change; the rest stay as they are, so two copies can become one regular and one foil card without removing either. When the deck already has the new printing and finish in the same zone, the cards join it. The change is written to the deck's history and can be undone. The message reads "Card name is now (SET) number" (with "foil" or "etched" for those finishes), or "N of M Card name changed to (SET) number" when only some cards change, with where copies were linked from and how many are missing. A printing can only be chosen in a finish it is made in.
+With more than one card, the chooser first asks **How many to change**, as its own step, starting at 1, with **-**, **+** and **All N** buttons; **Choose the printing** goes on to the printings, and **Change how many** goes back. Only that many cards change; the rest stay as they are, so two copies can become one regular and one foil card without removing either. When the deck already has the new printing and finish in the same zone, the cards join it. The change is written to the deck's history and can be undone. The message reads "Card name is now (SET) number" (with "foil" or "etched" for those finishes), or "N of M Card name changed to (SET) number" when only some cards change, with where copies were linked from and how many are missing. A printing can only be chosen in a finish it is made in.
 
 ### Finish
 
@@ -184,8 +184,8 @@ The Cards tab shows only the deck's cards. **Options** holds:
 | Item | Use |
 |---|---|
 | View: List, Text, Stacks, Grid | How the cards are shown (kept for your account) |
-| Group | Type, Mana value, Color, Rarity, Tag or None (kept for your account) |
-| Sort | Name, Mana value or Price, within each group (kept for your account) |
+| Group | Type, SubType, Type and Tag, Rarity, Color, Color Identity, Mana Value, Set, Artist, Tag or No grouping (kept for your account); see [List views](/about/screen-layout#list-views) |
+| Sort | Name, Mana Value, Price, Rarity or Color, within each group (kept for your account) |
 | Clear filters | Shown while deck filters are on |
 | Edit as text... | See Edit as text |
 | Done | Closes Options |
@@ -250,6 +250,7 @@ The price of a missing card is the price of its printing in the regular finish (
 
 - **Add missing to wishlist** (or **Add missing deck cards to wishlist**) adds the missing copies to your wishlist in one step that can be undone; see [Wishlists and trading](/about/wishlists-and-trading).
 - **Link owned copies** links free copies of the exact printing and finish to every missing card.
+- **In Deck name**: a missing card whose copies all fill other decks shows a badge naming each deck (IN DECK NAME on pictures). A click on it lists those copies with **Move to this deck**, which unlinks the copy from the other deck (that deck then misses it) and links it here, as one step that can be undone. The message reads "Card moved from Deck to this deck. Deck now misses it".
 - **Export missing** (or **Export missing deck cards (text)**) downloads deck-name-missing.txt with one line per card, such as `2 Lightning Bolt (M10) 146`.
 
 | Message | Cause |

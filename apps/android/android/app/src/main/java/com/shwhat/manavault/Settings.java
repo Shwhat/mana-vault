@@ -44,6 +44,13 @@ final class Settings {
         store.edit().putString("lastOffer", value).apply();
     }
 
+    /** Changes made on the phone that wait for the server, as the JSON list the app sends to /api/sync (0.17.0). */
+    String pendingSync() { return store.getString("pendingSync", "[]"); }
+
+    void setPendingSync(String value) {
+        store.edit().putString("pendingSync", value == null || value.isEmpty() ? "[]" : value).apply();
+    }
+
     void update(JSObject change) {
         SharedPreferences.Editor editor = store.edit();
         for (String key : new String[] { "server", "token", "user" }) {

@@ -18,13 +18,16 @@ import {
 } from "../types";
 import { choices, Picker } from "../components/Picker";
 import { LayoutRows, OptionsButton } from "../components/Options";
+import { EntryMenuButton, GroupedList, ListOptionRows, ManaCost } from "../components/GroupedList";
+import { groupList } from "../list-groups";
 import { Switcher } from "../components/Switcher";
 import { StatsPanel } from "./StatsView";
 import { Quantity, Thumb } from "./Views";
 
 const ALL_FACETS: Facets = { rarity: undefined, color: undefined, type: undefined, set: undefined, curve: undefined, finish: undefined, trade: undefined, inDeck: undefined, proxy: undefined };
 const SORTS: Array<[CollectionSort, string]> = [
-  ["name", "Name"], ["price-desc", "Price, highest first"], ["price-asc", "Price, lowest first"], ["quantity", "Quantity"], ["set", "Set and number"],
+  ["name", "Name"], ["mana", "Mana Value"], ["price-desc", "Price, highest first"], ["price-asc", "Price, lowest first"], ["rarity", "Rarity"], ["color", "Color"],
+  ["quantity", "Quantity"], ["set", "Set and number"],
 ];
 
 /** The chip text for each active filter tag. */
@@ -123,7 +126,7 @@ function CollectionHeader({ current, actions }: { current: Collection; actions: 
   const rows = store.collection?.length ?? current.entryCount;
   const shownRows = store.visibleCollection.length;
   const filtered = store.collectionTab === "cards" && store.collection !== null && shownRows < rows;
-  const unpriced = current.value[currency === "usd" ? "unpricedUsd" : "unpricedEur"];
+  const unpriced = current.value.unpricedUsd;
   return (
     <div id="pagetabs" className="colhead">
       <Switcher kind="collection" actions={actions} />
@@ -160,6 +163,7 @@ function CollectionOptions() {
   const active = (store.facets.trade ? 1 : 0) + (store.facets.inDeck ? 1 : 0);
   return (
     <OptionsButton title="Collection options" count={active}>
+      <ListOptionRows id="opt-coll" group={store.prefs.listGroups.collection} onGroup={(group) => store.setPrefs({ listGroups: { ...store.prefs.listGroups, collection: group } })} />
       <div className="prow"><label htmlFor="opt-sort">Sort</label>
         <Picker id="opt-sort" label="Sort" value={store.prefs.collectionSort} onChange={(value) => store.setPrefs({ collectionSort: value as CollectionSort })}
           options={choices(SORTS)} /></div>
@@ -367,6 +371,7 @@ function CardsTab({ actions }: { actions: Record<string, Action> }) {
   const pickedCards = (collection ?? []).filter((entry) => checked.has(entryKey(entry))).reduce((sum, entry) => sum + entry.quantity, 0);
   const currency = store.prefs.currency;
   const pictures = store.layout !== "list" && (collection?.length ?? 0) > 0 && visibleCollection.length > 0;
+  const group = store.prefs.listGroups.collection;
   return (
     <>
       {collection !== null && collection.length > 0 && <ChipBar />}
@@ -397,7 +402,9 @@ function CardsTab({ actions }: { actions: Record<string, Action> }) {
           </div>
         )}
         {collection !== null && collection.length > 0 && visibleCollection.length === 0 && <div className="emptynote">No rows match the filter tags</div>}
-        {visibleCollection.map((entry) => {
+        {visibleCollection.length > 0 && <GroupedList view={`collection-${store.prefs.openCollection ?? ""}`} headed={group !== "none"} label="Collection cards"
+          sections={groupList(visibleCollection, group, null, (entry) => copyPrice(entry, currency), (entry) => entry.quantity)}
+          render={(entry) => {
           const key = entryKey(entry);
           const active = checked.has(key);
           const price = copyPrice(entry, currency);
@@ -407,7 +414,7 @@ function CardsTab({ actions }: { actions: Record<string, Action> }) {
               {selectMode && <input type="checkbox" className="rowcheck" checked={active} readOnly aria-label={`Pick ${entry.name}`} />}
               <Thumb url={entry.image_url} />
               <div className="rowmain">
-                <div className="rowtitle"><b>{entry.name}</b>{entry.custom && <span className="badge custom">Custom</span>}{entry.removed && <RemovedPip onChange={() => changeEntryPrinting(store, entry)} />}<FinishBadge finish={entry.foil} promoTypes={entry.promo_types} />
+                <div className="rowtitle"><b>{entry.name}</b><ManaCost cost={entry.mana_cost} />{entry.custom && <span className="badge custom">Custom</span>}{entry.removed && <RemovedPip onChange={() => changeEntryPrinting(store, entry)} />}<FinishBadge finish={entry.foil} promoTypes={entry.promo_types} />
                   {entry.proxy && <span className="badge proxy" title="A proxy: kept apart from real copies, with no value">PROXY</span>}
                   {entry.trade > 0 && <span className="badge trade" title={`${entry.trade} of ${entry.quantity} for trade`}>FOR TRADE {entry.trade}</span>}</div>
                 <Tags entry={entry} />
@@ -422,9 +429,10 @@ function CardsTab({ actions }: { actions: Record<string, Action> }) {
                 onClick={(event) => { event.stopPropagation(); moveDialog(store, [entry]); }}><Icon name="move" /></button>
               <button type="button" className="btn small icon-only" title={`Remove ${entry.name}`} aria-label={`Remove ${entry.name} from collection`}
                 onClick={(event) => { event.stopPropagation(); removeCard(store, entry.name, entry.quantity, (left) => void store.setCollectionQuantity(entry, left)); }}><Icon name="del" /></button>
+              <EntryMenuButton menu={entryMenu(store, entry)} name={entry.name} />
             </div>
           );
-        })}
+        }} />}
       </div>}
     </>
   );
@@ -466,9 +474,9 @@ function CompletionTab({ current }: { current: Collection }) {
         <div className="mrow mhead" role="row"><span role="columnheader">Set</span><span role="columnheader">Owned</span><span role="columnheader" className="mnum">Owned of total</span></div>
         {blockGroups(report.sets).flatMap(([block, sets]) => [
           ...(block ? [<div className="mrow mblock" role="row" key={`block-${block}`}><span role="cell">{block}</span></div>] : []),
-          ...sets.map((set) => (
-          <div className="mrow" role="row" key={set.code}>
-            <span role="cell" className="mname"><SetIcon code={set.code} />{set.name} <span className="badge">{set.code.toUpperCase()}</span>{set.digital && <span className="badge">Digital</span>}</span>
+          ...withChildren(sets).map(({ set, child }) => (
+          <div className={child ? "mrow mchild" : "mrow"} role="row" key={set.code}>
+            <span role="cell" className="mname">{child && <span className="mtree" aria-hidden="true">└</span>}<SetIcon code={set.code} />{set.name} <span className="badge">{set.code.toUpperCase()}</span>{set.digital && <span className="badge">Digital</span>}</span>
             <span role="cell"><Meter owned={set.owned} total={set.total} label={`${set.name} completion`} /></span>
             <span role="cell" className="mnum">{set.owned} / {set.total} <b>{percent(set.owned, set.total)}%</b></span>
           </div>
@@ -479,13 +487,37 @@ function CompletionTab({ current }: { current: Collection }) {
   );
 }
 
+/** Child sets (promos, tokens, commander decks of a set) listed right under their parent set when both are in the list. */
+export function withChildren(sets: SetProgress[]): Array<{ set: SetProgress; child: boolean }> {
+  const codes = new Set(sets.map((set) => set.code));
+  const childrenOf = new Map<string, SetProgress[]>();
+  for (const set of sets) {
+    if (set.parentSetCode && codes.has(set.parentSetCode) && set.parentSetCode !== set.code) childrenOf.set(set.parentSetCode, [...(childrenOf.get(set.parentSetCode) ?? []), set]);
+  }
+  const placed = new Set<string>();
+  const out: Array<{ set: SetProgress; child: boolean }> = [];
+  const add = (set: SetProgress, child: boolean) => {
+    if (placed.has(set.code)) return;
+    placed.add(set.code);
+    out.push({ set, child });
+    for (const item of childrenOf.get(set.code) ?? []) add(item, true);
+  };
+  for (const set of sets) if (!(set.parentSetCode && codes.has(set.parentSetCode))) add(set, false);
+  for (const set of sets) add(set, true);
+  return out;
+}
+
 /** Sets grouped by their block (sets without a block, or alone in theirs, are listed on their own), in the report's order. */
 export function blockGroups(sets: SetProgress[]): Array<[string, SetProgress[]]> {
+  // a child set goes with its parent's block, so it can be listed under its parent
+  const byCode = new Map(sets.map((set) => [set.code, set]));
+  const blockOf = (set: SetProgress) => (set.parentSetCode && byCode.get(set.parentSetCode)?.block) || set.block || "";
   const counts = new Map<string, number>();
-  for (const set of sets) if (set.block) counts.set(set.block, (counts.get(set.block) ?? 0) + 1);
+  for (const set of sets) { const block = blockOf(set); if (block) counts.set(block, (counts.get(block) ?? 0) + 1); }
   const groups: Array<[string, SetProgress[]]> = [];
   for (const set of sets) {
-    const block = set.block && (counts.get(set.block) ?? 0) > 1 ? set.block : "";
+    const own = blockOf(set);
+    const block = own && (counts.get(own) ?? 0) > 1 ? own : "";
     const last = groups[groups.length - 1];
     const found = block ? groups.find(([name]) => name === block) : undefined;
     if (found) found[1].push(set);
@@ -532,7 +564,7 @@ function MissingTab({ current, actions }: { current: Collection; actions: Record
               onClick={() => store.select({ view: "cards", key, printingId: card.id })}>
               <Thumb url={card.image_url} />
               <div className="rowmain">
-                <div className="rowtitle"><b>{card.name}</b><span className="mana">{card.mana_cost}</span>
+                <div className="rowtitle"><b>{card.name}</b><ManaCost cost={card.mana_cost} />
                   {card.needs !== "any" && <span className={card.needs === "foil" ? "badge foil" : "badge"}>{card.needs === "foil" ? "FOIL NEEDED" : "REGULAR NEEDED"}</span>}</div>
                 <div className="rowsub">{card.type_line}</div>
                 <div className="rowmeta">{card.set_name} <span className="badge">{card.set_code.toUpperCase()}</span> {card.collector_number} <span className={`rar ${card.rarity}`}>{capitalize(card.rarity)}</span></div>

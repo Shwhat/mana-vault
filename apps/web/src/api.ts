@@ -63,6 +63,20 @@ export async function fetchFile(url: string): Promise<Response> {
   return response;
 }
 
+/** Sends a file (a receipt) as the body of a request and reads the JSON answer. Reading a receipt can take a while. */
+export async function sendFile<T>(url: string, method: "POST" | "PUT", file: Blob, name = ""): Promise<T> {
+  const init: RequestInit = { method, body: file, headers: { "content-type": file.type || "application/octet-stream", ...(name ? { "x-file-name": name } : {}) } };
+  const response = isApp() ? await appFetch(url, init, 180_000)
+    : await fetch(url, { ...init, credentials: "same-origin", headers: { ...(init.headers as Record<string, string>), "x-mana-vault": "1" } });
+  if (response.status === 401) {
+    if (!isApp()) window.location.href = "/login";
+    throw new SignedOutError("You are signed out.");
+  }
+  const body = (await response.json().catch(() => ({}))) as T & { error?: string };
+  if (!response.ok) throw new Error(body.error ?? `The server answered with an error (${response.status}).`);
+  return body;
+}
+
 export function downloadBlob(filename: string, blob: Blob) {
   if (isApp()) {
     void saveBlob(filename, blob).catch((reason: unknown) => console.error("Saving the file failed", reason));
@@ -88,6 +102,21 @@ export function csvCell(value: string | number | boolean | null): string {
 }
 
 export const slugify = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "deck";
+
+/** Opens the browser file picker for several files at once; resolves with the files chosen (none when cancelled). */
+export function pickFiles(accept: string): Promise<File[]> {
+  return new Promise((resolve) => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = accept;
+    input.multiple = true;
+    input.style.display = "none";
+    input.addEventListener("change", () => { resolve([...(input.files ?? [])]); input.remove(); });
+    input.addEventListener("cancel", () => { resolve([]); input.remove(); });
+    document.body.append(input);
+    input.click();
+  });
+}
 
 /** Opens the browser file picker and resolves with the chosen file, or null. */
 export function pickFile(accept: string): Promise<File | null> {

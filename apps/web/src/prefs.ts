@@ -3,6 +3,7 @@ import { request, APP_VERSION } from "./api";
 import { isApp } from "./android/platform";
 import { DEFAULT_WORKSPACE, isOpen, openPanel, PRESETS, type Layout, type Workspace, validLayout } from "./dock";
 import { DEFAULT_SHEET, PRINT_SORTS, type PrintSort, readSheet, type SheetSettings } from "./proxy-print";
+import { type ListGroup, type ListScope, readGroup, readSort } from "./list-groups";
 import { type CollectionLayout, type CollectionSort, type Currency, type DeckGroup, type DeckSort, type DeckView, type GridSize, SEARCH_SORTS, type SearchSort, type SortScope, type SwitchSort, type Zone } from "./types";
 
 export type Theme = "light" | "dark" | "system";
@@ -52,6 +53,10 @@ export type Prefs = {
   deckView: DeckView;
   deckGroup: DeckGroup;
   deckSort: DeckSort;
+  /** How the other list views group their cards (0.17.0): collection lists and All collections, card search and the print list. */
+  listGroups: Record<ListScope, ListGroup>;
+  /** Groups folded shut, as "view:group" (0.17.0). */
+  listFolds: string[];
   /** Scanner: vibrate when a card is recognized. */
   scanVibrate: boolean;
   /** Scanner: finish given to newly scanned cards. */
@@ -94,6 +99,7 @@ export function defaultPrefs(): Prefs {
     searchLayout: "grid", searchLayoutPhone: "grid", searchSize: "m", allWishlists: false, tradeAllCards: false, searchAllPrintings: false,
     searchSort: { cards: "best", deckAdd: "best", tradeGive: "best", tradeGet: "best" },
     collectionSwitchSort: "recent", deckSwitchSort: "recent", recent: {}, deckView: "list", deckGroup: "type", deckSort: "name",
+    listGroups: { collection: "none", search: "none", print: "none" }, listFolds: [],
     scanVibrate: true, scanFoil: false, scanCamera: "environment", scanQuick: false, scanSounds: true, scanSets: [], scanIgnorePromos: false,
     scanProxy: false, scanCondition: "NM", scanLanguage: "en", scanShowTotal: false, scanShowOwned: false, pricesOnPictures: false, printSort: "added", printLayout: "list", printSize: "m",
     proxySheet: DEFAULT_SHEET, proxyTab: "print", appVersion: APP_VERSION,
@@ -123,8 +129,8 @@ export function mergePrefs(saved: unknown): Prefs {
     targetCollection: typeof value.targetCollection === "string" ? value.targetCollection : null,
     addTo: value.addTo === "deck" ? "deck" : "collection",
     openCollection: typeof value.openCollection === "string" ? value.openCollection : null,
-    currency: value.currency === "eur" ? "eur" : "usd",
-    collectionSort: ["price-desc", "price-asc", "quantity", "set"].includes(String(value.collectionSort)) ? value.collectionSort as CollectionSort : "name",
+    currency: "usd",
+    collectionSort: ["price-desc", "price-asc", "quantity", "set", "mana", "rarity", "color"].includes(String(value.collectionSort)) ? value.collectionSort as CollectionSort : "name",
     // accounts from before 0.7.0 keep the layout they used; new accounts start with Grid
     collectionLayout: layoutOf(value.collectionLayout, "grid"),
     collectionLayoutPhone: layoutOf(value.collectionLayoutPhone, layoutOf(value.collectionLayout, "grid")),
@@ -142,8 +148,12 @@ export function mergePrefs(saved: unknown): Prefs {
       ? Object.fromEntries(Object.entries(value.recent).filter(([, time]) => typeof time === "number").sort((a, b) => b[1] - a[1]).slice(0, 300))
       : {},
     deckView: (["list", "text", "stacks", "grid"] as const).find((item) => item === value.deckView) ?? "list",
-    deckGroup: (["type", "mana", "color", "rarity", "tag", "none"] as const).find((item) => item === value.deckGroup) ?? "type",
-    deckSort: (["name", "mana", "price"] as const).find((item) => item === value.deckSort) ?? "name",
+    deckGroup: readGroup(value.deckGroup),
+    deckSort: readSort(value.deckSort),
+    listGroups: {
+      collection: readGroup(value.listGroups?.collection, "none"), search: readGroup(value.listGroups?.search, "none"), print: readGroup(value.listGroups?.print, "none"),
+    },
+    listFolds: Array.isArray(value.listFolds) ? value.listFolds.filter((item): item is string => typeof item === "string").slice(-300) : [],
     scanVibrate: value.scanVibrate !== false,
     scanFoil: value.scanFoil === true,
     scanCamera: value.scanCamera === "user" ? "user" : "environment",

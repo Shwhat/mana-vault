@@ -121,7 +121,8 @@ Everything done to a row acts on the row's own collection: counts, Copy details,
 
 | Item | Use |
 |---|---|
-| Sort | Name, Price, highest first, Price, lowest first, Quantity, or Set and number. Kept for your account |
+| Group | For the List layout: Type, SubType, Rarity, Color, Color Identity, Mana Value, Set, Artist or No grouping; see [List views](/about/screen-layout#list-views). Kept for your account |
+| Sort | Name, Mana Value, Price, highest first, Price, lowest first, Rarity, Color, Quantity, or Set and number. Kept for your account |
 | Layout | Grid, Binder or List (see Card layouts) |
 | Card size | Small, Medium or Large, for the Grid layout. Kept for your account |
 | Decks | **In decks or not**, **In a deck** (rows whose copies fill a deck) or **Not in a deck** |

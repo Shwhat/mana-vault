@@ -297,7 +297,7 @@ test.describe("phone layout", () => {
     await expect(page.locator("#view-home")).toBeVisible();
     await expect(page.locator("#titlebar")).toHaveCount(0);
     await page.locator(".ptab", { hasText: "Search" }).click();
-    await page.locator("#view-cards .row", { hasText: "Counterspell" }).click();
+    await page.locator("#view-cards .row", { hasText: "Counterspell" }).locator(".rowtitle b").click();
     await expect(page.locator(".cardpage h2")).toHaveText("Counterspell");
     await page.getByRole("button", { name: "Card actions" }).click();
     await page.locator(".fabmenu .pmrow", { hasText: /^Add to Main collection\.\.\.$/ }).click();
@@ -313,7 +313,7 @@ test.describe("phone layout", () => {
     await expect(page.locator("#view-collection .row", { hasText: "Counterspell" }).first()).toBeVisible();
     await page.locator(".ptab", { hasText: "Decks" }).click();
     await expect(page.locator("#pmain")).toContainText("New deck...");
-    await page.getByRole("button", { name: "Menu" }).click();
+    await page.getByRole("button", { name: "Menu", exact: true }).click();
     await expect(page.locator(".pmrow", { hasText: "Sign out" })).toBeVisible();
     await expect(page.locator(".pmsection > summary")).toContainText(["File", "Edit", "View", "Help"]);
     await page.locator(".pmsection > summary", { hasText: "File" }).first().click();

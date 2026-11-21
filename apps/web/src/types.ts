@@ -29,9 +29,10 @@ export type Card = {
   printings?: number;
 };
 
-export type Prices = { usd: number | null; usd_foil: number | null; usd_etched: number | null; eur: number | null; eur_foil: number | null };
-export type PriceFields = { price_usd: number | null; price_usd_foil: number | null; price_usd_etched: number | null; price_eur: number | null; price_eur_foil: number | null };
-export type Currency = "usd" | "eur";
+/** Prices are in US dollars only (0.17.0). */
+export type Prices = { usd: number | null; usd_foil: number | null; usd_etched: number | null };
+export type PriceFields = { price_usd: number | null; price_usd_foil: number | null; price_usd_etched: number | null };
+export type Currency = "usd";
 /** 0 regular, 1 foil, 2 etched. */
 export type FinishCode = 0 | 1 | 2;
 export type Condition = "M" | "NM" | "LP" | "MP" | "HP" | "DMG";
@@ -198,6 +199,8 @@ export type DeckCard = Pick<Card, "name" | "mana_cost" | "type_line" | "set_code
   missing?: number;
   /** For a card with missing copies: free copies the account owns, of this version or another one (0.11.0). */
   owned?: Candidate[];
+  /** Copies of the card that fill other decks (0.17.0), for Move to this deck. */
+  inDecks?: InOtherDeck[];
   /** Upgrade wanted: the version wanted instead of this one (0.11.0). */
   want_card_id?: string | null;
   want_finish?: FinishCode;
@@ -255,8 +258,8 @@ export type View = "home" | "cards" | "collection" | "deck" | "trade" | "proxies
 export type CollectionTab = "cards" | "completion" | "missing" | "stats";
 export type DeckTab = "cards" | "add" | "ownership" | "stats" | "playtest" | "description" | "history";
 export type DeckView = "list" | "text" | "stacks" | "grid";
-export type DeckGroup = "type" | "mana" | "color" | "rarity" | "tag" | "none";
-export type DeckSort = "name" | "mana" | "price";
+export type DeckGroup = import("./list-groups").ListGroup;
+export type DeckSort = import("./list-groups").ListSort;
 export type CollectionLayout = "list" | "binder" | "grid";
 export type GridSize = "s" | "m" | "l";
 export type SwitchSort = "recent" | "name" | "created" | "cards" | "value" | "format" | "commander";
@@ -279,7 +282,7 @@ export type Ownership = {
 
 /** Narrowing of the collection list: chosen by clicking a tag on a row or a bar in Statistics. */
 export type Facets = { rarity?: string; color?: string; type?: string; set?: string; curve?: string; finish?: string; trade?: boolean; inDeck?: "yes" | "no"; proxy?: boolean };
-export type CollectionSort = "name" | "price-desc" | "price-asc" | "quantity" | "set";
+export type CollectionSort = "name" | "price-desc" | "price-asc" | "quantity" | "set" | "mana" | "rarity" | "color";
 
 export const CONDITIONS: Array<[Condition, string]> = [
   ["M", "Mint"], ["NM", "Near mint"], ["LP", "Lightly played"], ["MP", "Moderately played"], ["HP", "Heavily played"], ["DMG", "Damaged"],
@@ -330,22 +333,18 @@ export const curveKey = (manaValue: number | null, typeLine: string) => {
   return value >= 7 ? "7+" : String(Math.max(0, value));
 };
 
-/** The price of one copy: etched uses the etched price or else the foil price; EUR has one foil price. */
-export function priceOf(prices: PriceFields, foil: FinishCode, currency: Currency): number | null {
-  if (currency === "eur") return foil === 0 ? prices.price_eur : prices.price_eur_foil;
+/** The price of one copy in US dollars: etched uses the etched price or else the foil price. */
+export function priceOf(prices: PriceFields, foil: FinishCode, _currency: Currency = "usd"): number | null {
   return foil === 0 ? prices.price_usd : foil === 1 ? prices.price_usd_foil : prices.price_usd_etched ?? prices.price_usd_foil;
 }
 export const pricesOf = (card: { prices?: Prices }): PriceFields => ({
   price_usd: card.prices?.usd ?? null, price_usd_foil: card.prices?.usd_foil ?? null, price_usd_etched: card.prices?.usd_etched ?? null,
-  price_eur: card.prices?.eur ?? null, price_eur_foil: card.prices?.eur_foil ?? null,
 });
 /** A printing's price in any finish, regular first: used where no finish is chosen, such as search results. */
-export const anyPrice = (fields: PriceFields, currency: Currency) => (currency === "eur"
-  ? fields.price_eur ?? fields.price_eur_foil
-  : fields.price_usd ?? fields.price_usd_foil ?? fields.price_usd_etched);
-export function money(value: number | null | undefined, currency: Currency): string {
+export const anyPrice = (fields: PriceFields, _currency: Currency = "usd") => fields.price_usd ?? fields.price_usd_foil ?? fields.price_usd_etched;
+export function money(value: number | null | undefined, _currency: Currency = "usd"): string {
   if (value === null || value === undefined) return "No price";
-  return new Intl.NumberFormat(currency === "eur" ? "de-DE" : "en-US", { style: "currency", currency: currency.toUpperCase() }).format(value);
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value);
 }
 export const copyKey = (entry: Pick<CollectionEntry, "id" | "foil" | "condition" | "language" | "proxy">): CopyKey =>
   ({ cardId: entry.id, foil: entry.foil, condition: entry.condition, language: entry.language, proxy: !!entry.proxy });
@@ -427,3 +426,9 @@ export const SEARCH_SORTS: Array<[SearchSort, string]> = [
 ];
 /** The searches that each keep their own sort. */
 export type SortScope = "cards" | "deckAdd" | "tradeGive" | "tradeGet";
+
+/** A copy that fills a card of another deck (0.17.0). */
+export type InOtherDeck = {
+  linkId: number; deckId: string; deckName: string; collectionId: string; collectionName: string; cardId: string; set_code: string; collector_number: string;
+  foil: number; condition: string; language: string; proxy: boolean; quantity: number;
+};

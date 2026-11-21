@@ -36,7 +36,7 @@ The Completion tab of the collection view shows:
 
 - **Overall completion**: the percentage, "owned of total owned, missing missing", and a bar.
 - The rules in use, with **Change rules** (opens Collection settings) and **Show missing cards**.
-- A row for each linked set with its symbol, name, code, a Digital badge for sets only released online, a bar, owned / total and the percentage. Sets of the same block (two or more linked) are listed together under the block's name, such as Ice Age.
+- A row for each linked set with its symbol, name, code, a Digital badge for sets only released online, a bar, owned / total and the percentage. Sets of the same block (two or more linked) are listed together under the block's name, such as Ice Age. Child sets (a set's promos, tokens and Commander decks) are listed right under their parent set, marked with └, when both are linked; a child set is placed in its parent's block.
 
 A collection with no linked sets shows **Collection settings...** to link them.
 

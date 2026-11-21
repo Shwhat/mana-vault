@@ -1,7 +1,7 @@
 {
   "name": "@mana-vault/web",
   "private": true,
-  "version": "0.16.1",
+  "version": "0.17.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -21,6 +21,8 @@
   },
   "dependencies": {
     "@capacitor/core": "^8.6.2",
+    "@fontsource/crimson-pro": "^5.3.0",
+    "@fontsource/merriweather-sans": "^5.3.0",
     "fflate": "^0.8.3",
     "pdf-lib": "^1.17.1",
     "react": "^19.3.1",

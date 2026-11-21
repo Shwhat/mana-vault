@@ -21,7 +21,6 @@ Preferences are saved for your account on the server and follow you to every bro
 | All cards, not only for trade | On, Off | Off | The You give search of a trade |
 | Switcher sort (collections, decks) | Recently opened, Name, Date created, Card count, Value (collections), Format and Commander (decks) | Recently opened | Sort in the switcher list |
 | Recently opened | When each collection and deck was last opened | None | Opening a collection or deck |
-| Prices (currency) | US dollars, Euros | US dollars | View menu, PRICES in the status bar, Statistics tabs |
 | Collection sort | Name, Price, highest first, Price, lowest first, Quantity, Set and number | Name | Options in the collection view |
 | Collection layout, desktop | Grid, Binder, List | Grid (List for accounts from before 0.7.0 that used it) | Options in the collection view, Grid layout, Binder layout, List layout, B |
 | Collection layout, phone | Grid, Binder, List | Grid, or the layout chosen before 0.7.0 | Options in the collection view on a phone |

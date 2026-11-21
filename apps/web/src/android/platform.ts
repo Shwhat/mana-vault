@@ -30,10 +30,16 @@ export interface ManaVaultNative {
   setTorch?(options: { on: boolean }): Promise<{ ok: boolean; reason?: string }>;
   /** Puts the app in the background (the Back button on the first screen). */
   minimize(): Promise<void>;
+  /** A file another app shared with Mana Vault (0.17.0), once: name, type and base64 data. */
+  takeSharedFile?(): Promise<{ file: { name: string; type: string; data: string } | null }>;
+  /** The changes waiting for the server (0.17.0), sent by the phone in the background as soon as it is online. */
+  setPendingSync?(options: { changes: string }): Promise<void>;
   appInfo(): Promise<{ version: string; android: string; device: string }>;
   addListener(event: "backButton", listener: () => void): Promise<PluginListenerHandle>;
   /** A notification was tapped while the app was open. */
   addListener(event: "offer", listener: (data: { offer: string }) => void): Promise<PluginListenerHandle>;
+  /** A file was shared into the app while it was open; takeSharedFile returns it. */
+  addListener(event: "shared", listener: () => void): Promise<PluginListenerHandle>;
 }
 
 declare global {

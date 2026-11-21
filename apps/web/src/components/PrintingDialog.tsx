@@ -1,6 +1,6 @@
 // ---------- the printing chooser: every printing of a card, newest first, with a search box ----------
 import { LanguagePip, SetIcon } from "./CardMarks";
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { request } from "../api";
 import type { ScanCard } from "../scan-state";
 import { type Currency, type FinishCode, finishLabel, money, priceOf } from "../types";
@@ -17,7 +17,7 @@ export const finishesOf = (printing: Pick<Printing, "finishes">): FinishCode[] =
 };
 const FINISH_LABEL: Record<FinishCode, string> = { 0: "Regular", 1: "Foil", 2: "Etched" };
 
-function PrintingList({ cardId, currentId, finish, currency, onPick }: {
+export function PrintingList({ cardId, currentId, finish, currency, onPick }: {
   cardId: string; currentId: string; finish: FinishCode; currency: Currency; onPick: (printing: Printing, finish: FinishCode) => void;
 }) {
   const [printings, setPrintings] = useState<Printing[] | null>(null);
@@ -39,7 +39,6 @@ function PrintingList({ cardId, currentId, finish, currency, onPick }: {
   if (!printings) return <p className="note">Loading printings</p>;
   const priceIn = (card: Printing, code: FinishCode) => money(priceOf({
     price_usd: card.price_usd ?? null, price_usd_foil: card.price_usd_foil ?? null, price_usd_etched: card.price_usd_etched ?? null,
-    price_eur: card.price_eur ?? null, price_eur_foil: card.price_eur_foil ?? null,
   }, code, currency), currency);
   return (
     <div className="printpick">
@@ -97,40 +96,62 @@ function PrintingList({ cardId, currentId, finish, currency, onPick }: {
   );
 }
 
-/** The "How many" box of the chooser, for a card with more than one copy. */
-function HowMany({ max, value, onChange }: { max: number; value: number; onChange: (value: number) => void }) {
+/** How many to change, asked as its own step before the printings (0.17.0): starts at 1, with - and + buttons and All. */
+function HowManyStep({ name, max, onNext }: { name: string; max: number; onNext: (count: number) => void }) {
+  const [value, setValue] = useState(1);
+  const set = (next: number) => setValue(Math.max(1, Math.min(max, Math.floor(next) || 1)));
   return (
-    <label className="howmany">How many to change
-      <input type="number" min={1} max={max} value={value} aria-label="How many to change"
-        onChange={(event) => onChange(Math.max(1, Math.min(max, Math.floor(Number(event.target.value) || 1))))} />
-      <span className="muted">of {max}</span>
-    </label>
+    <div className="howmanystep">
+      <p className="dlgq">How many of the {max} copies of {name} change printing?</p>
+      <div className="howmanybig">
+        <button type="button" className="btn" aria-label="One fewer" onClick={() => set(value - 1)} disabled={value <= 1}>-</button>
+        <input type="number" autoFocus min={1} max={max} value={value} aria-label="How many to change" onFocus={(event) => event.currentTarget.select()}
+          onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); event.stopPropagation(); onNext(value); } }}
+          onChange={(event) => set(Number(event.target.value))} />
+        <button type="button" className="btn" aria-label="One more" onClick={() => set(value + 1)} disabled={value >= max}>+</button>
+        <button type="button" className={value === max ? "btn on" : "btn"} onClick={() => setValue(max)}>All {max}</button>
+      </div>
+      <div className="btnrow end"><button type="button" className="btn primary" onClick={() => onNext(value)}>Choose the printing</button></div>
+    </div>
   );
 }
 
 /**
  * Opens the printing chooser. `onPick` runs with the printing and finish chosen: another printing, or another finish of
  * the same printing (such as its foil version). Choosing the current printing in its current finish does nothing.
- * With `quantity` above 1 the chooser asks how many of the copies change (all by default); the rest stay as they are.
+ * With `quantity` above 1 the chooser first asks how many of the copies change (1 to start with); the rest stay as they are.
  */
 export function choosePrinting(name: string, cardId: string, currentId: string,
   options: { finish?: FinishCode; currency: Currency; quantity?: number; title?: string; allowCurrent?: boolean },
   onPick: (printing: Printing, finish: FinishCode, count: number) => void) {
   const current = options.finish ?? 0;
   const max = Math.max(1, options.quantity ?? 1);
-  let count = max;
-  function Body({ close }: { close: () => void }) {
-    const [value, setValue] = useState(max);
-    return (
-      <>
-        {max > 1 && <HowMany max={max} value={value} onChange={(next) => { setValue(next); count = next; }} />}
-        <PrintingList cardId={cardId} currentId={currentId} finish={current} currency={options.currency}
-          onPick={(printing, finish) => {
-            close();
-            if (options.allowCurrent || printing.id !== currentId || finish !== current) onPick(printing, finish, Math.min(max, count));
-          }} />
-      </>
-    );
+  const pickWith = (close: () => void, count: number) => (printing: Printing, finish: FinishCode) => {
+    close();
+    if (options.allowCurrent || printing.id !== currentId || finish !== current) onPick(printing, finish, count);
+  };
+  const title = options.title ?? `Change printing of ${name}`;
+  if (max <= 1) {
+    customDialog(title, (close) => (
+      <PrintingList cardId={cardId} currentId={currentId} finish={current} currency={options.currency} onPick={pickWith(close, 1)} />
+    ), 600, "Cancel");
+    return;
   }
-  customDialog(options.title ?? `Change printing of ${name}`, (close) => <Body close={close} />, 600, "Cancel");
+  customDialog(title, (close) => (
+    <TwoSteps name={name} max={max} render={(count) => (
+      <PrintingList cardId={cardId} currentId={currentId} finish={current} currency={options.currency} onPick={pickWith(close, count)} />
+    )} />
+  ), 600, "Cancel");
+}
+
+/** The how-many step, then the printing list for that many copies, in one window. */
+function TwoSteps({ name, max, render }: { name: string; max: number; render: (count: number) => React.ReactNode }) {
+  const [count, setCount] = useState<number | null>(null);
+  if (count === null) return <HowManyStep name={name} max={max} onNext={setCount} />;
+  return (
+    <>
+      <p className="dlgq">Changing {count} of {max}. <button type="button" className="lnk" onClick={() => setCount(null)}>Change how many</button></p>
+      {render(count)}
+    </>
+  );
 }

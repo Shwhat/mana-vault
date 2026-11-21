@@ -154,3 +154,24 @@ describe("card tracking between decks and collections", () => {
     expect(cards.map((card) => [card.finish, card.missing, card.want_card_id]).sort()).toEqual([[0, 1, null], [1, 0, "b2"]]);
   });
 });
+
+// 0.17.0: a card whose only copy fills another deck names that deck, and Move to this deck takes the copy over
+describe("copies in other decks", () => {
+  it("lists the other deck and moves the copy, with the way back for undo", async () => {
+    const { call, main, deckId } = await server();
+    await call("POST", `/api/collections/${main}/cards/add`, { items: [copy("b1", 1)] });
+    await call("POST", `/api/decks/${deckId}/replace`, { text: "1 Lightning Bolt (M10) 146\n" });
+    const other = (await call("POST", "/api/decks", { name: "Second", format: "modern" })).json() as { id: string };
+    await call("POST", `/api/decks/${other.id}/replace`, { text: "1 Lightning Bolt (M10) 146\n" });
+    const [card] = (await call("GET", `/api/decks/${other.id}`)).json().cards as Array<{ entry_id: number; missing: number; owned: unknown[]; inDecks: Array<{ linkId: number; deckName: string }> }>;
+    expect(card).toMatchObject({ missing: 1, owned: [] });
+    expect(card!.inDecks).toEqual([expect.objectContaining({ deckName: "Burn", quantity: 1 })]);
+    const moved = (await call("POST", `/api/decks/${other.id}/entries/${card!.entry_id}/take`, { linkId: card!.inDecks[0]!.linkId })).json();
+    expect(moved).toMatchObject({ moved: 1, from: { deckId, deckName: "Burn" } });
+    expect((await call("GET", `/api/decks/${other.id}`)).json().cards[0]).toMatchObject({ missing: 0 });
+    expect((await cardsOf(call, deckId))[0]).toMatchObject({ missing: 1 });
+    // undo: the copy goes back
+    await call("POST", `/api/decks/${moved.from.deckId}/entries/${moved.from.entryId}/take`, { linkId: moved.linkId, quantity: moved.moved });
+    expect((await cardsOf(call, deckId))[0]).toMatchObject({ missing: 0 });
+  });
+});

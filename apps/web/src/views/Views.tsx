@@ -1,6 +1,8 @@
 // ---------- central work area: card search, collection and deck views ----------
 import type { Action } from "../actions";
 import type { FoundCard } from "../card-search";
+import { ListOptionRows } from "../components/GroupedList";
+import { InDeckMarks } from "../components/CardMarks";
 import { CardResults, countLine, SortPicker } from "../components/CardResults";
 import { LayoutRows, OptionsButton } from "../components/Options";
 import { linkDialog } from "../components/LibraryDialogs";
@@ -35,6 +37,7 @@ export function SearchOptions() {
   const store = useApp();
   return (
     <OptionsButton title="Search options">
+      <ListOptionRows id="search-opt" group={store.prefs.listGroups.search} onGroup={(group) => store.setPrefs({ listGroups: { ...store.prefs.listGroups, search: group } })} />
       <LayoutRows name="Search results" layout={store.searchLayout} size={store.prefs.searchSize} onLayout={store.setSearchLayout} onSize={(searchSize) => store.setPrefs({ searchSize })} />
       <label className="check"><input type="checkbox" checked={store.prefs.searchAllPrintings}
         onChange={(event) => store.setPrefs({ searchAllPrintings: event.target.checked })} /> Show every printing</label>
@@ -177,7 +180,8 @@ export function OwnershipTab({ actions }: { actions: Record<string, Action> }) {
             onClick={() => store.select({ view: "deck", key: String(entry.entryId), printingId: entry.cardId })}>
             <span role="cell" className="mname">{entry.name}{entry.zone !== "main" && <span className="badge"> {zoneLabel(entry.zone)}</span>}</span>
             <span role="cell"><span className={entry.missing ? "badge" : "badge own"}>{entry.owned} of {entry.needed}</span></span>
-            <span role="cell" className="sub">{entry.where.length ? entry.where.map((place) => `${place.name} (${place.quantity})`).join(", ") : "Missing"}{entry.proxies ? ` (${entry.proxies} proxy)` : ""}</span>
+            <span role="cell" className="sub">{entry.where.length ? entry.where.map((place) => `${place.name} (${place.quantity})`).join(", ") : "Missing"}{entry.proxies ? ` (${entry.proxies} proxy)` : ""}
+              {(() => { const card = store.deck?.cards.find((item) => item.entry_id === entry.entryId); return card ? <InDeckMarks store={store} card={card} /> : null; })()}</span>
             <span role="cell" className="mnum">{entry.missing ? `${entry.missing} x ${money(entry.price, currency)}` : "Owned"}</span>
           </div>
         ))}

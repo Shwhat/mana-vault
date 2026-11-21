@@ -5,6 +5,7 @@ import { confirmDialog, dialog } from "./components/Dialog";
 import { activatePanel, clone, type Layout, openPanel, type PanelId, PRESETS, type Workspace } from "./dock";
 import { type Counts, entryKey, useLibraryState, type WishChange } from "./library-state";
 import { useScanState } from "./scan-state";
+import { askWishlists, type WishAsk } from "./components/WishlistAsk";
 import { useTradeState } from "./trade-state";
 import { useProxyState } from "./proxy-state";
 import { isApp } from "./android/platform";
@@ -33,6 +34,10 @@ type DeckKey = { deckId: string; oracle_id: string; printing_id: string | null; 
 const UNDO_LIMIT = 150;
 
 const message = (reason: unknown, fallback: string) => (reason instanceof Error ? reason.message : fallback);
+
+const RARITY_RANK = ["common", "uncommon", "rare", "mythic", "special", "bonus"];
+const COLOR_RANK = "WUBRGMC";
+const colorRank = (colors: string | null | undefined) => (!colors ? "C" : colors.length > 1 ? "M" : colors);
 
 export function useStoreState(user: User, initialPrefs: Prefs) {
   const [prefs, setPrefsState] = useState(initialPrefs);
@@ -573,7 +578,7 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
     const key = { cardId, foil: code, condition: "NM" as const, language: "en", proxy };
     const finishText = code === 2 ? " (etched)" : code === 1 ? " (foil)" : "";
     try {
-      const entry = await request<CollectionEntry & { wishlist?: WishChange[] }>(`/api/collections/${encodeURIComponent(target)}/cards`, {
+      const entry = await request<CollectionEntry & { wishlist?: WishChange[]; wishAsk?: WishAsk[] }>(`/api/collections/${encodeURIComponent(target)}/cards`, {
         method: "POST", body: JSON.stringify({ ...key, quantity: 1 }),
       });
       const after = entry.quantity;
@@ -589,6 +594,7 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
         redo: async () => { await setCounts(target, [{ ...key, quantity: after }]); await restoreWishes(wishes, "after"); count(1); },
       });
       flash(`${name}${finishText}${proxy ? " (proxy)" : ""} added to ${where}`);
+      askWishlists(entry.wishAsk);
       await refreshAfterChange();
     } catch (reason) {
       fail(reason, "Could not add the card.");
@@ -888,7 +894,7 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
   const addDeckToCollection = useCallback(async (deckId: string, collectionId: string, mode: "missing" | "all") => {
     try {
       const before = await loadDeck(deckId);
-      const result = await request<{ added: number; linked: number; before: Counts; after: Counts; wishlist?: WishChange[] }>(
+      const result = await request<{ added: number; linked: number; before: Counts; after: Counts; wishlist?: WishChange[]; wishAsk?: WishAsk[] }>(
         `/api/decks/${encodeURIComponent(deckId)}/add-to-collection`, { method: "POST", body: JSON.stringify({ collectionId, mode }) });
       const where = collectionName(collectionId);
       if (!result.added) {
@@ -901,6 +907,7 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
         undo: async () => { await restoreDeck(after, before); await setCounts(collectionId, result.before); await restoreWishes(result.wishlist ?? [], "before"); },
         redo: async () => { await setCounts(collectionId, result.after); await restoreWishes(result.wishlist ?? [], "after"); await restoreDeck(before, after); },
       });
+      askWishlists(result.wishAsk);
       flash(`${result.added} ${result.added === 1 ? "card" : "cards"} added to ${where}${result.linked ? `, ${result.linked} linked to the deck` : ""}`);
       await refreshAfterChange();
     } catch (reason) {
@@ -1131,6 +1138,9 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
       "price-asc": (a, b) => (price(a) ?? Infinity) - (price(b) ?? Infinity) || byName(a, b),
       quantity: (a, b) => b.quantity - a.quantity || byName(a, b),
       set: (a, b) => a.set_name.localeCompare(b.set_name) || a.collector_number.localeCompare(b.collector_number, undefined, { numeric: true }) || byName(a, b),
+      mana: (a, b) => (a.mana_value ?? 0) - (b.mana_value ?? 0) || byName(a, b),
+      rarity: (a, b) => RARITY_RANK.indexOf(b.rarity) - RARITY_RANK.indexOf(a.rarity) || byName(a, b),
+      color: (a, b) => COLOR_RANK.indexOf(colorRank(a.colors)) - COLOR_RANK.indexOf(colorRank(b.colors)) || byName(a, b),
     };
     return prefs.collectionSort === "name" ? shown : [...shown].sort(sorts[prefs.collectionSort]);
   }, [collection, collectionFilter, facets, prefs.currency, prefs.collectionSort, filterSets.collection, collectionMatch]);

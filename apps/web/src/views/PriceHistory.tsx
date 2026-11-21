@@ -3,11 +3,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { request } from "../api";
 import { type Currency, money } from "../types";
 
-type PricePoint = { day: string; usd: number | null; usdFoil: number | null; usdEtched: number | null; eur: number | null; eurFoil: number | null };
+type PricePoint = { day: string; usd: number | null; usdFoil: number | null; usdEtched: number | null };
 type Finish = "regular" | "foil" | "etched";
 
-const valueOf = (point: PricePoint, finish: Finish, currency: Currency): number | null => {
-  if (currency === "eur") return finish === "regular" ? point.eur : point.eurFoil;
+const valueOf = (point: PricePoint, finish: Finish, _currency: Currency): number | null => {
   return finish === "regular" ? point.usd : finish === "foil" ? point.usdFoil : point.usdEtched ?? point.usdFoil;
 };
 

@@ -93,7 +93,7 @@ describe("import formats", () => {
 });
 
 describe("collections and wishlists", () => {
-  it("lowers wishlist wants when copies are added, the oldest want first", async () => {
+  it("asks which wishlist to lower when the card is on more than one (0.17.0), and lowers the one chosen", async () => {
     const { signUp, call } = await server();
     const main = await signUp("ann");
     const first = (await call("ann", "POST", "/api/collections", { name: "Wants", kind: "wishlist" })).json().id;
@@ -101,9 +101,18 @@ describe("collections and wishlists", () => {
     await call("ann", "POST", `/api/collections/${first}/cards`, { cardId: "b2", quantity: 2 });
     await call("ann", "POST", `/api/collections/${second}/cards`, { cardId: "4031e5e4-e573-4130-8d20-4a606edef0a0", quantity: 1 });
     const added = (await call("ann", "POST", `/api/collections/${main}/cards/add`, { items: [{ cardId: "4031e5e4-e573-4130-8d20-4a606edef0a0", foil: 0, quantity: 3 }] })).json();
-    expect(added.wishlist.map((change: { collectionName: string; after: { quantity: number } }) => `${change.collectionName}:${change.after.quantity}`))
-      .toEqual(["Wants:0", "More wants:0"]);
+    // on two wishlists: nothing is lowered yet, and the person is asked
+    expect(added.wishlist).toEqual([]);
+    expect(added.wishAsk).toEqual([expect.objectContaining({ quantity: 3, wishlists: [
+      expect.objectContaining({ collectionId: first, name: "Wants", wanted: 2 }), expect.objectContaining({ collectionId: second, name: "More wants", wanted: 1 }),
+    ] })]);
+    const lowered = (await call("ann", "POST", "/api/wishlists/lower", { items: [{ cardId: "4031e5e4-e573-4130-8d20-4a606edef0a0", quantity: 3, collectionId: first }] })).json();
+    expect(lowered.wishlist.map((change: { collectionName: string; after: { quantity: number } }) => `${change.collectionName}:${change.after.quantity}`)).toEqual(["Wants:0"]);
     expect((await call("ann", "GET", `/api/collections/${first}/cards`)).json()).toEqual([]);
+    expect((await call("ann", "GET", `/api/collections/${second}/cards`)).json()).toHaveLength(1);
+    // on one wishlist: lowered at once, as before
+    const one = (await call("ann", "POST", `/api/collections/${main}/cards/add`, { items: [{ cardId: "4031e5e4-e573-4130-8d20-4a606edef0a0", foil: 0, quantity: 1 }] })).json();
+    expect(one.wishlist.map((change: { collectionName: string }) => change.collectionName)).toEqual(["More wants"]);
     // proxies lower nothing
     await call("ann", "POST", `/api/collections/${second}/cards`, { cardId: "g1", quantity: 1 });
     await call("ann", "POST", `/api/collections/${main}/cards`, { cardId: "g1", proxy: true });

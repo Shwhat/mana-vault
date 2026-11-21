@@ -7,14 +7,25 @@ export const KIND_LABELS: Record<EntryKind, string> = { purchase: "Purchase", ca
 
 export type Product = { id: string; label: string; packs: number };
 export type EntrySummary = {
-  id: string; kind: EntryKind; kindLabel: string; date: string; place: string; note: string; currency: "usd" | "eur"; description: string; source: string | null;
+  id: string; kind: EntryKind; kindLabel: string; date: string; place: string; note: string; currency: "usd"; description: string; source: string | null;
   sets: string[]; products: string[]; out: number; in: number; value: number; gain: number; unpriced: number;
 };
 export type Opening = { id: string; entryId: string; name: string; collectionId: string | null };
+export type PlaceKind = "store" | "website" | "person" | "other";
+export const PLACE_KINDS: Record<PlaceKind, string> = { store: "Store", website: "Website", person: "Person", other: "Other" };
+export type Place = { id: string; name: string; kind: PlaceKind; note: string; createdBy: number | null; createdAt: string; uses: number; lastUsed: string | null };
+export type ReceiptFields = {
+  date: string | null; place: string | null; tax: number | null; shipping: number | null; total: number | null; linesTotal: number;
+  lines: Array<{ text: string; product: string; name: string; setCode: string | null; quantity: number; cost: number }>;
+};
+export type TradeFigures = {
+  gave: number; got: number; net: number; originalCost: number; noCostValue: number; noCost: string[];
+  given: Array<{ saleId: string; cost: number | null; from: { entryId: string; date: string; description: string } | null }>;
+};
 export type PurchaseList = {
-  currency: "usd" | "eur"; entries: EntrySummary[];
+  currency: "usd"; entries: EntrySummary[];
   summary: { spent: number; received: number; value: number; gain: number; otherCurrency: number; unpriced: number };
-  places: string[]; activeOpening: Opening | null; products: Product[];
+  places: Place[]; activeOpening: Opening | null; products: Product[];
 };
 export type EntryLine = {
   id: string; product: string; productLabel: string; name: string; setCode: string | null; quantity: number; cost: number; full: number; packs: number;
@@ -27,7 +38,7 @@ export type EntrySale = {
 };
 export type EntryTie = {
   id: number; cardId: string; name: string; setCode: string; collectorNumber: string; imageUrl: string | null; foil: number; condition: string; language: string;
-  proxy: boolean; collectionId: string; quantity: number; held: number; price: number | null; lineId: string | null; openingId: string | null;
+  proxy: boolean; collectionId: string; quantity: number; held: number; price: number | null; lineId: string | null; openingId: string | null; tradePrice: number | null;
 };
 export type EntryOpening = {
   id: string; lineId: string; count: number; name: string; collectionId: string | null; active: boolean; createdAt: string; doneAt: string | null;
@@ -35,6 +46,7 @@ export type EntryOpening = {
 };
 export type Entry = Omit<EntrySummary, "sets" | "products"> & {
   tax: number; shipping: number; fees: number; cashOut: number; cashIn: number; tradeId: string | null; pulledIncome: number;
+  placeId: string | null; shippingBy: "me" | "buyer"; trade: TradeFigures | null; receipt: { name: string; type: string; bytes: number; addedAt: string } | null;
   lines: EntryLine[]; sales: EntrySale[]; ties: EntryTie[]; openings: EntryOpening[];
 };
 export type ChartPoint = { date: string; spent: number; value: number };
@@ -43,6 +55,9 @@ export type ChartPoint = { date: string; spent: number; value: number };
 let opening: Opening | null = null;
 let loaded = false;
 const listeners = new Set<(value: Opening | null) => void>();
+
+/** The opening cards are tied to now, when known. */
+export const currentOpening = () => opening;
 
 export function setActiveOpening(value: Opening | null) {
   opening = value;
@@ -71,4 +86,10 @@ export function useActiveOpening(): Opening | null {
     return () => { listeners.delete(setValue); };
   }, []);
   return value;
+}
+
+/** Shows the purchase entry of an opening in the Purchases view. */
+export function openOpeningEntry(store: { setView: (view: "purchases") => void }, entryId: string) {
+  store.setView("purchases");
+  window.setTimeout(() => window.dispatchEvent(new CustomEvent("mana-vault:purchases", { detail: entryId })), 0);
 }

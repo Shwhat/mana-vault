@@ -1,11 +1,11 @@
 // ---------- library: collections, set completion, bulk edits, ownership and sending ----------
-import { copiesAdded, copiesLowered } from "./copy-events.js";
+import { copiesAdded, copiesLowered, copiesMoved } from "./copy-events.js";
 import { randomUUID } from "node:crypto";
 import type { FastifyInstance, FastifyReply } from "fastify";
 import type { DatabaseSync } from "node:sqlite";
 import { listSets, type SetDetails, setDetails } from "./sets.js";
 import { type CopyExtras, type CopyKey, type Currency, NO_EXTRAS, PRICE_COLUMNS, priceSql, readCopyExtras, readCopyKey } from "./copies.js";
-import { alignDeckCard, collectionLinks, dropLinks, linkedCount, moveLinks, rowKey, trimLinks } from "./links.js";
+import { alignDeckCard, collectionLinks, dropLinks, linkedCount, moveLinks, relinkRemoved, rowKey, trimLinks } from "./links.js";
 import { finishOffered, readDeckFinish } from "./decks.js";
 
 export type Kind = "collection" | "deck";
@@ -267,7 +267,7 @@ export function createCollection(database: DatabaseSync, ownerId: number, input:
 }
 
 export const ENTRY_COLUMNS = `c.id, c.oracle_id, c.name, c.mana_cost, c.mana_value, c.type_line, c.set_code, c.set_name, c.collector_number, c.rarity,
-  c.image_url, c.colors, c.legalities, c.custom, c.promo_types, c.removed, ${PRICE_COLUMNS}, i.quantity, i.foil, i.condition, i.language, i.proxy, i.trade,
+  c.image_url, c.colors, c.color_identity, c.artist, c.legalities, c.custom, c.promo_types, c.removed, ${PRICE_COLUMNS}, i.quantity, i.foil, i.condition, i.language, i.proxy, i.trade,
   i.purchase_price, i.price_currency, i.added_at, i.misprint, i.altered, i.signed`;
 const KEY_WHERE = "card_id = ? AND foil = ? AND condition = ? AND language = ? AND proxy = ?";
 const KEY_CONFLICT = "ON CONFLICT(collection_id, card_id, foil, condition, language, proxy)";
@@ -349,13 +349,19 @@ export function copyCollectionCards(database: DatabaseSync, from: string, to: st
 
 /** A wishlist row lowered because copies of its card were added to a collection: the row before and after, for undo. */
 export type WishChange = { collectionId: string; collectionName: string; before: Item; after: Item };
+/** A card added that is on more than one wishlist (0.17.0): the person is asked which one to lower. */
+export type WishAsk = { cardId: string; name: string; quantity: number; wishlists: Array<{ collectionId: string; name: string; wanted: number }> };
+/** The changes made, and the cards that wait for the person to choose a wishlist. */
+export type WishResult = WishChange[] & { ask: WishAsk[] };
 
 /**
  * Lowers wishlist rows of the cards added to a collection: one wanted copy per added copy, the row added first lowered
  * first, and a row at zero removed. Proxies are not the real card and lower nothing.
  */
-export function lowerWishlists(database: DatabaseSync, userId: number, added: Array<{ cardId: string; quantity: number; proxy: boolean }>): WishChange[] {
-  const changes: WishChange[] = [];
+export function lowerWishlists(database: DatabaseSync, userId: number, added: Array<{ cardId: string; quantity: number; proxy: boolean }>,
+  only?: string): WishResult {
+  const changes = [] as unknown as WishResult;
+  changes.ask = [];
   const wanted = database.prepare(
     `SELECT i.collection_id, COALESCE(m.display_name, col.name) AS name, i.card_id, i.foil, i.condition, i.language, i.proxy, i.quantity, i.trade
      FROM collection_cards i JOIN collections col ON col.id = i.collection_id JOIN cards c ON c.id = i.card_id
@@ -367,7 +373,18 @@ export function lowerWishlists(database: DatabaseSync, userId: number, added: Ar
   for (const item of added) {
     if (item.proxy || item.quantity <= 0) continue;
     let left = item.quantity;
-    for (const row of wanted.all(userId, userId, item.cardId)) {
+    const rows = wanted.all(userId, userId, item.cardId).filter((row) => !only || String(row.collection_id) === only);
+    // 0.17.0: a card on more than one wishlist lowers none of them until the person chooses one (or None)
+    const lists = [...new Set(rows.map((row) => String(row.collection_id)))];
+    if (!only && lists.length > 1) {
+      changes.ask.push({
+        cardId: item.cardId, quantity: item.quantity, name: String(database.prepare("SELECT name FROM cards WHERE id = ?").get(item.cardId)?.name ?? "A card"),
+        wishlists: lists.map((id) => ({ collectionId: id, name: String(rows.find((row) => String(row.collection_id) === id)!.name),
+          wanted: rows.filter((row) => String(row.collection_id) === id).reduce((sum, row) => sum + Number(row.quantity), 0) })),
+      });
+      continue;
+    }
+    for (const row of rows) {
       if (left <= 0) break;
       const key: CopyKey = {
         cardId: String(row.card_id), foil: Number(row.foil) as CopyKey["foil"], condition: String(row.condition) as CopyKey["condition"],
@@ -506,11 +523,11 @@ export function registerLibraryRoutes(app: FastifyInstance, database: DatabaseSy
         if (!result.changes) return null;
         touch(database, "collection", id);
         copiesAdded(database, request.user?.id, id, [{ key, quantity }]);
-        return isWishlist(database, id) ? [] : lowerWishlists(database, userOf(request), [{ cardId: key.cardId, quantity, proxy: key.proxy }]);
+        return isWishlist(database, id) ? Object.assign([], { ask: [] }) as WishResult : lowerWishlists(database, userOf(request), [{ cardId: key.cardId, quantity, proxy: key.proxy }]);
       });
       if (!wishlist) return reply.code(404).send({ error: "Card printing not found" });
       const where = `AND i.${KEY_WHERE.replaceAll(" AND ", " AND i.")}`;
-      return { ...entriesOf(id, where, [...keyValues(key)])[0], wishlist };
+      return { ...entriesOf(id, where, [...keyValues(key)])[0], wishlist: [...wishlist], wishAsk: wishlist.ask };
     },
   );
 
@@ -539,11 +556,31 @@ export function registerLibraryRoutes(app: FastifyInstance, database: DatabaseSy
       }
       touch(database, "collection", id);
       copiesAdded(database, request.user?.id, id, after.map((item, index) => ({ key: item, quantity: item.quantity - before[index]!.quantity })));
-      const wishlist = wishlistTarget ? [] : lowerWishlists(database, userOf(request),
+      const lowered = wishlistTarget ? null : lowerWishlists(database, userOf(request),
         after.map((item, index) => ({ cardId: item.cardId, quantity: item.quantity - before[index]!.quantity, proxy: item.proxy })));
-      return { before, after, wishlist };
+      return { before, after, wishlist: lowered ? [...lowered] : [], wishAsk: lowered?.ask ?? [] };
     });
     return { added: result.after.reduce((sum, item, index) => sum + item.quantity - result.before[index]!.quantity, 0), ...result };
+  });
+
+  // the person chose which wishlist a card added lowers (0.17.0); the rows before and after come back for undo
+  app.post<{ Body: { items?: unknown } }>("/api/wishlists/lower", async (request, reply) => {
+    const items = Array.isArray(request.body?.items) ? request.body!.items as Array<Record<string, unknown>> : [];
+    const changes: WishChange[] = [];
+    try {
+      transaction(database, () => {
+        for (const item of items) {
+          const collectionId = String(item.collectionId ?? "");
+          const quantity = Number(item.quantity);
+          if (!collectionId || !isWishlist(database, collectionId) || !access(database, "collection", collectionId, userOf(request))) throw new Error("Choose one of your wishlists");
+          if (!Number.isInteger(quantity) || quantity < 1) throw new Error("Quantity must be a whole number of at least 1");
+          changes.push(...lowerWishlists(database, userOf(request), [{ cardId: String(item.cardId ?? ""), quantity, proxy: false }], collectionId));
+        }
+      });
+      return { wishlist: changes };
+    } catch (error) {
+      return reply.code(400).send({ error: error instanceof Error ? error.message : "Could not lower the wishlist" });
+    }
   });
 
   // sets exact counts for many entries at once; a count of 0 removes the entry
@@ -585,6 +622,8 @@ export function registerLibraryRoutes(app: FastifyInstance, database: DatabaseSy
         }
         trimLinks(database, id, lowered.item);
       }
+      // copies that come back (undo of a lower count) take back the deck links removed with them
+      for (const raised of changes.filter((change) => change.item.quantity > change.before)) relinkRemoved(database, id, raised.item);
       copiesLowered(database, request.user?.id, id, changes.filter((change) => change.item.quantity < change.before)
         .map((change) => ({ key: change.item, quantity: change.before - change.item.quantity })));
       copiesAdded(database, request.user?.id, id, changes.filter((change) => change.item.quantity > change.before)
@@ -617,6 +656,7 @@ export function registerLibraryRoutes(app: FastifyInstance, database: DatabaseSy
     const target: CopyKey = { ...key, cardId: to, foil: finish };
     transaction(database, () => {
       const linked = linkedCount(database, id, key);
+      copiesMoved(database, { collectionId: id, key }, { collectionId: id, key: target }, count);
       const trade = Math.min(Number(row.trade), count);
       const exists = database.prepare(`SELECT 1 FROM collection_cards WHERE collection_id = ? AND ${KEY_WHERE}`).get(id, ...keyValues(target));
       if (exists) {
@@ -640,6 +680,8 @@ export function registerLibraryRoutes(app: FastifyInstance, database: DatabaseSy
           .run(count, count, trade, id, ...keyValues(key));
       }
       for (const deckCard of deckCards) alignDeckCard(database, Number(deckCard.deck_card_id));
+      // copies changed back (undo of Change printing with No) take back the deck links they lost
+      relinkRemoved(database, id, target);
       touch(database, "collection", id);
     });
     return { status: "changed", moved: count, name: String(next.name), set: String(next.set_code).toUpperCase(), number: String(next.collector_number), finish };
@@ -662,6 +704,7 @@ export function registerLibraryRoutes(app: FastifyInstance, database: DatabaseSy
         const quantity = Math.min(have, item.quantity);
         if (!quantity) continue;
         const free = have - linkedCount(database, from, item);
+        copiesMoved(database, { collectionId: from, key: item }, { collectionId: to, key: item }, quantity);
         // copies marked for trade stay behind while they fit; the rest of the marks move with the copies
         const trade = Number(row?.trade ?? 0);
         const stays = Math.min(trade, have - quantity);

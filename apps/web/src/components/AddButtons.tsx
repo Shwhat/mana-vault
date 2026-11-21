@@ -3,6 +3,7 @@ import type { MouseEvent as ReactMouseEvent } from "react";
 import { request } from "../api";
 import type { Store } from "../store";
 import type { Card, FinishCode, Zone } from "../types";
+import { currentOpening } from "../purchase-state";
 import { finishName } from "./CardMarks";
 import { choosePrinting, type Printing } from "./PrintingDialog";
 
@@ -28,6 +29,9 @@ export function addTargetOf(store: Store, target: AddTarget = "auto"): { kind: "
   const deck = store.deck;
   if (target === "deck" || (target === "auto" && store.prefs.addTo === "deck" && deck)) return deck ? { kind: "deck", name: deck.name } : null;
   const collection = store.prefs.targetCollection;
+  // while an opening ties the cards added to its collection, the opening is named as where they go
+  const opening = currentOpening();
+  if (collection && opening?.collectionId === collection) return { kind: "collection", name: opening.name };
   return collection ? { kind: "collection", name: store.collectionName(collection) } : null;
 }
 

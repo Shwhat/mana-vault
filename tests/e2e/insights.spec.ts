@@ -21,17 +21,17 @@ async function openCollection(page: Page) {
   await expect(page.locator("#view-collection")).toBeVisible();
 }
 
-test("prices show in search, the Card panel and the collection, in either currency", async ({ page }) => {
+test("prices show in search and the Card panel, in US dollars only (0.17.0)", async ({ page }) => {
   await signUp(page);
   await search(page, "Shivan the Mighty");
   await expect(page.locator("#view-cards .row")).toHaveCount(1);
   await expect(page.locator("#view-cards .row").first()).toContainText("Also printed as Shivan the Mighty");
   await expect(page.locator("#view-cards .row .price").first()).toHaveText("$900.00");
-  await page.locator("#view-cards .row").first().click();
+  await page.locator("#view-cards .row").first().locator(".rowtitle b").click();
   await expect(page.locator(".pgrp", { hasText: "Prices" })).toContainText("$900.00");
-  await page.locator("#st-toggles", { hasText: "PRICES: USD" }).getByText("PRICES: USD").click();
-  await expect(status(page)).toHaveText("Prices in euros");
-  await expect(page.locator(".pgrp", { hasText: "Prices" })).toContainText("800,00");
+  // the currency choice is gone: no PRICES toggle in the status bar and no euro prices
+  await expect(page.locator("#st-toggles")).not.toContainText("PRICES");
+  await expect(page.locator(".pgrp", { hasText: "Prices" })).not.toContainText("800,00");
   await search(page, "usd<20");
   await expect(page.locator("#view-cards .row .rowtitle b")).toHaveText(["Atraxa, Praetors' Voice", "Lightning Bolt"]);
 });

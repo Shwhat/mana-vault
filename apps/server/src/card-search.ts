@@ -108,12 +108,12 @@ export function parseCardQuery(query: string, context: SearchContext = {}): Sear
       continue;
     }
 
-    if (key === "usd" || key === "eur") {
+    if (key === "usd") {
       if (!["=", ":", ">", "<", ">=", "<="].includes(operator)) throw new Error(`${rawKey} needs a comparison operator`);
       const amount = Number(value);
       if (!Number.isFinite(amount) || amount < 0 || amount > 1_000_000) throw new Error("Prices must be a number of 0 or more");
       // the regular price, or the foil price for printings that only come in foil
-      const field = key === "usd" ? "COALESCE(price_usd, price_usd_foil, price_usd_etched)" : "COALESCE(price_eur, price_eur_foil)";
+      const field = "COALESCE(price_usd, price_usd_foil, price_usd_etched)";
       clauses.push({ sql: `${negate}(${field} ${operator === ":" ? "=" : operator} CAST(? AS REAL))`, values: [String(amount)] });
       continue;
     }

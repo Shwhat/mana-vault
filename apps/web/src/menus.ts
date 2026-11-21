@@ -11,7 +11,7 @@ export const MENUS: Menu[] = [
   { id: "edit", name: "Edit", items: ["undo", "redo", "-", "find", "pickAll", "clearFilters"] },
   {
     id: "view", name: "View", items: [
-      "view.purchases", "-", "theme.light", "theme.dark", "theme.system", "-", "currency.usd", "currency.eur", "-", "prices.pictures", "-",
+      "view.purchases", "-", "theme.light", "theme.dark", "theme.system", "-", "prices.pictures", "-",
       "panel.filters", "panel.collections", "panel.decks", "panel.card", "panel.decklist", "panel.review", "-",
       "workspaces", "-", "workspace.save", "workspace.manage", "workspace.reset",
     ],

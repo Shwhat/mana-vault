@@ -29,8 +29,10 @@ import com.google.mlkit.vision.text.TextRecognition;
 import com.google.mlkit.vision.text.TextRecognizer;
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.InputStream;
 
 /**
  * The app's native features for the web interface: saved sign-in, text recognition on the phone,
@@ -44,11 +46,13 @@ public class ManaVaultPlugin extends Plugin {
     static final String EXTRA_OFFER = "com.shwhat.manavault.OFFER";
     private TextRecognizer recognizer;
     private String launchOffer;
+    private JSObject sharedFile;
 
     @Override
     public void load() {
         launchOffer = getActivity().getIntent().getStringExtra(EXTRA_OFFER);
         getActivity().getIntent().removeExtra(EXTRA_OFFER);
+        sharedFile = readShared(getActivity().getIntent());
         getActivity().getOnBackPressedDispatcher().addCallback(getActivity(), new OnBackPressedCallback(true) {
             @Override
             public void handleOnBackPressed() {
@@ -66,6 +70,73 @@ public class ManaVaultPlugin extends Plugin {
             data.put("offer", offer);
             notifyListeners("offer", data, true);
         }
+        JSObject shared = readShared(intent);
+        if (shared != null) {
+            sharedFile = shared;
+            notifyListeners("shared", new JSObject(), true);
+        }
+    }
+
+    // ---------- files shared into the app (0.17.0): a CSV or text list to import, or a receipt ----------
+
+    private static final int MAX_SHARED = 20 * 1024 * 1024;
+
+    /** A file or text another app shared with Mana Vault, as name, type and base64 data; null for any other start. */
+    private JSObject readShared(Intent intent) {
+        if (intent == null || !Intent.ACTION_SEND.equals(intent.getAction())) return null;
+        try {
+            String type = intent.getType() == null ? "application/octet-stream" : intent.getType();
+            Uri uri = intent.getParcelableExtra(Intent.EXTRA_STREAM);
+            JSObject file = new JSObject();
+            if (uri != null) {
+                String name = uri.getLastPathSegment() == null ? "shared" : uri.getLastPathSegment();
+                try (android.database.Cursor cursor = getContext().getContentResolver().query(uri, new String[] { android.provider.OpenableColumns.DISPLAY_NAME }, null, null, null)) {
+                    if (cursor != null && cursor.moveToFirst() && !cursor.isNull(0)) name = cursor.getString(0);
+                }
+                ByteArrayOutputStream out = new ByteArrayOutputStream();
+                try (InputStream input = getContext().getContentResolver().openInputStream(uri)) {
+                    if (input == null) return null;
+                    byte[] buffer = new byte[8192];
+                    for (int count; (count = input.read(buffer)) > 0;) {
+                        out.write(buffer, 0, count);
+                        if (out.size() > MAX_SHARED) return null;
+                    }
+                }
+                file.put("name", name);
+                file.put("type", type);
+                file.put("data", Base64.encodeToString(out.toByteArray(), Base64.NO_WRAP));
+            } else {
+                String text = intent.getStringExtra(Intent.EXTRA_TEXT);
+                if (text == null) return null;
+                file.put("name", "shared.txt");
+                file.put("type", "text/plain");
+                file.put("data", Base64.encodeToString(text.getBytes(java.nio.charset.StandardCharsets.UTF_8), Base64.NO_WRAP));
+            }
+            intent.setAction(Intent.ACTION_MAIN);
+            return file;
+        } catch (Exception error) {
+            return null;
+        }
+    }
+
+    /** The file shared into the app, once. */
+    @PluginMethod
+    public void takeSharedFile(PluginCall call) {
+        JSObject result = new JSObject();
+        result.put("file", sharedFile);
+        sharedFile = null;
+        call.resolve(result);
+    }
+
+    // ---------- changes waiting for the server, sent in the background as soon as the phone is online (0.17.0) ----------
+
+    @PluginMethod
+    public void setPendingSync(PluginCall call) {
+        String changes = call.getString("changes", "[]");
+        Settings.get(getContext()).setPendingSync(changes);
+        if (changes == null || changes.equals("[]")) SyncWorker.cancel(getContext());
+        else SyncWorker.schedule(getContext());
+        call.resolve();
     }
 
     // ---------- settings ----------
@@ -93,6 +164,7 @@ public class ManaVaultPlugin extends Plugin {
     public void clearSettings(PluginCall call) {
         Settings.get(getContext()).clear();
         InboxWorker.stop(getContext());
+        SyncWorker.cancel(getContext());
         call.resolve();
     }
 

@@ -1,7 +1,8 @@
 // ---------- card marks shared by every view: finish badges, Upgrade wanted, owned versions of missing cards, Remove how many ----------
 import type { MouseEvent as ReactMouseEvent, ReactNode } from "react";
 import { type Store, useApp } from "../store";
-import { type Candidate, type DeckCard, type FinishCode, copyLabel, finishLabel, money } from "../types";
+import { type Candidate, type DeckCard, type FinishCode, type InOtherDeck, copyLabel, finishLabel, money } from "../types";
+import { request } from "../api";
 import { closeDialog, customDialog, dialog } from "./Dialog";
 import { apiUrl } from "../android/platform";
 
@@ -27,9 +28,9 @@ export function wantedLabel(card: Pick<DeckCard, "want_set_code" | "want_collect
 }
 
 /** The Upgrade wanted badge, with the version wanted in its tooltip. */
-export function UpgradeBadge({ card, className = "" }: { card: DeckCard; className?: string }) {
+export function UpgradeBadge({ card, className = "", compact = false }: { card: DeckCard; className?: string; compact?: boolean }) {
   if (!card.want_card_id) return null;
-  return <span className={`badge upgrade${className ? ` ${className}` : ""}`} title={`Upgrade wanted: ${wantedLabel(card)}`}>Upgrade wanted</span>;
+  return <span className={`badge upgrade${className ? ` ${className}` : ""}`} title={`Upgrade wanted: ${wantedLabel(card)}`}>{compact ? "UPGRADE" : "Upgrade wanted"}</span>;
 }
 
 /** A free copy as a version: set, number and finish. */
@@ -93,16 +94,74 @@ export function OwnedMarks({ store, card, compact = false }: { store: Store; car
   if (exact.length) {
     return (
       <button type="button" className={`tag badge owned${compact ? " dmark" : ""}`} title={`Free copies of this version are in ${exact[0]!.collectionName}. Link them.`}
-        onClick={stop(() => linkExact(store, card))}>Owned, link</button>
+        onClick={stop(() => linkExact(store, card))}>{compact ? "OWNED" : "Owned, link"}</button>
     );
   }
   if (other.length) {
     return (
       <button type="button" className={`tag badge other${compact ? " dmark" : ""}`} title="You own another version of this card. Choose one to switch to."
-        onClick={stop(() => switchVersionDialog(store, card))}>Other version owned</button>
+        aria-label="Other version owned" onClick={stop(() => switchVersionDialog(store, card))}>{compact ? "OTHER" : "Other version owned"}</button>
     );
   }
   return null;
+}
+
+/**
+ * In Deck A (0.17.0): a missing card whose copies all fill other decks names those decks; Move to this deck unlinks a
+ * copy from the other deck (which then misses it) and links it here, as one undo step.
+ */
+export function InDeckMarks({ store, card, compact = false }: { store: Store; card: DeckCard; compact?: boolean }) {
+  if ((card.missing ?? 0) <= 0 || card.zone === "maybeboard" || !card.inDecks?.length) return null;
+  const { exact, other } = ownedVersions(card);
+  if (exact.length || other.length) return null;
+  const names = [...new Set(card.inDecks.map((item) => item.deckName))];
+  return (
+    <>
+      {names.map((name) => (
+        <button key={name} type="button" className={`tag badge indeck${compact ? " dmark" : ""}`} title={`Your copy fills ${name}. Move it to this deck`}
+          onClick={(event) => { event.stopPropagation(); moveToDeckDialog(store, card); }}>{compact ? `IN ${name.toUpperCase()}` : `In ${name}`}</button>
+      ))}
+    </>
+  );
+}
+
+/** Lists the copies of a card that fill other decks, each with Move to this deck. */
+export function moveToDeckDialog(store: Store, card: DeckCard) {
+  const deckId = store.deck?.id;
+  if (!deckId || !card.inDecks?.length) return;
+  const move = async (item: InOtherDeck, close: () => void) => {
+    try {
+      const result = await request<{ moved: number; linkId: number | null; from: { deckId: string; deckName: string; entryId: number } }>(
+        `/api/decks/${encodeURIComponent(deckId)}/entries/${card.entry_id}/take`, { method: "POST", body: JSON.stringify({ linkId: item.linkId }) });
+      close();
+      store.pushUndo({
+        label: `Move ${card.name} from ${item.deckName}`,
+        undo: async () => {
+          if (result.linkId) await request(`/api/decks/${encodeURIComponent(result.from.deckId)}/entries/${result.from.entryId}/take`, { method: "POST", body: JSON.stringify({ linkId: result.linkId, quantity: result.moved }) });
+          await store.refreshAfterChange();
+        },
+        redo: async () => { store.flash("Move the copy again from the deck card", "err"); },
+      });
+      await store.refreshAfterChange();
+      store.flash(`${card.name} moved from ${item.deckName} to this deck. ${item.deckName} now misses it`);
+    } catch (reason) {
+      store.fail(reason, "Could not move the copy.");
+    }
+  };
+  customDialog(`${card.name} in other decks`, (close) => (
+    <div className="versionlist">
+      <p className="note">Moving a copy here makes the other deck miss it.</p>
+      {card.inDecks!.map((item) => (
+        <div key={item.linkId} className="row versionrow">
+          <div className="rowmain">
+            <div className="rowtitle"><b>{item.deckName}</b> <span className="sub">({item.set_code.toUpperCase()}) {item.collector_number}</span><FinishBadge finish={item.foil} /></div>
+            <div className="rowmeta">{item.quantity} from {item.collectionName}</div>
+          </div>
+          <button type="button" className="btn small primary" onClick={() => void move(item, close)}>Move to this deck</button>
+        </div>
+      ))}
+    </div>
+  ), 520);
 }
 
 /**
@@ -157,7 +216,8 @@ export function FinishPip({ finish, promoTypes }: { finish: FinishCode | number 
 export function PricePip({ price }: { price: number | null | undefined }) {
   const store = useApp();
   if (!store.prefs.pricesOnPictures || price === null || price === undefined) return null;
-  return <span className="pricepip" title="Price">{money(price, store.prefs.currency)}</span>;
+  // the price has its own line under the status pips, the same on every card picture
+  return <><span className="pipbreak" aria-hidden="true" /><span className="pricepip" title="Price">{money(price, store.prefs.currency)}</span></>;
 }
 
 /** A set's symbol (its Scryfall symbol, or a custom set's own), hidden when the set has none. */

@@ -64,10 +64,13 @@ async function synced(page: Page) {
 async function signUpOnPhone(page: Page, baseURL: string, prefix: string): Promise<string> {
   const name = `${prefix}${Date.now().toString(36)}`;
   await page.goto("/");
+  // 0.17.0: https only, apart from the phone's own address used for testing
+  await page.fill("#server", "http://vault.example.com");
+  await page.getByRole("button", { name: "Continue" }).click();
+  await expect(page.locator(".appcard")).toContainText("https only");
   await page.fill("#server", baseURL);
   await page.getByRole("button", { name: "Continue" }).click();
   await expect(page.locator(".appcard")).toContainText("(version test)");
-  await expect(page.locator(".appcard .warn")).toContainText("not encrypted");
   await page.getByRole("button", { name: "Create account" }).first().click();
   await page.fill("#name", name);
   await page.fill("#pw", "correct horse");
@@ -91,7 +94,7 @@ async function signUpOnPhone(page: Page, baseURL: string, prefix: string): Promi
 async function addFromSearch(page: Page, query: string, name: string) {
   await page.locator(".ptab", { hasText: "Search" }).click();
   await page.getByRole("textbox", { name: "Search cards" }).fill(query);
-  await page.locator("#view-cards .row", { hasText: name }).first().click();
+  await page.locator("#view-cards .row", { hasText: name }).first().locator(".rowtitle b").click();
   await expect(page.locator(".cardpage h2")).toHaveText(name);
   await page.getByRole("button", { name: "Card actions" }).click();
   await page.locator(".fabmenu .pmrow", { hasText: /^Add to Main collection\.\.\.$/ }).click();
@@ -100,7 +103,7 @@ async function addFromSearch(page: Page, query: string, name: string) {
   await page.getByRole("button", { name: "Back" }).click();
 }
 
-const openMenu = (page: Page) => page.getByRole("button", { name: "Menu" }).click();
+const openMenu = (page: Page) => page.getByRole("button", { name: "Menu", exact: true }).click();
 
 async function serverCards(page: Page, baseURL: string, collection = "Main collection"): Promise<string[]> {
   const token = await page.evaluate(() => (JSON.parse(localStorage.getItem("test.native") ?? "{}") as { token: string }).token);
