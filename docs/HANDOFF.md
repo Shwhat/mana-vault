@@ -43,6 +43,7 @@ Mana Vault is Devon's self-hosted Magic: The Gathering collection and deck manag
 - Card maker frames are drawn by Mana Vault (Devon asked to extract Cardforge's frames; declined because they are not ours to copy, and Devon accepted). Fonts are Crimson Pro and Merriweather Sans (OFL, @fontsource).
 - Art library is one for the server (flag `art_library_shared` joins libraries once, deduped); the uploader or an admin renames and deletes.
 - Android: SEND intent for text, CSV, PDF and pictures; SyncWorker (WorkManager, CONNECTED) sends waiting changes; the server's sync ids make resends harmless. https only, except localhost and 127.0.0.1 so the tests keep working. Android 8.0 stays the minimum. Update checks call `/api/app/latest`; `/api/app/apk` fetches the release APK once into `<data>/apk`.
+- Deviation from the spec: backups stay version 7. Each entry snapshot now carries its place, who paid shipping and its receipt, and a restore joins places by name, so no new backup version was needed. Pictures in the shared art library are backed up by the account that added them.
 - Offline search uses `compileQuery` (query-match.ts), mirroring the server parser; `art:` and `otag:` still need the server.
 
 ## Code map
