@@ -96,7 +96,7 @@ The **balance bar** under the header shows You give against You get as one bar, 
 
 1. The cards you give leave the collections they come from. When one of them fills a deck, the trade names the cards and decks first and asks before going on; those deck cards become missing.
 2. The cards you get are added to the chosen collection, and your wishlist wants for them go down.
-3. The trade becomes Done.
+3. The trade becomes Done, and a Trade entry is recorded in [Purchases](/about/purchases).
 
 **Undo** (Ctrl+Z) puts every card back and opens the trade again. A done trade cannot change.
 

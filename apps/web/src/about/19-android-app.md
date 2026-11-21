@@ -52,6 +52,7 @@ The app always uses the phone layout described in [Screen layout](/about/screen-
 | Opening a collection or deck | One tap in the Collections panel, the Decks panel or a switcher opens it, and the open one is where new cards go (browsers on a phone keep one tap to choose and a double tap to open) |
 | Suggestions | Card names come from the card list on the phone and the other lists from the copy kept the first time suggestions are used online, so they also work without a connection |
 | Symbols window | Opens as a sheet at the bottom of the screen in the card maker |
+| Purchases | A Purchases button on Home and Purchases view in the Menu. Without a connection the history and summary show from the last copy; changes need a connection |
 
 ## Without a connection
 

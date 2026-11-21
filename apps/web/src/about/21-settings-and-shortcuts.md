@@ -77,6 +77,7 @@ Shortcuts work when no text box, menu or window has focus, except the Ctrl short
 | 3 | Deck view |
 | 4 | Trade view |
 | 5 | Proxies view |
+| 6 | Purchases view |
 | Up, Down | Select the previous or next row (Down also leaves the search box) |
 
 ### Adding cards

@@ -1,6 +1,6 @@
 import { parse } from "csv-parse/sync";
 import type { DatabaseSync } from "node:sqlite";
-import { type Condition, type FinishCode, readCondition, readFlag, readLanguage } from "./copies.js";
+import { type Condition, type CopyKey, type FinishCode, readCondition, readFlag, readLanguage } from "./copies.js";
 
 type CsvRow = Record<string, string>;
 
@@ -22,6 +22,10 @@ export interface CollectionImportResult {
   matchedRows: number;
   importedQuantity: number;
   unmatched: Array<{ row: number; name: string; reason: string }>;
+  /** Copies with a purchase price (0.16.0), for the purchase history question. */
+  pricedCopies: number;
+  /** What was added, for purchase history (not sent to the browser). */
+  additions?: Array<{ key: CopyKey; quantity: number; price: number | null; currency: string | null; added: string | null }>;
 }
 
 /** A name matches a card's name, its flavor name, or the front face of a two-faced card. */
@@ -253,5 +257,13 @@ export function importCollectionCsv(database: DatabaseSync, text: string, commit
     }
   }
 
-  return { format: chosen, formatName: IMPORT_FORMATS[chosen], matchedRows, importedQuantity, unmatched };
+  const list = [...additions.values()];
+  return {
+    format: chosen, formatName: IMPORT_FORMATS[chosen], matchedRows, importedQuantity, unmatched,
+    pricedCopies: list.filter((item) => item.price !== null && item.price > 0 && !item.proxy).reduce((sum, item) => sum + item.quantity, 0),
+    additions: list.map((item) => ({
+      key: { cardId: item.cardId, foil: item.foil, condition: item.condition, language: item.language, proxy: item.proxy }, quantity: Math.min(10_000, item.quantity),
+      price: item.proxy ? null : item.price, currency: item.currency, added: item.added,
+    })),
+  };
 }

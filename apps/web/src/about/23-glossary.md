@@ -5,6 +5,9 @@
 | Card | A card by name, such as Lightning Bolt, across all its printings |
 | Printing | One version of a card in one set, with its own set code, collector number, rarity and artwork |
 | Card database | The local catalog of every printing, downloaded from Scryfall |
+| Opening | The opened part of a purchased product, which cards added to its collection are tied to until Done opening |
+| Tied card | A copy that came from a purchase, an opening or a trade, counted in Value now while it is held |
+| Sealed | A purchased product not yet opened or sold |
 | Art library | The pictures an account keeps for the card maker |
 | Block | A group of sets released together (such as Ice Age), used to group sets in set completion |
 | Card back | The picture printed on the reverse of proxies: the standard Magic back or an uploaded one |

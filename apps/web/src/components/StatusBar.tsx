@@ -1,9 +1,11 @@
 // ---------- status bar ----------
+import { setActiveOpening, useActiveOpening } from "../purchase-state";
+import { request } from "../api";
 import type { Action } from "../actions";
 import { customDialog } from "./Dialog";
 import { useApp, zoneLabel } from "../store";
 
-const VIEW_NAMES = { home: "Home", cards: "Card search", collection: "Collection", deck: "Deck", trade: "Trade", proxies: "Proxies", about: "About", admin: "Administration" } as const;
+const VIEW_NAMES = { home: "Home", cards: "Card search", collection: "Collection", deck: "Deck", trade: "Trade", proxies: "Proxies", purchases: "Purchases", about: "About", admin: "Administration" } as const;
 
 export function StatusBar({ actions }: { actions: Record<string, Action> }) {
   const store = useApp();
@@ -16,6 +18,7 @@ export function StatusBar({ actions }: { actions: Record<string, Action> }) {
   // cards go to the deck when a deck was selected last
   const deckTarget = store.prefs.addTo === "deck" ? store.deck : null;
   const picked = store.view === "collection" && store.checked.size > 1 ? store.checked.size : 0;
+  const opening = useActiveOpening();
 
   return (
     <div id="status">
@@ -61,6 +64,14 @@ export function StatusBar({ actions }: { actions: Record<string, Action> }) {
           onClick={() => customDialog("Card database update failed", () => <p className="dlgq">The last card database update failed: {failed}</p>, 420)}
         >
           Last update failed
+        </span>
+      )}
+      {opening && (
+        <span id="st-opening" className="pt on" role="button" title="Cards added to the collection are tied to this opening. Click for Done opening"
+          onClick={() => void request(`/api/purchases/openings/${opening.id}/active`, { method: "POST", body: JSON.stringify({ active: false }) })
+            .then(() => { setActiveOpening(null); store.flash("Done opening"); window.dispatchEvent(new CustomEvent("mana-vault:purchases", { detail: "" })); })
+            .catch((reason: unknown) => store.fail(reason, "Could not end the opening."))}>
+          OPENING: {opening.name.toUpperCase()}
         </span>
       )}
       <span id="st-toggles">

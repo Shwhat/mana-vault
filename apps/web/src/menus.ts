@@ -5,13 +5,13 @@ export type Menu = { id: string; name: string; items: string[] };
 export const MENUS: Menu[] = [
   {
     id: "file", name: "File", items: [
-      "collection.new", "newDeck", "-", "io.import", "io.export", "-", "scan", "-", "backup", "restore", "-", "updateCatalog", "-", "signout",
+      "collection.new", "newDeck", "-", "io.import", "io.export", "purchases.export", "-", "purchases.new", "purchases.sale", "-", "scan", "-", "backup", "restore", "-", "updateCatalog", "-", "signout",
     ],
   },
   { id: "edit", name: "Edit", items: ["undo", "redo", "-", "find", "pickAll", "clearFilters"] },
   {
     id: "view", name: "View", items: [
-      "theme.light", "theme.dark", "theme.system", "-", "currency.usd", "currency.eur", "-", "prices.pictures", "-",
+      "view.purchases", "-", "theme.light", "theme.dark", "theme.system", "-", "currency.usd", "currency.eur", "-", "prices.pictures", "-",
       "panel.filters", "panel.collections", "panel.decks", "panel.card", "panel.decklist", "panel.review", "-",
       "workspaces", "-", "workspace.save", "workspace.manage", "workspace.reset",
     ],
@@ -27,6 +27,7 @@ export const MODE_TABS: Array<{ action: string; name: string; view: string }> = 
   { action: "view.deck", name: "Decks", view: "deck" },
   { action: "view.trade", name: "Trade", view: "trade" },
   { action: "view.proxies", name: "Proxies", view: "proxies" },
+  { action: "view.purchases", name: "Purchases", view: "purchases" },
 ];
 
 /** The account menu at the top right (desktop and phone). */

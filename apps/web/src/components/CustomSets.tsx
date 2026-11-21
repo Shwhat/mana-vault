@@ -130,7 +130,6 @@ function EditSet({ store, set, onSaved, close }: { store: Store; set: CustomSet;
       <div className="prow"><label>Set symbol</label><SymbolChooser store={store} current={set.symbolUrl} choice={choice} setChoice={setChoice} /></div>
       <label className="ck"><input type="checkbox" checked={rarityColors} disabled={!svg} onChange={(event) => setRarityColors(event.target.checked)} /> Rarity colors (SVG symbols)</label>
       <div className="btnrow end">
-        <button type="button" className="btn" onClick={close}>Cancel</button>
         <button type="button" className="btn primary" disabled={busy || code.length < 2 || !name.trim()} onClick={() => void save()}>Save</button>
       </div>
     </div>

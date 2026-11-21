@@ -182,7 +182,7 @@ describe("art library and backups", () => {
     expect((await call("POST", "/api/custom/cards", { card: customCard("abc", "Art Card"), picture: PNG, art: dataUrl("other art bytes", "image/png") })).statusCode).toBe(201);
     expect((await call("GET", "/api/art")).json()).toHaveLength(2);
     const backup = (await call("GET", "/api/backup")).body;
-    expect(JSON.parse(backup)).toMatchObject({ version: 6, artLibrary: [{ name: "Deep forest" }, { name: "Art Card" }] });
+    expect(JSON.parse(backup)).toMatchObject({ version: 7, artLibrary: [{ name: "Deep forest" }, { name: "Art Card" }] });
     await call("DELETE", `/api/art/${art.id}`);
     expect((await call("GET", "/api/art")).json()).toHaveLength(1);
     expect((await call("POST", "/api/backup/restore", backup)).statusCode).toBe(200);

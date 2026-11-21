@@ -1,4 +1,5 @@
 // ---------- trades: saved trades, completing them, proposals between accounts, wishlist matches and the shared trade binder ----------
+import { tradeDone, tradeReopened, type TradeSide } from "./copy-events.js";
 import { randomBytes, randomUUID } from "node:crypto";
 import type { FastifyInstance, FastifyReply } from "fastify";
 import type { DatabaseSync } from "node:sqlite";
@@ -264,6 +265,16 @@ export function registerTradeRoutes(app: FastifyInstance, database: DatabaseSync
       record.added.push({ collectionId: receiver, key, quantity });
       lowerWishlists(database, fromOwner ? partnerId! : ownerId, [{ cardId: key.cardId, quantity, proxy: false }]);
     }
+    // each account's side of the trade goes to its purchase history
+    const price = (line: { [key: string]: unknown }) => (line.price === null || line.price === undefined ? null : Number(line.price));
+    const nameOf = (id: number | null) => (id === null ? null : String(database.prepare("SELECT name FROM users WHERE id = ?").get(id)?.name ?? ""));
+    const sideOf = (userId: number, gives: string, collectionId: string | null, partner: number | null): TradeSide => ({
+      tradeId: String(row.id), userId, name: String(row.name), partnerName: nameOf(partner), collectionId,
+      given: lines.filter((line) => line.side === gives).map((line) => ({ key: keyOf(line), quantity: Number(line.quantity), collectionId: String(line.collection_id ?? ""), price: price(line) })),
+      got: lines.filter((line) => line.side !== gives).map((line) => ({ key: keyOf(line), quantity: Number(line.quantity), price: price(line) })),
+    });
+    tradeDone(database, sideOf(ownerId, "give", ownerCollection || null, partnerId));
+    if (partnerId !== null) tradeDone(database, sideOf(partnerId, "get", partnerCollection, ownerId));
     return record;
   };
 
@@ -303,6 +314,7 @@ export function registerTradeRoutes(app: FastifyInstance, database: DatabaseSync
         if (database.prepare("SELECT 1 FROM collections WHERE id = ?").get(change.collectionId)) putCopies(database, change.collectionId, change.key, change.quantity);
       }
       database.prepare(`UPDATE trades SET status = 'open', record = NULL, done_at = NULL, updated_at = ${now} WHERE id = ?`).run(String(row.id));
+      tradeReopened(database, String(row.id));
     });
     return { status: "open" };
   });

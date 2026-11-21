@@ -47,6 +47,7 @@ function useKeyboard(store: Store, actions: Record<string, Action>) {
         case "3": run("view.deck"); break;
         case "4": run("view.trade"); break;
         case "5": run("view.proxies"); break;
+        case "6": run("view.purchases"); break;
         case "w": case "W": run("wishlist.add"); break;
         case "e": case "E": run("copy.details"); break;
         case "b": case "B": run("collection.binder"); break;

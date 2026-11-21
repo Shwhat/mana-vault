@@ -177,6 +177,10 @@ This page lists what Mana Vault does in the current version, followed by what is
 - Notifications for new offers in the Inbox, checked in the background about every 15 minutes, optionally only on Wi-Fi.
 - The Back button, the Android share sheet for exports and backups, and a daily check for a newer app.
 
+### 0.16.0 additions
+
+- Purchases: purchases with product lines and single cards, tax and shipping spread over the lines, Open... with pulled cards tied to the opening, sealed values with history, card and product sales that remove copies, trades recorded when completed, imported purchase prices, Spent, Received, Value now and Gain or loss with a chart, History filters, CSV export, undo and backups (version 7).
+
 ### 0.15.0 additions
 
 - A pip bar under every card picture (above each picture in deck Stacks) holds all the pips, so nothing covers the card.
@@ -204,5 +208,4 @@ These are part of the release plan and are not available yet.
 
 | Version | Planned features |
 |---|---|
-| 0.13.0 | Purchase history |
 | Later | Windows, Linux and other installs besides Docker; a built-in demo collection; instant notifications; more than one server or account in the Android app; sharing files into the Android app |

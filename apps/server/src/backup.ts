@@ -1,4 +1,5 @@
 import { cleanSvg } from "./svg.js";
+import { purchaseBackup, restorePurchases } from "./purchases.js";
 import { randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import { cardInsertStatement } from "./database.js";
@@ -35,7 +36,7 @@ type BackupCustomCard = {
 
 export interface ManaVaultBackup {
   format: "mana-vault-backup";
-  version: 5 | 6;
+  version: 5 | 6 | 7;
   createdAt: string;
   cards: BackupCard[];
   collections: BackupCollection[];
@@ -55,6 +56,8 @@ export interface ManaVaultBackup {
   /** Version 6: the account's art library and its own card back. */
   artLibrary: BackupArt[];
   cardBack: { bytes: string; type: string } | null;
+  /** Version 7: the purchase history, entry by entry as kept. */
+  purchases: unknown[];
 }
 
 export type BackupArt = { name: string; type: string; bytes: string; created_at: string };
@@ -82,8 +85,11 @@ export function createBackup(database: DatabaseSync, userId: number): ManaVaultB
      WHERE id IN (SELECT card_id FROM collection_cards WHERE collection_id IN (SELECT id FROM collections WHERE owner_id = ?))
         OR oracle_id IN (SELECT oracle_id FROM deck_cards WHERE deck_id IN (SELECT id FROM decks WHERE owner_id = ?))
         OR id IN (SELECT id FROM custom_cards WHERE owner_id = ?)
+        OR id IN (SELECT card_id FROM purchase_ties WHERE user_id = ?)
+        OR id IN (SELECT s.card_id FROM purchase_sales s JOIN purchase_entries e ON e.id = s.entry_id WHERE e.user_id = ?)
+        OR id IN (SELECT l.card_id FROM purchase_lines l JOIN purchase_entries e ON e.id = l.entry_id WHERE e.user_id = ?)
      ORDER BY id`,
-  ).all(userId, userId, userId) as BackupCard[];
+  ).all(userId, userId, userId, userId, userId, userId) as BackupCard[];
   const base64 = (value: unknown) => (value ? Buffer.from(value as Uint8Array).toString("base64") : null);
   const customIds = new Set(database.prepare("SELECT id FROM cards WHERE custom = 1").all().map((row) => String(row.id)));
   const customCards = cards.filter((card) => customIds.has(String(card.id))).map((card) => {
@@ -113,7 +119,8 @@ export function createBackup(database: DatabaseSync, userId: number): ManaVaultB
   const back = database.prepare("SELECT bytes, type FROM card_backs WHERE id = ?").get(`user:${userId}`);
   return {
     format: "mana-vault-backup",
-    version: 6,
+    version: 7,
+    purchases: purchaseBackup(database, userId),
     customSets,
     customCards,
     artLibrary: database.prepare("SELECT name, type, bytes, created_at FROM art_library WHERE user_id = ? ORDER BY created_at, rowid").all(userId)
@@ -166,7 +173,7 @@ export function restoreBackup(database: DatabaseSync, source: string, userId: nu
         set.symbol_type === "image/svg+xml" ? (symbol ? new Uint8Array(Buffer.from(symbol, "utf8")) : null) : bytes(set.symbol), set.symbol_type === "image/svg+xml" && !symbol ? null : set.symbol_type);
     }
     // version 6: the art library and the card back are replaced by the backup's (older backups leave them as they are)
-    if (backup.version === 6) {
+    if (backup.version >= 6) {
       database.prepare("DELETE FROM art_library WHERE user_id = ?").run(userId);
       const insertArt = database.prepare("INSERT INTO art_library (id, user_id, name, bytes, type, created_at) VALUES (?, ?, ?, ?, ?, ?)");
       for (const art of backup.artLibrary) insertArt.run(randomUUID(), userId, art.name, bytes(art.bytes)!, art.type, art.created_at);
@@ -269,6 +276,8 @@ export function restoreBackup(database: DatabaseSync, source: string, userId: nu
       const card = deckId ? deckCardOf.get(deckId, link.printing_id, link.zone, link.deck_finish ?? link.foil) : undefined;
       if (card && collectionId) insertLink.run(Number(card.id), collectionId, link.card_id, link.foil, link.condition, link.language, link.proxy, link.quantity);
     }
+    // version 7: the purchase history is replaced by the backup's, tied to the restored collections
+    if (backup.version === 7) restorePurchases(database, userId, backup.purchases, (id) => collectionIds.get(id) ?? null);
     database.exec("COMMIT");
   } catch (error) {
     database.exec("ROLLBACK");
@@ -299,7 +308,7 @@ function summarizeBackup(backup: ManaVaultBackup): BackupSummary {
 }
 
 function validateBackup(value: unknown): ManaVaultBackup {
-  if (!isRecord(value) || value.format !== "mana-vault-backup" || ![1, 2, 3, 4, 5, 6].includes(Number(value.version))) {
+  if (!isRecord(value) || value.format !== "mana-vault-backup" || ![1, 2, 3, 4, 5, 6, 7].includes(Number(value.version))) {
     throw new Error("Unsupported backup file format or version");
   }
   if (typeof value.createdAt !== "string" || !Number.isFinite(Date.parse(value.createdAt))) {
@@ -462,7 +471,8 @@ function validateBackup(value: unknown): ManaVaultBackup {
     ? { bytes: base64(value.cardBack.bytes)!, type: pictureType(value.cardBack.type)! } : null;
   return {
     format: "mana-vault-backup",
-    version: Number(value.version) === 6 ? 6 : 5,
+    version: Number(value.version) === 7 ? 7 : Number(value.version) === 6 ? 6 : 5,
+    purchases: Number(value.version) === 7 && Array.isArray(value.purchases) ? value.purchases : [],
     customSets,
     customCards,
     artLibrary,
