@@ -217,11 +217,14 @@ export function plainWords(query: string): string {
     .map((token) => token.replace(/^"|"$/g, "")).filter(Boolean).join(" ");
 }
 
+/** An ORDER BY for card search; `with` is a WITH step it needs (its values come first). */
+export type SearchOrder = { sql: string; values: (string | number)[]; with?: string; withValues?: (string | number)[] };
+
 /**
  * The ORDER BY for card search, on rows named `x`. Best match puts cards named exactly as the search words first,
  * then names that start with them, then names that hold every word, then everything else, each by name.
  */
-export function searchOrder(sort: SearchSort, query: string, options: { currency?: string; userId?: number } = {}): { sql: string; values: (string | number)[] } {
+export function searchOrder(sort: SearchSort, query: string, options: { currency?: string; userId?: number } = {}): SearchOrder {
   const words = plainWords(query).toLowerCase();
   const byName = "x.name, x.lang != 'en', x.released_at DESC";
   const usd = options.currency === "eur" ? "COALESCE(x.price_eur, x.price_eur_foil)" : "COALESCE(x.price_usd, x.price_usd_foil, x.price_usd_etched)";
@@ -240,11 +243,16 @@ export function searchOrder(sort: SearchSort, query: string, options: { currency
     case "set": return { sql: `x.set_name, CAST(x.collector_number AS INTEGER), x.collector_number, ${byName}`, values: [] };
     case "owned": {
       if (!options.userId) return { sql: byName, values: [] };
+      // the account's copies are counted once per search (the owned step) and looked up for each card
       return {
-        sql: `(SELECT COALESCE(SUM(i.quantity), 0) FROM collection_cards i JOIN collections col ON col.id = i.collection_id
-               WHERE i.card_id IN (SELECT o.id FROM cards o WHERE o.oracle_id = x.oracle_id) AND i.proxy = 0 AND col.kind = 'collection'
-                 AND (col.owner_id = ? OR EXISTS (SELECT 1 FROM members m WHERE m.kind = 'collection' AND m.item_id = col.id AND m.user_id = ?))) DESC, ${byName}`,
-        values: [options.userId, options.userId],
+        with: `owned AS MATERIALIZED (SELECT o.oracle_id, SUM(i.quantity) AS n FROM collection_cards i JOIN cards o ON o.id = i.card_id
+                 JOIN collections col ON col.id = i.collection_id
+                 WHERE i.proxy = 0 AND col.kind = 'collection'
+                   AND (col.owner_id = ? OR EXISTS (SELECT 1 FROM members m WHERE m.kind = 'collection' AND m.item_id = col.id AND m.user_id = ?))
+                 GROUP BY o.oracle_id)`,
+        withValues: [options.userId, options.userId],
+        sql: `COALESCE((SELECT owned.n FROM owned WHERE owned.oracle_id = x.oracle_id), 0) DESC, ${byName}`,
+        values: [],
       };
     }
     default: {

@@ -524,17 +524,22 @@ export async function buildApp(
                 set_code, set_name, collector_number, rarity, image_url, released_at, artist, ${CARD_PRICE_COLUMNS}`;
       // grouped: one result per card, showing its newest regular English printing, with how many printings matched
       const grouped = group === "1";
+      // Grouped search picks one printing per card. Only the few columns the pick needs go through the window step,
+      // and the total comes from the same pass, so the cards table is read once; the page's full rows are joined last.
       const rows = grouped
         ? database.prepare(
-          `WITH matched AS (SELECT * FROM cards ${where}),
-                ranked AS (SELECT *, ROW_NUMBER() OVER (PARTITION BY oracle_id ORDER BY lang != 'en', promo, variation, released_at IS NULL, released_at DESC) AS pick,
-                                  COUNT(*) OVER (PARTITION BY oracle_id) AS printings FROM matched)
-           SELECT ${columns}, printings FROM ranked x WHERE pick = 1 ORDER BY ${order.sql} LIMIT ? OFFSET ?`,
-        ).all(...values, ...order.values, parsedLimit, parsedOffset)
-        : database.prepare(`SELECT ${columns} FROM cards x ${where} ORDER BY ${order.sql} LIMIT ? OFFSET ?`).all(...values, ...order.values, parsedLimit, parsedOffset);
+          `WITH ${order.with ? `${order.with},` : ""} ranked AS (SELECT id AS pid, ROW_NUMBER() OVER (PARTITION BY oracle_id ORDER BY lang != 'en', promo, variation, released_at IS NULL, released_at DESC) AS pick,
+                                  COUNT(*) OVER (PARTITION BY oracle_id) AS printings FROM cards ${where}),
+                picked AS (SELECT pid, printings, COUNT(*) OVER () AS matches FROM ranked WHERE pick = 1)
+           SELECT ${columns}, p.printings, p.matches FROM picked p JOIN cards x ON x.id = p.pid ORDER BY ${order.sql} LIMIT ? OFFSET ?`,
+        ).all(...(order.withValues ?? []), ...values, ...order.values, parsedLimit, parsedOffset)
+        : database.prepare(`${order.with ? `WITH ${order.with} ` : ""}SELECT ${columns} FROM cards x ${where} ORDER BY ${order.sql} LIMIT ? OFFSET ?`)
+          .all(...(order.withValues ?? []), ...values, ...order.values, parsedLimit, parsedOffset);
       if (paged !== "1") return rows.map(toCardRow);
       // a page of results with the total number of matches and how many copies the account owns, by finish
-      const total = Number(database.prepare(grouped ? `SELECT COUNT(DISTINCT oracle_id) AS count FROM cards ${where}` : `SELECT COUNT(*) AS count FROM cards ${where}`).get(...values)?.count ?? 0);
+      const total = grouped && rows.length
+        ? Number(rows[0]!.matches)
+        : Number(database.prepare(grouped ? `SELECT COUNT(DISTINCT oracle_id) AS count FROM cards ${where}` : `SELECT COUNT(*) AS count FROM cards ${where}`).get(...values)?.count ?? 0);
       const userId = request.user!.id;
       const ownedOf = database.prepare(
         `SELECT i.foil, COALESCE(SUM(i.quantity), 0) AS owned FROM collection_cards i JOIN collections col ON col.id = i.collection_id
