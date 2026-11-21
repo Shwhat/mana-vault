@@ -3,6 +3,8 @@ import type { DatabaseSync } from "node:sqlite";
 
 export const PICTURE_SIZES = ["small", "normal", "large", "png", "art_crop", "border_crop"] as const;
 export type PictureSize = (typeof PICTURE_SIZES)[number];
+/** The official printed languages that can be kept besides English, in Scryfall's codes. */
+export const CARD_LANGUAGES = ["es", "fr", "de", "it", "pt", "ja", "ko", "ru", "zhs", "zht"];
 export type SignupMode = "open" | "closed" | "invite";
 
 export type ServerSettings = {
@@ -19,6 +21,10 @@ export type ServerSettings = {
   updateIntervalHours: number;
   /** Also keep Scryfall's unofficial languages (Phyrexian, Quenya and others), read from the All Cards file. */
   extraLanguages: boolean;
+  /** Official printed languages kept besides English (0.15.0): es, fr, de, it, pt, ja, ko, ru, zhs, zht. */
+  cardLanguages: string[];
+  /** Also download pictures of printings in languages other than English (0.15.0). */
+  languagePictures: boolean;
   pictureSizes: PictureSize[];
   /** The picture folder chosen in the program; empty uses the default. */
   picturesDir: string;
@@ -36,7 +42,7 @@ export type ServerSettings = {
 };
 
 export const DEFAULT_SETTINGS: ServerSettings = {
-  signup: "open", sessionDays: 30, attemptLimit: 30, minPasswordLength: 8, serverName: "", updateIntervalHours: 168, extraLanguages: true,
+  signup: "open", sessionDays: 30, attemptLimit: 30, minPasswordLength: 8, serverName: "", updateIntervalHours: 168, extraLanguages: true, cardLanguages: [], languagePictures: false,
   pictureSizes: [], picturesDir: "", minFreeGb: 10, backupIntervalHours: 0, backupKeep: 7, backupDir: "", setupDone: false, pictureEstimates: {},
 };
 
@@ -78,7 +84,11 @@ export function readSettingsInput(body: unknown): Partial<ServerSettings> | stri
     if (typeof input.serverName !== "string" || input.serverName.trim().length > 60) return "The server name can have up to 60 characters";
     out.serverName = input.serverName.trim();
   }
-  for (const key of ["extraLanguages", "setupDone"] as const) {
+  if (input.cardLanguages !== undefined) {
+    if (!Array.isArray(input.cardLanguages) || input.cardLanguages.some((code) => !CARD_LANGUAGES.includes(code as string))) return "Unknown card language";
+    out.cardLanguages = CARD_LANGUAGES.filter((code) => (input.cardLanguages as unknown[]).includes(code));
+  }
+  for (const key of ["extraLanguages", "setupDone", "languagePictures"] as const) {
     if (input[key] !== undefined) {
       if (typeof input[key] !== "boolean") return `${key} must be true or false`;
       out[key] = input[key] as boolean;

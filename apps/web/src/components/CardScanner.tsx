@@ -9,6 +9,8 @@ import { finishCode, finishFor, hasFinish, matchText, scanCount, type ScanCard, 
 import { type Store, useApp } from "../store";
 import { CONDITIONS, type CardDetail, LANGUAGES, money, priceOf, type SetInfo } from "../types";
 import { closeDialog, confirmDialog, customDialog, dialog, isDialogOpen } from "./Dialog";
+import { Suggest } from "./Suggest";
+import { SetIcon } from "./CardMarks";
 
 type Capabilities = MediaTrackCapabilities & { torch?: boolean; focusMode?: string[]; pointsOfInterest?: unknown };
 const advanced = (value: Record<string, unknown>) => ({ advanced: [value] }) as unknown as MediaTrackConstraints;
@@ -516,7 +518,7 @@ function ScanSettings({ onClose }: { onClose: () => void }) {
               <button key={set.code} type="button" className="pmrow" onClick={() => {
                 if (!prefs.scanSets.includes(set.code)) store.setPrefs({ scanSets: [...prefs.scanSets, set.code] });
                 setQuery("");
-              }}>{set.name} <span className="badge">{set.code.toUpperCase()}</span></button>
+              }}><SetIcon code={set.code} />{set.name} <span className="badge">{set.code.toUpperCase()}</span></button>
             ))}
           </div>
         )}
@@ -658,7 +660,7 @@ function ScanList({ onClose }: { onClose?: () => void }) {
         {onClose && <button type="button" className="btn" onClick={onClose}>Close</button>}
       </div>
       <form className="scanadd" onSubmit={(event) => void addByName(event)}>
-        <input className="search" value={name} onChange={(event) => setName(event.target.value)} placeholder="Add a card by name" aria-label="Add a card by name" maxLength={120} />
+        <Suggest className="search" mode="name" value={name} onValue={setName} placeholder="Add a card by name" aria-label="Add a card by name" maxLength={120} />
         <button type="submit" className="btn" aria-label="Add by name" title="Add by name" disabled={busy || !name.trim()}><b>+</b></button>
       </form>
       <div className="scanrows">

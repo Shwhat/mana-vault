@@ -53,6 +53,8 @@ export type CollectionEntry = Pick<Card, "id" | "name" | "set_code" | "set_name"
   PriceFields & {
     oracle_id: string;
     quantity: number;
+    /** Scryfall removed the printing (0.15.0); the copy keeps it until its printing is changed. */
+    removed?: boolean;
     foil: FinishCode;
     condition: Condition;
     language: string;
@@ -96,7 +98,10 @@ export type Collection = Sharing & {
   createdAt?: string;
 };
 
-export type SetProgress = { code: string; name: string; owned: number; total: number; printedSize: number | null; known: boolean };
+export type SetProgress = {
+  code: string; name: string; owned: number; total: number; printedSize: number | null; known: boolean;
+  symbolUrl?: string | null; block?: string | null; parentSetCode?: string | null; digital?: boolean; foilOnly?: boolean; nonfoilOnly?: boolean;
+};
 export type MissingCard = Pick<Card, "id" | "name" | "set_code" | "set_name" | "collector_number" | "rarity" | "colors" | "image_url" | "mana_cost" | "type_line"> & {
   oracle_id: string;
   needs: "any" | "regular" | "foil";
@@ -109,7 +114,10 @@ export type CompletionReport = {
   missing: MissingCard[];
 };
 
-export type SetInfo = { code: string; name: string; set_type: string; released_at: string | null; printed_size: number | null; printings: number };
+export type SetInfo = {
+  code: string; name: string; set_type: string; released_at: string | null; printed_size: number | null; printings: number;
+  symbolUrl?: string | null; block?: string | null; parentSetCode?: string | null; digital?: boolean; foilOnly?: boolean; nonfoilOnly?: boolean;
+};
 
 export type Offer = { id: string; kind: "collection" | "deck"; itemId: string; itemName: string; mode: "copy" | "share" | "transfer"; createdAt: string; user: string };
 
@@ -160,6 +168,7 @@ export type Deck = Partial<Sharing> & {
 export type DeckLink = CopyKey & { collectionId: string; collectionName: string; quantity: number };
 
 export type DeckCard = Pick<Card, "name" | "mana_cost" | "type_line" | "set_code" | "set_name" | "collector_number" | "image_url" | "custom"> & Partial<PriceFields> & {
+  removed?: boolean;
   mana_value?: number | null;
   rarity?: string;
   colors?: string;
@@ -216,6 +225,8 @@ export type CatalogStatus = {
   updatedAt: string | null;
   /** Cards the last update left out because their record failed a check (up to 50 names). */
   skipped?: { count: number; names: string[] };
+  /** Scryfall's printing changes applied by the last update (0.15.0). */
+  migrations?: { merged: number; removed: number } | null;
   update: {
     scheduled: boolean;
     intervalHours: number | null;

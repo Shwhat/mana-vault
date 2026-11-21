@@ -24,6 +24,12 @@ Messages appear at the right end of the status bar (on the phone, in a banner ab
 | You left name | Leaving a shared collection or deck |
 | Deck renamed to name, or Deck name deleted | Rename deck, Delete deck |
 | Sent to name. It is added when they accept it. | Sending a collection or deck |
+| Set name (CODE) saved | Edit set |
+| Name used on the card | Choosing art from the art library |
+| Name added to the art library, or Name deleted from the art library | Art library |
+| Card back uploaded | Upload back... |
+| Card languages saved. The next card database update applies them | Save languages in Administration |
+| Card database updated with N printings, N printings merged, N removed | A card database update that applied printing changes |
 | Name accepted, or Name declined | Accepting or declining an offer |
 | Offer of name to person cancelled | Cancelling an offer you sent |
 | Stopped sharing with name | Stop sharing |
@@ -171,6 +177,19 @@ Messages appear at the right end of the status bar (on the phone, in a banner ab
 | Decklist has no card rows | The decklist has no card lines |
 | A set code has 2 to 6 letters or digits, such as XXX | A custom set code of another length or with other characters |
 | The set code CODE is already used by another set | The code belongs to a Scryfall set or another custom set |
+| Symbols must be SVG, JPEG, PNG or WebP | A custom set symbol of another file type |
+| This SVG has no drawing Mana Vault can use | An SVG set symbol that is empty once scripts and links are removed |
+| That set has no symbol yet. Update the card database to load the set symbols | Scryfall set symbol... chose a set whose symbol is not saved |
+| A set symbol can be up to 512 KB | Upload symbol... with a larger file |
+| Art can be up to 10 MB, or Pictures can be up to 10 MB | A larger art file |
+| Pictures must be JPEG, PNG or WebP | An art library picture or card back of another type |
+| That art is not in your library | The picture was deleted, or belongs to another account |
+| Enter a name | Renaming art with an empty name |
+| A card back can be up to 6 MB | Upload back... with a larger file |
+| No card back is uploaded | Card backs is Uploaded back and none was uploaded |
+| Upload a card back first, or choose another card back | Making a PDF with Uploaded back and none uploaded |
+| The card back is not downloaded yet. An admin can update the card database to download it | Making a PDF with Standard back before the first update with 0.15.0 |
+| This set has no symbol | A set without a saved symbol |
 | Give the set a name | A custom set without a name |
 | The release date must be a date such as 2026-11-19 | A custom set release date that is not a date |
 | Delete or move the cards in this set first | Deleting a custom set that has cards |

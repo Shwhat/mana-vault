@@ -29,7 +29,9 @@ Card pictures downloaded to the server are kept in the picture folder: by defaul
 | Deck cards | Every card in those decks, with zone, count, printing and tags |
 | Deck links | Which copies in your own collections fill each deck card |
 | Cards | The card records they use, so a backup can be restored on a server with an empty card database |
-| Custom sets and custom cards | The custom sets and custom cards you made or use, with their card maker designs, pictures, art and set symbols |
+| Custom sets and custom cards | The custom sets and custom cards you made or use, with their card maker designs, pictures, art and set symbols (SVG symbols included) |
+| Art library | Every picture in your art library, with its name (backups made with 0.15.0 and later) |
+| Card back | The card back you uploaded for printing, if any (backups made with 0.15.0 and later) |
 
 A backup does not contain collections or decks shared with you by others, accounts, preferences, prices, deck history, trades, the trade binder link, the print list or the full card database. Prices return with the next card database update.
 
@@ -40,7 +42,7 @@ A backup does not contain collections or decks shared with you by others, accoun
 3. Choose **Restore backup** to go ahead, or **Cancel**.
 4. Your own collections and decks are replaced by the backup's. Items you had shared stop being shared, and offers of them are cancelled. Collections and decks shared with you by others, and other accounts' data, are not changed. The card records in the backup are added to the card database; the rest of the card database is unchanged. Custom sets and custom cards missing on the server are added, made by your account; custom cards already on the server keep their current version.
 
-A restore cannot be undone, and it clears the undo history. Backups made before version 0.2.0 hold a single collection; they restore as a collection named Main collection. Backups made before version 0.3.0 restore every copy as near mint English with none for trade, and every collection as a collection (not a wishlist). Backups made before version 0.6.0 restore without proxies, copy details or deck links, and cards of decks that kept cards by name take the newest printing. Download a backup first if the current data might be needed.
+A restore cannot be undone, and it clears the undo history. Backups made before version 0.2.0 hold a single collection; they restore as a collection named Main collection. Backups made before version 0.3.0 restore every copy as near mint English with none for trade, and every collection as a collection (not a wishlist). Backups made before version 0.6.0 restore without proxies, copy details or deck links, and cards of decks that kept cards by name take the newest printing. A backup made with 0.15.0 or later replaces your art library and uploaded card back with the backup's; an older backup leaves them as they are. Download a backup first if the current data might be needed.
 
 ### Restore messages
 
@@ -62,6 +64,7 @@ A restore cannot be undone, and it clears the undo history. Backups made before 
 | Backup collection refers to a missing card | A collection entry has no matching card record |
 | Backup deck card refers to a missing or incompatible card | A deck card has no matching card record |
 | The backup file must be 250 MB or smaller | The file is too large |
+| Backup art N is invalid | A picture of the art library in the file is damaged |
 
 ## Server backups
 

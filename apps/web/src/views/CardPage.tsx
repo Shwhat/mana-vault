@@ -1,4 +1,6 @@
 // ---------- card page: the card's art, text, versions with prices, rulings and what you own ----------
+import { LanguagePip, SetIcon } from "../components/CardMarks";
+import { SymbolText } from "../components/SymbolPicker";
 import { addMenuItems } from "../components/AddButtons";
 import { PriceHistory } from "./PriceHistory";
 import { useEffect, useState } from "react";
@@ -64,9 +66,9 @@ export function CardPage({ actions }: { actions: Record<string, Action> }) {
       <div className="list cpbody">
         <div className="cphead">
           <div><h2>{card.name}</h2><div className="cptype">{card.type_line}</div></div>
-          <div className="cpright"><span className="mana">{card.mana_cost}</span>{card.power != null && <b className="cppt">{card.power}/{card.toughness}</b>}</div>
+          <div className="cpright"><span className="mana">{card.mana_cost ? <SymbolText text={card.mana_cost} /> : null}</span>{card.power != null && <b className="cppt">{card.power}/{card.toughness}</b>}</div>
         </div>
-        {card.oracle_text && <div className="cptext">{card.oracle_text.split("\n").map((line, index) => <p key={index}>{line}</p>)}</div>}
+        {card.oracle_text && <div className="cptext">{card.oracle_text.split("\n").map((line, index) => <p key={index}><SymbolText text={line} /></p>)}</div>}
         <div className="cpowned">
           {owned.allPrintings + (owned.proxies ?? 0) === 0 ? <span className="sub">Not in your collections</span> : owned.collections.map((place) => (
             <span key={place.id} className="badge">{place.name}: {place.allPrintings}{place.proxies ? ` (+${place.proxies} proxy)` : ""}</span>
@@ -87,7 +89,7 @@ export function CardPage({ actions }: { actions: Record<string, Action> }) {
                 <div key={version.id} className={version.id === card.id ? "cpver on" : "cpver"} onClick={() => store.setCardPage(version.id)}>
                   {version.image_url ? <img className="thumb-img" src={version.image_url} alt="" loading="lazy" /> : <span className="thumb-img none">MV</span>}
                   <div className="cpvermain">
-                    <b>{version.set_name} ({version.set_code.toUpperCase()})</b>
+                    <b><SetIcon code={version.set_code} />{version.set_name} ({version.set_code.toUpperCase()}) <LanguagePip lang={(version as { lang?: string }).lang} /></b>
                     <span className="sub">#{version.collector_number} {capitalize(version.rarity)}{version.released_at ? `, ${version.released_at.slice(0, 4)}` : ""}</span>
                   </div>
                   <div className="cpprices">

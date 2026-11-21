@@ -52,3 +52,15 @@ describe("pick or open", () => {
     expect(pick).toHaveBeenCalledTimes(4);
   });
 });
+
+describe("Suggest: the word being typed", async () => {
+  const { partAt } = await import("./components/Suggest");
+  it("finds types after t:, names for plain words and keeps a Quick add count", () => {
+    expect(partAt("search", "c:red t:dra", 11)).toMatchObject({ list: "types", term: "dra", start: 8 });
+    expect(partAt("search", "lightning", 9)).toMatchObject({ list: "names", term: "lightning" });
+    expect(partAt("search", "c:red bolt", 10)).toBeNull();
+    expect(partAt("quick", "2 Sol R", 7)).toMatchObject({ list: "names", term: "Sol R", start: 2 });
+    expect(partAt("typeLine", "Creature - El", 13)).toMatchObject({ list: "types", term: "El", start: 11 });
+    expect(partAt("search", "a:rebecca gu", 12)?.wrap("Rebecca Guay")).toBe('"Rebecca Guay"');
+  });
+});

@@ -78,6 +78,14 @@ export async function search(page: Page, text: string) {
   if (text) await page.keyboard.type(text);
   await done;
   await expect(page.locator("#view-cards .phpos")).not.toHaveText("Searching");
+  await closeSuggestions(page);
+}
+
+/** Closes the suggestions under a text field, so they do not cover what the test clicks next. */
+export async function closeSuggestions(page: Page) {
+  await page.waitForTimeout(250);
+  if (await page.locator(".suggestlist").count()) await page.keyboard.press("Escape");
+  await expect(page.locator(".suggestlist")).toHaveCount(0);
 }
 
 /** Runs a ribbon command by its label: the tab is named first, then the button, or the list button that holds it. */

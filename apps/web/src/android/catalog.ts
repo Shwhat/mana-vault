@@ -163,3 +163,15 @@ export async function matchOnPhone(lines: string[], info: string): Promise<Match
 export function setCatalogForTest(stored: Stored | null) {
   loaded = stored ? expand(stored) : null;
 }
+
+/** Suggestions offline: card names from the catalog on the phone, other lists from the copy kept of /api/catalog/lists. */
+export async function suggestOnPhone(params: URLSearchParams, lists: Record<string, string[]> | undefined): Promise<string[]> {
+  const term = (params.get("q") ?? "").trim().toLowerCase();
+  const limit = Math.min(20, Math.max(1, Number(params.get("limit")) || 10));
+  if (!term) return [];
+  const list = params.get("list") ?? "names";
+  const items = list === "names" ? [...new Set((await catalog())?.cards.map((card) => card.name) ?? [])] : lists?.[list] ?? [];
+  const starts = items.filter((item) => item.toLowerCase().startsWith(term));
+  const holds = items.filter((item) => !item.toLowerCase().startsWith(term) && item.toLowerCase().includes(term));
+  return [...starts.sort((a, b) => a.length - b.length || a.localeCompare(b)), ...holds].slice(0, limit);
+}

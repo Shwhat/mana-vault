@@ -16,7 +16,7 @@ const ROUGH_BYTES: Record<Size, number> = { small: 10_000, normal: 75_000, large
 
 type Settings = {
   signup: "open" | "closed" | "invite"; sessionDays: number; attemptLimit: number; minPasswordLength: number; serverName: string; updateIntervalHours: number;
-  extraLanguages: boolean; pictureSizes: Size[]; picturesDir: string; minFreeGb: number; backupIntervalHours: number; backupKeep: number; backupDir: string;
+  extraLanguages: boolean; cardLanguages: string[]; languagePictures: boolean; pictureSizes: Size[]; picturesDir: string; minFreeGb: number; backupIntervalHours: number; backupKeep: number; backupDir: string;
   setupDone: boolean; pictureEstimates: Partial<Record<Size, { bytes: number; at: string }>>;
 };
 type Space = { free: number; total: number } | null;
@@ -400,7 +400,85 @@ function SignupTab({ overview, save }: TabProps) {
   );
 }
 
-const LANGUAGE_NAMES: Record<string, string> = { en: "English", ph: "Phyrexian", qya: "Quenya", he: "Hebrew", la: "Latin", grc: "Ancient Greek", ar: "Arabic", sa: "Sanskrit" };
+const LANGUAGE_NAMES: Record<string, string> = {
+  en: "English", es: "Spanish", fr: "French", de: "German", it: "Italian", pt: "Portuguese", ja: "Japanese", ko: "Korean", ru: "Russian",
+  zhs: "Simplified Chinese", zht: "Traditional Chinese", ph: "Phyrexian", qya: "Quenya", he: "Hebrew", la: "Latin", grc: "Ancient Greek", ar: "Arabic", sa: "Sanskrit",
+};
+/** The printed languages Scryfall has besides English, in the order Card languages lists them. */
+const OFFICIAL_LANGUAGES = ["es", "fr", "de", "it", "pt", "ja", "ko", "ru", "zhs", "zht"];
+type LanguageMode = "default" | "all" | "chosen";
+type Estimate = { printings: number; growthBytes: number; downloadBytes: number | null; picturesBytes: number };
+type Part = { part: string; count: number; at: string | null };
+
+/** The parts of the card database with their counts and when each was last updated. */
+function DatabaseParts() {
+  const [parts, setParts] = useState<{ parts: Part[]; lastMigrations: { merged: number; removed: number }; removedHeld: number } | null>(null);
+  useEffect(() => { void request<typeof parts>("/api/admin/card-database").then(setParts).catch(() => setParts(null)); }, []);
+  if (!parts) return null;
+  return (
+    <Section title="Parts">
+      <table className="admtable"><thead><tr><th>Part</th><th>Count</th><th>Updated</th></tr></thead><tbody>
+        {parts.parts.map((part) => <tr key={part.part}><td>{part.part}</td><td>{part.count.toLocaleString()}</td><td>{when(part.at)}</td></tr>)}
+      </tbody></table>
+      <p className="note">Last update: {parts.lastMigrations.merged} printings merged, {parts.lastMigrations.removed} removed. {parts.removedHeld ? `${parts.removedHeld} removed ${parts.removedHeld === 1 ? "printing is" : "printings are"} still held in collections or decks.` : ""}</p>
+    </Section>
+  );
+}
+
+/** Card languages: English and unofficial languages, all languages, or chosen ones, with the size shown before saving. */
+function CardLanguages({ overview, save }: TabProps) {
+  const settings = overview.settings;
+  const startMode: LanguageMode = !settings.cardLanguages.length ? (settings.extraLanguages ? "default" : "chosen")
+    : settings.cardLanguages.length === OFFICIAL_LANGUAGES.length && settings.extraLanguages ? "all" : "chosen";
+  const [mode, setMode] = useState<LanguageMode>(startMode);
+  const [chosen, setChosen] = useState<string[]>(settings.cardLanguages);
+  const [extra, setExtra] = useState(settings.extraLanguages);
+  const [pictures, setPictures] = useState(settings.languagePictures);
+  const [estimate, setEstimate] = useState<Estimate | null>(null);
+  const languages = mode === "all" ? OFFICIAL_LANGUAGES : mode === "default" ? [] : chosen;
+  const unofficial = mode === "chosen" ? extra : true;
+  useEffect(() => {
+    let live = true;
+    const timer = window.setTimeout(() => {
+      void request<Estimate>("/api/admin/card-languages/estimate", { method: "POST", body: JSON.stringify({ cardLanguages: languages, extraLanguages: unofficial, languagePictures: pictures }) })
+        .then((value) => { if (live) setEstimate(value); }).catch(() => { if (live) setEstimate(null); });
+    }, 250);
+    return () => { live = false; window.clearTimeout(timer); };
+  }, [languages.join(","), unofficial, pictures]); // eslint-disable-line react-hooks/exhaustive-deps
+  const changed = languages.join(",") !== settings.cardLanguages.join(",") || unofficial !== settings.extraLanguages || pictures !== settings.languagePictures;
+  const locked = overview.locks.extraLanguages ?? overview.locks.cardLanguages;
+  return (
+    <Section title="Card languages">
+      <div className="radios" role="radiogroup" aria-label="Card languages">
+        <label className="check"><input type="radio" name="langmode" checked={mode === "default"} disabled={!!locked} onChange={() => setMode("default")} /> English and unofficial languages</label>
+        <label className="check"><input type="radio" name="langmode" checked={mode === "all"} disabled={!!locked} onChange={() => setMode("all")} /> All languages</label>
+        <label className="check"><input type="radio" name="langmode" checked={mode === "chosen"} disabled={!!locked} onChange={() => setMode("chosen")} /> Chosen languages</label>
+      </div>
+      {mode === "chosen" && (
+        <div className="langgrid">
+          {OFFICIAL_LANGUAGES.map((lang) => (
+            <label key={lang} className="check"><input type="checkbox" checked={chosen.includes(lang)} disabled={!!locked}
+              onChange={(event) => setChosen(event.target.checked ? OFFICIAL_LANGUAGES.filter((item) => item === lang || chosen.includes(item)) : chosen.filter((item) => item !== lang))} /> {LANGUAGE_NAMES[lang]}</label>
+          ))}
+          <label className="check"><input type="checkbox" checked={extra} disabled={!!locked} onChange={(event) => setExtra(event.target.checked)} /> Unofficial languages (Phyrexian, Quenya and others)</label>
+        </div>
+      )}
+      <label className="check"><input type="checkbox" checked={pictures} disabled={!!locked} onChange={(event) => setPictures(event.target.checked)} /> Pictures of other languages</label>
+      {estimate && (
+        <table className="admtable kv"><tbody>
+          <tr><th>Printings kept</th><td>About {estimate.printings.toLocaleString()} besides English</td></tr>
+          <tr><th>Download</th><td>{estimate.downloadBytes === null ? (languages.length || unofficial ? "Scryfall's All Cards file" : "None") : `${bytes(estimate.downloadBytes)} (Scryfall's All Cards file) with each update`}</td></tr>
+          <tr><th>Database growth</th><td>About {bytes(estimate.growthBytes)}</td></tr>
+          {pictures && <tr><th>Pictures</th><td>About {bytes(estimate.picturesBytes)} in the picture sizes chosen</td></tr>}
+        </tbody></table>
+      )}
+      <p className="note">Languages taken out are removed at the next update, except printings that copies, deck cards or trades use.</p>
+      <Locked by={locked} />
+      <div className="btnrow"><button type="button" className="btn primary" disabled={!changed || !!locked}
+        onClick={() => void save({ cardLanguages: languages, extraLanguages: unofficial, languagePictures: pictures }, "Card languages saved. The next card database update applies them")}>Save languages</button></div>
+    </Section>
+  );
+}
 
 function NumberSetting({ id, label, value, locked, min, max, unit, onSave }: { id: string; label: string; value: number; locked?: string; min: number; max: number; unit: string; onSave: (value: number) => void }) {
   const [text, setText] = useState(String(value));
@@ -443,11 +521,8 @@ function CatalogTab({ overview, save }: TabProps) {
           onSave={(updateIntervalHours) => void save({ updateIntervalHours }, updateIntervalHours ? `Card database updates every ${updateIntervalHours} hours` : "Scheduled updates turned off")} />
         <Locked by={overview.locks.updateIntervalHours} />
       </Section>
-      <Section title="Languages">
-        <label className="check"><input type="checkbox" checked={overview.settings.extraLanguages}
-          onChange={(event) => void save({ extraLanguages: event.target.checked })} /> Also keep printings in Scryfall's unofficial languages (Phyrexian, Quenya and others)</label>
-        <p className="note">This reads Scryfall's All Cards file (several hundred MB) with each update.</p>
-      </Section>
+      <CardLanguages overview={overview} save={save} />
+      <DatabaseParts />
     </>
   );
 }

@@ -46,6 +46,18 @@ saveSets(database, { data: [
   { code: "m10", name: "Magic 2010", set_type: "core", released_at: "2009-07-17", printed_size: 249, card_count: 1 },
 ] });
 database.prepare("INSERT OR REPLACE INTO catalog_metadata (key, value) VALUES ('updated_at', ?)").run(new Date().toISOString());
+// 0.15.0: a saved set symbol, Scryfall's name and keyword lists and a printing Scryfall removed (Sol Ring from M10 would be it)
+const symbolSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 10 10"><path d="M5 0L10 10H0z"/></svg>';
+database.prepare("UPDATE sets SET icon_svg_uri = 'https://svgs.scryfall.io/sets/lea.svg?1', block = 'Core Set' WHERE code IN ('lea', 'm10')").run();
+database.prepare("INSERT INTO set_symbols (code, uri, svg) VALUES ('lea', 'https://svgs.scryfall.io/sets/lea.svg?1', ?)").run(symbolSvg);
+const catalog = database.prepare("INSERT INTO catalogs (name, items) VALUES (?, ?)");
+catalog.run("card-names", JSON.stringify(cards.map((card) => card[2])));
+catalog.run("creature-types", JSON.stringify(["Angel", "Dragon", "Druid", "Elf", "Elemental", "Horror"]));
+catalog.run("keyword-abilities", JSON.stringify(["Deathtouch", "Flying", "First strike", "Lifelink", "Vigilance"]));
+catalog.run("artist-names", JSON.stringify(cards.map((card) => card[13])));
+insert.run("sol-old", "o-sol", "Sol Ring", "{1}", 1, "Artifact", "{T}: Add {C}{C}.", "", "", legal, "m10", "Magic 2010", "999", "uncommon", null, "2009-07-17", "Mark Tedin");
+extras.run("nonfoil", 0, 0, "sol-old");
+database.prepare("UPDATE cards SET removed = 1 WHERE id = 'sol-old'").run();
 
 const webRoot = fileURLToPath(new URL("../../apps/web/dist", import.meta.url));
 // the test machine may not reach Scryfall: card pictures and mana symbols are never downloaded in the browser tests

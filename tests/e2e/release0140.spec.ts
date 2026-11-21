@@ -12,9 +12,9 @@ test("the card maker: symbol picker, frame styles and a nickname", async ({ page
   await signUp(page, "v14maker");
   await openMaker(page);
   await page.locator("#cm-name").fill("Ember Hound");
-  // the picker opens under the mana cost and inserts at its cursor
-  const symbols = page.locator(".makerform").getByRole("button", { name: "Symbols" });
-  await symbols.first().click();
+  // one Symbols button opens the picker; a click inserts at the cursor of the field used last
+  await page.locator("#cm-manaCost").click();
+  await page.locator(".makerform").getByRole("button", { name: "Symbols" }).click();
   const picker = page.locator(".sympicker");
   await expect(picker.locator(".symname")).toHaveText(["Numbers", "Colors", "Phyrexian", "Hybrid", "Two or color", "Other"]);
   await expect(picker.locator(".symbtn")).toHaveCount(22 + 7 + 5 + 10 + 5 + 3);
@@ -22,13 +22,12 @@ test("the card maker: symbol picker, frame styles and a nickname", async ({ page
   await picker.getByRole("button", { name: "Insert {R/G}" }).click();
   await picker.getByRole("button", { name: "Insert {R/P}" }).click();
   await expect(page.locator("#cm-manaCost")).toHaveValue("{2}{R/G}{R/P}");
-  // the rules text has its own Symbols button
-  await symbols.first().click();
-  await symbols.last().click();
+  // the same picker fills the rules text once it is used
   await page.locator("#cm-rules").fill("Pay ");
   await page.locator("#cm-rules").press("End");
   await page.locator(".sympicker").getByRole("button", { name: "Insert {T}" }).click();
   await expect(page.locator("#cm-rules")).toHaveValue("Pay {T}");
+  await page.locator(".symwindow").getByRole("button", { name: "Close" }).click();
   await page.locator("#cm-typeLine").fill("Creature - Dog");
   await page.locator("#cm-power").fill("3");
   await page.locator("#cm-toughness").fill("2");
@@ -77,9 +76,9 @@ test("the print list sorts and shows as a list, grid or binder; prices on pictur
   await page.locator("#view-cards").getByRole("button", { name: /^Options/ }).click();
   await page.locator(".optpop").getByRole("group", { name: "Search results layout" }).getByRole("button", { name: "Grid" }).click();
   await page.locator(".optpop").getByRole("button", { name: "Done" }).click();
-  await expect(page.locator("#view-cards .pocket .pricepip").first()).toBeVisible();
+  await expect(page.locator("#view-cards .pipbar .pricepip").first()).toBeVisible();
   await menu(page, "View", "Prices on pictures");
-  await expect(page.locator("#view-cards .pocket .pricepip")).toHaveCount(0);
+  await expect(page.locator("#view-cards .pipbar .pricepip")).toHaveCount(0);
 });
 
 test.describe("phone card maker", () => {

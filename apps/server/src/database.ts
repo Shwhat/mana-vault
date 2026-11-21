@@ -515,6 +515,69 @@ function initializeCustomTables(database: DatabaseSync): void {
     );
     CREATE INDEX IF NOT EXISTS cards_custom_idx ON cards(custom);
   `);
+  initializeExtras(database);
+}
+
+/** Tables and columns added in 0.15.0: more Scryfall data, custom set symbols and the art library. */
+function initializeExtras(database: DatabaseSync): void {
+  const columnsOf = (table: string) => new Set((database.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>).map((column) => column.name));
+  const sets = columnsOf("sets");
+  for (const [column, type] of [["icon_svg_uri", "TEXT"], ["parent_set_code", "TEXT"], ["block", "TEXT"], ["block_code", "TEXT"],
+    ["digital", "INTEGER NOT NULL DEFAULT 0"], ["foil_only", "INTEGER NOT NULL DEFAULT 0"], ["nonfoil_only", "INTEGER NOT NULL DEFAULT 0"]] as const) {
+    if (!sets.has(column)) database.exec(`ALTER TABLE sets ADD COLUMN ${column} ${type}`);
+  }
+  // a printing Scryfall deleted keeps its row, marked, so copies of it keep their name (0.15.0)
+  if (!columnsOf("cards").has("removed")) database.exec("ALTER TABLE cards ADD COLUMN removed INTEGER NOT NULL DEFAULT 0");
+  if (!columnsOf("custom_sets").has("rarity_colors")) database.exec("ALTER TABLE custom_sets ADD COLUMN rarity_colors INTEGER NOT NULL DEFAULT 1");
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS set_symbols (
+      code TEXT PRIMARY KEY,
+      uri TEXT NOT NULL,
+      svg TEXT NOT NULL,
+      saved_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%f', 'now'))
+    );
+    CREATE TABLE IF NOT EXISTS symbology (
+      symbol TEXT PRIMARY KEY,
+      code TEXT NOT NULL,
+      english TEXT NOT NULL DEFAULT '',
+      mana_value REAL,
+      colors TEXT NOT NULL DEFAULT '',
+      hybrid INTEGER NOT NULL DEFAULT 0,
+      phyrexian INTEGER NOT NULL DEFAULT 0,
+      represents_mana INTEGER NOT NULL DEFAULT 0,
+      funny INTEGER NOT NULL DEFAULT 0,
+      position INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE TABLE IF NOT EXISTS migrations_applied (
+      id TEXT PRIMARY KEY,
+      performed_at TEXT,
+      strategy TEXT NOT NULL,
+      old_id TEXT NOT NULL,
+      new_id TEXT,
+      note TEXT,
+      applied_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%f', 'now'))
+    );
+    CREATE TABLE IF NOT EXISTS catalogs (
+      name TEXT PRIMARY KEY,
+      items TEXT NOT NULL,
+      saved_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%f', 'now'))
+    );
+    CREATE TABLE IF NOT EXISTS card_backs (
+      id TEXT PRIMARY KEY,
+      bytes BLOB NOT NULL,
+      type TEXT NOT NULL,
+      saved_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%f', 'now'))
+    );
+    CREATE TABLE IF NOT EXISTS art_library (
+      id TEXT PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      bytes BLOB NOT NULL,
+      type TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%f', 'now'))
+    );
+    CREATE INDEX IF NOT EXISTS art_library_user ON art_library(user_id, created_at);
+  `);
 }
 
 /** Collections and decks without an owner (from before accounts owned data) go to the oldest account. */

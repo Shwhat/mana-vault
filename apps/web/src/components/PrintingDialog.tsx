@@ -1,4 +1,5 @@
 // ---------- the printing chooser: every printing of a card, newest first, with a search box ----------
+import { LanguagePip, SetIcon } from "./CardMarks";
 import { useEffect, useMemo, useState } from "react";
 import { request } from "../api";
 import type { ScanCard } from "../scan-state";
@@ -31,7 +32,7 @@ function PrintingList({ cardId, currentId, finish, currency, onPick }: {
   }, [cardId]);
   const words = term.trim().toLowerCase().split(/\s+/).filter(Boolean);
   const shown = useMemo(() => (printings ?? []).filter((card) => {
-    const text = `${card.set_name} ${card.set_code} ${card.collector_number} ${card.released_at ?? ""}`.toLowerCase();
+    const text = `${card.set_name} ${card.set_code} ${card.collector_number} ${card.released_at ?? ""} ${(card as { lang?: string }).lang ?? ""}`.toLowerCase();
     return words.every((word) => text.includes(word));
   }), [printings, words]);
   if (error) return <p className="note err">{error}</p>;
@@ -72,7 +73,7 @@ function PrintingList({ cardId, currentId, finish, currency, onPick }: {
               onClick={() => onPick(card, rowFinish)} onKeyDown={(event) => { if (event.key === "Enter") onPick(card, rowFinish); }}>
               {card.image_url ? <img src={card.image_url} alt="" loading="lazy" /> : <span className="noimg" />}
               <span className="pinfo">
-                <b>{card.set_name}</b>
+                <b><SetIcon code={card.set_code} />{card.set_name} <LanguagePip lang={(card as { lang?: string }).lang} /></b>
                 <span className="muted">({card.set_code.toUpperCase()}) {card.collector_number}{card.released_at ? `, ${card.released_at.slice(0, 4)}` : ""}</span>
                 <span className="pfinishes" role="group" aria-label={`Finishes of ${card.set_code.toUpperCase()} ${card.collector_number}`}>
                   {finishes.map((code) => {

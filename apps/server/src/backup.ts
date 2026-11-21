@@ -1,3 +1,4 @@
+import { cleanSvg } from "./svg.js";
 import { randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import { cardInsertStatement } from "./database.js";
@@ -34,7 +35,7 @@ type BackupCustomCard = {
 
 export interface ManaVaultBackup {
   format: "mana-vault-backup";
-  version: 5;
+  version: 5 | 6;
   createdAt: string;
   cards: BackupCard[];
   collections: BackupCollection[];
@@ -51,7 +52,12 @@ export interface ManaVaultBackup {
   /** Version 5: the custom sets and custom cards the account made or uses. */
   customSets: BackupCustomSet[];
   customCards: BackupCustomCard[];
+  /** Version 6: the account's art library and its own card back. */
+  artLibrary: BackupArt[];
+  cardBack: { bytes: string; type: string } | null;
 }
+
+export type BackupArt = { name: string; type: string; bytes: string; created_at: string };
 
 export interface BackupSummary {
   createdAt: string;
@@ -104,11 +110,15 @@ export function createBackup(database: DatabaseSync, userId: number): ManaVaultB
       code: String(row.code), name: String(row.name), released_at: (row.released_at as string | null) ?? null, symbol: base64(row.symbol), symbol_type: (row.symbol_type as string | null) ?? null,
     }] : [];
   });
+  const back = database.prepare("SELECT bytes, type FROM card_backs WHERE id = ?").get(`user:${userId}`);
   return {
     format: "mana-vault-backup",
-    version: 5,
+    version: 6,
     customSets,
     customCards,
+    artLibrary: database.prepare("SELECT name, type, bytes, created_at FROM art_library WHERE user_id = ? ORDER BY created_at, rowid").all(userId)
+      .map((row) => ({ name: String(row.name), type: String(row.type), bytes: base64(row.bytes)!, created_at: String(row.created_at) })),
+    cardBack: back ? { bytes: base64(back.bytes)!, type: String(back.type) } : null,
     createdAt: new Date().toISOString(),
     cards,
     collections,
@@ -151,7 +161,17 @@ export function restoreBackup(database: DatabaseSync, source: string, userId: nu
     for (const set of backup.customSets) {
       if (database.prepare("SELECT 1 FROM sets WHERE code = ?").get(set.code)) continue;
       database.prepare("INSERT INTO sets (code, name, set_type, released_at, printed_size, card_count) VALUES (?, ?, 'custom', ?, NULL, NULL)").run(set.code, set.name, set.released_at);
-      database.prepare("INSERT INTO custom_sets (code, owner_id, symbol, symbol_type) VALUES (?, ?, ?, ?)").run(set.code, userId, bytes(set.symbol), set.symbol_type);
+      const symbol = set.symbol_type === "image/svg+xml" && set.symbol ? cleanSvg(Buffer.from(set.symbol, "base64").toString("utf8")) : null;
+      database.prepare("INSERT INTO custom_sets (code, owner_id, symbol, symbol_type) VALUES (?, ?, ?, ?)").run(set.code, userId,
+        set.symbol_type === "image/svg+xml" ? (symbol ? new Uint8Array(Buffer.from(symbol, "utf8")) : null) : bytes(set.symbol), set.symbol_type === "image/svg+xml" && !symbol ? null : set.symbol_type);
+    }
+    // version 6: the art library and the card back are replaced by the backup's (older backups leave them as they are)
+    if (backup.version === 6) {
+      database.prepare("DELETE FROM art_library WHERE user_id = ?").run(userId);
+      const insertArt = database.prepare("INSERT INTO art_library (id, user_id, name, bytes, type, created_at) VALUES (?, ?, ?, ?, ?, ?)");
+      for (const art of backup.artLibrary) insertArt.run(randomUUID(), userId, art.name, bytes(art.bytes)!, art.type, art.created_at);
+      database.prepare("DELETE FROM card_backs WHERE id = ?").run(`user:${userId}`);
+      if (backup.cardBack) database.prepare("INSERT INTO card_backs (id, bytes, type) VALUES (?, ?, ?)").run(`user:${userId}`, bytes(backup.cardBack.bytes)!, backup.cardBack.type);
     }
     for (const card of backup.cards) {
       // a custom card already on this server keeps its current version: its maker may have changed it since
@@ -215,7 +235,7 @@ export function restoreBackup(database: DatabaseSync, source: string, userId: nu
         typeof deck.description === "string" ? deck.description.slice(0, 20000) : "", cover);
     }
     // a deck card without a printing (Normal decks before 0.6.0) takes the newest printing of the card
-    const newest = database.prepare("SELECT id FROM cards WHERE oracle_id = ? ORDER BY lang != 'en', released_at IS NULL, released_at DESC, promo, variation LIMIT 1");
+    const newest = database.prepare("SELECT id FROM cards WHERE oracle_id = ? ORDER BY removed, lang != 'en', released_at IS NULL, released_at DESC, promo, variation LIMIT 1");
     const insertDeckCard = database.prepare(
       `INSERT INTO deck_cards (deck_id, oracle_id, printing_id, quantity, zone, finish) VALUES (?, ?, ?, ?, ?, ?)
        ON CONFLICT(deck_id, oracle_id, printing_id, zone, finish) WHERE printing_id IS NOT NULL DO UPDATE SET quantity = quantity + excluded.quantity`,
@@ -279,7 +299,7 @@ function summarizeBackup(backup: ManaVaultBackup): BackupSummary {
 }
 
 function validateBackup(value: unknown): ManaVaultBackup {
-  if (!isRecord(value) || value.format !== "mana-vault-backup" || ![1, 2, 3, 4, 5].includes(Number(value.version))) {
+  if (!isRecord(value) || value.format !== "mana-vault-backup" || ![1, 2, 3, 4, 5, 6].includes(Number(value.version))) {
     throw new Error("Unsupported backup file format or version");
   }
   if (typeof value.createdAt !== "string" || !Number.isFinite(Date.parse(value.createdAt))) {
@@ -410,12 +430,12 @@ function validateBackup(value: unknown): ManaVaultBackup {
   const pictureType = (field: unknown) => (field === null || field === undefined ? null : typeof field === "string" && /^image\/(jpeg|png|webp)$/.test(field) ? field : undefined);
   const customSets = (Array.isArray(value.customSets) ? value.customSets : []).map((entry: unknown, index: number) => {
     if (!isRecord(entry) || typeof entry.code !== "string" || !/^[a-z0-9]{2,6}$/.test(entry.code) || typeof entry.name !== "string" || !entry.name ||
-      base64(entry.symbol) === undefined || pictureType(entry.symbol_type) === undefined) {
+      base64(entry.symbol) === undefined || (entry.symbol_type !== "image/svg+xml" && pictureType(entry.symbol_type) === undefined)) {
       throw new Error(`Backup custom set ${index + 1} is invalid`);
     }
     return {
       code: entry.code, name: entry.name.slice(0, 100), released_at: typeof entry.released_at === "string" ? entry.released_at : null,
-      symbol: base64(entry.symbol)!, symbol_type: pictureType(entry.symbol_type)!,
+      symbol: base64(entry.symbol)!, symbol_type: entry.symbol_type === "image/svg+xml" ? "image/svg+xml" : pictureType(entry.symbol_type)!,
     };
   });
   const customCards = (Array.isArray(value.customCards) ? value.customCards : []).map((entry: unknown, index: number) => {
@@ -433,11 +453,20 @@ function validateBackup(value: unknown): ManaVaultBackup {
       price_usd_foil: numberOrNull("price_usd_foil"), price_eur: numberOrNull("price_eur"), price_eur_foil: numberOrNull("price_eur_foil"),
     };
   });
+  // version 6 adds the art library and the card back
+  const artLibrary = (Array.isArray(value.artLibrary) ? value.artLibrary : []).map((entry: unknown, index: number) => {
+    if (!isRecord(entry) || typeof entry.name !== "string" || !base64(entry.bytes) || !pictureType(entry.type)) throw new Error(`Backup art ${index + 1} is invalid`);
+    return { name: entry.name.slice(0, 80) || "Art", type: pictureType(entry.type)!, bytes: base64(entry.bytes)!, created_at: typeof entry.created_at === "string" ? entry.created_at : new Date().toISOString() };
+  });
+  const back = isRecord(value.cardBack) && base64(value.cardBack.bytes) && pictureType(value.cardBack.type)
+    ? { bytes: base64(value.cardBack.bytes)!, type: pictureType(value.cardBack.type)! } : null;
   return {
     format: "mana-vault-backup",
-    version: 5,
+    version: Number(value.version) === 6 ? 6 : 5,
     customSets,
     customCards,
+    artLibrary,
+    cardBack: back,
     createdAt: value.createdAt,
     cards,
     collections,

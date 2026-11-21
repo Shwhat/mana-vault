@@ -1,10 +1,12 @@
 // ---------- collection view: cards, set completion and missing cards ----------
+import { SetIcon } from "../components/CardMarks";
+import type { SetProgress } from "../types";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Action } from "../actions";
 import { rowMenu } from "../components/ContextMenu";
 import { collectionDialog, copyDialog, moveDialog } from "../components/LibraryDialogs";
 import { choosePrinting } from "../components/PrintingDialog";
-import { CountPip, FinishBadge, FinishPip, finishName, PricePip, removeCard } from "../components/CardMarks";
+import { CountPip, FinishBadge, FinishPip, finishName, PipBar, PricePip, RemovedPip, removeCard } from "../components/CardMarks";
 import { Icon } from "../icons";
 import { entryKey } from "../library-state";
 import { type Store, useApp } from "../store";
@@ -65,6 +67,10 @@ function Tags({ entry }: { entry: CollectionEntry }) {
     </div>
   );
 }
+
+/** Change printing... for a copy. */
+const changeEntryPrinting = (store: Store, entry: CollectionEntry) => choosePrinting(entry.name, entry.id, entry.id, { finish: entry.foil, currency: store.prefs.currency, quantity: entry.quantity },
+  (printing, finish, count) => void store.changeCopyPrinting(entry, printing, finish, count));
 
 /** The menu of a collection row: right-click or long press. */
 function entryMenu(store: Store, entry: CollectionEntry) {
@@ -249,10 +255,13 @@ function Stack({ entries }: { entries: CollectionEntry[] }) {
         onClick={(event) => store.pickRow(first, { ctrl: event.ctrlKey || event.metaKey, shift: event.shiftKey })}
         onDoubleClick={() => copyDialog(store, first)} {...entryMenu(store, first)}>
         {first.image_url ? <img src={first.image_url} alt={first.name} loading="lazy" draggable={false} /> : <span className="pocketname">{first.name}</span>}
-        <CountPip count={count} />
-        <PricePip price={copyPrice(first, store.prefs.currency)} />
-        <span className="dmarks">{split ? entries.map((entry) => <FinishBadge key={entryKey(entry)} finish={entry.foil} promoTypes={entry.promo_types} />) : <CopyPips entry={first} />}</span>
       </div>
+      <PipBar>
+        <CountPip count={count} />
+        {split ? entries.map((entry) => <FinishBadge key={entryKey(entry)} finish={entry.foil} promoTypes={entry.promo_types} />) : <CopyPips entry={first} />}
+        {first.removed && <RemovedPip onChange={() => changeEntryPrinting(store, first)} />}
+        <PricePip price={copyPrice(first, store.prefs.currency)} />
+      </PipBar>
       {split && (
         <div className="slines" role="group" aria-label={`Copies of ${first.name} (${first.set_code.toUpperCase()}) ${first.collector_number}`}>
           {entries.map((entry) => <StackLine key={entryKey(entry)} entry={entry} />)}
@@ -386,7 +395,7 @@ function CardsTab({ actions }: { actions: Record<string, Action> }) {
               {selectMode && <input type="checkbox" className="rowcheck" checked={active} readOnly aria-label={`Pick ${entry.name}`} />}
               <Thumb url={entry.image_url} />
               <div className="rowmain">
-                <div className="rowtitle"><b>{entry.name}</b>{entry.custom && <span className="badge custom">Custom</span>}<FinishBadge finish={entry.foil} promoTypes={entry.promo_types} />
+                <div className="rowtitle"><b>{entry.name}</b>{entry.custom && <span className="badge custom">Custom</span>}{entry.removed && <RemovedPip onChange={() => changeEntryPrinting(store, entry)} />}<FinishBadge finish={entry.foil} promoTypes={entry.promo_types} />
                   {entry.proxy && <span className="badge proxy" title="A proxy: kept apart from real copies, with no value">PROXY</span>}
                   {entry.trade > 0 && <span className="badge trade" title={`${entry.trade} of ${entry.quantity} for trade`}>FOR TRADE {entry.trade}</span>}</div>
                 <Tags entry={entry} />
@@ -443,17 +452,35 @@ function CompletionTab({ current }: { current: Collection }) {
       </div>
       <div className="meterlist" role="table" aria-label="Completion by set">
         <div className="mrow mhead" role="row"><span role="columnheader">Set</span><span role="columnheader">Owned</span><span role="columnheader" className="mnum">Owned of total</span></div>
-        {report.sets.map((set) => (
+        {blockGroups(report.sets).flatMap(([block, sets]) => [
+          ...(block ? [<div className="mrow mblock" role="row" key={`block-${block}`}><span role="cell">{block}</span></div>] : []),
+          ...sets.map((set) => (
           <div className="mrow" role="row" key={set.code}>
-            <span role="cell" className="mname">{set.name} <span className="badge">{set.code.toUpperCase()}</span></span>
+            <span role="cell" className="mname"><SetIcon code={set.code} />{set.name} <span className="badge">{set.code.toUpperCase()}</span>{set.digital && <span className="badge">Digital</span>}</span>
             <span role="cell"><Meter owned={set.owned} total={set.total} label={`${set.name} completion`} /></span>
             <span role="cell" className="mnum">{set.owned} / {set.total} <b>{percent(set.owned, set.total)}%</b></span>
           </div>
-        ))}
+        ))])}
       </div>
 
     </div>
   );
+}
+
+/** Sets grouped by their block (sets without a block, or alone in theirs, are listed on their own), in the report's order. */
+export function blockGroups(sets: SetProgress[]): Array<[string, SetProgress[]]> {
+  const counts = new Map<string, number>();
+  for (const set of sets) if (set.block) counts.set(set.block, (counts.get(set.block) ?? 0) + 1);
+  const groups: Array<[string, SetProgress[]]> = [];
+  for (const set of sets) {
+    const block = set.block && (counts.get(set.block) ?? 0) > 1 ? set.block : "";
+    const last = groups[groups.length - 1];
+    const found = block ? groups.find(([name]) => name === block) : undefined;
+    if (found) found[1].push(set);
+    else if (!block && last && !last[0]) last[1].push(set);
+    else groups.push([block, [set]]);
+  }
+  return groups;
 }
 
 function MissingTab({ current, actions }: { current: Collection; actions: Record<string, Action> }) {

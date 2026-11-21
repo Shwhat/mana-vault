@@ -17,6 +17,7 @@ import { logDeck, registerDeckRoutes } from "./decks.js";
 import { registerDeckBuilderRoutes } from "./deck-builder.js";
 import { registerTradeRoutes } from "./trades.js";
 import { CUSTOM_PUBLIC, registerCustomRoutes } from "./custom.js";
+import { EXTRAS_PUBLIC, registerExtrasRoutes } from "./extras.js";
 import { type Fetcher, registerProxyRoutes } from "./proxies.js";
 import { deviceUser, handleCrossOrigin, registerMobileRoutes, Revision } from "./mobile.js";
 import { access, createCollection, forgetItem, itemSharing, registerLibraryRoutes } from "./library.js";
@@ -147,7 +148,7 @@ export async function buildApp(
     }
     // the shared trade binder is the one page that works without signing in
     if (PUBLIC_PATHS.has(path) || request.user || (path === "/api/devices" && request.method === "POST")
-      || ((request.method === "GET" || request.method === "HEAD") && (/^\/share\/[\w-]{10,64}$/.test(path) || CUSTOM_PUBLIC.test(path) || PICTURE_PATH.test(path)))) return;
+      || ((request.method === "GET" || request.method === "HEAD") && (/^\/share\/[\w-]{10,64}$/.test(path) || CUSTOM_PUBLIC.test(path) || EXTRAS_PUBLIC.test(path) || PICTURE_PATH.test(path)))) return;
     if (path.startsWith("/api/")) return reply.code(401).send({ error: "You are signed out. Sign in again to continue." });
     if (path === "/" || path.endsWith(".html") || !path.includes(".")) return reply.redirect("/login");
     return reply.code(401).send({ error: "Signed out" });
@@ -214,6 +215,7 @@ export async function buildApp(
     applySettings, exitAfterRestore: options.exitAfterRestore ?? false, pictureSummary: () => pictures.summary(),
   };
   registerAdminRoutes(app, adminContext);
+  registerExtrasRoutes(app, database, settings, options.fetcher as typeof fetch | undefined);
   const stopBackups = startBackupSchedule(adminContext);
   app.addHook("onClose", async () => {
     stopBackups();
@@ -394,6 +396,13 @@ export async function buildApp(
     printingCount: database.prepare("SELECT COUNT(*) AS count FROM cards").get()?.count ?? 0,
     updatedAt: database.prepare("SELECT value FROM catalog_metadata WHERE key = 'updated_at'").get()?.value ?? null,
     skipped: catalogSkipped(),
+    migrations: (() => {
+      try {
+        return JSON.parse(String(database.prepare("SELECT value FROM catalog_metadata WHERE key = 'last_migrations'").get()?.value ?? "null")) as { merged: number; removed: number } | null;
+      } catch {
+        return null;
+      }
+    })(),
     update: getCatalogUpdateStatus(),
     tags: {
       art: Number(database.prepare("SELECT COUNT(*) AS n FROM tags WHERE kind = 'art'").get()?.n ?? 0),
@@ -473,7 +482,8 @@ export async function buildApp(
         return reply.code(400).send({ error: "Color must be one of W, U, B, R, or G" });
       }
 
-      const conditions: string[] = [];
+      // printings Scryfall removed stay for the copies that hold them, but are no longer found by search
+      const conditions: string[] = ["removed = 0"];
       const values: (string | number)[] = [];
       try {
         for (const clause of parseCardQuery(q, { userId: request.user?.id })) {
@@ -530,7 +540,7 @@ export async function buildApp(
       // and the total comes from the same pass, so the cards table is read once; the page's full rows are joined last.
       const rows = grouped
         ? database.prepare(
-          `WITH ${order.with ? `${order.with},` : ""} ranked AS (SELECT id AS pid, ROW_NUMBER() OVER (PARTITION BY oracle_id ORDER BY lang != 'en', promo, variation, released_at IS NULL, released_at DESC) AS pick,
+          `WITH ${order.with ? `${order.with},` : ""} ranked AS (SELECT id AS pid, ROW_NUMBER() OVER (PARTITION BY oracle_id ORDER BY removed, lang != 'en', promo, variation, released_at IS NULL, released_at DESC) AS pick,
                                   COUNT(*) OVER (PARTITION BY oracle_id) AS printings FROM cards ${where}),
                 picked AS (SELECT pid, printings, COUNT(*) OVER () AS matches FROM ranked WHERE pick = 1)
            SELECT ${columns}, p.printings, p.matches FROM picked p JOIN cards x ON x.id = p.pid ORDER BY ${order.sql} LIMIT ? OFFSET ?`,

@@ -124,19 +124,22 @@ test("the card maker saves a custom card to the card database, and the print lis
   await signUp(page, "v9maker");
   await page.keyboard.press("5");
   await page.getByRole("tab", { name: "Card maker" }).click();
-  await page.locator(".makerform").getByRole("button", { name: "Create a custom set..." }).click();
+  // other tests may have made custom sets already: the set is made in the Custom sets window and chosen
+  await page.getByRole("button", { name: "Custom sets..." }).click();
   await page.locator("#cs-code").fill("XMV");
   await page.locator("#cs-name").fill("My Test Set");
   await page.getByRole("button", { name: "Create set" }).click();
   await expect(status(page)).toHaveText("Custom set XMV created");
-  await expect(page.getByRole("textbox", { name: "Name of XMV" })).toHaveValue("My Test Set");
+  await expect(page.locator("dialog#dlg[open] .csetrow", { hasText: "XMV" })).toContainText("My Test Set");
   await page.getByRole("button", { name: "Close" }).click();
+  await choose(page, page.locator("#cm-set"), "xmv");
 
   await page.locator("#cm-name").fill("Goblin Tester");
   await page.locator("#cm-manaCost").fill("{1}");
-  await page.locator(".makerform").getByRole("button", { name: "Symbols" }).first().click();
+  await page.locator(".makerform").getByRole("button", { name: "Symbols" }).click();
   await page.locator(".sympicker").getByRole("button", { name: "Insert {R}" }).click();
   await expect(page.locator("#cm-manaCost")).toHaveValue("{1}{R}");
+  await page.locator(".symwindow").getByRole("button", { name: "Close" }).click();
   await page.locator("#cm-typeLine").fill("Creature - Goblin");
   await page.locator("#cm-rules").fill("Haste (This creature can attack right away.)");
   await page.locator("#cm-power").fill("2");

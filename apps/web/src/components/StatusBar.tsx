@@ -33,6 +33,11 @@ export function StatusBar({ actions }: { actions: Record<string, Action> }) {
           {store.pictureProgress.paused ? "Picture downloads paused" : "Downloading pictures"}: {store.pictureProgress.done.toLocaleString()} of {store.pictureProgress.total.toLocaleString()}
         </span>
       )}
+      {!!catalog?.migrations && (catalog.migrations.merged > 0 || catalog.migrations.removed > 0) && !catalog.update.isUpdating && (
+        <span id="st-migrations" role="button" tabIndex={-1} title="Open Activity in Administration" onClick={() => store.openAdmin("activity")}>
+          {catalog.migrations.merged} printings merged, {catalog.migrations.removed} removed
+        </span>
+      )}
       {!!catalog?.skipped?.count && !catalog.update.isUpdating && (
         <span
           id="st-skipped"

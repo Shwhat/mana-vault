@@ -441,7 +441,9 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
           if (status.update.lastError) flash(`Card database update failed: ${status.update.lastError}`, "err");
           else {
             const skipped = status.skipped?.count ?? 0;
-            flash(`Card database updated with ${(status.update.lastImportedCount ?? status.printingCount).toLocaleString()} printings${skipped ? `, ${skipped.toLocaleString()} skipped` : ""}`);
+            const changes = status.migrations && (status.migrations.merged || status.migrations.removed)
+              ? `, ${status.migrations.merged} printings merged, ${status.migrations.removed} removed` : "";
+            flash(`Card database updated with ${(status.update.lastImportedCount ?? status.printingCount).toLocaleString()} printings${skipped ? `, ${skipped.toLocaleString()} skipped` : ""}${changes}`);
           }
         }
         previousUpdate.current = status.update;
@@ -1244,7 +1246,7 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
     catalog, catalogRequestPending, updateCatalog,
     review, setReview,
     flashMsg, flash, fail,
-    undoStack, redoStack, undo, redo,
+    undoStack, redoStack, undo, redo, pushUndo,
     addToCollection, setCollectionQuantity, addToDeck, setDeckQuantity, moveDeckCard, linkOwnedCopies, markUpgrade,
     showReview, downloadBackup, restoreBackup, loadCandidates, setDeckLinks, restoreDeck, loadDeck, restoreWishes,
     applyWorkspace, saveWorkspace, deleteWorkspace,

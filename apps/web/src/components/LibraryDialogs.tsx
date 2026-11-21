@@ -1,4 +1,5 @@
 // ---------- library dialogs: collection settings and sets, move, send, inbox and sharing ----------
+import { SetIcon } from "./CardMarks";
 import { useEffect, useRef, useState } from "react";
 import { request } from "../api";
 import type { CollectionInput } from "../library-state";
@@ -44,8 +45,9 @@ function SetPicker({ holder, initial }: { holder: { sets: string[] }; initial: A
           return (
             <label key={set.code} className={on ? "setrow on" : "setrow"}>
               <input type="checkbox" checked={on} onChange={() => toggle({ code: set.code, name: set.name })} />
-              <span className="nl">{set.name}</span>
+              <span className="nl"><SetIcon code={set.code} />{set.name}{set.block ? <span className="sub"> ({set.block})</span> : null}</span>
               <span className="badge">{set.code.toUpperCase()}</span>
+              {set.digital && <span className="badge">Digital</span>}
               <span className="cnt">{set.released_at?.slice(0, 4) ?? ""}</span>
             </label>
           );

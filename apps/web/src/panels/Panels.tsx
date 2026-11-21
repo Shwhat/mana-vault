@@ -1,4 +1,7 @@
 // ---------- dockable panels: filters, decks, card, deck list and import review ----------
+import { SetIcon } from "../components/CardMarks";
+import { Suggest } from "../components/Suggest";
+import { SymbolText } from "../components/SymbolPicker";
 import { useEffect, useState } from "react";
 import { request } from "../api";
 import type { Action } from "../actions";
@@ -40,15 +43,15 @@ export function FiltersPanel({ actions }: { actions: Record<string, Action> }) {
       <div className="pgrp">
         <h4>Card</h4>
         <div className="prow"><label htmlFor="flt-type">Type</label>{text("type", "Creature")}</div>
-        <div className="prow"><label htmlFor="flt-set">Set code</label>{text("set", "lea")}</div>
+        <div className="prow"><label htmlFor="flt-set">Set code</label><span className="withbtn">{text("set", "lea")}{filters.set.trim() && <SetIcon code={filters.set.trim()} big />}</span></div>
         <div className="prow"><label htmlFor="flt-color">Color</label>{pick("color", [["", "Any color"], ["W", "White"], ["U", "Blue"], ["B", "Black"], ["R", "Red"], ["G", "Green"]], "Color")}</div>
         <div className="prow"><label htmlFor="flt-rarity">Rarity</label>{pick("rarity", [["", "Any rarity"], ["common", "Common"], ["uncommon", "Uncommon"], ["rare", "Rare"], ["mythic", "Mythic"]], "Rarity")}</div>
         <div className="prow"><label htmlFor="flt-format">Legal in</label>{pick("format", [["", "Any format"], ...FORMATS.filter((f) => f !== "casual").map((f): [string, string] => [f, formatName(f)])], "Legal in")}</div>
         <div className="prow"><label htmlFor="flt-name">Name</label>{text("name", "angel")}</div>
         <div className="prow"><label htmlFor="flt-text">Card text</label>{text("text", "draw a card")}</div>
-        <div className="prow"><label htmlFor="flt-creature">Creature type</label>{text("creature", "Elf")}</div>
-        <div className="prow"><label htmlFor="flt-keyword">Keyword</label>{text("keyword", "Flying")}</div>
-        <div className="prow"><label htmlFor="flt-artist">Artist</label>{text("artist", "Rebecca Guay")}</div>
+        <div className="prow"><label htmlFor="flt-creature">Creature type</label><Suggest id="flt-creature" mode="types" value={filters.creature} placeholder="Elf" onValue={(value) => set({ creature: value })} /></div>
+        <div className="prow"><label htmlFor="flt-keyword">Keyword</label><Suggest id="flt-keyword" mode="keywords" value={filters.keyword} placeholder="Flying" onValue={(value) => set({ keyword: value })} /></div>
+        <div className="prow"><label htmlFor="flt-artist">Artist</label><Suggest id="flt-artist" mode="artists" value={filters.artist} placeholder="Rebecca Guay" onValue={(value) => set({ artist: value })} /></div>
       </div>
       <div className="pgrp">
         <h4>Art and role</h4>
@@ -225,9 +228,9 @@ export function CardPanel({ actions }: { actions: Record<string, Action> }) {
       </div>
       <div className="pgrp">
         <h4>Card</h4>
-        <div className="prow"><label>Mana cost</label><span>{card.mana_cost || "None"}</span></div>
+        <div className="prow"><label>Mana cost</label><span>{card.mana_cost ? <SymbolText text={card.mana_cost} /> : "None"}</span></div>
         <div className="prow"><label>Mana value</label><span>{card.mana_value ?? 0}</span></div>
-        {card.oracle_text && <div className="oracle">{card.oracle_text}</div>}
+        {card.oracle_text && <div className="oracle"><SymbolText text={card.oracle_text} /></div>}
       </div>
       <div className="pgrp">
         <h4>Printing</h4>

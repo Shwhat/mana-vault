@@ -36,7 +36,7 @@ The Completion tab of the collection view shows:
 
 - **Overall completion**: the percentage, "owned of total owned, missing missing", and a bar.
 - The rules in use, with **Change rules** (opens Collection settings) and **Show missing cards**.
-- A row for each linked set with its name, code, a bar, owned / total and the percentage.
+- A row for each linked set with its symbol, name, code, a Digital badge for sets only released online, a bar, owned / total and the percentage. Sets of the same block (two or more linked) are listed together under the block's name, such as Ice Age.
 
 A collection with no linked sets shows **Collection settings...** to link them.
 

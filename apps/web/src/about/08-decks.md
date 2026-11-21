@@ -29,7 +29,7 @@ The **All**, **Commander**, **Main**, **Sideboard** and **Maybe** buttons above 
 
 ## Opening decks
 
-- **The deck switcher**: the button with the deck's name at the left of the deck view header (on a phone, at the top of the Decks tab). It opens a list of every deck with its cover card, commander, format and card count. Type to find a deck by name, commander or format; Up and Down move through the list, Enter opens the highlighted deck and Esc closes the list. One click on a deck makes it where new cards go and keeps the list open; a double click opens it. **Sort** orders the list by Recently opened, Name, Date created, Card count, Format or Commander; the choice is kept for your account. **New deck...** is at the bottom of the list.
+- **The deck switcher**: the button with the deck's name at the left of the deck view header (on a phone, at the top of the Decks tab). It opens a list of every deck with its cover card, commander, format and card count. Type to find a deck by name, commander or format; Up and Down move through the list, Enter opens the highlighted deck and Esc closes the list. One click on a deck makes it where new cards go and keeps the list open; a double click opens it. In the Android app one tap opens the deck, and the open deck is where new cards go; browsers work as described here. **Sort** orders the list by Recently opened, Name, Date created, Card count, Format or Commander; the choice is kept for your account. **New deck...** is at the bottom of the list.
 - **Decks panel**: decks are grouped by format, each with its card count and value. One click on a deck makes it where new cards go without leaving the view you are in (see [Collections](/about/collections)); a double click opens it in the deck view. The deck shows **Adding here** while it is where cards go. Right-click or long press a deck for its menu: Open, Rename..., Deck format..., Send..., Export..., Delete or Leave.
 - **Open deck...** (Ctrl+O) lists every deck with its format and card count.
 - **New deck...** (File menu, Decks panel, deck switcher) asks for the name and format. **Create deck** creates it and opens it.
@@ -116,7 +116,7 @@ The card shows an **Upgrade wanted** badge (the wanted version in its tooltip), 
 
 ### Quick add
 
-The box at the top of the Add tab adds a card by typing it: a count and a name, such as `2 Sol Ring`, `2x Sol Ring` or `Sol Ring` (one copy). A set code and collector number pick the printing, such as `1 Sol Ring (C21) 263`; without them the newest printing is used. Names are suggested while you type. Choose the zone in the list beside the box, then press Enter or **Add**. **Q** jumps to the box. The cards are linked to a free copy as described above.
+The box at the top of the Add tab adds a card by typing it: a count and a name, such as `2 Sol Ring`, `2x Sol Ring` or `Sol Ring` (one copy). A set code and collector number pick the printing, such as `1 Sol Ring (C21) 263`; without them the newest printing is used. Card names are suggested under the box while you type (Up and Down move through them, Enter or a click takes one and keeps the count). Choose the zone in the list beside the box, then press Enter or **Add**. **Q** jumps to the box. The cards are linked to a free copy as described above.
 
 | Message | Cause |
 |---|---|
@@ -196,8 +196,8 @@ The cards are shown under a heading for each zone (Commander, Main deck, Sideboa
 |---|---|
 | List | A row for each card: picture, name, mana cost, type, printing, a **Not legal** badge, its tags, the collections its copies are in, PROXY, Missing and + Wishlist, the price, the link button, the count controls, the zone list and a remove button |
 | Text | A compact line for each card: count, name, mana cost and price, in columns. Cards that break a rule are red; missing cards have an amber count |
-| Stacks | A column of overlapping card pictures for each group, one picture per printing with its total count and finish badges |
-| Grid | Card pictures in rows, one per printing, with pips on the picture: the count, FOIL or ETCHED, Missing (with the number when only some are missing), Upgrade wanted and the owned marks. A printing in the deck in more than one finish gets a line under the picture for each finish with its pip, Missing and count. Pictures show no prices; the List view has them |
+| Stacks | A column of overlapping card pictures for each group, one picture per printing. Each picture has a pip bar above it (in the strip that stays in view while the pictures overlap) with its total count, finish badges, Missing, Upgrade wanted, Printing removed and the owned marks |
+| Grid | Card pictures in rows, one per printing, with a pip bar under the picture: the count, FOIL or ETCHED, Missing (with the number when only some are missing), Upgrade wanted, Printing removed (a click opens Change printing...) and the owned marks. A printing in the deck in more than one finish gets a line under the picture for each finish with its pip, Missing and count. Pictures show no prices; the List view has them |
 
 On the desktop, pointing at a card's name in the List or Text view shows a large picture of the card. Click a card to select it; on a phone, tapping opens its card page.
 
