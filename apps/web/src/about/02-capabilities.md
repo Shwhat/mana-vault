@@ -16,7 +16,7 @@ This page lists what Mana Vault does in the current version, followed by what is
 - Show results as a Grid or Binder of card pictures with prices and how many you own, or as a List. Each device type remembers its own choice. The deck's Add tab and the trade searches use the same views.
 - Click a result to select it, double-click to add it, right-click or long press for its menu.
 - Sort results by Best match (the default: exact names first, then names that start with the search words), Name, Newest, Oldest, Price, Mana value, Rarity, Color, Set or Owned first. Card search, the deck's Add tab and both trade searches each keep their own sort.
-- Search by price with `usd` and `eur`, and find cards by their flavor names (such as a Godzilla series name).
+- Search by price with `usd`, and find cards by their flavor names (such as a Godzilla series name).
 - Click a result's set code or rarity to filter by it.
 - Show each result's price.
 - Show a card's image, mana cost, rules text, printing details, prices and how many copies you own, and want, in the Card panel.
@@ -30,8 +30,8 @@ This page lists what Mana Vault does in the current version, followed by what is
 - Change the printing or finish of all or some copies (such as one of two copies to the foil version), keeping their count, condition, language, trade marks and details, and choose whether the decks they fill change too or keep their version.
 - Right-click or long press a collection (panel or switcher) to open, rename, change settings, send, export, delete or leave it.
 - Record each copy's finish (regular, foil or etched), condition (Mint to Damaged) and language with Copy details.
-- Show each entry's value, and each collection's total value, in US dollars or euros.
-- Sort entries by name, price, quantity, or set and number.
+- Show each entry's value, and each collection's total value, in US dollars.
+- Sort entries by name, mana value, price, rarity, color, quantity, or set and number, and group the List layout by type, subtype, rarity, color, color identity, mana value, set or artist, with headings that fold.
 - Narrow the list with filter tags by clicking a set code or rarity on an entry, or a bar in Statistics.
 - Show a collection as a grid of card pictures that loads more while scrolling (Small, Medium or Large), as binder pages of nine cards with a page box, or as a list. Each device type remembers its own layout.
 - Open collections from a switcher with search, five sort orders and the keyboard. One click on a collection in the Collections panel or the switcher makes it where new cards go; a double click opens it.
@@ -44,7 +44,7 @@ This page lists what Mana Vault does in the current version, followed by what is
 - Filter a collection by card or set name.
 - Track completion, or choose None for bulk collections (the default for new collections).
 - Keep proxies apart from real copies: marked everywhere, with no value, out of set completion.
-- Record purchase price and currency, date added, and misprint, altered and signed marks with each entry.
+- Record purchase price, date added, and misprint, altered and signed marks with each entry.
 - Show on each entry the decks its copies fill, and filter entries by In a deck or Not in a deck.
 - Import from Mana Vault, Moxfield, ManaBox, Archidekt, Deckbox and TCGplayer CSV files and plain text lists, with the format detected from the file and changeable, into an existing or a new collection, with a preview before anything is added.
 - Export the whole collection, the filtered cards, the picked cards or the missing cards in any of those formats.
@@ -53,7 +53,7 @@ This page lists what Mana Vault does in the current version, followed by what is
 
 - Mark any collection as a wishlist. Its cards are wanted, not owned.
 - Add a card, every missing card of a set, or every missing card of a deck to the wishlist in one step.
-- Lower wishlist wants as copies of the card are added to collections, oldest want first.
+- Lower wishlist wants as copies of the card are added to collections, asking which wishlist when the card is on more than one.
 - Mark copies for trade.
 - Save trades with a name and a status (Open, Done or Cancelled); start, rename, cancel and delete them.
 - Build a trade in two columns, each with its own search: You give searches your cards for trade (or every card), You get searches the card database. Each line has its own count, finish, condition and a price that can be changed by hand.
@@ -77,14 +77,14 @@ This page lists what Mana Vault does in the current version, followed by what is
 - Change the printing or finish of all or some of a deck card's cards: free copies of the new printing in that finish are linked, from the collection you choose when several have them.
 - Keep a finish for every deck card (regular, foil or etched), shown as FOIL or ETCHED in every deck view, the Deck list panel and the Card panel, used for its price, set by `*F*` and `*E*` marks, Add as foil, Add as, linked copies and Change printing. A regular and a foil card of the same printing are separate deck cards.
 - Link lines of Edit as text and decklist imports that name a set and number to free copies of exactly that printing and finish; lines without them stay missing until linked. Link owned copies fills every missing card from exact copies.
-- Show on a missing deck card when you own it (Owned, link) or another version of it (Other version owned, with Switch).
+- Show on a missing deck card when you own it (Owned, link), another version of it (Other version owned, with Switch), or a copy that fills another deck (In Deck name, with Move to this deck).
 - Mark a deck card Upgrade wanted with the version you want; it stays owned and is listed in the Ownership tab.
-- Right-click or long press a deck (panel or switcher) to open, rename, change the format, send, export, delete or leave it, and a card in the Deck list panel for the deck card menu.
+- Right-click or long press a deck (panel or switcher) to open, rename, change the format, send it to the print list (whole deck, missing cards or chosen zones), send, export, delete or leave it, and a card in the Deck list panel for the deck card menu.
 - The Decks panel groups decks by format with each deck's card count and value.
 - Add cards by typing them (Quick add, such as 2 Sol Ring), from the Add tab's card search with + Main, + Side, + Maybe and + Commander (each showing how many are already in the deck), from card search or from the scanner.
 - Filter the deck's cards with a filter box and the Filters panel.
 - Edit the whole deck as text, checked before it is applied, as one step that can be undone.
-- Show the cards as a list, text, stacks of pictures or a grid, grouped by type, mana value, color, rarity or your own tags, and sorted by name, mana value or price.
+- Show the cards as a list, text, stacks of pictures or a grid, grouped by type, subtype, type and tag, rarity, color, color identity, mana value, set, artist or your own tags, and sorted by name, mana value, price, rarity or color.
 - Check a deck against its format: deck and sideboard size, copies of each card, banned and not legal cards, and the commander's color identity.
 - Keep a maybeboard of cards being considered, list the tokens the deck makes, and point at a card name for a large picture.
 - Playtest: shuffle, draw opening hands, mulligan, draw and play cards.
@@ -107,7 +107,7 @@ This page lists what Mana Vault does in the current version, followed by what is
 - Set the paper (Letter, A4, Legal or custom), margins, card size, scale, gap, bleed, cutting guides and background, with a live page preview.
 - Export a PDF at 300 DPI, pictures for MakePlayingCards with bleed, and a card list for MPC Autofill with custom cards as pictures.
 - After exporting, add the printed cards as proxies to a collection or deck.
-- Make custom cards in the card maker: every card field, mana symbol buttons, Mana Vault's own frames in every color, hybrid, gold, artifact, colorless and land with legendary versions, creature, planeswalker, saga, token and double-faced cards, uploaded art or a card's art with move and zoom, and PNG export.
+- Make custom cards in the card maker: every card field, mana symbol buttons, Mana Vault's own frames in six styles and every color, hybrid, gold, artifact, colorless, land and vehicle, with a frame picker, an automatic legendary crown and power and toughness box, creature, planeswalker, saga, token, split and double-faced cards, open-licensed card fonts, uploaded art or a card's art with move and zoom, and PNG export.
 - Save custom cards to the card database for every account, in custom sets with their own codes, names, release dates and symbols, with colors, color identity, finishes, prices, legality and tokens, found with `is:custom`.
 
 ### Sending and sharing
@@ -170,12 +170,19 @@ This page lists what Mana Vault does in the current version, followed by what is
 
 - An Android app (Android 8.0 or newer) with every feature of the phone layout, installed from the APK on the GitHub releases page.
 - Sign in a phone with a server address, then a user name and password; the phone keeps its own device sign-in.
-- Use collections, decks, card search, card pages with rulings and the scanner without a connection, and create collections and decks offline, with changes sent when the connection returns.
+- Use collections, decks, card search with the full search syntax, card pages with rulings and the scanner without a connection, and create collections and decks offline, with changes sent when the connection returns.
 - Go offline only when the server cannot be reached, with a sync button that always shows the state and syncs now.
 - Offline count changes are applied as differences, so edits made elsewhere at the same time are kept; changes the server refuses are listed.
 - Scan with the phone's own text recognition, matched against the card list on the phone when offline.
 - Notifications for new offers in the Inbox, checked in the background about every 15 minutes, optionally only on Wi-Fi.
-- The Back button, the Android share sheet for exports and backups, and a daily check for a newer app.
+- The Back button, the Android share sheet for exports and backups, sharing lists into the app to import them and pictures or PDFs to read as receipts, background sync as soon as the phone is online, https only, and a daily check of your server for a newer app.
+
+### 0.17.0 additions
+
+- Purchases: single cards found by search with pictures and every printing, scanned into the purchase, or taken from the scanned list; a searchable set list; receipts read from a photo, PDF or screenshot and kept with the entry; places shared on the server, editable by every account, merged and deleted by admins; who paid shipping on each sale; trade entries with Gave, Got, Net and Original cost; opening buttons Add cards, Scan, Add existing copies... and Done opening.
+- List views in decks, collections, All collections, card search and the print list: ten groupings, five sorts, mana symbols, columns on wide screens and a menu button on each row.
+- Prices in US dollars only.
+- One art library for the server.
 
 ### 0.16.0 additions
 

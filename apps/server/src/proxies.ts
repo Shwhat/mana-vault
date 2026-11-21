@@ -108,7 +108,7 @@ export function registerProxyRoutes(app: FastifyInstance, database: DatabaseSync
     }
     // lines of cards no longer in the card database (a deleted custom card) are left out; each line carries its card's details
     const card = database.prepare(
-      `SELECT id, oracle_id, name, type_line, set_code, set_name, collector_number, image_url, back_image_url, custom, tokens,
+      `SELECT id, oracle_id, name, mana_cost, type_line, set_code, set_name, collector_number, image_url, back_image_url, custom, tokens, color_identity, artist,
               mana_value, rarity, colors, price_usd, price_usd_foil, price_usd_etched, price_eur, price_eur_foil, finishes,
               (SELECT back_picture IS NOT NULL FROM custom_cards WHERE custom_cards.id = cards.id) AS custom_back
        FROM cards WHERE id = ?`,
@@ -123,6 +123,7 @@ export function registerProxyRoutes(app: FastifyInstance, database: DatabaseSync
           set_name: String(row.set_name), collector_number: String(row.collector_number), image_url: (row.image_url as string | null) ?? null,
           custom: Number(row.custom) === 1, hasBack: Number(row.custom) === 1 ? Number(row.custom_back) === 1 : !!row.back_image_url,
           mana_value: Number(row.mana_value ?? 0), rarity: String(row.rarity ?? ""), colors: String(row.colors ?? ""), finishes: String(row.finishes ?? ""),
+          mana_cost: (row.mana_cost as string | null) ?? null, color_identity: String(row.color_identity ?? ""), artist: (row.artist as string | null) ?? null,
           price_usd: row.price_usd as number | null, price_usd_foil: row.price_usd_foil as number | null, price_usd_etched: row.price_usd_etched as number | null,
           price_eur: row.price_eur as number | null, price_eur_foil: row.price_eur_foil as number | null,
         },

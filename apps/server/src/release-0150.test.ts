@@ -169,15 +169,18 @@ describe("card languages", () => {
 });
 
 describe("art library and backups", () => {
-  it("keeps uploads and card art per account and backs them up", async () => {
+  it("keeps uploads and card art in one library for the server and backs them up", async () => {
     const { call, signUp } = await server();
     const art = (await call("POST", "/api/art", { name: "Forest", picture: PNG })).json() as { id: string; url: string };
     expect((await call("POST", "/api/art", { name: "Same", picture: PNG })).json().id).toBe(art.id);
     expect((await call("PATCH", `/api/art/${art.id}`, { name: "Deep forest" })).statusCode).toBe(200);
     expect((await call("GET", "/api/art")).json()).toMatchObject([{ name: "Deep forest" }]);
+    // 0.17.0: one library for the server; bob sees and uses the picture but cannot change it
     const other = await signUp("bob");
-    expect((await other("GET", "/api/art")).json()).toEqual([]);
-    expect((await other("GET", art.url)).statusCode).toBe(404);
+    expect((await other("GET", "/api/art")).json()).toMatchObject([{ name: "Deep forest", addedBy: "ann", canChange: false }]);
+    expect((await other("GET", art.url)).statusCode).toBe(200);
+    expect((await other("PATCH", `/api/art/${art.id}`, { name: "Mine" })).statusCode).toBe(403);
+    expect((await other("DELETE", `/api/art/${art.id}`)).statusCode).toBe(403);
     await call("POST", "/api/custom/sets", { code: "abc", name: "Alpha" });
     expect((await call("POST", "/api/custom/cards", { card: customCard("abc", "Art Card"), picture: PNG, art: dataUrl("other art bytes", "image/png") })).statusCode).toBe(201);
     expect((await call("GET", "/api/art")).json()).toHaveLength(2);

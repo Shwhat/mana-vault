@@ -24,15 +24,15 @@ Card pictures downloaded to the server are kept in the picture folder: by defaul
 | Part | Contents |
 |---|---|
 | Collections | Every collection you own, with its name, description, completion rule, finish rule, whether it is a wishlist, linked sets and dates |
-| Copies | Every row in those collections with its finish, condition, language, proxy, count, number for trade, purchase price and currency, date added, and misprint, altered and signed marks |
+| Copies | Every row in those collections with its finish, condition, language, proxy, count, number for trade, purchase price, date added, and misprint, altered and signed marks |
 | Decks | Every deck you own, with its name, format, the collection remembered for it, its description and cover card, and dates |
 | Deck cards | Every card in those decks, with zone, count, printing and tags |
 | Deck links | Which copies in your own collections fill each deck card |
 | Cards | The card records they use, so a backup can be restored on a server with an empty card database |
 | Custom sets and custom cards | The custom sets and custom cards you made or use, with their card maker designs, pictures, art and set symbols (SVG symbols included) |
-| Art library | Every picture in your art library, with its name (backups made with 0.15.0 and later) |
+| Art library | Every picture you added to the art library, with its name (backups made with 0.15.0 and later). A restore keeps pictures other accounts added |
 | Card back | The card back you uploaded for printing, if any (backups made with 0.15.0 and later) |
-| Purchase history | Every entry with its lines, openings, tied cards, sales and sealed values (backups made with 0.16.0 and later, version 7) |
+| Purchase history | Every entry with its lines, openings, tied cards, sales, sealed values, place, who paid shipping and receipt (backups made with 0.16.0 and later, version 7). On restore each place is matched to the server's places by name, and added when it is new |
 
 A backup does not contain collections or decks shared with you by others, accounts, preferences, prices, deck history, trades, the trade binder link, the print list or the full card database. Prices return with the next card database update.
 

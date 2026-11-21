@@ -47,7 +47,6 @@ export function CardPage({ actions }: { actions: Record<string, Action> }) {
   if (!card) return <div className="view cardpage"><div className="emptynote">Loading the card</div></div>;
 
   const price = (fields: PriceFields, finish: "regular" | "foil" | "etched") => {
-    if (currency === "eur") return finish === "regular" ? fields.price_eur : fields.price_eur_foil;
     return finish === "regular" ? fields.price_usd : finish === "foil" ? fields.price_usd_foil : fields.price_usd_etched;
   };
   const rows = [...versions].sort((a, b) => (a.id === card.id ? -1 : b.id === card.id ? 1 : 0));

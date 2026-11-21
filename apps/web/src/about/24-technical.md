@@ -12,10 +12,12 @@
 | Card pictures | Downloaded from cards.scryfall.io into the picture folder, six at a time, keyed by Scryfall's picture address and its change stamp. Every picture address the server sends is rewritten to /pictures/, which sends the saved file or redirects to Scryfall |
 | Server backups | SQLite VACUUM INTO a new file; a restore is put in place when the server starts again |
 | Card text recognition | Tesseract.js with the English model, running in the browser; its files are served by Mana Vault from /ocr. In the Android app, Google ML Kit text recognition on the phone |
+| Receipts | The server reads PDF receipts with pdf.js (pdfjs-dist) and pictures with Tesseract.js, using the same model files served from /ocr. Receipts are kept in the database with their entry |
+| App updates | /api/app/latest gives the server's version and /api/app/apk the app for it, which the server fetches once from the GitHub release and keeps in the data folder (apk) |
 | Scan matching | The server compares the text read from a card with every card name (edit distance over a three-letter index) and with set codes and collector numbers |
 | Sign-in | PBKDF2-SHA256 password hashes (600,000 rounds), HTTP-only session cookie, request safety header on every change |
 | Container | Docker image for amd64 and arm64, running as user 65532, published to ghcr.io/shwhat/mana-vault |
-| Android app | The same interface inside Capacitor, with a Java plugin for text recognition, encrypted settings, the background Inbox check (WorkManager), file sharing and the Back button. Its copy of the library is kept in IndexedDB |
+| Android app | The same interface inside Capacitor, with a Java plugin for text recognition, encrypted settings, the background Inbox check and background sync (WorkManager), files shared in and out, and the Back button. It connects over https only. Its copy of the library is kept in IndexedDB |
 | Phone sign-in | A random device token per phone, sent as a Bearer token; the server stores only its SHA-256 hash. The server accepts requests from the app's page origin (https://localhost) |
 | Sync | Changes made offline are sent in order to /api/sync with a unique id each; the server applies each once and keeps the ids for 30 days. /api/sync/state reports a revision that changes with every change, and new offers |
 
@@ -71,6 +73,8 @@ The container checks itself every 30 seconds by running the server with `-health
 - A copy fills one deck card at a time; decks from other accounts never use your copies.
 - Power, toughness, two-faced rules text and rulings arrive with the first card database update after installing 0.6.0.
 - The scanner's live camera needs HTTPS or a local address (in the browser).
+- In the Android app without a connection, searches by art tags and Oracle tags (`art:`, `otag:`) need the server.
+- Removed deck links are kept for 60 minutes, so undo of a remove can link the copies again; after that, undo puts the cards back as missing.
 - The Android app reads English card text, checks for offers about every 15 minutes rather than at once, and signs in to one server and account at a time.
 
 ## Third-party components
@@ -84,6 +88,8 @@ The container checks itself every 30 seconds by running the server with `-health
 | fflate | Making the zip files of MakePlayingCards pictures | MIT |
 | Tesseract English model (@tesseract.js-data/eng) | Card text recognition | Apache 2.0 |
 | Capacitor (@capacitor/core, @capacitor/android, @capacitor/cli) | Android app | MIT |
+| pdf.js (pdfjs-dist) | Reading PDF receipts on the server | Apache 2.0 |
+| Crimson Pro, Merriweather Sans (@fontsource) | Card maker fonts, bundled with the interface | SIL Open Font License 1.1 |
 | Google ML Kit text recognition | Card text recognition in the Android app | ML Kit terms of service |
 | AndroidX (AppCompat, WorkManager, Security) | Android app | Apache 2.0 |
 | Fastify, @fastify/static | Web server | MIT |

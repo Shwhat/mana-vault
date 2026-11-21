@@ -22,15 +22,60 @@ function rowQuantity(database: DatabaseSync, collectionId: string, key: CopyKey)
   return Number(database.prepare(`SELECT quantity FROM collection_cards WHERE collection_id = ? AND ${KEY}`).get(collectionId, ...keyValues(key))?.quantity ?? 0);
 }
 
+// ---------- links taken away, kept for a while so undo can put them back (0.17.0) ----------
+
+/** How long a removed link can come back when its copies return (undo of a lower count or of a printing change). */
+export const RELINK_MINUTES = 60;
+
+function ensureRemoved(database: DatabaseSync) {
+  database.exec(`CREATE TABLE IF NOT EXISTS removed_links (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, deck_card_id INTEGER NOT NULL, collection_id TEXT NOT NULL,
+    card_id TEXT NOT NULL, foil INTEGER NOT NULL, condition TEXT NOT NULL, language TEXT NOT NULL, proxy INTEGER NOT NULL DEFAULT 0,
+    quantity INTEGER NOT NULL, removed_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%f', 'now')))`);
+}
+
+function keepRemoved(database: DatabaseSync, link: { id: number; deck_card_id: unknown }, collectionId: string, key: CopyKey, quantity: number) {
+  ensureRemoved(database);
+  database.prepare(`INSERT INTO removed_links (deck_card_id, collection_id, card_id, foil, condition, language, proxy, quantity) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+    .run(Number(link.deck_card_id), collectionId, ...keyValues(key), quantity);
+}
+
+/**
+ * Copies came back to a row (undo of a lower count, undo of a printing change, a sale undone): links removed from this
+ * row in the last hour come back, newest first, while the deck card still misses copies of this printing and finish.
+ */
+export function relinkRemoved(database: DatabaseSync, collectionId: string, key: CopyKey): number {
+  ensureRemoved(database);
+  database.prepare(`DELETE FROM removed_links WHERE removed_at < strftime('%Y-%m-%d %H:%M:%f', 'now', '-${RELINK_MINUTES} minutes')`).run();
+  let free = rowQuantity(database, collectionId, key) - linkedCount(database, collectionId, key);
+  let restored = 0;
+  for (const row of database.prepare(`SELECT * FROM removed_links WHERE collection_id = ? AND ${KEY} ORDER BY id DESC`).all(collectionId, ...keyValues(key))) {
+    if (free <= 0) break;
+    const deckCard = database.prepare("SELECT id, printing_id, finish, quantity, zone FROM deck_cards WHERE id = ?").get(Number(row.deck_card_id));
+    const linked = deckCard ? Number(database.prepare("SELECT COALESCE(SUM(quantity), 0) AS n FROM deck_links WHERE deck_card_id = ?").get(Number(deckCard.id))?.n ?? 0) : 0;
+    const room = deckCard && deckCard.zone !== "maybeboard" && String(deckCard.printing_id) === key.cardId && Number(deckCard.finish ?? 0) === key.foil
+      ? Number(deckCard.quantity) - linked : 0;
+    const take = Math.min(free, room, Number(row.quantity));
+    if (take > 0) {
+      addLink(database, Number(row.deck_card_id), { ...key, collectionId, quantity: take });
+      free -= take;
+      restored += take;
+    }
+    database.prepare("DELETE FROM removed_links WHERE id = ?").run(Number(row.id));
+  }
+  return restored;
+}
+
 /** Removes links beyond the copies a row still holds, newest links first. The deck cards they filled become missing. */
 export function trimLinks(database: DatabaseSync, collectionId: string, key: CopyKey): void {
   let excess = linkedCount(database, collectionId, key) - rowQuantity(database, collectionId, key);
   if (excess <= 0) return;
   touchCollection(database, collectionId);
-  const links = database.prepare(`SELECT id, quantity FROM deck_links WHERE collection_id = ? AND ${KEY} ORDER BY id DESC`).all(collectionId, ...keyValues(key));
+  const links = database.prepare(`SELECT id, deck_card_id, quantity FROM deck_links WHERE collection_id = ? AND ${KEY} ORDER BY id DESC`).all(collectionId, ...keyValues(key));
   for (const link of links) {
     if (excess <= 0) break;
     const take = Math.min(excess, Number(link.quantity));
+    keepRemoved(database, { id: Number(link.id), deck_card_id: link.deck_card_id }, collectionId, key, take);
     if (take === Number(link.quantity)) database.prepare("DELETE FROM deck_links WHERE id = ?").run(Number(link.id));
     else database.prepare("UPDATE deck_links SET quantity = quantity - ? WHERE id = ?").run(take, Number(link.id));
     excess -= take;
@@ -54,10 +99,11 @@ export function dropLinks(database: DatabaseSync, from: { collectionId: string; 
   let dropping = Math.max(0, count - keepFree);
   if (dropping <= 0) return;
   touchCollection(database, from.collectionId);
-  const links = database.prepare(`SELECT id, quantity FROM deck_links WHERE collection_id = ? AND ${KEY} ORDER BY id DESC`).all(from.collectionId, ...keyValues(from.key));
+  const links = database.prepare(`SELECT id, deck_card_id, quantity FROM deck_links WHERE collection_id = ? AND ${KEY} ORDER BY id DESC`).all(from.collectionId, ...keyValues(from.key));
   for (const link of links) {
     if (dropping <= 0) break;
     const take = Math.min(dropping, Number(link.quantity));
+    keepRemoved(database, { id: Number(link.id), deck_card_id: link.deck_card_id }, from.collectionId, from.key, take);
     if (take === Number(link.quantity)) database.prepare("DELETE FROM deck_links WHERE id = ?").run(Number(link.id));
     else database.prepare("UPDATE deck_links SET quantity = quantity - ? WHERE id = ?").run(take, Number(link.id));
     dropping -= take;

@@ -5,6 +5,12 @@ import type { DatabaseSync } from "node:sqlite";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { tokenKey, type User } from "./auth.js";
 
+/** The formats the phone's card list knows legality for (Scryfall's legality keys), one bit each. */
+export const LEGAL_FORMATS = [
+  "standard", "future", "historic", "timeless", "gladiator", "pioneer", "explorer", "modern", "legacy", "pauper", "vintage", "penny", "commander",
+  "oathbreaker", "standardbrawl", "brawl", "alchemy", "paupercommander", "duel", "oldschool", "premodern", "predh",
+];
+
 /** The page origin of the Android app (Capacitor serves its bundled files from https://localhost). */
 export const APP_ORIGINS = new Set(["https://localhost"]);
 const BEARER = /^Bearer ([a-f0-9]{64})$/;
@@ -219,14 +225,30 @@ export function registerMobileRoutes(app: FastifyInstance, database: DatabaseSyn
       `:${String(database.prepare("SELECT value FROM catalog_metadata WHERE key = 'custom_at'").get()?.value ?? "")}`;
     if (request.headers["if-none-match"] === `"${stamp}"`) return reply.code(304).send();
     if (compact?.stamp !== stamp) {
+      // 0.17.0: everything the search syntax reads, so the app answers full searches without a connection
       const rows = database.prepare(
         `SELECT id, oracle_id, name, mana_cost, mana_value, type_line, colors, set_code, set_name, collector_number, rarity,
-                image_url, released_at, finishes, flavor_name, promo, variation, oracle_text, power, toughness
+                image_url, released_at, finishes, flavor_name, promo, variation, oracle_text, power, toughness,
+                color_identity, artist, keywords, promo_types, frame, frame_effects, border_color, full_art, lang, custom, legalities,
+                COALESCE(price_usd, price_usd_foil, price_usd_etched) AS usd
          FROM cards WHERE removed = 0 OR id IN (SELECT card_id FROM collection_cards) ORDER BY name, released_at DESC`,
       ).all();
       const fields = ["id", "oracle_id", "name", "mana_cost", "mana_value", "type_line", "colors", "set_code", "set_name", "collector_number",
-        "rarity", "image_url", "released_at", "finishes", "flavor_name", "promo", "variation", "oracle_text", "power", "toughness"];
-      const body = { version: stamp, fields, rows: rows.map((row) => fields.map((field) => row[field] ?? null)) };
+        "rarity", "image_url", "released_at", "finishes", "flavor_name", "promo", "variation", "oracle_text", "power", "toughness",
+        "color_identity", "artist", "keywords", "promo_types", "frame", "frame_effects", "border_color", "full_art", "lang", "custom", "usd", "legal"];
+      // formats a card is legal in, as bits in the order of LEGAL_FORMATS
+      const legal = (text: unknown) => {
+        let mask = 0;
+        try {
+          const value = JSON.parse(String(text ?? "{}")) as Record<string, string>;
+          LEGAL_FORMATS.forEach((format, bit) => { if (value[format] === "legal") mask |= 1 << bit; });
+        } catch { /* no legality data */ }
+        return mask;
+      };
+      const body = {
+        version: stamp, fields, formats: LEGAL_FORMATS,
+        rows: rows.map((row) => fields.map((field) => (field === "legal" ? legal(row.legalities) : row[field] ?? null))),
+      };
       compact = { stamp, body: gzipSync(JSON.stringify(body)) };
     }
     reply.header("content-type", "application/json; charset=utf-8");

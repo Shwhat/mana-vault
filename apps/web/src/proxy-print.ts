@@ -7,8 +7,8 @@ export type PrintCard = {
   id: string; oracle_id: string; name: string; type_line: string; set_code: string; set_name: string; collector_number: string;
   image_url: string | null; custom: boolean; hasBack: boolean;
   /** Details for sorting and the price pip (0.14.0); lines added before the list is loaded again may lack them. */
-  mana_value?: number; rarity?: string; colors?: string; finishes?: string;
-  price_usd?: number | null; price_usd_foil?: number | null; price_usd_etched?: number | null; price_eur?: number | null; price_eur_foil?: number | null;
+  mana_value?: number; rarity?: string; colors?: string; finishes?: string; mana_cost?: string | null; color_identity?: string; artist?: string | null;
+  price_usd?: number | null; price_usd_foil?: number | null; price_usd_etched?: number | null;
 };
 
 /** How the print list is ordered; the PDF and the pictures follow the same order. */
@@ -21,12 +21,10 @@ const colorOrder = (colors = "") => {
   const list = colors.replace(/[\s,]/g, "");
   return !list ? 7 : list.length > 1 ? 6 : "WUBRG".indexOf(list) + 1;
 };
-export const printPrice = (card: PrintCard, currency: "usd" | "eur") => (currency === "eur"
-  ? card.price_eur ?? card.price_eur_foil ?? null
-  : card.price_usd ?? card.price_usd_foil ?? card.price_usd_etched ?? null);
+export const printPrice = (card: PrintCard, _currency: "usd" = "usd") => card.price_usd ?? card.price_usd_foil ?? card.price_usd_etched ?? null;
 
 /** The print list in the chosen order (Order added keeps the list as it is), each sort falling back to the name. */
-export function sortPrintLines(lines: PrintLine[], sort: PrintSort, currency: "usd" | "eur"): PrintLine[] {
+export function sortPrintLines(lines: PrintLine[], sort: PrintSort, currency: "usd" = "usd"): PrintLine[] {
   if (sort === "added") return lines;
   const name = (a: PrintLine, b: PrintLine) => a.card.name.localeCompare(b.card.name);
   const compare: Record<Exclude<PrintSort, "added">, (a: PrintLine, b: PrintLine) => number> = {

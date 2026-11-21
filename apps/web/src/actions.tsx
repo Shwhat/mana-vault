@@ -79,10 +79,6 @@ export function useActions(store: Store): Record<string, Action> {
     const entry = store.view === "collection" && store.selection?.view === "collection"
       ? store.collection?.find((item) => entryKey(item) === store.selection?.key) ?? null : null;
     const markable = store.view === "collection" ? store.pickedEntries() : [];
-    const currency = (value: "usd" | "eur", label: string): Action => ({
-      label, short: value.toUpperCase(), icon: value, on: prefs.currency === value,
-      run: () => { store.setPrefs({ currency: value }); store.flash(label); },
-    });
     // a zone button shows only that zone in the deck list and makes it where Add puts cards; All shows every zone and adds to Main
     const setZone = (zone: Zone | "all") => {
       store.setPrefs({ zone: zone === "all" ? "main" : zone, deckZoneView: zone });
@@ -290,8 +286,6 @@ export function useActions(store: Store): Record<string, Action> {
         label: "Export missing deck cards (text)", short: "Missing text", icon: "txt", disabled: !deck,
         run: () => void store.exportDeckMissing(),
       },
-      "currency.usd": currency("usd", "Prices in US dollars"),
-      "currency.eur": currency("eur", "Prices in euros"),
       find: {
         label: "Find card", short: "Find", icon: "find", key: "/",
         run: () => {

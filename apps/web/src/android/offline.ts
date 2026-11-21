@@ -3,6 +3,7 @@ import type { CardDetail, Collection, CollectionEntry, DeckCard, DeckDetail, Dec
 import { compactCard, matchOnPhone, printingsOf, refreshCatalog, refreshRulings, rulingsOf, searchCards, suggestOnPhone } from "./catalog";
 import { idbAll, idbDelete, idbGet, idbSet } from "./idb";
 import { appFetch, OfflineError, readJson, SignedOutError } from "./net";
+import { native } from "./platform";
 
 export type SyncState = "online" | "offline" | "syncing";
 export type SyncStatus = { state: SyncState; pending: number; lastSync: number | null; error?: string | null };
@@ -46,7 +47,10 @@ async function queue(): Promise<Queued[]> {
 
 /** Waiting changes shown to the user (a settings change is sent along, but is not counted). */
 async function countQueue() {
-  setStatus({ pending: (await queue()).filter((item) => item.url !== "/api/prefs").length });
+  const waiting = await queue();
+  setStatus({ pending: waiting.filter((item) => item.url !== "/api/prefs").length });
+  // the phone keeps its own copy of the waiting changes and sends them as soon as it is online, even with the app closed
+  void native().setPendingSync?.({ changes: JSON.stringify(waiting.map(({ id, method, url, body, base }) => ({ id, method, url, body, base }))) }).catch(() => undefined);
 }
 
 // ---------- changes made on the phone ----------
@@ -67,7 +71,7 @@ async function newEntry(item: Item): Promise<CollectionEntry | null> {
   return {
     id: card.id, oracle_id: card.oracle_id, name: card.name, set_code: card.set_code, set_name: card.set_name, collector_number: card.collector_number,
     rarity: card.rarity, image_url: card.image_url, colors: card.colors, mana_cost: card.mana_cost, mana_value: card.mana_value, type_line: card.type_line,
-    price_usd: null, price_usd_foil: null, price_usd_etched: null, price_eur: null, price_eur_foil: null,
+    price_usd: null, price_usd_foil: null, price_usd_etched: null,
     quantity: 0, foil: item.foil, condition: item.condition as CollectionEntry["condition"], language: item.language, trade: 0, proxy: item.proxy, decks: [],
   };
 }

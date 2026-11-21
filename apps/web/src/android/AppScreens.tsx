@@ -1,20 +1,21 @@
 // ---------- screens and windows that only the Android app has ----------
 import { Icon } from "../icons";
 import { useEffect, useState, type FormEvent } from "react";
-import { APP_VERSION } from "../api";
+import { APP_VERSION, request } from "../api";
 import { customDialog } from "../components/Dialog";
 import { idbWipe } from "./idb";
 import { appFetch, readJson } from "./net";
 import { onSyncStatus, syncNow, syncStatus, type SyncProblem, type SyncStatus } from "./offline";
-import { clearSettings, isApp, isPrivateAddress, native, normalizeServer, saveSettings } from "./platform";
+import { apiUrl, clearSettings, isApp, native, normalizeServer, saveSettings } from "./platform";
 
 type ServerInfo = { server: string; version: string | null; signup: boolean };
 
 async function checkServer(text: string): Promise<ServerInfo> {
   const server = normalizeServer(text);
   if (!server) throw new Error("Enter the server address, for example https://vault.example.com.");
-  if (server.startsWith("http:") && !isPrivateAddress(server)) {
-    throw new Error("Plain http addresses work only on a home network. Use the https address of the server.");
+  // 0.17.0: the app connects over https only (the phone's own address, used for testing, is the one exception)
+  if (server.startsWith("http:") && !/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(server)) {
+    throw new Error("The app connects over https only. Enter the https address of the server.");
   }
   let health: { status?: string; version?: string | null };
   try {
@@ -94,7 +95,7 @@ export function AppSignIn({ onDone }: { onDone: () => void }) {
         <form className="appcard" onSubmit={signIn}>
           <div className="appbrand"><span className="brand" aria-hidden="true">M</span><h1>Mana Vault</h1></div>
           <p className="note">{info.server}{info.version ? ` (version ${info.version})` : ""}</p>
-          {info.server.startsWith("http:") && <p className="note warn">This address is not encrypted. Use it only on your home network.</p>}
+
           {info.signup && (
             <div className="seg apptabs">
               <button type="button" className={mode === "in" ? "on" : undefined} onClick={() => setMode("in")}>Sign in</button>
@@ -214,7 +215,6 @@ export function DeviceList() {
 }
 
 const UPDATE_KEY = "mana-vault.updateCheck";
-const RELEASES = "https://github.com/Shwhat/mana-vault/releases";
 
 /** True when version a is newer than version b (both X.Y.Z). */
 export function newerVersion(a: string, b: string): boolean {
@@ -229,28 +229,27 @@ export async function checkForUpdate(always = false): Promise<void> {
   const last = Number(localStorage.getItem(UPDATE_KEY) ?? 0);
   if (!always && Date.now() - last < 86_400_000) return;
   localStorage.setItem(UPDATE_KEY, String(Date.now()));
-  type Release = { tag_name?: string; html_url?: string };
-  let latest: Release | null = null;
+  // 0.17.0: the app asks its own server, which offers the app that matches the server's version
+  let latest: { version: string; url: string } | null = null;
   try {
-    const response = await fetch("https://api.github.com/repos/Shwhat/mana-vault/releases/latest", { credentials: "omit" });
-    latest = response.ok ? (await response.json()) as Release : null;
+    latest = await request<{ version: string; url: string }>("/api/app/latest");
   } catch {
     latest = null;
   }
-  const tag = latest?.tag_name ?? "";
-  if (tag && newerVersion(tag, APP_VERSION)) {
+  const version = latest?.version ?? "";
+  if (version && newerVersion(version, APP_VERSION)) {
     customDialog("Update available", () => (
       <div>
-        <p>Mana Vault {tag.replace(/^v/, "")} is available. This phone has {APP_VERSION}.</p>
-        <p><a className="lnk" href={latest?.html_url ?? RELEASES} target="_blank" rel="noreferrer">Open the download page</a></p>
+        <p>Your server runs Mana Vault {version}. This phone has {APP_VERSION}.</p>
+        <p><a className="lnk" href={apiUrl(latest!.url)} target="_blank" rel="noreferrer">Download the app for {version}</a></p>
       </div>
     ), 400);
   } else if (always) {
     customDialog("Check for updates", () => (
       <div>
-        <p>{tag ? `This phone has the newest version (${APP_VERSION}).` : "The release list could not be reached."}</p>
-        <p><a className="lnk" href={RELEASES} target="_blank" rel="noreferrer">Open the releases page</a></p>
+        <p>{version ? `This phone has the app for the server's version (${APP_VERSION}).` : "The server could not be reached."}</p>
       </div>
     ), 400);
   }
 }
+

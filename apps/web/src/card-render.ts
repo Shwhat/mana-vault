@@ -1,10 +1,11 @@
 // ---------- the card maker's card pictures: Mana Vault's own frames drawn on a canvas ----------
 // A card is drawn in a 745 x 1040 layout (the size of Scryfall's full pictures) and saved at twice that size.
+import { RULES_FONT, TITLE_FONT } from "./card-fonts";
 
-export type CardKind = "normal" | "creature" | "planeswalker" | "saga" | "token";
+export type CardKind = "normal" | "creature" | "planeswalker" | "saga" | "token" | "split";
 export const FRAME_COLORS = ["W", "U", "B", "R", "G"] as const;
 export const HYBRID_FRAMES = ["WU", "WB", "UB", "UR", "BR", "BG", "RG", "RW", "GW", "GU"] as const;
-export const FRAMES = ["auto", "W", "U", "B", "R", "G", ...HYBRID_FRAMES, "gold", "artifact", "colorless", "land"] as const;
+export const FRAMES = ["auto", "W", "U", "B", "R", "G", ...HYBRID_FRAMES, "gold", "artifact", "colorless", "land", "vehicle"] as const;
 export type Frame = (typeof FRAMES)[number];
 
 /** Where the art sits in the art box: offsets as parts of the box size, and the zoom (1 fills the box). */
@@ -12,9 +13,15 @@ export type ArtPlace = { x: number; y: number; zoom: number };
 
 /** How the frame is drawn: Classic, Borderless (art fills the card), Full art (art behind the type line and text),
  * Showcase (an ornate gold-trimmed frame) and Nickname (a nickname in the name bar, the card name under it). */
-export const FRAME_STYLES = ["classic", "borderless", "fullart", "showcase", "nickname"] as const;
+export const FRAME_STYLES = ["classic", "borderless", "fullart", "showcase", "nickname", "showcasenickname"] as const;
 export type FrameStyle = (typeof FRAME_STYLES)[number];
-export const FRAME_STYLE_NAMES: Record<FrameStyle, string> = { classic: "Classic", borderless: "Borderless", fullart: "Full art", showcase: "Showcase", nickname: "Nickname" };
+export const FRAME_STYLE_NAMES: Record<FrameStyle, string> = {
+  classic: "Classic", borderless: "Borderless", fullart: "Full art", showcase: "Showcase", nickname: "Nickname", showcasenickname: "Showcase Nickname",
+};
+/** Automatic, always or never: the legendary crown (from the type line) and the power and toughness box (creatures and vehicles). */
+export type Auto = "auto" | "on" | "off";
+/** The second half of a split card: its own name, cost, type, text and art (the art is the back art picture). */
+export type SplitHalf = { name: string; manaCost: string; typeLine: string; rulesText: string; flavorText: string; art: ArtPlace };
 
 export type FaceDesign = {
   kind: CardKind;
@@ -35,12 +42,19 @@ export type FaceDesign = {
   textSize: number;
   flavorSize: number;
   art: ArtPlace;
+  /** 0.17.0: the legendary crown and the power and toughness box, each Automatic, On or Off. */
+  crown?: Auto;
+  ptBox?: Auto;
+  /** 0.17.0: the second half of a split card. */
+  split?: SplitHalf;
 };
 
 export type CardInfo = { rarity: string; artist: string; setCode: string; collectorNumber: string; back: boolean; face: "front" | "back" };
 
 export type Assets = {
   art: CanvasImageSource | null;
+  /** The second half's art of a split card. */
+  splitArt?: CanvasImageSource | null;
   setSymbol: CanvasImageSource | null;
   /** Colors a one-color set symbol (an SVG) by the card's rarity, with a light outline (0.15.0). */
   setSymbolTint?: boolean;
@@ -54,11 +68,20 @@ export const SCALE = 2;
 
 export const blankFace = (): FaceDesign => ({
   kind: "normal", frame: "auto", style: "classic", nickname: "", legendary: false, name: "", manaCost: "", typeLine: "", rulesText: "", flavorText: "",
-  power: "", toughness: "", loyalty: "", textSize: 100, flavorSize: 100, art: { x: 0, y: 0, zoom: 1 },
+  power: "", toughness: "", loyalty: "", textSize: 100, flavorSize: 100, art: { x: 0, y: 0, zoom: 1 }, crown: "auto", ptBox: "auto",
 });
+export const blankHalf = (): SplitHalf => ({ name: "", manaCost: "", typeLine: "", rulesText: "", flavorText: "", art: { x: 0, y: 0, zoom: 1 } });
+
+/** Whether a face shows the legendary crown: Automatic follows the word Legendary in the type line. */
+export const hasCrown = (face: FaceDesign) => (face.crown === "on" || (face.crown === "off" ? false : /\blegendary\b/i.test(face.typeLine) || (face.crown === undefined && face.legendary)));
+/** Whether a face shows the power and toughness box: Automatic shows it for creatures and vehicles. */
+export const hasPtBox = (face: FaceDesign) => (face.kind === "planeswalker" ? !!face.loyalty
+  : face.ptBox === "on" ? true : face.ptBox === "off" ? false
+  : /\b(creature|vehicle)\b/i.test(face.typeLine) || face.kind === "creature" || (!face.ptBox && !!(face.power || face.toughness)));
 
 const FRAME_NAMES: Record<string, string> = {
   auto: "Automatic", W: "White", U: "Blue", B: "Black", R: "Red", G: "Green", gold: "Multicolor (gold)", artifact: "Artifact", colorless: "Colorless", land: "Land",
+  vehicle: "Vehicle",
 };
 const COLOR_WORDS: Record<string, string> = { W: "White", U: "Blue", B: "Black", R: "Red", G: "Green" };
 export const frameName = (frame: string) => FRAME_NAMES[frame] ?? `Hybrid ${COLOR_WORDS[frame[0]!]!.toLowerCase()} and ${COLOR_WORDS[frame[1]!]!.toLowerCase()}`;
@@ -74,10 +97,12 @@ const PALETTES: Record<string, Palette> = {
   artifact: { base: "#b5bdc5", dark: "#6f7982", bar: "#e8ecef", box: "#f4f6f8", text: "#151a1f" },
   colorless: { base: "#d3cec7", dark: "#918a80", bar: "#efece8", box: "#f8f7f5", text: "#1b1916" },
   land: { base: "#ad8664", dark: "#674a33", bar: "#efe3d6", box: "#f8f2eb", text: "#21160d" },
+  vehicle: { base: "#8a6748", dark: "#4a3220", bar: "#ecdccb", box: "#f7efe6", text: "#22150a" },
 };
 const SYMBOL_FILL: Record<string, string> = { W: "#f8f6d8", U: "#c1d7e9", B: "#bab1ab", R: "#e49977", G: "#a3c095", C: "#ccc2c0" };
 const RARITY_COLOR: Record<string, string> = { common: "#1a1a1a", uncommon: "#9fb1c2", rare: "#c9a227", mythic: "#d5552b", special: "#8a5fb8" };
-const SERIF = "Georgia, 'Times New Roman', serif";
+// rules and flavor text in the rules font; names, type lines, power and toughness in the title font (card-fonts.ts)
+const SERIF = RULES_FONT;
 
 /** The mana symbols in a text, in order: {W}{U/R}{2} gives W, U/R, 2. */
 export const symbolsIn = (text: string) => [...text.matchAll(/\{([^}]{1,6})\}/g)].map((match) => match[1]!.toUpperCase());
@@ -90,7 +115,7 @@ export function frameOf(face: FaceDesign): Exclude<Frame, "auto"> {
   if (/\bland\b/i.test(face.typeLine) && !face.manaCost) return "land";
   const symbols = symbolsIn(face.manaCost);
   const colors = FRAME_COLORS.filter((color) => symbols.some((symbol) => symbol.split("/").includes(color)));
-  if (colors.length === 0) return /\bartifact\b/i.test(face.typeLine) ? "artifact" : "colorless";
+  if (colors.length === 0) return /\bvehicle\b/i.test(face.typeLine) ? "vehicle" : /\bartifact\b/i.test(face.typeLine) ? "artifact" : "colorless";
   if (colors.length === 1) return colors[0]!;
   const colored = symbols.filter((symbol) => FRAME_COLORS.some((color) => symbol.split("/").includes(color)));
   if (colors.length === 2 && colored.every((symbol) => symbol.includes("/") && symbol.split("/").every((part) => FRAME_COLORS.includes(part as never)))) {
@@ -98,6 +123,22 @@ export function frameOf(face: FaceDesign): Exclude<Frame, "auto"> {
     if (pair) return pair;
   }
   return "gold";
+}
+
+/** Where the art sits on the card, as in the drawing: used to move the art by dragging in the card maker. */
+export function artBoxOf(face: FaceDesign): { x: number; y: number; w: number; h: number } {
+  if (face.kind === "split") return splitArtBoxes()[0]!;
+  if (face.style === "borderless") return { x: 0, y: 0, w: WIDTH, h: HEIGHT - 44 };
+  if (face.style === "fullart") return { x: 40, y: 40, w: WIDTH - 80, h: HEIGHT - 124 };
+  if (face.kind === "saga") return { x: WIDTH / 2 + 4, y: 126, w: WIDTH / 2 - 62, h: HEIGHT - 70 - 64 - 8 - 126 };
+  return { x: 58, y: 126, w: WIDTH - 116, h: face.kind === "token" ? 520 : 438 };
+}
+
+/** The art boxes of the two halves of a split card. */
+export function splitArtBoxes(): Array<{ x: number; y: number; w: number; h: number }> {
+  const top = 26;
+  const height = (HEIGHT - 44 - top - 10) / 2;
+  return [top, top + height + 10].map((start) => ({ x: 56, y: start + 14 + 46 + 6, w: WIDTH - 112, h: height * 0.36 }));
 }
 
 /** A bar outline with cut corners, used by the Showcase style. */
@@ -256,10 +297,10 @@ function drawLines(ctx: CanvasRenderingContext2D, lines: Line[], x: number, y: n
 /** Fits a single line of text into a width by shrinking it, and draws it. */
 function fitText(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, width: number, size: number, weight: number, color: string, align: CanvasTextAlign = "left") {
   let fontSize = size;
-  ctx.font = `${weight} ${fontSize}px ${SERIF}`;
+  ctx.font = `${weight} ${fontSize}px ${weight >= 600 ? TITLE_FONT : SERIF}`;
   while (fontSize > size * 0.5 && ctx.measureText(text).width > width) {
     fontSize -= 1;
-    ctx.font = `${weight} ${fontSize}px ${SERIF}`;
+    ctx.font = `${weight} ${fontSize}px ${weight >= 600 ? TITLE_FONT : SERIF}`;
   }
   ctx.fillStyle = color;
   ctx.textAlign = align;
@@ -349,7 +390,9 @@ export function renderCard(canvas: HTMLCanvasElement, face: FaceDesign, info: Ca
   const style: FrameStyle = FRAME_STYLES.includes(face.style) ? face.style : "classic";
   // Borderless and Full art draw the art first and the bars over it, a little see-through
   const overArt = style === "borderless" || style === "fullart";
-  const showcase = style === "showcase";
+  const showcase = style === "showcase" || style === "showcasenickname";
+  if (face.kind === "split") { renderSplit(ctx, face, info, assets, showcase); return; }
+  const saga = face.kind === "saga";
   const shape = showcase ? chamfered : rounded;
   const veil = overArt ? 0.86 : 1;
   const drawArt = (box: { x: number; y: number; w: number; h: number }) => {
@@ -430,22 +473,8 @@ export function renderCard(canvas: HTMLCanvasElement, face: FaceDesign, info: Ca
     ctx.restore();
   }
 
-  // a legendary crest over the name bar
-  if (face.legendary) {
-    ctx.save();
-    ctx.beginPath();
-    ctx.moveTo(46, 60);
-    ctx.quadraticCurveTo(WIDTH / 2, 8, WIDTH - 46, 60);
-    ctx.lineTo(WIDTH - 46, 78);
-    ctx.quadraticCurveTo(WIDTH / 2, 30, 46, 78);
-    ctx.closePath();
-    ctx.fillStyle = frameFill(ctx, frame, "dark", 46, WIDTH - 92);
-    ctx.fill();
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = "#d9b860";
-    ctx.stroke();
-    ctx.restore();
-  }
+  // the legendary crown over the name bar
+  if (hasCrown(face)) drawCrown(ctx, frame, showcase);
 
   // name bar with the mana cost
   const nameBar = { x: 44, y: 56, w: WIDTH - 88, h: 62 };
@@ -475,14 +504,17 @@ export function renderCard(canvas: HTMLCanvasElement, face: FaceDesign, info: Ca
   }
   const nameWidth = nameBar.w - 40 - costWidth - (nameLeft - nameBar.x - 20);
   // the Nickname style puts the nickname in the name bar and the card name in a small bar under it
-  const nickname = style === "nickname" && face.nickname.trim() ? face.nickname.trim() : "";
+  const nickname = (style === "nickname" || style === "showcasenickname") && face.nickname.trim() ? face.nickname.trim() : "";
   const shownName = nickname || face.name || "Card name";
   if (token) fitText(ctx, shownName, WIDTH / 2, nameBar.y + nameBar.h / 2 + 2, nameWidth, 36, 700, palette.text, "center");
   else fitText(ctx, shownName, nameLeft, nameBar.y + nameBar.h / 2 + 2, nameWidth, 36, 700, palette.text);
 
   // the art: in its box (Classic, Showcase, Nickname), behind the type line and text (Full art), or over the whole card (Borderless)
+  // a saga has its art down the right side and its chapters on the left, with the type line at the bottom
+  const sagaType = { x: 44, y: HEIGHT - 70 - 64, w: WIDTH - 88, h: 56 };
   const artBox = style === "borderless" ? { x: 0, y: 0, w: WIDTH, h: HEIGHT - 44 }
     : style === "fullart" ? { x: 40, y: 40, w: WIDTH - 80, h: HEIGHT - 124 }
+    : saga ? { x: WIDTH / 2 + 4, y: 126, w: WIDTH / 2 - 62, h: sagaType.y - 8 - 126 }
     : { x: 58, y: 126, w: WIDTH - 116, h: token ? 520 : 438 };
   if (!overArt) drawArt(artBox);
   if (nickname) {
@@ -492,7 +524,7 @@ export function renderCard(canvas: HTMLCanvasElement, face: FaceDesign, info: Ca
   }
 
   // type bar with the set symbol
-  const typeBar = { x: 44, y: (overArt ? 126 + (token ? 520 : 438) : artBox.y + artBox.h) + 8, w: WIDTH - 88, h: 56 };
+  const typeBar = saga ? sagaType : { x: 44, y: (overArt ? 126 + (token ? 520 : 438) : artBox.y + artBox.h) + 8, w: WIDTH - 88, h: 56 };
   bar(typeBar.x, typeBar.y, typeBar.w, typeBar.h, 12);
   fitText(ctx, face.typeLine || "Type", typeBar.x + 20, typeBar.y + typeBar.h / 2 + 1, typeBar.w - 90, 30, 700, palette.text);
   const symbolBox = { x: typeBar.x + typeBar.w - 58, y: typeBar.y + 8, s: 40 };
@@ -517,7 +549,8 @@ export function renderCard(canvas: HTMLCanvasElement, face: FaceDesign, info: Ca
   }
 
   // text box
-  const textBox = { x: 58, y: typeBar.y + typeBar.h + 8, w: WIDTH - 116, h: HEIGHT - 70 - (typeBar.y + typeBar.h + 8) - 20 };
+  const textBox = saga ? { x: 58, y: 126, w: WIDTH / 2 - 66, h: typeBar.y - 8 - 126 }
+    : { x: 58, y: typeBar.y + typeBar.h + 8, w: WIDTH - 116, h: HEIGHT - 70 - (typeBar.y + typeBar.h + 8) - 20 };
   ctx.save();
   ctx.globalAlpha = veil;
   ctx.fillStyle = frameFill(ctx, frame, "box", textBox.x, textBox.w);
@@ -526,7 +559,7 @@ export function renderCard(canvas: HTMLCanvasElement, face: FaceDesign, info: Ca
   ctx.lineWidth = showcase ? 3 : 2.5;
   ctx.strokeStyle = showcase ? GOLD : frameFill(ctx, frame, "dark", textBox.x, textBox.w);
   ctx.strokeRect(textBox.x, textBox.y, textBox.w, textBox.h);
-  const statBox = face.kind === "planeswalker" ? !!face.loyalty : !!(face.power || face.toughness);
+  const statBox = !saga && hasPtBox(face);
   drawTextBox(ctx, face, { ...textBox, h: textBox.h - (statBox ? 26 : 0) }, palette, assets);
 
   // power and toughness, or loyalty
@@ -548,6 +581,15 @@ export function renderCard(canvas: HTMLCanvasElement, face: FaceDesign, info: Ca
       ctx.lineWidth = 2;
       ctx.stroke();
       fitText(ctx, face.loyalty, x + 42, box.y + 27, 70, 36, 700, "#ffffff", "center");
+    } else if (frame === "vehicle") {
+      // a vehicle's box is dark brown with light numbers
+      rounded(ctx, box.x, box.y, box.w, box.h, 12);
+      ctx.fillStyle = PALETTES.vehicle!.dark;
+      ctx.fill();
+      ctx.lineWidth = 2.5;
+      ctx.strokeStyle = showcase ? GOLD : "#2b1c10";
+      ctx.stroke();
+      fitText(ctx, `${face.power}/${face.toughness}`, box.x + box.w / 2, box.y + box.h / 2 + 2, box.w - 16, 38, 700, "#f6efe6", "center");
     } else {
       bar(box.x, box.y, box.w, box.h, 12);
       fitText(ctx, `${face.power}/${face.toughness}`, box.x + box.w / 2, box.y + box.h / 2 + 2, box.w - 16, 38, 700, palette.text, "center");
@@ -555,7 +597,11 @@ export function renderCard(canvas: HTMLCanvasElement, face: FaceDesign, info: Ca
     ctx.restore();
   }
 
-  // the information line: number, rarity, set and artist
+  infoLine(ctx, info);
+}
+
+/** The information line: number, rarity, set and artist. */
+function infoLine(ctx: CanvasRenderingContext2D, info: CardInfo) {
   const rarityLetter = (info.rarity[0] ?? "c").toUpperCase();
   ctx.fillStyle = "#e8e8e8";
   ctx.font = `400 17px ${SERIF}`;
@@ -565,6 +611,116 @@ export function renderCard(canvas: HTMLCanvasElement, face: FaceDesign, info: Ca
   if (info.artist) ctx.fillText(`Illus. ${info.artist}`, 210, HEIGHT - 28);
   ctx.textAlign = "right";
   ctx.fillText("Mana Vault custom card", WIDTH - 50, HEIGHT - 28);
+}
+
+/** The legendary crown: a band over the name bar with five points, in the frame's colors (gold-trimmed always). */
+function drawCrown(ctx: CanvasRenderingContext2D, frame: string, showcase: boolean) {
+  ctx.save();
+  const left = 70;
+  const right = WIDTH - 70;
+  ctx.beginPath();
+  ctx.moveTo(left, 62);
+  // five points rising to the middle one
+  const points = 5;
+  for (let index = 0; index <= points * 2; index += 1) {
+    const x = left + ((right - left) * index) / (points * 2);
+    const middle = 1 - Math.abs(index - points) / points;
+    const y = index % 2 === 1 ? 20 - middle * 12 : 44 - middle * 8;
+    ctx.lineTo(x, y);
+  }
+  ctx.lineTo(right, 62);
+  ctx.closePath();
+  ctx.fillStyle = frameFill(ctx, frame, "dark", left, right - left);
+  ctx.fill();
+  ctx.lineWidth = showcase ? 3 : 2;
+  ctx.strokeStyle = GOLD;
+  ctx.stroke();
+  // a jewel at each point
+  ctx.fillStyle = GOLD;
+  for (let index = 1; index < points * 2; index += 2) {
+    const x = left + ((right - left) * index) / (points * 2);
+    const middle = 1 - Math.abs(index - points) / points;
+    ctx.beginPath();
+    ctx.arc(x, 20 - middle * 12 + 2, 4, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+/**
+ * A split card: two halves, one above the other, each with its own name and cost, art, type line and text. The first
+ * half is the face itself; the second half is face.split, with its art from the back art picture.
+ */
+function renderSplit(ctx: CanvasRenderingContext2D, face: FaceDesign, info: CardInfo, assets: Assets, showcase: boolean) {
+  const half = face.split ?? blankHalf();
+  const shape = showcase ? chamfered : rounded;
+  ctx.fillStyle = "#121212";
+  ctx.fillRect(0, 0, WIDTH, HEIGHT);
+  const area = { top: 26, bottom: HEIGHT - 44 };
+  const height = (area.bottom - area.top - 10) / 2;
+  const halves: Array<{ part: { name: string; manaCost: string; typeLine: string; rulesText: string; flavorText: string; art: ArtPlace }; art: CanvasImageSource | null; top: number }> = [
+    { part: face, art: assets.art, top: area.top },
+    { part: half, art: assets.splitArt ?? null, top: area.top + height + 10 },
+  ];
+  for (const { part, art, top } of halves) {
+    const partFace: FaceDesign = { ...face, ...part, kind: "normal", split: undefined };
+    const partFrame = frameOf(partFace);
+    const partPalette = paletteOf(partFrame);
+    rounded(ctx, 26, top, WIDTH - 52, height, 16);
+    ctx.fillStyle = frameFill(ctx, partFrame, "base", 26, WIDTH - 52);
+    ctx.fill();
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = showcase ? GOLD : frameFill(ctx, partFrame, "dark", 26, WIDTH - 52);
+    ctx.stroke();
+    const bar = (x: number, y: number, w: number, h: number) => {
+      shape(ctx, x, y, w, h, 10);
+      ctx.fillStyle = frameFill(ctx, partFrame, "bar", x, w);
+      ctx.fill();
+      ctx.lineWidth = showcase ? 3 : 2;
+      ctx.strokeStyle = showcase ? GOLD : frameFill(ctx, partFrame, "dark", x, w);
+      ctx.stroke();
+    };
+    const name = { x: 42, y: top + 14, w: WIDTH - 84, h: 46 };
+    bar(name.x, name.y, name.w, name.h);
+    const cost = symbolsIn(part.manaCost);
+    const size = 30;
+    const costWidth = cost.length * (size + 3);
+    cost.forEach((code, index) => drawSymbol(ctx, code, name.x + name.w - 12 - costWidth + index * (size + 3), name.y + 8, size, assets));
+    fitText(ctx, part.name || "Card name", name.x + 16, name.y + name.h / 2 + 1, name.w - 40 - costWidth, 28, 700, partPalette.text);
+    const artBox = { x: 56, y: name.y + name.h + 6, w: WIDTH - 112, h: height * 0.36 };
+    ctx.save();
+    ctx.fillStyle = "#2b2b2b";
+    ctx.fillRect(artBox.x, artBox.y, artBox.w, artBox.h);
+    if (art) {
+      ctx.beginPath();
+      ctx.rect(artBox.x, artBox.y, artBox.w, artBox.h);
+      ctx.clip();
+      const source = art as { width: number; height: number };
+      const cover = Math.max(artBox.w / source.width, artBox.h / source.height) * Math.max(0.2, part.art.zoom);
+      ctx.drawImage(art, artBox.x + (artBox.w - source.width * cover) / 2 + part.art.x * artBox.w, artBox.y + (artBox.h - source.height * cover) / 2 + part.art.y * artBox.h,
+        source.width * cover, source.height * cover);
+    } else {
+      ctx.fillStyle = "#8a8f96";
+      ctx.font = `400 22px ${SERIF}`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("Art", artBox.x + artBox.w / 2, artBox.y + artBox.h / 2);
+    }
+    ctx.restore();
+    ctx.lineWidth = 2.5;
+    ctx.strokeStyle = showcase ? GOLD : frameFill(ctx, partFrame, "dark", artBox.x, artBox.w);
+    ctx.strokeRect(artBox.x, artBox.y, artBox.w, artBox.h);
+    const type = { x: 42, y: artBox.y + artBox.h + 6, w: WIDTH - 84, h: 40 };
+    bar(type.x, type.y, type.w, type.h);
+    fitText(ctx, part.typeLine || "Type", type.x + 16, type.y + type.h / 2 + 1, type.w - 32, 24, 700, partPalette.text);
+    const text = { x: 56, y: type.y + type.h + 6, w: WIDTH - 112, h: top + height - 12 - (type.y + type.h + 6) };
+    ctx.fillStyle = frameFill(ctx, partFrame, "box", text.x, text.w);
+    ctx.fillRect(text.x, text.y, text.w, text.h);
+    ctx.strokeStyle = showcase ? GOLD : frameFill(ctx, partFrame, "dark", text.x, text.w);
+    ctx.strokeRect(text.x, text.y, text.w, text.h);
+    drawTextBox(ctx, { ...partFace, textSize: face.textSize * 0.8, flavorSize: face.flavorSize * 0.8 }, text, partPalette, assets);
+  }
+  infoLine(ctx, info);
 }
 
 /** Loads a picture from a blob or address into an image element. Resolves null when it cannot be read. */

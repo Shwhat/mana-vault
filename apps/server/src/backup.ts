@@ -176,7 +176,12 @@ export function restoreBackup(database: DatabaseSync, source: string, userId: nu
     if (backup.version >= 6) {
       database.prepare("DELETE FROM art_library WHERE user_id = ?").run(userId);
       const insertArt = database.prepare("INSERT INTO art_library (id, user_id, name, bytes, type, created_at) VALUES (?, ?, ?, ?, ?, ?)");
-      for (const art of backup.artLibrary) insertArt.run(randomUUID(), userId, art.name, bytes(art.bytes)!, art.type, art.created_at);
+      // the library is shared: a picture someone else already added stays theirs
+      const kept = database.prepare("SELECT 1 FROM art_library WHERE length(bytes) = ? AND bytes = ?");
+      for (const art of backup.artLibrary) {
+        const picture = bytes(art.bytes)!;
+        if (!kept.get(picture.length, picture)) insertArt.run(randomUUID(), userId, art.name, picture, art.type, art.created_at);
+      }
       database.prepare("DELETE FROM card_backs WHERE id = ?").run(`user:${userId}`);
       if (backup.cardBack) database.prepare("INSERT INTO card_backs (id, bytes, type) VALUES (?, ?, ?)").run(`user:${userId}`, bytes(backup.cardBack.bytes)!, backup.cardBack.type);
     }

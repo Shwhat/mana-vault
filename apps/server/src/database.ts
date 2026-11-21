@@ -463,6 +463,12 @@ export function initializeCatalogExtras(database: DatabaseSync): void {
     );
     CREATE INDEX IF NOT EXISTS cards_by_lang ON cards(lang);
   `);
+  // 0.17.0: prices are kept in US dollars only; stored euro prices and euro price history are dropped once
+  if (!database.prepare("SELECT 1 FROM catalog_metadata WHERE key = 'eur_dropped'").get()) {
+    database.exec("UPDATE cards SET price_eur = NULL, price_eur_foil = NULL WHERE price_eur IS NOT NULL OR price_eur_foil IS NOT NULL");
+    database.exec("UPDATE price_history SET eur = NULL, eur_foil = NULL WHERE eur IS NOT NULL OR eur_foil IS NOT NULL");
+    database.prepare("INSERT INTO catalog_metadata (key, value) VALUES ('eur_dropped', ?)").run(new Date().toISOString());
+  }
 }
 
 /** Saves the treatments and language of a printing (0.12.0). */

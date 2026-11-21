@@ -141,6 +141,28 @@ export function editSetDialog(store: Store, set: CustomSet, onSaved: () => void)
 }
 
 /** The Custom sets window: every custom set, with a right-click (long-press) menu, and a form for a new set. */
+/** The commands for one custom set, the same in the Custom sets window and in the card maker's list (0.17.0). */
+export function customSetMenuItems(store: Store, set: CustomSet, onChange: () => void, onNewCard: (code: string) => void) {
+  const mine = set.ownerId === store.user.id;
+  const remove = async () => {
+    if (set.cardCount > 0) return store.flash("Delete or move the cards of the set first", "err");
+    if (!(await confirmDialog("Delete custom set", `Delete the custom set ${set.name} (${set.code.toUpperCase()})?`, "Delete set"))) return;
+    try {
+      await request(`/api/custom/sets/${encodeURIComponent(set.code)}`, { method: "DELETE" });
+      onChange();
+      store.flash(`${set.name} deleted`);
+    } catch (reason) {
+      store.fail(reason, "Could not delete the set.");
+    }
+  };
+  return [
+    mine && { label: "Edit set...", run: () => editSetDialog(store, set, onChange) },
+    { label: "Show its cards", run: () => { store.setFilters({ query: `set:${set.code}` }); store.setView("cards"); } },
+    { label: "New card in this set", run: () => onNewCard(set.code) },
+    mine && { label: "Delete...", run: () => void remove() },
+  ];
+}
+
 export function SetManager({ store, onChange, onNewCard }: { store: Store; onChange: () => void; onNewCard: (code: string) => void }) {
   const [sets, setSets] = useState<CustomSet[] | null>(null);
   const [code, setCode] = useState("");

@@ -12,17 +12,13 @@ The app needs Android 8.0 or newer. Updates install over the old app and keep it
 
 ## First run
 
-1. Enter the **Server address**, the address you use for Mana Vault in a browser (for example https://vault.example.com or http://192.168.1.20:3417), and choose **Continue**. The app checks that a Mana Vault server answers there and shows its address and version.
+1. Enter the **Server address**, the address you use for Mana Vault in a browser (for example https://vault.example.com), and choose **Continue**. The app checks that a Mana Vault server answers there and shows its address and version.
 2. Choose **Sign in** with an existing account, or **Create account** when the server allows new accounts.
 3. The app downloads your collections, decks and the card list. The card list is several megabytes, so the first sync takes longer than later ones.
 
 **Change server** goes back to the address step.
 
-| Address | Allowed |
-|---|---|
-| https:// address | Always |
-| http:// address on a home network (192.168.x.x, 10.x.x.x, 172.16.x.x to 172.31.x.x, 100.64.x.x to 100.127.x.x, names ending in .local, .lan or .home.arpa) | Yes, with the warning "This address is not encrypted. Use it only on your home network." |
-| http:// address anywhere else | No |
+The app connects over https only. An http:// address shows "The app connects over https only. Enter the https address of the server." The phone's own address (localhost or 127.0.0.1), used for testing, is the one exception.
 
 ## Signing in on a phone
 
@@ -63,7 +59,7 @@ The app goes **Offline** only when the server cannot be reached: when a request 
 | Works offline | Needs a connection |
 |---|---|
 | Browsing and filtering collections and decks | Importing, backups and restores |
-| Card search by name and flavor name, with the color, type, set, rarity and mana value filters | Card search in rules text and the search syntax (such as `o:` or `usd>`) |
+| Card search with the full search syntax (such as `o:`, `t:`, `c:`, `id:`, `f:`, `usd>`, `is:` and `a:`), the filters and Owned on this phone | Searches by art tags and Oracle tags (`art:`, `otag:`) |
 | Card details and card pages, with rules text and rulings | Prices of cards not opened before |
 | Adding, removing, editing and moving copies | Deleting collections and decks |
 | Adding and changing deck cards | Collection settings other than the name and description |
@@ -91,6 +87,7 @@ Every change made offline waits on the phone in order. Changes are sent:
 - when the connection returns,
 - when the app opens,
 - every minute while the app is open,
+- in the background, as soon as the phone is online again, even when the app is closed (Android runs it when a connection is available),
 - when you tap the sync button in the top bar, or choose **Sync now** (Menu, Account).
 
 After sending, the phone downloads the lists of collections and decks, then only the collections and decks that changed on the server since the last sync, a newer card list when the server's card database was updated or a custom card changed, and newer rulings.
@@ -130,8 +127,17 @@ The check runs about every 15 minutes; Android decides the exact time and may wa
 
 Android asks for notification permission the first time the setting is turned on. If permission is refused, the message "Notifications are not allowed for Mana Vault in the Android settings." appears and the setting stays off.
 
+## Sharing files into the app
+
+Mana Vault is offered in Android's share menu for lists, CSV files, pictures and PDFs.
+
+| Shared | What happens |
+|---|---|
+| A CSV or text file, or shared text | The Import window opens with the file, to choose a collection or deck and import it |
+| A picture or PDF | The window **Shared file** asks "What do you want to do with file?"; **Read receipt...** reads it as a purchase receipt (see [Purchases](/about/purchases)) |
+
 ## Updates
 
-Once a day, when the app opens, it checks GitHub for a newer release. When there is one, the window **Update available** shows both versions and **Open the download page**. **Check for updates...** (Menu, Account) checks at once and also links to the releases page.
+Once a day, when the app opens, it asks your Mana Vault server which version it runs. When the server is newer, the window **Update available** shows both versions and **Download the app for** the server's version. The download comes from your server, which fetches the app for its version from the GitHub release once and keeps it. **Check for updates...** (Menu, Account) checks at once, and says "This phone has the app for the server's version" or "The server could not be reached".
 
 The app's version always matches the server version it was released with. An app and a server of different versions work together as long as both are 0.5.0 or newer.

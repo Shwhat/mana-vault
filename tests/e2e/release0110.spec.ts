@@ -93,7 +93,7 @@ test("Edit as text links exact printings, finish badges show in every view, and 
   const bar = page.locator("#view-deck .dgrid .stackcell", { has: page.locator('.dcard[title^="Lightning Bolt"]') }).locator(".pipbar");
   await expect(bar.locator(".pipcount")).toHaveText("3x");
   await expect(bar.locator(".badge.foil")).toHaveText("FOIL");
-  await expect(bar.locator(".badge.miss")).toHaveText("Missing 1");
+  await expect(bar.locator(".badge.miss")).toHaveText("MISSING 1");
   await expect(picture.locator(".badge")).toHaveCount(0);
   await expect(page.locator("#view-deck .dgrid .sline")).toHaveCount(0);
   await deckOptions(page, () => page.getByRole("group", { name: "Show cards as" }).getByRole("button", { name: "List" }).click());
@@ -123,8 +123,9 @@ test("Upgrade wanted, part of a stack changing finish, and a deck that keeps its
 
   // one of the two cards becomes foil; the other stays
   await rightClick(page, bolt.first(), "Change printing...");
-  await page.getByRole("spinbutton", { name: "How many to change" }).fill("1");
+  // 0.17.0: how many to change is its own first step, starting at 1
   await expect(page.getByRole("spinbutton", { name: "How many to change" })).toHaveValue("1");
+  await page.getByRole("button", { name: "Choose the printing" }).click();
   await page.getByRole("button", { name: "Foil M10 146" }).click();
   await expect(status(page)).toHaveText("1 of 2 Lightning Bolt changed to (M10) 146 foil, 1 missing");
   await expect(bolt).toHaveCount(2);

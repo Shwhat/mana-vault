@@ -8,6 +8,8 @@ import { choices, Picker } from "./Picker";
 import { PipBar, PricePip } from "./CardMarks";
 import { Thumb } from "../views/Views";
 import { rowMenu } from "./ContextMenu";
+import { EntryMenuButton, GroupedList, ManaCost } from "./GroupedList";
+import { groupList } from "../list-groups";
 
 type MenuItem = { label: string; run: () => void } | false | null | undefined;
 export type ResultProps = {
@@ -117,7 +119,7 @@ function ResultRow({ card, props, store }: { card: FoundCard; props: ResultProps
       onClick={() => props.onPick(card)} onDoubleClick={() => props.onOpen(card)} {...rowMenu(store, card.name, () => props.menu(card))}>
       <Thumb url={card.image_url} />
       <div className="rowmain">
-        <div className="rowtitle"><b>{card.name}</b>{card.custom && <span className="badge custom">Custom</span>}<span className="mana">{card.mana_cost}</span><PrintingsBadge card={card} /><OwnedBadge owned={card.owned} grouped={!!card.printings} /></div>
+        <div className="rowtitle"><b>{card.name}</b>{card.custom && <span className="badge custom">Custom</span>}<ManaCost cost={card.mana_cost} /><PrintingsBadge card={card} /><OwnedBadge owned={card.owned} grouped={!!card.printings} /></div>
         <div className="rowsub">{card.type_line}</div>
         <div className="rowmeta">{card.set_name}{" "}
           {props.onTag
@@ -134,6 +136,7 @@ function ResultRow({ card, props, store }: { card: FoundCard; props: ResultProps
       </div>
       <span className="price">{money(anyPrice(pricesOf(card), currency), currency)}</span>
       {props.buttons && <div className="rowact">{props.buttons(card)}</div>}
+      <EntryMenuButton menu={rowMenu(store, card.name, () => props.menu(card))} name={card.name} />
     </div>
   );
 }
@@ -158,9 +161,12 @@ function ResultList({ props, store }: { props: ResultProps; store: Store }) {
   const { root, end } = useMoreOnScroll(props.search);
   useEffect(() => { root.current?.scrollTo({ top: 0 }); }, [props.resetKey, root]);
   const { cards, total } = props.search;
+  const group = store.prefs.listGroups.search;
+  const currency = store.prefs.currency;
   return (
     <div className="list" role="listbox" aria-label={props.label} ref={root}>
-      {cards.map((card) => <ResultRow key={card.id} card={card} props={props} store={store} />)}
+      <GroupedList view="search" headed={group !== "none"} sections={groupList(cards, group, null, (card) => anyPrice(pricesOf(card), currency))}
+        render={(card) => <ResultRow key={card.id} card={card} props={props} store={store} />} />
       {cards.length < total && <div ref={end} className="gridmore">Loading more cards</div>}
     </div>
   );

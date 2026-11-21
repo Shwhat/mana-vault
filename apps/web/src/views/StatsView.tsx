@@ -105,9 +105,6 @@ export function StatsPanel({ stats, kind, onFacet, extra }: { stats: Stats | nul
           <button type="button" className={measure === "count" ? "on" : ""} aria-pressed={measure === "count"} onClick={() => setMeasure("count")}>Cards</button>
           <button type="button" className={measure === "value" ? "on" : ""} aria-pressed={measure === "value"} onClick={() => setMeasure("value")}>Value</button>
         </div>
-        <button type="button" className="lnk" onClick={() => store.setPrefs({ currency: currency === "usd" ? "eur" : "usd" })}>
-          Show in {currency === "usd" ? "euros" : "US dollars"}
-        </button>
       </div>
       <div className="chartgrid">
         {extra}

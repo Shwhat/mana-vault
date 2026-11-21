@@ -60,9 +60,29 @@ export function importCustomArt(database: DatabaseSync): void {
   }
 }
 
-/** Adds a picture to an account's art library unless the same picture is already there. Returns its id. */
+/**
+ * 0.17.0: one art library for the server. Pictures kept more than once (by different accounts) are joined, keeping the
+ * oldest; user_id now records who added a picture. Runs once.
+ */
+export function shareArtLibrary(database: DatabaseSync): void {
+  if (database.prepare("SELECT 1 FROM catalog_metadata WHERE key = 'art_library_shared'").get()) return;
+  database.exec("BEGIN");
+  try {
+    database.exec(`DELETE FROM art_library WHERE rowid IN (
+      SELECT later.rowid FROM art_library later JOIN art_library first
+        ON length(first.bytes) = length(later.bytes) AND first.bytes = later.bytes
+       AND (first.created_at < later.created_at OR (first.created_at = later.created_at AND first.rowid < later.rowid)))`);
+    database.prepare("INSERT INTO catalog_metadata (key, value) VALUES ('art_library_shared', ?)").run(new Date().toISOString());
+    database.exec("COMMIT");
+  } catch (error) {
+    database.exec("ROLLBACK");
+    throw error;
+  }
+}
+
+/** Adds a picture to the art library unless the same picture is already there (added by anyone). Returns its id. */
 export function addToArtLibrary(database: DatabaseSync, userId: number, name: string, picture: { bytes: Uint8Array; type: string }): string {
-  const same = database.prepare("SELECT id FROM art_library WHERE user_id = ? AND length(bytes) = ? AND bytes = ?").get(userId, picture.bytes.length, picture.bytes);
+  const same = database.prepare("SELECT id FROM art_library WHERE length(bytes) = ? AND bytes = ?").get(picture.bytes.length, picture.bytes);
   if (same) return String(same.id);
   const id = randomUUID();
   database.prepare("INSERT INTO art_library (id, user_id, name, bytes, type) VALUES (?, ?, ?, ?, ?)").run(id, userId, name || "Art", picture.bytes, picture.type);
@@ -85,6 +105,7 @@ export function registerExtrasRoutes(app: FastifyInstance, database: DatabaseSyn
   };
   try {
     importCustomArt(database);
+    shareArtLibrary(database);
   } catch (error) {
     console.warn(`Could not put custom card art in the art library: ${error instanceof Error ? error.message : String(error)}`);
   }
@@ -173,37 +194,44 @@ export function registerExtrasRoutes(app: FastifyInstance, database: DatabaseSyn
   }));
 
   // ---------- art library ----------
-  const artRow = (row: Record<string, unknown>) => ({
+  // one library for every account: anyone uses any picture; the person who added it, or an admin, renames or deletes it
+  const artRow = (request: FastifyRequest) => (row: Record<string, unknown>) => ({
     id: String(row.id), name: String(row.name), type: String(row.type), bytes: Number(row.size), createdAt: String(row.created_at),
-    url: `/api/art/${String(row.id)}/picture`,
+    url: `/api/art/${String(row.id)}/picture`, addedBy: row.added_by ? String(row.added_by) : null,
+    canChange: Number(row.user_id) === userOf(request) || isAdmin(database, request.user?.id),
   });
-  const ownArt = (request: FastifyRequest<{ Params: { id: string } }>) =>
-    database.prepare("SELECT id FROM art_library WHERE id = ? AND user_id = ?").get(request.params.id, userOf(request));
-  app.get("/api/art", async (request) => database.prepare(
-    "SELECT id, name, type, length(bytes) AS size, created_at FROM art_library WHERE user_id = ? ORDER BY created_at DESC, name",
-  ).all(userOf(request)).map(artRow));
+  const ART_ROW = "SELECT a.id, a.name, a.type, a.user_id, length(a.bytes) AS size, a.created_at, u.name AS added_by FROM art_library a LEFT JOIN users u ON u.id = a.user_id";
+  const ownArt = (request: FastifyRequest<{ Params: { id: string } }>) => {
+    const row = database.prepare("SELECT id, user_id FROM art_library WHERE id = ?").get(request.params.id);
+    return row && (Number(row.user_id) === userOf(request) || isAdmin(database, request.user?.id)) ? row : null;
+  };
+  const artMissing = (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) =>
+    database.prepare("SELECT 1 FROM art_library WHERE id = ?").get(request.params.id)
+      ? reply.code(403).send({ error: "Only the person who added this art, or an admin, can change it" })
+      : reply.code(404).send({ error: "That art is not in the library" });
+  app.get("/api/art", async (request) => database.prepare(`${ART_ROW} ORDER BY a.created_at DESC, a.name`).all().map(artRow(request)));
   app.post<{ Body: { name?: unknown; picture?: unknown } }>("/api/art", { bodyLimit: 16 * 1024 * 1024 }, async (request, reply) => {
     const picture = readImage(request.body?.picture, MAX_ART);
     if (typeof picture === "string") return reply.code(400).send({ error: picture });
     const id = addToArtLibrary(database, userOf(request), cleanName(request.body?.name), picture);
-    const row = database.prepare("SELECT id, name, type, length(bytes) AS size, created_at FROM art_library WHERE id = ?").get(id)!;
-    return reply.code(201).send(artRow(row));
+    const row = database.prepare(`${ART_ROW} WHERE a.id = ?`).get(id)!;
+    return reply.code(201).send(artRow(request)(row));
   });
   app.patch<{ Params: { id: string }; Body: { name?: unknown } }>("/api/art/:id", async (request, reply) => {
-    if (!ownArt(request)) return reply.code(404).send({ error: "That art is not in your library" });
+    if (!ownArt(request)) return artMissing(request, reply);
     const name = cleanName(request.body?.name);
     if (!name) return reply.code(400).send({ error: "Enter a name" });
     database.prepare("UPDATE art_library SET name = ? WHERE id = ?").run(name, request.params.id);
     return { ok: true };
   });
   app.delete<{ Params: { id: string } }>("/api/art/:id", async (request, reply) => {
-    if (!ownArt(request)) return reply.code(404).send({ error: "That art is not in your library" });
+    if (!ownArt(request)) return artMissing(request, reply);
     database.prepare("DELETE FROM art_library WHERE id = ?").run(request.params.id);
     return { ok: true };
   });
   app.get<{ Params: { id: string } }>("/api/art/:id/picture", async (request, reply) => {
-    const row = database.prepare("SELECT bytes, type FROM art_library WHERE id = ? AND user_id = ?").get(request.params.id, userOf(request));
-    if (!row) return reply.code(404).send({ error: "That art is not in your library" });
+    const row = database.prepare("SELECT bytes, type FROM art_library WHERE id = ?").get(request.params.id);
+    if (!row) return reply.code(404).send({ error: "That art is not in the library" });
     reply.header("Cache-Control", "private, max-age=86400");
     return reply.type(String(row.type)).send(Buffer.from(row.bytes as Uint8Array));
   });

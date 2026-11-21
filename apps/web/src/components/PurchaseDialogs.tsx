@@ -1,12 +1,18 @@
 // ---------- purchase history windows: new and edited entries, Open..., Set current value..., and imported prices ----------
 import { useEffect, useMemo, useState } from "react";
-import { request } from "../api";
-import { type Entry, type EntryKind, type EntryLine, KIND_LABELS, type Product, type PurchaseList, reloadOpening, setActiveOpening } from "../purchase-state";
+import { pickFile, request, sendFile } from "../api";
+import { isApp, native } from "../android/platform";
+import type { FoundCard } from "../card-search";
+import {
+  type Entry, type EntryKind, type EntryLine, KIND_LABELS, type Place, type PlaceKind, PLACE_KINDS, type Product, type PurchaseList, type ReceiptFields, reloadOpening, setActiveOpening,
+} from "../purchase-state";
+import { finishCode, type ScanCard, type ScanItem } from "../scan-state";
 import { type Store } from "../store";
-import { CONDITIONS, type Currency, money } from "../types";
-import { SetIcon } from "./CardMarks";
+import { CONDITIONS, type Currency, finishLabel, type FinishCode, LANGUAGES, money } from "../types";
+import { FinishBadge, SetIcon } from "./CardMarks";
 import { customDialog } from "./Dialog";
-import { choices, Picker } from "./Picker";
+import { type Choice, choices, Picker } from "./Picker";
+import { finishesOf, type Printing, PrintingList } from "./PrintingDialog";
 import { Suggest } from "./Suggest";
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -15,6 +21,7 @@ const num = (text: string) => {
   return text.trim() === "" ? 0 : Number.isFinite(value) ? value : NaN;
 };
 const fixed = (value: number) => (Number.isFinite(value) ? String(Math.round(value * 100) / 100) : "");
+const USD: Currency = "usd";
 
 /** What happens after an entry is saved: the view reloads and opens it. */
 type Saved = (entry: Entry) => void;
@@ -29,97 +36,403 @@ export function recordCreated(store: Store, entry: Entry, after: () => void) {
   });
 }
 
-/** The header fields every entry has: date, place, currency and note. */
+/**
+ * A text field with the app's own list of matches under it: pick a place from the list, or type a new name. The list
+ * shows places whose name holds every word typed.
+ */
+export function PlaceField({ id, value, places, onValue, placeholder }: { id: string; value: string; places: Place[]; onValue: (value: string) => void; placeholder?: string }) {
+  const [open, setOpen] = useState(false);
+  const [index, setIndex] = useState(0);
+  const words = value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const shown = places.filter((place) => words.every((word) => `${place.name} ${place.note}`.toLowerCase().includes(word))).slice(0, 12);
+  const exact = places.some((place) => place.name.toLowerCase() === value.trim().toLowerCase());
+  const pick = (name: string) => { onValue(name); setOpen(false); };
+  return (
+    <span className="combo">
+      <input id={id} value={value} maxLength={120} placeholder={placeholder} autoComplete="off" role="combobox" aria-expanded={open && shown.length > 0} aria-controls={`${id}-list`}
+        onFocus={() => setOpen(true)} onBlur={() => window.setTimeout(() => setOpen(false), 150)}
+        onChange={(event) => { onValue(event.target.value); setOpen(true); setIndex(0); }}
+        onKeyDown={(event) => {
+          if (!open || !shown.length) return;
+          if (event.key === "ArrowDown") { event.preventDefault(); setIndex(Math.min(shown.length - 1, index + 1)); }
+          else if (event.key === "ArrowUp") { event.preventDefault(); setIndex(Math.max(0, index - 1)); }
+          else if (event.key === "Enter" && !exact) { event.preventDefault(); pick(shown[index]!.name); }
+          else if (event.key === "Escape") { event.stopPropagation(); setOpen(false); }
+        }} />
+      {open && shown.length > 0 && (
+        <div className="combolist" id={`${id}-list`} role="listbox">
+          {shown.map((place, at) => (
+            <div key={place.id} role="option" aria-selected={at === index} className={at === index ? "pkopt hi" : "pkopt"}
+              onMouseDown={(event) => { event.preventDefault(); pick(place.name); }}>
+              <span className="pktext"><span>{place.name}</span><span className="pkdetail">{PLACE_KINDS[place.kind] ?? "Store"}{place.note ? `, ${place.note}` : ""}</span></span>
+            </div>
+          ))}
+        </div>
+      )}
+      {value.trim() && !exact && <span className="sub comboadd">New place</span>}
+    </span>
+  );
+}
+
+/** The header fields every entry has: date, place and note. Amounts are in USD. */
 function HeaderFields({ value, set, places, kind }: {
-  value: { date: string; place: string; currency: Currency; note: string }; set: (change: Partial<{ date: string; place: string; currency: Currency; note: string }>) => void;
-  places: string[]; kind: EntryKind;
+  value: { date: string; place: string; note: string }; set: (change: Partial<{ date: string; place: string; note: string }>) => void;
+  places: Place[]; kind: EntryKind;
 }) {
   return (
     <>
       <div className="prow"><label htmlFor="pe-date">Date</label><input id="pe-date" type="date" value={value.date} onChange={(event) => set({ date: event.target.value })} /></div>
       <div className="prow"><label htmlFor="pe-place">{kind === "trade" ? "Traded with" : kind === "purchase" ? "Bought from" : "Sold to or on"}</label>
-        <input id="pe-place" list="pe-places" value={value.place} maxLength={120} placeholder="Store, website or person" onChange={(event) => set({ place: event.target.value })} />
-        <datalist id="pe-places">{places.map((place) => <option key={place} value={place} />)}</datalist></div>
-      <div className="prow"><label htmlFor="pe-currency">Currency</label>
-        <Picker id="pe-currency" label="Currency" value={value.currency} options={choices([["usd", "USD"], ["eur", "EUR"]])} onChange={(currency) => set({ currency: currency as Currency })} /></div>
+        <PlaceField id="pe-place" value={value.place} places={places} placeholder="Store, website or person" onValue={(place) => set({ place })} /></div>
       <div className="prow"><label htmlFor="pe-note">Note</label><input id="pe-note" value={value.note} maxLength={1000} onChange={(event) => set({ note: event.target.value })} /></div>
     </>
   );
 }
 
+// ---------- sets ----------
+
+type SetRow = { code: string; name: string; set_type: string; released_at: string | null };
+let setCache: Promise<SetRow[]> | null = null;
+/** Every set of the card database, newest first, loaded once. */
+export function loadSets(): Promise<SetRow[]> {
+  if (!setCache) setCache = request<SetRow[]>("/api/sets").catch((reason: unknown) => { setCache = null; throw reason; });
+  return setCache;
+}
+
+/** A searchable list of sets, each with its symbol, name and code. */
+export function SetPicker({ label, value, onChange, disabled }: { label: string; value: string; onChange: (code: string) => void; disabled?: boolean }) {
+  const [sets, setSets] = useState<SetRow[]>([]);
+  useEffect(() => { void loadSets().then(setSets).catch(() => setSets([])); }, []);
+  const options: Choice[] = useMemo(() => [
+    { value: "", label: "No set" },
+    ...sets.map((set) => ({ value: set.code, label: set.name, detail: `${set.code.toUpperCase()}${set.released_at ? `, ${set.released_at.slice(0, 4)}` : ""}`, icon: <SetIcon code={set.code} /> })),
+    ...(value && !sets.some((set) => set.code === value) ? [{ value, label: value.toUpperCase(), icon: <SetIcon code={value} /> }] : []),
+  ], [sets, value]);
+  return <Picker label={label} value={value} options={options} onChange={onChange} disabled={disabled} className="setpick" />;
+}
+
+// ---------- single cards ----------
+
+type SingleDraft = {
+  id?: string; key: string; cardId: string; name: string; setCode: string; number: string; image: string | null; finishes: string; promoTypes: string | null;
+  foil: FinishCode; condition: string; language: string; collectionId: string; quantity: string; each: string; total: string; locked: number;
+};
+
 type LineDraft = {
-  id?: string; product: string; name: string; setCode: string; quantity: string; each: string; total: string; packs: string;
-  card: string; cardId: string | null; foil: string; condition: string; collectionId: string; locked: number;
+  id?: string; product: string; name: string; setCode: string; quantity: string; each: string; total: string; packs: string; locked: number;
+};
+
+/** The purchase window as typed so far, kept while the scanner is open. */
+export type PurchaseDraft = {
+  entry: Entry | null; head: { date: string; place: string; note: string }; tax: string; shipping: string; lines: LineDraft[]; singles: SingleDraft[];
+  receipt: File | null;
+  /** The receipt is read as the window opens (a picture or PDF shared into the app). */
+  readNow?: boolean;
 };
 
 const draftOf = (line: EntryLine): LineDraft => ({
   id: line.id, product: line.product, name: line.product === "other" ? line.name : "", setCode: line.setCode ?? "", quantity: String(line.quantity),
-  each: fixed(line.cost / line.quantity), total: fixed(line.cost), packs: String(line.packs), card: line.product === "single" ? line.name : "", cardId: line.cardId,
-  foil: String(line.foil ?? 0), condition: line.condition ?? "NM", collectionId: line.collectionId ?? "", locked: line.opened + line.sold,
+  each: fixed(line.cost / line.quantity), total: fixed(line.cost), packs: String(line.packs), locked: line.opened + line.sold,
 });
+const singleOf = (line: EntryLine): SingleDraft => ({
+  id: line.id, key: line.id, cardId: line.cardId ?? "", name: line.name, setCode: line.setCode ?? "", number: "", image: null, finishes: "", promoTypes: null,
+  foil: (line.foil ?? 0) as FinishCode, condition: line.condition ?? "NM", language: line.language ?? "en", collectionId: line.collectionId ?? "",
+  quantity: String(line.quantity), each: fixed(line.cost / line.quantity), total: fixed(line.cost), locked: line.quantity,
+});
+const newKey = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
 
-/** The purchase window: one line per product, with tax and shipping spread over the lines by cost. */
-function PurchaseEditor({ store, list, entry, close, onSaved }: { store: Store; list: PurchaseList; entry: Entry | null; close: () => void; onSaved: Saved }) {
-  const owned = (store.collections ?? []).filter((item) => item.kind === "collection" && item.role === "owner");
-  const blank = (product = "play_booster"): LineDraft => ({
-    product, name: "", setCode: "", quantity: "1", each: "", total: "", packs: String(list.products.find((item) => item.id === product)?.packs ?? 0),
-    card: "", cardId: null, foil: "0", condition: "NM", collectionId: store.prefs.targetCollection && owned.some((item) => item.id === store.prefs.targetCollection) ? store.prefs.targetCollection : owned[0]?.id ?? "", locked: 0,
-  });
-  const [head, setHead] = useState({ date: entry?.date ?? today(), place: entry?.place ?? "", currency: (entry?.currency ?? store.prefs.currency) as Currency, note: entry?.note ?? "" });
-  const [tax, setTax] = useState(entry ? fixed(entry.tax) : "");
-  const [shipping, setShipping] = useState(entry ? fixed(entry.shipping) : "");
-  const [lines, setLines] = useState<LineDraft[]>(entry ? entry.lines.map(draftOf) : [blank()]);
-  const [error, setError] = useState("");
+/** A single cards line from a printing and finish. */
+function singleFrom(card: Pick<ScanCard, "id" | "name" | "set_code" | "collector_number" | "image_url" | "finishes"> & { promo_types?: string | null },
+  foil: FinishCode, collectionId: string, extra: Partial<SingleDraft> = {}): SingleDraft {
+  return {
+    key: newKey(), cardId: card.id, name: card.name, setCode: card.set_code, number: card.collector_number, image: card.image_url, finishes: card.finishes,
+    promoTypes: card.promo_types ?? null, foil, condition: "NM", language: "en", collectionId, quantity: "1", each: "", total: "", locked: 0, ...extra,
+  };
+}
+
+/** Find cards: a card search with pictures; picking a card shows its printings, and picking a printing adds it. */
+function SingleFinder({ onAdd, onClose }: { onAdd: (card: Printing, finish: FinishCode) => void; onClose: () => void }) {
+  const [term, setTerm] = useState("");
+  const [found, setFound] = useState<FoundCard[]>([]);
   const [busy, setBusy] = useState(false);
+  const [chosen, setChosen] = useState<FoundCard | null>(null);
+  useEffect(() => {
+    if (term.trim().length < 2) { setFound([]); return; }
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      setBusy(true);
+      void request<{ total: number; cards: FoundCard[] }>(`/api/cards?paged=1&group=1&offset=0&limit=24&sort=best&q=${encodeURIComponent(term.trim())}`, { signal: controller.signal })
+        .then((page) => setFound(page.cards)).catch(() => undefined).finally(() => setBusy(false));
+    }, 250);
+    return () => { window.clearTimeout(timer); controller.abort(); };
+  }, [term]);
+  if (chosen) {
+    return (
+      <div className="singlefind">
+        <div className="btnrow"><button type="button" className="btn small" onClick={() => setChosen(null)}>Back to cards</button><b>Choose the printing of {chosen.name}</b></div>
+        <PrintingList cardId={chosen.id} currentId={chosen.id} finish={0} currency={USD} onPick={(printing, finish) => { onAdd(printing, finish); setChosen(null); }} />
+      </div>
+    );
+  }
+  return (
+    <div className="singlefind">
+      <div className="btnrow">
+        <Suggest mode="search" className="search grow" autoFocus aria-label="Find a card" placeholder="Card name or search" value={term} onValue={setTerm} />
+        <button type="button" className="btn small" onClick={onClose}>Done</button>
+      </div>
+      <p className="note">{busy ? "Searching" : term.trim().length < 2 ? "Type at least two letters of a card name" : `${found.length} cards`}</p>
+      <div className="singlegrid" role="listbox" aria-label="Cards found">
+        {found.map((card) => (
+          <button key={card.id} type="button" role="option" aria-selected={false} className="singlecard" aria-label={card.name} title={card.name} onClick={() => setChosen(card)}>
+            {card.image_url ? <img src={card.image_url} alt="" loading="lazy" /> : <span className="noimg">{card.name}</span>}
+            <span className="singlename">{card.name}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** From scanned list...: the scanner's list with a checkbox on each card; checked cards become single cards lines. */
+function ScannedPicker({ store, onAdd, onClose }: { store: Store; onAdd: (items: ScanItem[]) => void; onClose: () => void }) {
+  const [checked, setChecked] = useState<Set<string>>(() => new Set(store.scanItems.map((item) => item.key)));
+  const items = store.scanItems;
+  return (
+    <div className="singlefind">
+      {!items.length && <p className="note">The scanned list is empty.</p>}
+      <div className="scanpick">
+        {items.map((item) => (
+          <label key={item.key} className="check scanpickrow">
+            <input type="checkbox" checked={checked.has(item.key)} onChange={(event) => {
+              const next = new Set(checked);
+              if (event.target.checked) next.add(item.key); else next.delete(item.key);
+              setChecked(next);
+            }} />
+            {item.card.image_url ? <img className="thumb-img sm" src={item.card.image_url} alt="" /> : null}
+            <span>{item.quantity}x {item.card.name} <span className="sub">{item.card.set_code.toUpperCase()} #{item.card.collector_number}</span> <FinishBadge finish={finishCode(item)} /></span>
+          </label>
+        ))}
+      </div>
+      <div className="btnrow end">
+        <button type="button" className="btn small" onClick={onClose}>Cancel</button>
+        <button type="button" className="btn small primary" disabled={!checked.size} onClick={() => {
+          const chosen = items.filter((item) => checked.has(item.key));
+          for (const item of chosen) store.removeScanItem(item.key);
+          onAdd(chosen);
+        }}>Add {[...checked].length} to the purchase</button>
+      </div>
+    </div>
+  );
+}
+
+// ---------- scanning into a purchase ----------
+
+let purchaseScan: { draft: PurchaseDraft; added: ScanItem[]; reopen: (draft: PurchaseDraft) => void } | null = null;
+/** Whether the scanner was opened from a purchase window (its Add to... offers This purchase). */
+export const scanningForPurchase = () => !!purchaseScan;
+/** The scanner's Add to...: the scanned cards go to the purchase window, and leave the scanned list. */
+export function deliverPurchaseScan(store: Store, items: ScanItem[]) {
+  if (!purchaseScan) return;
+  purchaseScan.added.push(...items);
+  for (const item of items) store.removeScanItem(item.key);
+  store.setScannerOpen(false);
+}
+/** The scanner closed: the purchase window comes back with any cards added. */
+export function finishPurchaseScan() {
+  const session = purchaseScan;
+  if (!session) return;
+  purchaseScan = null;
+  const collectionId = session.draft.singles[0]?.collectionId ?? "";
+  const singles = [...session.draft.singles, ...session.added.map((item) => singleFrom(item.card, finishCode(item), collectionId, {
+    condition: item.condition ?? "NM", language: item.language ?? "en", quantity: String(item.quantity),
+  }))];
+  window.setTimeout(() => session.reopen({ ...session.draft, singles }), 0);
+}
+
+// ---------- receipts ----------
+
+const RECEIPT_TYPES = "application/pdf,image/png,image/jpeg,image/webp,image/gif,image/bmp";
+
+/** Reads a receipt: on the Android app a photo is read on the phone, everything else by the server. */
+export async function readReceipt(file: File): Promise<ReceiptFields> {
+  if (isApp() && file.type.startsWith("image/")) {
+    try {
+      const text = await phoneText(file);
+      return (await request<{ fields: ReceiptFields }>("/api/purchases/receipts/parse", { method: "POST", body: JSON.stringify({ text }) })).fields;
+    } catch {
+      // the phone could not read it: the server tries
+    }
+  }
+  return (await sendFile<{ fields: ReceiptFields }>("/api/purchases/receipts/read", "POST", file)).fields;
+}
+
+/** The lines of text on a photo, read by the phone's text recognition and put in reading order. */
+async function phoneText(file: File): Promise<string> {
+  const bitmap = await createImageBitmap(file);
+  const scale = Math.min(1, 2200 / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(bitmap.width * scale);
+  canvas.height = Math.round(bitmap.height * scale);
+  canvas.getContext("2d")?.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  const image = canvas.toDataURL("image/jpeg", 0.88).replace(/^data:[^,]*,/, "");
+  const { lines } = await native().recognize({ image });
+  const sorted = [...lines].sort((a, b) => a.top - b.top || a.left - b.left);
+  const rows: Array<{ top: number; bottom: number; parts: typeof lines }> = [];
+  for (const line of sorted) {
+    const row = rows.find((item) => line.top < item.bottom - (item.bottom - item.top) * 0.4 && line.bottom > item.top + (item.bottom - item.top) * 0.4);
+    if (row) { row.parts.push(line); row.bottom = Math.max(row.bottom, line.bottom); } else rows.push({ top: line.top, bottom: line.bottom, parts: [line] });
+  }
+  return rows.map((row) => row.parts.sort((a, b) => a.left - b.left).map((part) => part.text).join(" ")).join("\n");
+}
+
+/** Keeps a receipt with an entry, as one undo step (undo puts back the receipt kept before, or none). */
+export async function keepReceipt(store: Store, entryId: string, file: File, after: () => void) {
+  const { before } = await sendFile<{ before: StoredReceipt | null }>(`/api/purchases/${entryId}/receipt`, "PUT", file, file.name);
+  store.pushUndo({
+    label: "Receipt",
+    undo: async () => { await putBack(entryId, before); after(); },
+    redo: async () => { await sendFile(`/api/purchases/${entryId}/receipt`, "PUT", file, file.name); after(); },
+  });
+}
+
+type StoredReceipt = { name: string; type: string; data: string };
+async function putBack(entryId: string, receipt: StoredReceipt | null) {
+  if (!receipt) { await request(`/api/purchases/${entryId}/receipt`, { method: "DELETE" }); return; }
+  const bytes = Uint8Array.from(atob(receipt.data), (char) => char.charCodeAt(0));
+  await sendFile(`/api/purchases/${entryId}/receipt`, "PUT", new Blob([bytes], { type: receipt.type }), receipt.name);
+}
+
+/** Removes the receipt of an entry, as one undo step. */
+export async function removeReceipt(store: Store, entryId: string, after: () => void) {
+  const { before } = await request<{ before: StoredReceipt | null }>(`/api/purchases/${entryId}/receipt`, { method: "DELETE" });
+  store.pushUndo({ label: "Remove receipt", undo: async () => { await putBack(entryId, before); after(); }, redo: async () => { await request(`/api/purchases/${entryId}/receipt`, { method: "DELETE" }); after(); } });
+}
+
+/** Chooses a receipt file (on a phone the camera is one of the choices). */
+export const pickReceipt = () => pickFile(RECEIPT_TYPES);
+
+// ---------- the purchase window ----------
+
+const PACK_PRODUCTS = ["booster_box", "bundle", "prerelease_kit", "other", "other_booster", "jumpstart_booster", "secret_lair"];
+
+/** The purchase window: one line per product, single cards picked by printing, with tax and shipping spread over the lines by cost. */
+function PurchaseEditor({ store, list, start, close, onSaved, reopen }: {
+  store: Store; list: PurchaseList; start: PurchaseDraft; close: () => void; onSaved: Saved; reopen: (draft: PurchaseDraft) => void;
+}) {
+  const entry = start.entry;
+  const owned = (store.collections ?? []).filter((item) => item.kind === "collection" && item.role === "owner");
+  const defaultCollection = store.prefs.targetCollection && owned.some((item) => item.id === store.prefs.targetCollection) ? store.prefs.targetCollection : owned[0]?.id ?? "";
+  const blank = (product = "play_booster"): LineDraft => ({
+    product, name: "", setCode: "", quantity: "1", each: "", total: "", packs: String(list.products.find((item) => item.id === product)?.packs ?? 0), locked: 0,
+  });
+  const [head, setHead] = useState(start.head);
+  const [tax, setTax] = useState(start.tax);
+  const [shipping, setShipping] = useState(start.shipping);
+  const [lines, setLines] = useState<LineDraft[]>(start.lines);
+  const [singles, setSingles] = useState<SingleDraft[]>(start.singles);
+  const [receipt, setReceipt] = useState<File | null>(start.receipt);
+  const [panel, setPanel] = useState<"" | "find" | "scanned">("");
+  const [error, setError] = useState("");
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  const draft = (): PurchaseDraft => ({ entry, head, tax, shipping, lines, singles, receipt });
   const setLine = (index: number, change: Partial<LineDraft>) => setLines(lines.map((line, at) => (at === index ? { ...line, ...change } : line)));
+  const setSingle = (key: string, change: Partial<SingleDraft>) => setSingles(singles.map((line) => (line.key === key ? { ...line, ...change } : line)));
   // either cost each or the total fills the other
-  const costChange = (index: number, field: "each" | "total", textValue: string) => {
-    const line = lines[index]!;
+  const costOf = (line: { quantity: string; each: string }, field: "each" | "total", textValue: string) => {
     const quantity = Math.max(1, Number(line.quantity) || 1);
     const value = num(textValue);
-    setLine(index, field === "each" ? { each: textValue, total: Number.isFinite(value) && textValue ? fixed(value * quantity) : "" } : { total: textValue, each: Number.isFinite(value) && textValue ? fixed(value / quantity) : "" });
+    return field === "each" ? { each: textValue, total: Number.isFinite(value) && textValue ? fixed(value * quantity) : "" } : { total: textValue, each: Number.isFinite(value) && textValue ? fixed(value / quantity) : "" };
   };
-  const subtotal = lines.reduce((sum, line) => sum + (num(line.total) || 0), 0);
+  const quantityOf = (line: { each: string; total: string }, quantity: string) => {
+    const each = num(line.each);
+    return { quantity, total: line.each && Number.isFinite(each) ? fixed(each * (Number(quantity) || 1)) : line.total };
+  };
+  const subtotal = [...lines, ...singles].reduce((sum, line) => sum + (num(line.total) || 0), 0);
   const extra = (num(tax) || 0) + (num(shipping) || 0);
-  const productOptions = list.products.map((product: Product) => ({ value: product.id, label: product.label }));
+  const count = lines.length + singles.length;
+  const shareOf = (total: string) => (subtotal > 0 ? extra * (num(total) || 0) / subtotal : count ? extra / count : 0);
+  const productOptions = list.products.filter((product: Product) => product.id !== "single").map((product: Product) => ({ value: product.id, label: product.label }));
+  const addCard = (card: Printing, finish: FinishCode) => {
+    setSingles([...singles, singleFrom(card, finish, singles.at(-1)?.collectionId || defaultCollection)]);
+    store.flash(`${card.name} added to the purchase`);
+  };
+  const addScanned = (items: ScanItem[]) => {
+    const collectionId = singles.at(-1)?.collectionId || defaultCollection;
+    setSingles([...singles, ...items.map((item) => singleFrom(item.card, finishCode(item), collectionId, { condition: item.condition ?? "NM", language: item.language ?? "en", quantity: String(item.quantity) }))]);
+    setPanel("");
+  };
+  const scan = () => {
+    purchaseScan = { draft: draft(), added: [], reopen };
+    close();
+    store.setScannerOpen(true);
+  };
+  const read = async () => {
+    const file = await pickReceipt();
+    if (file) await readFrom(file);
+  };
+  useEffect(() => { if (start.readNow && start.receipt) void readFrom(start.receipt); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  async function readFrom(file: File) {
+    setError("");
+    setNote("Reading the receipt");
+    setReceipt(file);
+    try {
+      const fields = await readReceipt(file);
+      const found = fields.lines.map((line): LineDraft => ({
+        product: line.product, name: line.product === "other" ? line.name : "", setCode: line.setCode ?? "", quantity: String(line.quantity),
+        each: fixed(line.cost / Math.max(1, line.quantity)), total: fixed(line.cost), packs: String(list.products.find((item) => item.id === line.product)?.packs ?? 0), locked: 0,
+      }));
+      setHead({ date: fields.date ?? head.date, place: head.place || fields.place || "", note: head.note });
+      if (fields.tax !== null) setTax(fixed(fields.tax));
+      if (fields.shipping !== null) setShipping(fixed(fields.shipping));
+      const kept = lines.filter((line) => line.id || num(line.total) > 0 || line.name);
+      if (found.length) setLines([...kept, ...found]);
+      const read = found.length ? `${found.length} ${found.length === 1 ? "line" : "lines"} read` : "No product lines found";
+      const total = fields.total === null ? "" : fields.total.toFixed(2) === (fields.linesTotal + (fields.tax ?? 0) + (fields.shipping ?? 0)).toFixed(2)
+        ? `, matching the total of ${money(fields.total, USD)}` : `. The receipt total is ${money(fields.total, USD)}; the lines, tax and shipping read add up to ${money(fields.linesTotal + (fields.tax ?? 0) + (fields.shipping ?? 0), USD)}`;
+      setNote(`${read}${total}. Check every field before saving.`);
+    } catch (reason) {
+      setNote("");
+      setError(reason instanceof Error ? reason.message : "The receipt could not be read. Enter the purchase by hand.");
+    }
+  }
   const save = async () => {
     setError("");
     setBusy(true);
     try {
-      const sent = [];
-      for (const line of lines) {
-        const quantity = Number(line.quantity);
-        let cardId = line.cardId;
-        if (line.product === "single" && !line.id) {
-          if (!line.card.trim()) throw new Error("Type the card name of every Single cards line");
-          cardId = (await request<{ id: string }>(`/api/cards/resolve?name=${encodeURIComponent(line.card.trim())}${line.setCode.trim() ? `&set=${encodeURIComponent(line.setCode.trim())}` : ""}`)).id;
-        }
+      const sent: Array<Record<string, unknown>> = lines.map((line) => ({
+        id: line.id, product: line.product, name: line.name, setCode: line.setCode, quantity: Number(line.quantity), cost: num(line.total), packs: Number(line.packs || 0),
+      }));
+      for (const line of singles) {
+        if (!line.collectionId) throw new Error(`Choose the collection ${line.name} goes to`);
         sent.push({
-          id: line.id, product: line.product, name: line.name, setCode: line.setCode, quantity, cost: num(line.total), packs: Number(line.packs || 0),
-          ...(line.product === "single" && !line.id ? { cardId, foil: Number(line.foil), condition: line.condition, language: "en", proxy: false, collectionId: line.collectionId } : {}),
+          id: line.id, product: "single", name: line.name, setCode: line.setCode, quantity: Number(line.quantity), cost: num(line.total), packs: 0,
+          ...(line.id ? {} : { cardId: line.cardId, foil: line.foil, condition: line.condition, language: line.language, proxy: false, collectionId: line.collectionId }),
         });
       }
+      if (!sent.length) throw new Error("Add at least one product or card");
       const body = { kind: "purchase", ...head, tax: num(tax), shipping: num(shipping), lines: sent };
+      let saved: Entry;
       if (entry) {
-        const before = { date: entry.date, place: entry.place, currency: entry.currency, note: entry.note, tax: entry.tax, shipping: entry.shipping,
+        const newSingles = singles.filter((line) => !line.id);
+        if (newSingles.length) throw new Error("Cards are added to a saved purchase from its page, with Add cards");
+        const before = { date: entry.date, place: entry.place, note: entry.note, tax: entry.tax, shipping: entry.shipping,
           lines: entry.lines.map((line) => ({ id: line.id, product: line.product, name: line.name, setCode: line.setCode, quantity: line.quantity, cost: line.cost, packs: line.packs })) };
-        const saved = await request<Entry>(`/api/purchases/${entry.id}`, { method: "PATCH", body: JSON.stringify(body) });
+        saved = await request<Entry>(`/api/purchases/${entry.id}`, { method: "PATCH", body: JSON.stringify(body) });
         store.pushUndo({
           label: `Edit purchase of ${entry.date}`,
           undo: async () => { await request(`/api/purchases/${entry.id}`, { method: "PATCH", body: JSON.stringify(before) }); onSaved(saved); },
           redo: async () => { await request(`/api/purchases/${entry.id}`, { method: "PATCH", body: JSON.stringify(body) }); onSaved(saved); },
         });
-        close();
-        onSaved(saved);
-        store.flash(`Purchase of ${saved.date} saved`);
       } else {
-        const saved = await request<Entry>("/api/purchases", { method: "POST", body: JSON.stringify(body) });
+        saved = await request<Entry>("/api/purchases", { method: "POST", body: JSON.stringify(body) });
         recordCreated(store, saved, () => onSaved(saved));
-        close();
-        onSaved(saved);
-        if (lines.some((line) => line.product === "single")) await store.refreshAfterChange();
-        store.flash(`Purchase of ${saved.date} saved`);
       }
+      if (receipt && !(entry?.receipt && start.receipt === receipt)) await sendFile(`/api/purchases/${saved.id}/receipt`, "PUT", receipt, receipt.name).catch(() => store.flash("The receipt could not be kept with the purchase", "err"));
+      close();
+      onSaved(saved);
+      if (singles.length) await store.refreshAfterChange();
+      store.flash(`Purchase of ${saved.date} saved`);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Could not save the purchase.");
     } finally {
@@ -129,53 +442,79 @@ function PurchaseEditor({ store, list, entry, close, onSaved }: { store: Store; 
   return (
     <div className="purchaseedit">
       {error && <p className="note err">{error}</p>}
+      {note && <p className="note" role="status">{note}</p>}
+      <div className="btnrow">
+        <button type="button" className="btn small" onClick={() => void read()}>Read receipt...</button>
+        {receipt && <span className="sub">Receipt: {receipt.name}</span>}
+      </div>
       <HeaderFields value={head} set={(change) => setHead({ ...head, ...change })} places={list.places} kind="purchase" />
+      <h4>Products</h4>
       <table className="dtable pelines">
         <thead><tr><th>Product</th><th>Set</th><th>Quantity</th><th>Cost each</th><th>Total</th><th>Packs in it</th><th>Full cost</th><th /></tr></thead>
         <tbody>
-          {lines.map((line, index) => {
-            const share = subtotal > 0 ? extra * (num(line.total) || 0) / subtotal : extra / lines.length;
-            return [
-              <tr key={`l${index}`}>
-                <td>
-                  <Picker label={`Product of line ${index + 1}`} value={line.product} options={productOptions} disabled={!!line.id && line.product === "single"}
-                    onChange={(product) => setLine(index, { product, packs: String(list.products.find((item) => item.id === product)?.packs ?? 0) })} />
-                  {line.product === "other" && <input aria-label={`Name of line ${index + 1}`} value={line.name} placeholder="Product name" maxLength={120} onChange={(event) => setLine(index, { name: event.target.value })} />}
-                </td>
-                <td><span className="withbtn"><input aria-label={`Set of line ${index + 1}`} className="setcode" value={line.setCode} maxLength={8} placeholder="Code"
-                  disabled={!!line.id && line.product === "single"} onChange={(event) => setLine(index, { setCode: event.target.value.toLowerCase() })} />{line.setCode.length >= 2 && <SetIcon code={line.setCode} />}</span></td>
-                <td><input aria-label={`Quantity of line ${index + 1}`} type="number" min={Math.max(1, line.locked)} value={line.quantity} className="num"
-                  onChange={(event) => { const quantity = event.target.value; const each = num(line.each); setLine(index, { quantity, total: line.each && Number.isFinite(each) ? fixed(each * (Number(quantity) || 1)) : line.total }); }} /></td>
-                <td><input aria-label={`Cost each of line ${index + 1}`} inputMode="decimal" value={line.each} className="num" onChange={(event) => costChange(index, "each", event.target.value)} /></td>
-                <td><input aria-label={`Total of line ${index + 1}`} inputMode="decimal" value={line.total} className="num" onChange={(event) => costChange(index, "total", event.target.value)} /></td>
-                <td>{["booster_box", "bundle", "prerelease_kit", "other", "other_booster", "jumpstart_booster", "secret_lair"].includes(line.product)
-                  ? <input aria-label={`Packs in line ${index + 1}`} type="number" min={0} value={line.packs} className="num" onChange={(event) => setLine(index, { packs: event.target.value })} />
-                  : <span className="sub">{line.packs === "0" ? "" : line.packs}</span>}</td>
-                <td className="numcell">{money((num(line.total) || 0) + share, head.currency)}</td>
-                <td><button type="button" className="btn small" disabled={lines.length === 1 || line.locked > 0} title={line.locked ? "Opened or sold lines stay" : undefined}
-                  onClick={() => setLines(lines.filter((_, at) => at !== index))}>Remove</button></td>
-              </tr>,
-              line.product === "single" && !line.id ? (
-                <tr key={`s${index}`} className="pesingle"><td colSpan={8}>
-                  <span className="btnrow">
-                    <Suggest mode="name" aria-label={`Card of line ${index + 1}`} placeholder="Card name" value={line.card} onValue={(card) => setLine(index, { card })} />
-                    <Picker label={`Finish of line ${index + 1}`} value={line.foil} options={choices([["0", "Regular"], ["1", "Foil"], ["2", "Etched"]])} onChange={(foil) => setLine(index, { foil })} />
-                    <Picker label={`Condition of line ${index + 1}`} value={line.condition} options={choices(CONDITIONS)} onChange={(condition) => setLine(index, { condition })} />
-                    <Picker label={`Collection of line ${index + 1}`} value={line.collectionId} options={owned.map((item) => ({ value: item.id, label: item.name }))} onChange={(collectionId) => setLine(index, { collectionId })} />
-                  </span>
-                </td></tr>
-              ) : null,
-            ];
+          {!lines.length && <tr><td colSpan={8} className="sub">No sealed products</td></tr>}
+          {lines.map((line, index) => (
+            <tr key={`l${index}`}>
+              <td>
+                <Picker label={`Product of line ${index + 1}`} value={line.product} options={productOptions}
+                  onChange={(product) => setLine(index, { product, packs: String(list.products.find((item) => item.id === product)?.packs ?? 0) })} />
+                {line.product === "other" && <input aria-label={`Name of line ${index + 1}`} value={line.name} placeholder="Product name" maxLength={120} onChange={(event) => setLine(index, { name: event.target.value })} />}
+              </td>
+              <td><SetPicker label={`Set of line ${index + 1}`} value={line.setCode} onChange={(setCode) => setLine(index, { setCode })} /></td>
+              <td><input aria-label={`Quantity of line ${index + 1}`} type="number" min={Math.max(1, line.locked)} value={line.quantity} className="num"
+                onChange={(event) => setLine(index, quantityOf(line, event.target.value))} /></td>
+              <td><input aria-label={`Cost each of line ${index + 1}`} inputMode="decimal" value={line.each} className="num" onChange={(event) => setLine(index, costOf(line, "each", event.target.value))} /></td>
+              <td><input aria-label={`Total of line ${index + 1}`} inputMode="decimal" value={line.total} className="num" onChange={(event) => setLine(index, costOf(line, "total", event.target.value))} /></td>
+              <td>{PACK_PRODUCTS.includes(line.product)
+                ? <input aria-label={`Packs in line ${index + 1}`} type="number" min={0} value={line.packs} className="num" onChange={(event) => setLine(index, { packs: event.target.value })} />
+                : <span className="sub">{line.packs === "0" ? "" : line.packs}</span>}</td>
+              <td className="numcell">{money((num(line.total) || 0) + shareOf(line.total), USD)}</td>
+              <td><button type="button" className="btn small" disabled={line.locked > 0} title={line.locked ? "Opened or sold lines stay" : undefined}
+                onClick={() => setLines(lines.filter((_, at) => at !== index))}>Remove</button></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <div className="btnrow"><button type="button" className="btn small" onClick={() => setLines([...lines, blank()])}>Add product</button></div>
+      <h4>Single cards</h4>
+      <table className="dtable pelines pesingles">
+        <thead><tr><th>Card</th><th>Finish</th><th>Condition</th><th>Language</th><th>Collection</th><th>Quantity</th><th>Cost each</th><th>Total</th><th /></tr></thead>
+        <tbody>
+          {!singles.length && <tr><td colSpan={9} className="sub">No single cards</td></tr>}
+          {singles.map((line) => {
+            const finishes = line.finishes ? finishesOf({ finishes: line.finishes }) : [line.foil];
+            const locked = !!line.id;
+            return (
+              <tr key={line.key}>
+                <td className="singlecell">{line.image ? <img className="thumb-img sm" src={line.image} alt="" /> : null}
+                  <span><b>{line.name}</b> <span className="sub">{line.setCode.toUpperCase()}{line.number ? ` #${line.number}` : ""}</span></span></td>
+                <td><Picker label={`Finish of ${line.name}`} value={String(line.foil)} disabled={locked}
+                  options={finishes.map((code) => ({ value: String(code), label: finishLabel(code, line.promoTypes) }))} onChange={(foil) => setSingle(line.key, { foil: Number(foil) as FinishCode })} /></td>
+                <td><Picker label={`Condition of ${line.name}`} value={line.condition} disabled={locked} options={choices(CONDITIONS)} onChange={(condition) => setSingle(line.key, { condition })} /></td>
+                <td><Picker label={`Language of ${line.name}`} value={line.language} disabled={locked} options={choices(LANGUAGES)} onChange={(language) => setSingle(line.key, { language })} /></td>
+                <td><Picker label={`Collection of ${line.name}`} value={line.collectionId} disabled={locked} options={owned.map((item) => ({ value: item.id, label: item.name }))} onChange={(collectionId) => setSingle(line.key, { collectionId })} /></td>
+                <td><input aria-label={`Quantity of ${line.name}`} type="number" min={locked ? line.locked : 1} disabled={locked} value={line.quantity} className="num" onChange={(event) => setSingle(line.key, quantityOf(line, event.target.value))} /></td>
+                <td><input aria-label={`Cost each of ${line.name}`} inputMode="decimal" value={line.each} className="num" onChange={(event) => setSingle(line.key, costOf(line, "each", event.target.value))} /></td>
+                <td><input aria-label={`Total of ${line.name}`} inputMode="decimal" value={line.total} className="num" onChange={(event) => setSingle(line.key, costOf(line, "total", event.target.value))} /></td>
+                <td><button type="button" className="btn small" disabled={locked} title={locked ? "Cards already in the collection stay" : undefined}
+                  onClick={() => setSingles(singles.filter((item) => item.key !== line.key))}>Remove</button></td>
+              </tr>
+            );
           })}
         </tbody>
       </table>
-      <div className="btnrow">
-        <button type="button" className="btn small" onClick={() => setLines([...lines, blank()])}>Add product</button>
-        <button type="button" className="btn small" onClick={() => setLines([...lines, blank("single")])}>Add single card</button>
-      </div>
+      {!entry && (
+        <div className="btnrow">
+          <button type="button" className={panel === "find" ? "btn small on" : "btn small"} onClick={() => setPanel(panel === "find" ? "" : "find")}>Find cards</button>
+          <button type="button" className="btn small" onClick={scan}>Scan</button>
+          <button type="button" className={panel === "scanned" ? "btn small on" : "btn small"} onClick={() => setPanel(panel === "scanned" ? "" : "scanned")}>From scanned list...</button>
+        </div>
+      )}
+      {panel === "find" && <SingleFinder onAdd={addCard} onClose={() => setPanel("")} />}
+      {panel === "scanned" && <ScannedPicker store={store} onAdd={addScanned} onClose={() => setPanel("")} />}
       <div className="prow"><label htmlFor="pe-tax">Tax</label><input id="pe-tax" inputMode="decimal" className="num" value={tax} onChange={(event) => setTax(event.target.value)} /></div>
       <div className="prow"><label htmlFor="pe-shipping">Shipping</label><input id="pe-shipping" inputMode="decimal" className="num" value={shipping} onChange={(event) => setShipping(event.target.value)} /></div>
-      <p className="petotal">Total <b>{money(subtotal + extra, head.currency)}</b></p>
+      <p className="petotal">Total <b>{money(subtotal + extra, USD)}</b></p>
       <div className="btnrow end">
         <button type="button" className="btn primary" disabled={busy} onClick={() => void save()}>Save purchase</button>
       </div>
@@ -185,19 +524,30 @@ function PurchaseEditor({ store, list, entry, close, onSaved }: { store: Store; 
 
 type CopyFound = {
   collectionId: string; collectionName: string; cardId: string; foil: number; condition: string; language: string; proxy: boolean; quantity: number;
-  name: string; setCode: string; collectorNumber: string; prices: { usd: number | null; usdFoil: number | null; usdEtched: number | null; eur: number | null; eurFoil: number | null };
+  name: string; setCode: string; collectorNumber: string; prices: { usd: number | null; usdFoil: number | null; usdEtched: number | null };
 };
 export type SaleCopy = Omit<CopyFound, "prices"> & { count: string; price: string };
 const copyId = (copy: { collectionId: string; cardId: string; foil: number; condition: string; language: string; proxy: boolean }) =>
   `${copy.collectionId}|${copy.cardId}|${copy.foil}|${copy.condition}|${copy.language}|${copy.proxy}`;
-const priceOf = (copy: CopyFound, currency: Currency) => (currency === "eur" ? (copy.foil ? copy.prices.eurFoil : copy.prices.eur)
-  : copy.foil === 0 ? copy.prices.usd : copy.foil === 1 ? copy.prices.usdFoil : copy.prices.usdEtched ?? copy.prices.usdFoil);
+const priceOf = (copy: CopyFound) => (copy.foil === 0 ? copy.prices.usd : copy.foil === 1 ? copy.prices.usdFoil : copy.prices.usdEtched ?? copy.prices.usdFoil);
+
+/** Shipping on a sale: paid by the buyer (it passes through and never counts) or by you (it lowers the gain). */
+function ShippingFields({ id, shipping, setShipping, by, setBy }: { id: string; shipping: string; setShipping: (value: string) => void; by: "me" | "buyer"; setBy: (value: "me" | "buyer") => void }) {
+  return (
+    <>
+      <div className="prow"><label htmlFor={`${id}-shipping`}>Shipping</label><input id={`${id}-shipping`} inputMode="decimal" className="num" value={shipping} onChange={(event) => setShipping(event.target.value)} /></div>
+      <div className="prow"><label htmlFor={`${id}-by`}>Who paid shipping</label>
+        <Picker id={`${id}-by`} label="Who paid shipping" value={by} options={choices([["buyer", "Buyer paid shipping"], ["me", "I paid shipping"]])} onChange={(value) => setBy(value as "me" | "buyer")} /></div>
+    </>
+  );
+}
 
 /** The card sale window: copies from collections with the sale price of each, fees and shipping. Saving removes the copies. */
 function CardSaleEditor({ store, list, start, close, onSaved }: { store: Store; list: PurchaseList; start: SaleCopy[]; close: () => void; onSaved: Saved }) {
-  const [head, setHead] = useState({ date: today(), place: "", currency: store.prefs.currency as Currency, note: "" });
+  const [head, setHead] = useState({ date: today(), place: "", note: "" });
   const [fees, setFees] = useState("");
   const [shipping, setShipping] = useState("");
+  const [shippingBy, setShippingBy] = useState<"me" | "buyer">("buyer");
   const [rows, setRows] = useState<SaleCopy[]>(start);
   const [term, setTerm] = useState("");
   const [found, setFound] = useState<CopyFound[]>([]);
@@ -212,14 +562,14 @@ function CardSaleEditor({ store, list, start, close, onSaved }: { store: Store; 
   const add = (copy: CopyFound) => {
     if (rows.some((row) => copyId(row) === copyId(copy))) return;
     const { prices: _prices, ...rest } = copy;
-    setRows([...rows, { ...rest, count: "1", price: fixed(priceOf(copy, head.currency) ?? 0) }]);
+    setRows([...rows, { ...rest, count: "1", price: fixed(priceOf(copy) ?? 0) }]);
   };
   const total = rows.reduce((sum, row) => sum + (num(row.price) || 0) * (Number(row.count) || 0), 0);
   const save = async () => {
     setError("");
     try {
       const body = {
-        kind: "card_sale", ...head, fees: num(fees), shipping: num(shipping),
+        kind: "card_sale", ...head, fees: num(fees), shipping: num(shipping), shippingBy,
         sales: rows.map((row) => ({ collectionId: row.collectionId, cardId: row.cardId, foil: row.foil, condition: row.condition, language: row.language, proxy: row.proxy,
           quantity: Number(row.count), price: (num(row.price) || 0) * Number(row.count) })),
       };
@@ -260,8 +610,8 @@ function CardSaleEditor({ store, list, start, close, onSaved }: { store: Store; 
         </tbody>
       </table>
       <div className="prow"><label htmlFor="cs-fees">Fees</label><input id="cs-fees" inputMode="decimal" className="num" value={fees} onChange={(event) => setFees(event.target.value)} /></div>
-      <div className="prow"><label htmlFor="cs-shipping">Shipping</label><input id="cs-shipping" inputMode="decimal" className="num" value={shipping} onChange={(event) => setShipping(event.target.value)} /></div>
-      <p className="petotal">Received <b>{money(total - (num(fees) || 0) - (num(shipping) || 0), head.currency)}</b></p>
+      <ShippingFields id="cs" shipping={shipping} setShipping={setShipping} by={shippingBy} setBy={setShippingBy} />
+      <p className="petotal">Received <b>{money(total - (num(fees) || 0) - (shippingBy === "me" ? num(shipping) || 0 : 0), USD)}</b></p>
       <div className="btnrow end">
         <button type="button" className="btn primary" disabled={!rows.length} onClick={() => void save()}>Save sale</button>
       </div>
@@ -273,9 +623,10 @@ type SealedLine = { lineId: string; entryId: string; label: string; date: string
 
 /** The product sale window: sealed lines (or part of one) with the sale price. */
 function ProductSaleEditor({ store, list, close, onSaved }: { store: Store; list: PurchaseList; close: () => void; onSaved: Saved }) {
-  const [head, setHead] = useState({ date: today(), place: "", currency: store.prefs.currency as Currency, note: "" });
+  const [head, setHead] = useState({ date: today(), place: "", note: "" });
   const [fees, setFees] = useState("");
   const [shipping, setShipping] = useState("");
+  const [shippingBy, setShippingBy] = useState<"me" | "buyer">("buyer");
   const [sealed, setSealed] = useState<SealedLine[] | null>(null);
   const [rows, setRows] = useState<Record<string, { count: string; price: string }>>({});
   const [error, setError] = useState("");
@@ -284,7 +635,7 @@ function ProductSaleEditor({ store, list, close, onSaved }: { store: Store; list
   const save = async () => {
     setError("");
     try {
-      const body = { kind: "product_sale", ...head, fees: num(fees), shipping: num(shipping), sales: chosen.map(([lineId, row]) => ({ lineId, quantity: Number(row.count), price: num(row.price) })) };
+      const body = { kind: "product_sale", ...head, fees: num(fees), shipping: num(shipping), shippingBy, sales: chosen.map(([lineId, row]) => ({ lineId, quantity: Number(row.count), price: num(row.price) })) };
       const saved = await request<Entry>("/api/purchases", { method: "POST", body: JSON.stringify(body) });
       recordCreated(store, saved, () => onSaved(saved));
       close();
@@ -314,7 +665,7 @@ function ProductSaleEditor({ store, list, close, onSaved }: { store: Store; list
         </tbody>
       </table>
       <div className="prow"><label htmlFor="ps-fees">Fees</label><input id="ps-fees" inputMode="decimal" className="num" value={fees} onChange={(event) => setFees(event.target.value)} /></div>
-      <div className="prow"><label htmlFor="ps-shipping">Shipping</label><input id="ps-shipping" inputMode="decimal" className="num" value={shipping} onChange={(event) => setShipping(event.target.value)} /></div>
+      <ShippingFields id="ps" shipping={shipping} setShipping={setShipping} by={shippingBy} setBy={setShippingBy} />
       <div className="btnrow end">
         <button type="button" className="btn primary" disabled={!chosen.length} onClick={() => void save()}>Save sale</button>
       </div>
@@ -324,7 +675,8 @@ function ProductSaleEditor({ store, list, close, onSaved }: { store: Store; list
 
 /** Header fields of any entry, and for trades the cash added by each side (trades with cards are recorded when completed). */
 function HeaderEditor({ store, list, entry, kind, close, onSaved }: { store: Store; list: PurchaseList; entry: Entry | null; kind: EntryKind; close: () => void; onSaved: Saved }) {
-  const [head, setHead] = useState({ date: entry?.date ?? today(), place: entry?.place ?? "", currency: (entry?.currency ?? store.prefs.currency) as Currency, note: entry?.note ?? "" });
+  const [head, setHead] = useState({ date: entry?.date ?? today(), place: entry?.place ?? "", note: entry?.note ?? "" });
+  const [shippingBy, setShippingBy] = useState<"me" | "buyer">(entry?.shippingBy ?? "buyer");
   const [cashOut, setCashOut] = useState(entry ? fixed(entry.cashOut) : "");
   const [cashIn, setCashIn] = useState(entry ? fixed(entry.cashIn) : "");
   const [fees, setFees] = useState(entry ? fixed(entry.fees) : "");
@@ -333,9 +685,9 @@ function HeaderEditor({ store, list, entry, kind, close, onSaved }: { store: Sto
   const save = async () => {
     setError("");
     try {
-      const body = { kind, ...head, ...(kind === "trade" ? { cashOut: num(cashOut), cashIn: num(cashIn) } : { fees: num(fees), shipping: num(shipping) }) };
+      const body = { kind, ...head, ...(kind === "trade" ? { cashOut: num(cashOut), cashIn: num(cashIn) } : { fees: num(fees), shipping: num(shipping), shippingBy }) };
       if (entry) {
-        const before = { date: entry.date, place: entry.place, currency: entry.currency, note: entry.note, cashOut: entry.cashOut, cashIn: entry.cashIn, fees: entry.fees, shipping: entry.shipping };
+        const before = { date: entry.date, place: entry.place, note: entry.note, cashOut: entry.cashOut, cashIn: entry.cashIn, fees: entry.fees, shipping: entry.shipping, shippingBy: entry.shippingBy };
         const saved = await request<Entry>(`/api/purchases/${entry.id}`, { method: "PATCH", body: JSON.stringify(body) });
         store.pushUndo({
           label: `Edit ${KIND_LABELS[kind].toLowerCase()} of ${entry.date}`,
@@ -364,7 +716,7 @@ function HeaderEditor({ store, list, entry, kind, close, onSaved }: { store: Sto
         <div className="prow"><label htmlFor="tr-in">Cash they added</label><input id="tr-in" inputMode="decimal" className="num" value={cashIn} onChange={(event) => setCashIn(event.target.value)} /></div>
       </>) : kind !== "purchase" ? (<>
         <div className="prow"><label htmlFor="he-fees">Fees</label><input id="he-fees" inputMode="decimal" className="num" value={fees} onChange={(event) => setFees(event.target.value)} /></div>
-        <div className="prow"><label htmlFor="he-shipping">Shipping</label><input id="he-shipping" inputMode="decimal" className="num" value={shipping} onChange={(event) => setShipping(event.target.value)} /></div>
+        <ShippingFields id="he" shipping={shipping} setShipping={setShipping} by={shippingBy} setBy={setShippingBy} />
       </>) : null}
       <div className="btnrow end">
         <button type="button" className="btn primary" onClick={() => void save()}>Save</button>
@@ -377,7 +729,11 @@ function HeaderEditor({ store, list, entry, kind, close, onSaved }: { store: Sto
 export function entryDialog(store: Store, list: PurchaseList, kind: EntryKind, entry: Entry | null, onSaved: Saved, sale: SaleCopy[] = []) {
   const title = `${entry ? "Edit" : "New"} ${KIND_LABELS[kind].toLowerCase()}`;
   if (kind === "purchase" && !(entry && !entry.lines.length)) {
-    customDialog(title, (close) => <PurchaseEditor store={store} list={list} entry={entry} close={close} onSaved={onSaved} />, 980, "Cancel");
+    purchaseWindow(store, list, {
+      entry, head: { date: entry?.date ?? today(), place: entry?.place ?? "", note: entry?.note ?? "" }, tax: entry ? fixed(entry.tax) : "", shipping: entry ? fixed(entry.shipping) : "",
+      lines: entry ? entry.lines.filter((line) => line.product !== "single").map(draftOf) : [], singles: entry ? entry.lines.filter((line) => line.product === "single").map(singleOf) : [],
+      receipt: null,
+    }, onSaved);
   } else if (kind === "card_sale" && !entry) {
     customDialog(title, (close) => <CardSaleEditor store={store} list={list} start={sale} close={close} onSaved={onSaved} />, 860, "Cancel");
   } else if (kind === "product_sale" && !entry) {
@@ -385,6 +741,22 @@ export function entryDialog(store: Store, list: PurchaseList, kind: EntryKind, e
   } else {
     customDialog(title, (close) => <HeaderEditor store={store} list={list} entry={entry} kind={kind} close={close} onSaved={onSaved} />, 560, "Cancel");
   }
+}
+
+/** A new purchase read from a receipt file (Read receipt... on the Purchases tab, or a picture or PDF shared into the app). */
+export async function purchaseFromReceipt(store: Store, file: File, onSaved: Saved = () => undefined) {
+  try {
+    const list = await request<PurchaseList>("/api/purchases");
+    purchaseWindow(store, list, { entry: null, head: { date: today(), place: "", note: "" }, tax: "", shipping: "", lines: [], singles: [], receipt: file, readNow: true }, onSaved);
+  } catch (reason) {
+    store.fail(reason, "Could not open purchase history.");
+  }
+}
+
+/** Opens the purchase window with a draft (a new purchase, a saved one, or one coming back from the scanner). */
+function purchaseWindow(store: Store, list: PurchaseList, draft: PurchaseDraft, onSaved: Saved) {
+  const reopen = (next: PurchaseDraft) => purchaseWindow(store, list, next, onSaved);
+  customDialog(`${draft.entry ? "Edit" : "New"} purchase`, (close) => <PurchaseEditor store={store} list={list} start={draft} close={close} onSaved={onSaved} reopen={reopen} />, 1040, "Cancel");
 }
 
 /** Open...: how many of a product line to open, and where the pulled cards go. */
@@ -446,7 +818,7 @@ function ValueEditor({ store, entry, line, close, onDone }: { store: Store; entr
       });
       close();
       onDone();
-      store.flash(`${line.productLabel} valued at ${money(num(value), entry.currency)} each`);
+      store.flash(`${line.productLabel} valued at ${money(num(value), USD)} each`);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Could not save the value.");
     }
@@ -455,7 +827,7 @@ function ValueEditor({ store, entry, line, close, onDone }: { store: Store; entr
     <div className="purchaseedit">
       {error && <p className="note err">{error}</p>}
       <div className="prow"><label htmlFor="sv-value">Value each today</label><input id="sv-value" autoFocus inputMode="decimal" className="num" value={value} onChange={(event) => setValue(event.target.value)} /></div>
-      {line.values.length > 0 && <p className="note">Earlier values: {line.values.map((item) => `${item.date} ${money(item.value, entry.currency)}`).join(", ")}</p>}
+      {line.values.length > 0 && <p className="note">Earlier values: {line.values.map((item) => `${item.date} ${money(item.value, USD)}`).join(", ")}</p>}
       <div className="btnrow end">
         <button type="button" className="btn primary" disabled={!Number.isFinite(num(value))} onClick={() => void save()}>Save value</button>
       </div>
@@ -508,3 +880,169 @@ export const fromPricesDialog = (store: Store, onDone: () => void) =>
 export function useProductOptions(list: PurchaseList | null) {
   return useMemo(() => (list?.products ?? []).map((product) => ({ value: product.id, label: product.label })), [list]);
 }
+
+// ---------- Places...: the stores, websites and people shared by every account ----------
+
+function PlacesEditor({ store }: { store: Store }) {
+  const [places, setPlaces] = useState<Place[] | null>(null);
+  const [term, setTerm] = useState("");
+  const [editing, setEditing] = useState<{ id: string; name: string; kind: PlaceKind; note: string } | null>(null);
+  const [merging, setMerging] = useState<Place | null>(null);
+  const [into, setInto] = useState("");
+  const [error, setError] = useState("");
+  const admin = !!store.user.admin;
+  const load = () => request<Place[]>("/api/places").then(setPlaces).catch((reason: unknown) => setError(reason instanceof Error ? reason.message : "Could not load the places."));
+  useEffect(() => { void load(); }, []);
+  const words = term.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const shown = (places ?? []).filter((place) => words.every((word) => `${place.name} ${place.note} ${PLACE_KINDS[place.kind]}`.toLowerCase().includes(word)));
+  const changed = () => { void load(); window.dispatchEvent(new CustomEvent("mana-vault:purchases", { detail: "" })); };
+  const run = async (work: () => Promise<void>) => {
+    setError("");
+    try { await work(); } catch (reason) { setError(reason instanceof Error ? reason.message : "Could not change the place."); }
+  };
+  const save = () => run(async () => {
+    if (!editing) return;
+    const body = { name: editing.name, kind: editing.kind, note: editing.note };
+    const { before } = await request<{ before: typeof body }>(`/api/places/${editing.id}`, { method: "PATCH", body: JSON.stringify(body) });
+    const id = editing.id;
+    store.pushUndo({
+      label: `Edit place ${before.name}`,
+      undo: async () => { await request(`/api/places/${id}`, { method: "PATCH", body: JSON.stringify(before) }); changed(); },
+      redo: async () => { await request(`/api/places/${id}`, { method: "PATCH", body: JSON.stringify(body) }); changed(); },
+    });
+    setEditing(null);
+    changed();
+    store.flash(before.name === body.name ? `${body.name} saved` : `${before.name} renamed to ${body.name} on every entry`);
+  });
+  const restorable = (result: { place: Place; entryIds: string[] }, label: string, again: () => Promise<unknown>) => store.pushUndo({
+    label, undo: async () => { await request("/api/places/restore", { method: "POST", body: JSON.stringify(result) }); changed(); }, redo: async () => { await again(); changed(); },
+  });
+  const merge = () => run(async () => {
+    if (!merging || !into) return;
+    const target = places?.find((place) => place.id === into);
+    const url = `/api/places/${merging.id}/merge`;
+    const body = JSON.stringify({ into });
+    const result = await request<{ place: Place; entryIds: string[] }>(url, { method: "POST", body });
+    restorable(result, `Merge ${merging.name} into ${target?.name ?? ""}`, () => request(url, { method: "POST", body }));
+    store.flash(`${merging.name} merged into ${target?.name ?? "the place kept"}: ${result.entryIds.length} ${result.entryIds.length === 1 ? "entry" : "entries"} moved`);
+    setMerging(null);
+    setInto("");
+    changed();
+  });
+  const remove = (place: Place) => run(async () => {
+    const result = await request<{ place: Place; entryIds: string[] }>(`/api/places/${place.id}`, { method: "DELETE" });
+    restorable(result, `Delete place ${place.name}`, () => request(`/api/places/${place.id}`, { method: "DELETE" }));
+    store.flash(`${place.name} deleted`);
+    changed();
+  });
+  const add = () => run(async () => {
+    const name = term.trim();
+    if (!name) return;
+    const place = await request<Place>("/api/places", { method: "POST", body: JSON.stringify({ name, kind: "store" }) });
+    setTerm("");
+    changed();
+    setEditing({ id: place.id, name: place.name, kind: place.kind, note: place.note });
+  });
+  return (
+    <div className="purchaseedit placeswin">
+      {error && <p className="note err">{error}</p>}
+      <div className="btnrow">
+        <input className="search grow" aria-label="Find a place" placeholder="Find a place, or type a new name" value={term} onChange={(event) => setTerm(event.target.value)} />
+        <button type="button" className="btn small" disabled={!term.trim() || (places ?? []).some((place) => place.name.toLowerCase() === term.trim().toLowerCase())} onClick={() => void add()}>Add place</button>
+      </div>
+      {!places && !error && <p className="note">Loading the places</p>}
+      <table className="dtable">
+        <thead><tr><th>Name</th><th>Kind</th><th>Note</th><th className="numcell">Entries</th><th /></tr></thead>
+        <tbody>
+          {places && !shown.length && <tr><td colSpan={5} className="sub">{places.length ? "No place matches" : "No places yet. A place is added when an entry names it."}</td></tr>}
+          {shown.map((place) => editing?.id === place.id ? (
+            <tr key={place.id}>
+              <td><input aria-label="Name" autoFocus value={editing.name} maxLength={120} onChange={(event) => setEditing({ ...editing, name: event.target.value })}
+                onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void save(); } }} /></td>
+              <td><Picker label="Kind" value={editing.kind} options={Object.entries(PLACE_KINDS).map(([value, label]) => ({ value, label }))} onChange={(kind) => setEditing({ ...editing, kind: kind as PlaceKind })} /></td>
+              <td><input aria-label="Note" value={editing.note} maxLength={500} onChange={(event) => setEditing({ ...editing, note: event.target.value })} /></td>
+              <td className="numcell">{place.uses}</td>
+              <td><span className="btnrow"><button type="button" className="btn small primary" onClick={() => void save()}>Save</button><button type="button" className="btn small" onClick={() => setEditing(null)}>Cancel</button></span></td>
+            </tr>
+          ) : (
+            <tr key={place.id}>
+              <td>{place.name}</td><td>{PLACE_KINDS[place.kind]}</td><td className="sub">{place.note}</td><td className="numcell">{place.uses}</td>
+              <td><span className="btnrow">
+                <button type="button" className="btn small" onClick={() => setEditing({ id: place.id, name: place.name, kind: place.kind, note: place.note })}>Edit</button>
+                {admin && <button type="button" className="btn small" onClick={() => { setMerging(place); setInto(""); }}>Merge into...</button>}
+                {admin && <button type="button" className="btn small" disabled={place.uses > 0} title={place.uses ? "Merge a place in use into another place" : undefined} onClick={() => void remove(place)}>Delete</button>}
+              </span></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {merging && (
+        <div className="mergebox">
+          <div className="prow"><label htmlFor="pl-into">Merge {merging.name} into</label>
+            <Picker id="pl-into" label={`Merge ${merging.name} into`} value={into} onChange={setInto}
+              options={[{ value: "", label: "Choose the place to keep" }, ...(places ?? []).filter((place) => place.id !== merging.id).map((place) => ({ value: place.id, label: place.name, detail: PLACE_KINDS[place.kind] }))]} /></div>
+          <p className="note">Every entry of {merging.name} moves to the place kept, and {merging.name} leaves the list.</p>
+          <div className="btnrow end"><button type="button" className="btn small" onClick={() => setMerging(null)}>Cancel</button><button type="button" className="btn small primary" disabled={!into} onClick={() => void merge()}>Merge</button></div>
+        </div>
+      )}
+      {!admin && <p className="note">Any account can add a place and change its name, kind or note. Only an admin can merge or delete places.</p>}
+    </div>
+  );
+}
+
+export const placesDialog = (store: Store) => customDialog("Places", () => <PlacesEditor store={store} />, 760);
+
+// ---------- Add existing copies...: copies already in a collection, tied to an opening ----------
+
+function TieCopies({ store, openingId, close, onDone }: { store: Store; openingId: string; close: () => void; onDone: () => void }) {
+  const [term, setTerm] = useState("");
+  const [found, setFound] = useState<CopyFound[]>([]);
+  const [rows, setRows] = useState<Array<CopyFound & { count: string }>>([]);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    if (term.trim().length < 2) { setFound([]); return; }
+    const timer = window.setTimeout(() => { void request<CopyFound[]>(`/api/purchases/copies?q=${encodeURIComponent(term.trim())}`).then(setFound).catch(() => setFound([])); }, 200);
+    return () => window.clearTimeout(timer);
+  }, [term]);
+  const save = async () => {
+    setError("");
+    try {
+      const items = rows.map((row) => ({ collectionId: row.collectionId, cardId: row.cardId, foil: row.foil, condition: row.condition, language: row.language, proxy: row.proxy, quantity: Number(row.count) }));
+      await request(`/api/purchases/openings/${openingId}/ties`, { method: "POST", body: JSON.stringify({ items }) });
+      store.flash(`${items.reduce((sum, item) => sum + item.quantity, 0)} cards tied to the opening`);
+      close();
+      onDone();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Could not tie the cards.");
+    }
+  };
+  return (
+    <div className="purchaseedit">
+      {error && <p className="note err">{error}</p>}
+      <div className="prow"><label htmlFor="tc-find">Find copies</label><input id="tc-find" autoFocus value={term} placeholder="Card name" onChange={(event) => setTerm(event.target.value)} /></div>
+      {found.length > 0 && (
+        <div className="pefound">{found.map((copy) => (
+          <button key={copyId(copy)} type="button" className="pefoundrow" onClick={() => { if (!rows.some((row) => copyId(row) === copyId(copy))) setRows([...rows, { ...copy, count: "1" }]); }}>
+            <b>{copy.name}</b> <span className="sub">{copy.setCode.toUpperCase()} #{copy.collectorNumber}{copy.foil ? (copy.foil === 1 ? " foil" : " etched") : ""} {copy.condition}, {copy.quantity} in {copy.collectionName}</span>
+          </button>))}</div>
+      )}
+      <table className="dtable pelines">
+        <thead><tr><th>Card</th><th>Collection</th><th>Count</th><th /></tr></thead>
+        <tbody>
+          {!rows.length && <tr><td colSpan={4} className="sub">No copies chosen</td></tr>}
+          {rows.map((row, index) => (
+            <tr key={copyId(row)}>
+              <td>{row.name} <span className="sub">{row.setCode.toUpperCase()} #{row.collectorNumber}</span></td><td>{row.collectionName}</td>
+              <td><input aria-label={`Count of ${row.name}`} type="number" min={1} max={row.quantity} className="num" value={row.count} onChange={(event) => setRows(rows.map((item, at) => (at === index ? { ...item, count: event.target.value } : item)))} /></td>
+              <td><button type="button" className="btn small" onClick={() => setRows(rows.filter((_, at) => at !== index))}>Remove</button></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <div className="btnrow end"><button type="button" className="btn primary" disabled={!rows.length} onClick={() => void save()}>Tie to the opening</button></div>
+    </div>
+  );
+}
+
+export const tieCopiesDialog = (store: Store, openingId: string, onDone: () => void) =>
+  customDialog("Add existing copies", (close) => <TieCopies store={store} openingId={openingId} close={close} onDone={onDone} />, 720, "Cancel");

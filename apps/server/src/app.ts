@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import fastifyStatic from "@fastify/static";
 import { registerScanRoutes } from "./scan.js";
 import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { assignUnowned, initializeDatabase, openDatabase, type CardRow } from "./database.js";
 import { IMPORT_FORMATS, type ImportFormat, importCollectionCsv } from "./collection-import.js";
 
@@ -22,6 +23,7 @@ import { copiesAdded } from "./copy-events.js";
 import { initializePurchases, purchasesFromPrices, registerPurchaseRoutes } from "./purchases.js";
 import { type Fetcher, registerProxyRoutes } from "./proxies.js";
 import { deviceUser, handleCrossOrigin, registerMobileRoutes, Revision } from "./mobile.js";
+import { registerAppUpdateRoutes } from "./app-updates.js";
 import { access, createCollection, forgetItem, itemSharing, registerLibraryRoutes } from "./library.js";
 import { isAdmin, logActivity, registerAdminRoutes, startBackupSchedule, useInvite } from "./admin.js";
 import { type Locks, type ServerSettings, Settings } from "./settings.js";
@@ -77,6 +79,8 @@ declare module "fastify" {
 const PUBLIC_PATHS = new Set([
   "/login", "/login.html", "/icon.svg", "/icon-192.png", "/icon-512.png", "/manifest.webmanifest", "/sw.js",
   "/api/health", "/api/config", "/api/login", "/api/signup", "/api/logout",
+  // the app for this server version (0.17.0): the same file as on the public releases page
+  "/api/app/latest", "/api/app/apk",
 ]);
 // card pictures are public, like Scryfall's own
 const PICTURE_PATH = /^\/pictures\//;
@@ -199,7 +203,7 @@ export async function buildApp(
   registerDeckBuilderRoutes(app, database);
   registerTradeRoutes(app, database);
   initializePurchases(database);
-  registerPurchaseRoutes(app, database);
+  registerPurchaseRoutes(app, database, join(webRoot, "ocr"));
   registerInsightRoutes(app, database);
   registerScanRoutes(app, database);
   registerCustomRoutes(app, database);
@@ -339,6 +343,7 @@ export async function buildApp(
   });
 
   registerMobileRoutes(app, database, revision, signIn);
+  registerAppUpdateRoutes(app, { version: options.version ?? "", databasePath, fetcher: options.fetcher });
 
   app.post("/api/logout", async (request, reply) => {
     const token = readCookie(request.headers.cookie, COOKIE_NAME);

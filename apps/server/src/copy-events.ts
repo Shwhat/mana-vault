@@ -14,7 +14,17 @@ export type TradeSide = {
   got: Array<CopyChange & { price: number | null }>;
 };
 
+/** Copies that moved to another collection or changed printing or finish: the same physical cards, so ties follow them. */
+type Moved = (database: DatabaseSync, from: { collectionId: string; key: CopyKey }, to: { collectionId: string; key: CopyKey }, quantity: number) => void;
+
 const added: Added[] = [];
+const moved: Moved[] = [];
+export const onCopiesMoved = (listener: Moved) => { moved.push(listener); };
+/** Called before the copies leave the source, so listeners can still count what the source holds. */
+export function copiesMoved(database: DatabaseSync, from: { collectionId: string; key: CopyKey }, to: { collectionId: string; key: CopyKey }, quantity: number): void {
+  if (quantity <= 0) return;
+  for (const listener of moved) listener(database, from, to, quantity);
+}
 const lowered: Lowered[] = [];
 const traded: Array<(database: DatabaseSync, side: TradeSide) => void> = [];
 const reopened: Array<(database: DatabaseSync, tradeId: string) => void> = [];

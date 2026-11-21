@@ -62,7 +62,6 @@ Messages appear at the right end of the status bar (on the phone, in a banner ab
 | Filters cleared | Clear filters, for the open view |
 | Light theme, Dark theme, or System theme | Changing the theme |
 | Workspace name, Workspace name saved, Workspace name deleted | Using, saving or deleting a workspace |
-| Prices in US dollars, or Prices in euros | Changing the currency |
 | Card name changed | Copy details |
 | Card name marked for trade, or N entries marked for trade | Mark for trade |
 | Card name no longer for trade | Unmark for trade |

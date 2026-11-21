@@ -1,15 +1,16 @@
 // ---------- the compact card catalog kept on the phone: offline search, card lookup and scan matching ----------
 import { bestName, buildNameIndex, MIN_NAME_SCORE, normalize, readInfoLine, type NameIndex } from "../../../server/src/scan-core";
 import type { Card, Currency, SearchSort } from "../types";
-import { sortFound } from "../search-sort";
+import { plainWords, sortFound } from "../search-sort";
+import { compileQuery, type QueryCard } from "../query-match";
 import { idbGet, idbSet } from "./idb";
 import { appFetch, OfflineError } from "./net";
 
 export type CompactCard = Card & {
   oracle_id: string; finishes: string; flavor_name: string | null; promo: number; variation: number; released_at: string | null;
 };
-type Stored = { version: string; fields: string[]; rows: unknown[][] };
-type Loaded = { version: string; cards: CompactCard[]; byId: Map<string, CompactCard>; names: NameIndex | null };
+type Stored = { version: string; fields: string[]; rows: unknown[][]; formats?: string[] };
+type Loaded = { version: string; cards: CompactCard[]; byId: Map<string, CompactCard>; names: NameIndex | null; formats: string[] };
 
 let loaded: Loaded | null = null;
 let loading: Promise<Loaded | null> | null = null;
@@ -21,7 +22,7 @@ function expand(stored: Stored): Loaded {
     if (!("oracle_text" in card)) card.oracle_text = null;
     return card as CompactCard;
   });
-  return { version: stored.version, cards, byId: new Map(cards.map((card) => [card.id, card])), names: null };
+  return { version: stored.version, cards, byId: new Map(cards.map((card) => [card.id, card])), names: null, formats: stored.formats ?? [] };
 }
 
 /** The catalog on the phone, read into memory once. Null until the first download. */
@@ -87,10 +88,24 @@ const newest = (a: CompactCard, b: CompactCard) =>
   (b.released_at ?? "").localeCompare(a.released_at ?? "") || a.promo - b.promo || a.variation - b.variation ||
   a.collector_number.length - b.collector_number.length || a.collector_number.localeCompare(b.collector_number);
 
-/** Card search on the phone: every word must appear in the name (or flavor name), with the filters from the Filters panel. */
+/** The oracle ids of the cards the account owns, from the copy of All collections kept on the phone (for is:owned). */
+async function ownedOnPhone(): Promise<Set<string> | null> {
+  for (const url of ["/api/library/cards", "/api/library/cards?wishlists=1"]) {
+    const rows = await idbGet<Array<{ oracle_id?: string; proxy?: boolean | number; collection_kind?: string }>>("cache", url).catch(() => undefined);
+    if (Array.isArray(rows)) return new Set(rows.filter((row) => !row.proxy && row.collection_kind !== "wishlist").map((row) => String(row.oracle_id ?? "")).filter(Boolean));
+  }
+  return null;
+}
+
+/**
+ * Card search on the phone (0.17.0): the full search syntax, read with the server's rules (query-match.ts), with the
+ * filters from the Filters panel.
+ */
 export async function searchCards(params: URLSearchParams): Promise<Card[] | { total: number; cards: Card[] }> {
-  const { cards } = await needCatalog();
-  const words = normalize(params.get("q") ?? "").split(" ").filter(Boolean);
+  const { cards, formats } = await needCatalog();
+  const query = params.get("q") ?? "";
+  const matches = compileQuery(query, { formats, owned: /\b(is|not):owned\b/i.test(query) ? await ownedOnPhone() : null });
+  const words = normalize(plainWords(query)).split(" ").filter(Boolean);
   const color = params.get("color")?.toUpperCase();
   const type = params.get("type")?.trim().toLowerCase();
   const set = params.get("set")?.trim().toLowerCase();
@@ -111,17 +126,14 @@ export async function searchCards(params: URLSearchParams): Promise<Card[] | { t
     if (type && !card.type_line.toLowerCase().includes(type)) continue;
     if (min !== null && (card.mana_value ?? 0) < min) continue;
     if (max !== null && (card.mana_value ?? 0) > max) continue;
-    if (words.length) {
-      const text = normalize(`${card.name} ${card.flavor_name ?? ""}`);
-      if (!words.every((word) => text.includes(word))) continue;
-    }
+    if (!matches(card as unknown as QueryCard)) continue;
     total += 1;
     if (sorting) found.push(card);
     else if (total > offset && found.length < limit) found.push(card);
     else if (!paged && found.length >= limit) break;
   }
   if (sorting) {
-    const currency: Currency = params.get("currency") === "eur" ? "eur" : "usd";
+    const currency: Currency = "usd";
     return { total, cards: sortFound(found, sort, params.get("q") ?? "", currency).slice(offset, offset + limit) };
   }
   return paged ? { total, cards: found } : found;

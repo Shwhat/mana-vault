@@ -84,20 +84,20 @@ test("the print list sorts and shows as a list, grid or binder; prices on pictur
 
 test.describe("phone card maker", () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
-  test("the whole card shows small at the top while the fields scroll, and a tap shows it full size", async ({ page }) => {
+  test("the card maker is one page that scrolls, and a tap on the card shows it full size", async ({ page }) => {
     await signUp(page, "v14phone");
     await page.locator(".ptab", { hasText: "Proxies" }).click();
     await page.getByRole("tab", { name: "Card maker" }).click();
     const canvas = page.locator(".cardcanvas");
     const box = await canvas.boundingBox();
     expect(box).not.toBeNull();
-    // the whole card is in view (its height matches its shape) and stays there while the form scrolls
+    // the whole card keeps its shape and fits the phone's width
     expect(Math.abs(box!.height / box!.width - 1040 / 745)).toBeLessThan(0.02);
-    expect(box!.y + box!.height).toBeLessThan(844);
+    expect(box!.x + box!.width).toBeLessThanOrEqual(390);
+    // the page scrolls as one: scrolling to the fields moves the card with it
     await page.locator("#cm-artist").scrollIntoViewIfNeeded();
-    const after = await canvas.boundingBox();
-    expect(after!.y).toBeGreaterThanOrEqual(0);
-    expect(after!.y + after!.height).toBeLessThan(844 / 2);
+    await expect(page.locator("#cm-artist")).toBeInViewport();
+    await canvas.scrollIntoViewIfNeeded();
     await page.screenshot({ path: "test-results/phone-card-maker.png" });
     await canvas.tap();
     await expect(page.getByRole("dialog", { name: "Card full size" })).toBeVisible();

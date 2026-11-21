@@ -12,10 +12,10 @@ import { choices as pickerChoices, Picker } from "./Picker";
 type ImportKind = "collection" | "deck";
 const NEW = "__new__";
 
-function ImportWindow({ initial }: { initial: ImportKind }) {
+function ImportWindow({ initial, start = null }: { initial: ImportKind; start?: { name: string; text: string } | null }) {
   const store = useApp();
   const [kind, setKind] = useState<ImportKind>(initial === "deck" && !store.deck ? "collection" : initial);
-  const [file, setFile] = useState<{ name: string; text: string } | null>(null);
+  const [file, setFile] = useState<{ name: string; text: string } | null>(start);
   const [format, setFormat] = useState("");
   const [detected, setDetected] = useState("");
   const collections = store.collections ?? [];
@@ -142,8 +142,8 @@ function ImportWindow({ initial }: { initial: ImportKind }) {
   );
 }
 
-export function importWindow(_store: Store, kind: ImportKind = "collection") {
-  customDialog("Import", () => <ImportWindow initial={kind} />, 560, "Cancel");
+export function importWindow(_store: Store, kind: ImportKind = "collection", start: { name: string; text: string } | null = null) {
+  customDialog("Import", () => <ImportWindow initial={kind} start={start} />, 560, "Cancel");
 }
 
 type ExportWhat = "collection" | "filtered" | "selected" | "missing" | "deck";

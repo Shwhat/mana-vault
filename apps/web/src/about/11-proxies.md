@@ -40,7 +40,7 @@ Above the lines, **Sort** orders the list and **Options** chooses the layout. Bo
 | Mana value | Lowest first |
 | Rarity | Mythic, rare, uncommon, common |
 | Color | White, blue, black, red, green, then multicolor, then colorless |
-| Price | Highest first, in the chosen currency |
+| Price | Highest first |
 | Count | Most copies first |
 
 | Layout | Shows |
@@ -102,7 +102,7 @@ The card maker makes custom cards with a live preview. A saved custom card is a 
 
 ### The list
 
-The list on the left shows every custom card with its set, number, type and maker, with a search box. **New card** starts an empty card in the set chosen last with the next free collector number. **Custom sets...** opens the custom sets window. Clicking a card opens it. Leaving a card with changes that are not saved asks first. The card being made stays while other views are used.
+The list on the left shows every custom card under a heading for its custom set, with its number, type and maker, and a search box. A right-click (long press) on a set heading opens the custom set menu: **Edit set...**, **Show its cards**, **New card in this set** and **Delete...**. The card maker opens on the card opened last; with no card made yet, it starts a new one. **New card** starts an empty card in the set chosen last with the next free collector number. **Custom sets...** opens the custom sets window. Clicking a card opens it. Leaving a card with changes that are not saved asks first. The card being made stays while other views are used.
 
 ### Buttons
 
@@ -125,10 +125,11 @@ The list on the left shows every custom card with its set, number, type and make
 | Rarity | Common, Uncommon, Rare, Mythic rare or Special. Colors the set symbol when the set has no picture |
 | Artist | Shown on the card's information line as "Illus." |
 | Double-faced card | Adds a back face, edited the same way with the **Front face** and **Back face** tabs |
-| Kind | Normal, Creature, Planeswalker, Saga or Token |
-| Style | Classic (the default), Borderless, Full art, Showcase or Nickname; see the table below |
-| Frame | Automatic, White, Blue, Black, Red, Green, the ten two-color hybrids, Multicolor (gold), Artifact, Colorless or Land |
-| Legendary | Adds a crest over the name bar |
+| Kind | Normal, Creature, Planeswalker, Saga, Token or Split card |
+| Style | Classic (the default), Borderless, Full art, Showcase, Nickname or Showcase Nickname; see the table below |
+| Frame | Automatic, White, Blue, Black, Red, Green, the ten two-color hybrids, Multicolor (gold), Artifact, Colorless, Land or Vehicle. **Choose frame...** beside it shows a small picture of the card in every style, then in every frame, to choose from |
+| Legendary crown | Automatic (the default: a crown when the type line says Legendary), On or Off |
+| Power and toughness box | Automatic (the default: shown for creatures and vehicles, or when power or toughness is filled), On or Off |
 | Name | Required. Card names from the card database are suggested while typing |
 | Nickname | Nickname style only: shown in the name bar, with the card's name in a small bar under it |
 | Mana cost | Symbols in braces, such as {2}{R} |
@@ -136,7 +137,8 @@ The list on the left shows every custom card with its set, number, type and make
 | Rules text | One ability per line. Keywords are suggested at the start of a line or after a comma. Symbols in braces are drawn as mana symbols; text in parentheses is reminder text in italics. Planeswalker lines such as "+1: Draw a card." get a loyalty cost badge; saga lines such as "I: ..." or "II, III: ..." get a chapter badge |
 | Rules text size, Flavor text size | 60 to 140 percent. Text that does not fit shrinks further |
 | Flavor text | In italics under a line |
-| Power, Toughness | Shown in a box at the bottom right |
+| Power, Toughness | Shown in a box at the bottom right (see Power and toughness box) |
+| Second half | Split card only: the second half's name, mana cost, type line, rules text and flavor text |
 | Loyalty | For planeswalkers, in a shield at the bottom right |
 
 **Symbols**, on the face heading line, opens the Symbols window. A click on a symbol puts it at the cursor of the mana cost or the rules text, whichever was used last (the mana cost before either is used); the window's title says which. On a desktop the window floats over the card maker and moves by its title bar; on a phone it is a sheet at the bottom of the screen. **Close**, **Symbols** again or Esc closes it.
@@ -150,12 +152,21 @@ The window shows the symbols as they are drawn on the card, in groups: Numbers, 
 | Full art | The art fills the frame behind the type line and text box, which sit over it |
 | Showcase | A gold-trimmed frame with a double gold line, a diamond at each corner and bars with cut corners |
 | Nickname | Classic, with the nickname in the name bar and the card's name in a small bar at the top of the art |
+| Showcase Nickname | Showcase, with the nickname in the name bar and the card's name in a small bar at the top of the art |
 
-Each style comes in every frame color. Dragging the art moves it inside the area the style gives it.
+Each style comes in every frame color, including the ten hybrids, which are drawn half in each color. Dragging the art moves it inside the area the style gives it.
 
-On a phone the whole card shows small at the top while the fields scroll under it. A tap on it shows the card full size; **Close** or a tap closes it.
+| Layout | How it is drawn |
+|---|---|
+| Saga | Chapters down the left half with chapter badges, the art down the right half |
+| Split card | The card turned on its side with two halves, each with its name, mana cost, art, type line and text. **First half** and **Second half** above the art controls choose which half's art is changed |
+| Vehicle frame | A brown frame with a lighter power and toughness box |
 
-The Automatic frame follows the mana cost and type: no colored symbols gives Artifact (for artifacts) or Colorless, a land without a mana cost gives Land, one color gives that color, two colors in hybrid symbols only gives that hybrid, and two or more colors otherwise give Multicolor (gold).
+Card names and rules text use bundled fonts under the SIL Open Font License (see [Technical](/about/technical)).
+
+On a phone the card maker is one page that scrolls: the card at the top, then the fields. A tap on the card shows it full size; **Close** or a tap closes it.
+
+The Automatic frame follows the mana cost and type: no colored symbols gives Vehicle (for vehicles), Artifact (for artifacts) or Colorless, a land without a mana cost gives Land, one color gives that color, two colors in hybrid symbols only gives that hybrid, and two or more colors otherwise give Multicolor (gold).
 
 The frames are Mana Vault's own designs, with the parts of a card in their usual places: name bar with mana cost, art box, type line with set symbol, text box, power and toughness box and an information line. They are not copies of the frame artwork printed on real cards. Mana symbols are Scryfall's symbol pictures, downloaded once by the server and kept in its database; a symbol that cannot be downloaded is drawn as a colored circle with its letters.
 
@@ -177,7 +188,7 @@ The frames are Mana Vault's own designs, with the parts of a card in their usual
 | Colors from the mana cost | On by default. Off: choose the colors |
 | Color identity from the mana symbols on the card | On by default (mana cost and rules text). Off: choose the colors |
 | Finishes | Regular, Foil, Etched; at least one |
-| Price (USD), Price (EUR) | Optional. The price is used for every finish |
+| Price (USD) | Optional. The price is used for every finish |
 | Legal in | The formats the card is legal in. New cards are legal in Casual only |
 | Tokens it makes | Tokens from the card database, found by name |
 
@@ -185,16 +196,16 @@ Colors from the mana cost, Color identity and the mana value use Scryfall's symb
 
 ### Art library
 
-Your art library keeps pictures for the card maker. It belongs to your account and is part of your account backups.
+The art library keeps pictures for the card maker. There is one art library for the server: every account sees and uses every picture in it. Each picture shows who added it. Only the account that added a picture, or an admin, can rename or delete it. Pictures are part of the backups of the account that added them.
 
 | Command | What it does |
 |---|---|
-| **Upload art...** (in the window) | Adds a JPEG, PNG or WebP picture up to 10 MB, named after its file |
+| **Upload art...** (in the window) | Adds JPEG, PNG or WebP pictures up to 10 MB each, named after their files. Several files can be chosen at once |
 | A click on a picture | Uses it on the face being edited |
-| Right-click (long press) menu | **Use on this card**, **Rename...**, **Delete...** |
+| Right-click (long press) menu | **Use on this card**, and for the account that added it or an admin, **Rename...** and **Delete...** |
 | Find art by name | Shows only the pictures whose name holds the words |
 
-Art uploaded on a card or chosen with **Art of a card...** is added to the library when the card is saved; the same picture is kept once. The first start of 0.15.0 adds the art of every custom card you made. Deleting a picture from the library leaves the cards that use it unchanged.
+Art uploaded on a card or chosen with **Art of a card...** is added to the library when the card is saved; the same picture is kept once. The first start of 0.15.0 adds the art of every custom card you made. The first start of 0.17.0 joins every account's art library into the one library, keeping one copy of each picture. Deleting a picture from the library leaves the cards that use it unchanged.
 
 ### Custom sets
 

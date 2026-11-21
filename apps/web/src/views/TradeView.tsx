@@ -123,7 +123,7 @@ function GiveSearch({ trade, editable }: { trade: Trade | null; editable: boolea
   const cards = useMemo(() => (rows ?? []).filter((row) => matchesFilters(row, filters, match)).map((row): FoundCard => ({
     id: entryKey(row), name: row.name, mana_cost: row.mana_cost, mana_value: row.mana_value, type_line: row.type_line, oracle_text: null, set_code: row.set_code,
     set_name: row.set_name, collector_number: row.collector_number, rarity: row.rarity, colors: row.colors, image_url: row.image_url,
-    prices: { usd: priceOf(row, row.foil, "usd"), usd_foil: null, usd_etched: null, eur: priceOf(row, row.foil, "eur"), eur_foil: null },
+    prices: { usd: priceOf(row, row.foil, "usd"), usd_foil: null, usd_etched: null },
   })), [rows, filters, match]);
   const sort = store.prefs.searchSort.tradeGive;
   const sorted = useMemo(() => sortFound(cards, sort, filters.query, store.prefs.currency), [cards, sort, filters.query, store.prefs.currency]);
@@ -218,7 +218,7 @@ function Matches() {
         side, cardId: match.cardId, foil: match.foil, condition: match.condition, language: match.language, quantity: 1, price: null,
         collectionId: side === "give" ? match.collectionId : null, collectionName: side === "give" && match.collectionId ? store.collectionName(match.collectionId) : null,
         name: match.name, set_code: match.set_code, set_name: match.set_name, collector_number: match.collector_number, image_url: match.image_url,
-        price_usd: match.price_usd, price_usd_foil: match.price_usd_foil, price_usd_etched: match.price_usd_etched, price_eur: match.price_eur, price_eur_foil: match.price_eur_foil,
+        price_usd: match.price_usd, price_usd_foil: match.price_usd_foil, price_usd_etched: match.price_usd_etched
       })}>{side === "get" ? "+ Get" : "+ Give"}</button>
     </div>
   );

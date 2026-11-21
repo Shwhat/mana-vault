@@ -16,7 +16,7 @@ Click a menu to open it. While a menu is open, pointing at another menu opens th
 |---|---|
 | File | New collection..., New deck..., Import..., Export..., Export purchase history... (Export purchases), New purchase..., New card sale... or Sell selected cards... when cards are picked in a collection (Sell), Scan card..., Download backup, Restore backup..., Update card database (Update database, admins only), Sign out |
 | Edit | Undo, Redo, Find, Select all cards, Clear filters |
-| View | Purchases view (Purchases); Light theme, Dark theme, System theme; Prices in US dollars, Prices in euros; Prices on pictures; Filters panel, Collections panel, Decks panel, Card panel, Deck list panel, Import review panel; every workspace (such as Deck building workspace); Save workspace..., Manage workspaces..., Reset panels |
+| View | Purchases view (Purchases); Light theme, Dark theme, System theme; Prices on pictures; Filters panel, Collections panel, Decks panel, Card panel, Deck list panel, Import review panel; every workspace (such as Deck building workspace); Save workspace..., Manage workspaces..., Reset panels |
 | Help | Keyboard shortcuts, About Mana Vault |
 
 Undo and Redo show the change they will reverse or repeat, for example "Undo Add Sol Ring". **Import...** and **Export...** open the import and export windows; see [Import and export](/about/import-and-export).
@@ -156,9 +156,9 @@ A workspace is a saved panel layout and view. Three are built in:
 | Updating card database | Shown in amber while an update runs |
 | Last update failed | Shown in red after a failed update; click it to read the reason |
 | Downloading pictures: N of N | Shown to admins while card pictures download to the server, or "Picture downloads paused"; click it to open Pictures in Administration |
-| ADDING TO | Where Enter, a double-click and the add button put cards: the target collection, or DECK name when a deck was selected last. With a deck open, click to switch between the deck and the target collection; without one, click to cycle the target collection |
+| OPENING | Shown while a purchase opening is active, with its name; click it to open its purchase entry (see [Purchases](/about/purchases)) |
+| ADDING TO | Where Enter, a double-click and the add button put cards: the target collection, the opening's name while an opening is active, or DECK name when a deck was selected last. With a deck open, click to switch between the deck and the target collection; without one, click to cycle the target collection |
 | FOIL | Click to switch Add as foil on or off (highlighted when on) |
-| PRICES | The currency for prices and values, USD or EUR; click to switch it |
 | ZONE | The target zone for Add to deck; click to cycle it |
 | Message | Confirmations in blue and problems in red, at the right end |
 
@@ -174,8 +174,25 @@ Below 900 pixels wide, and always in the Android app, the title bar, menus, mode
 - Sheets that slide up from the bottom: **Filters**, **Menu** and the scanned list in the scanner. Close a sheet with **Close**, by tapping outside it, or with Esc.
 - In a collection, **Select several cards** in **Options** turns on checkboxes; tap rows to pick them and use the bar above the list to move or remove them.
 - Messages appear as a short banner above the tab bar.
+- Rows of tabs and buttons wrap onto more lines when they do not fit, instead of scrolling sideways.
+- On card pictures, the pip bar stays under the card: the count and marks on one line, and the price on its own line.
 
 Panels (including the Collections panel) and workspaces are desktop only; on the phone, switch collections and decks with the switcher at the top of the view, which opens as a full sheet. Choices made on one layout are kept for the other, except the collection layout and the search layout (Grid, Binder or List), which each layout remembers on its own.
+
+## List views
+
+The List layout of a deck, a collection, All collections, card search and the print list sets the cards out under headings, like a printed deck list.
+
+| Item | Use |
+|---|---|
+| Group by (Options) | Type, SubType, Type and Tag (decks), Rarity, Color, Color Identity, Mana Value, Set, Artist, Tag (decks) or No grouping. Kept for your account, separately for decks, collections, card search and the print list |
+| Sort (Options) | Name, Mana Value, Price, Rarity or Color, within each group |
+| Headings | Each group heading shows its count. A click folds the group shut or opens it; folded groups are kept for your account |
+| Columns | On a wide screen the groups are set out in columns that fill the width; on a phone, one column |
+| Mana cost | Shown as mana symbols |
+| Menu button | The **...** button on each row opens the same menu as a right-click |
+
+Type groups are Creatures, Planeswalkers, Battles, Instants, Sorceries, Artifacts, Enchantments, Lands and Other. SubType groups by the first subtype. Color groups are White, Blue, Black, Red, Green, Multicolor and Colorless; Color Identity groups each combination of colors by name, such as "Blue and Red". Mana Value groups go from 0 to 7+, with lands last.
 
 ## Choice lists
 

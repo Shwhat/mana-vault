@@ -2,6 +2,35 @@
 
 The installed version is shown at the top of this guide.
 
+## 0.17.0 (2026-11-21): Purchases, list views and the card maker
+
+- Purchases: single cards are chosen with **Find cards** (card search with pictures and every printing), **Scan** (the scanner with This purchase as the target) or **From scanned list...**, never typed.
+- Purchases: the set of a product line is chosen from a searchable list with symbols and codes in capitals.
+- Purchases: **Read receipt...** reads a photo, PDF or screenshot into a new purchase. The receipt is kept with the entry and can be viewed, replaced or removed.
+- Purchases: places are shared by every account on the server in **Places...**. Any account adds and edits places; admins merge (with undo) and delete them. Renaming a place changes every entry that uses it.
+- Purchases: each sale says who paid the shipping. Buyer paid shipping (the default) leaves the shipping out of the money in; I paid shipping takes it off. Fees always lower the gain.
+- Purchases: trade entries show Gave, Got, Net and Original cost, with a From column for the cards given.
+- Purchases: an opening has **Add cards**, **Scan**, **Add existing copies...** and **Done opening**. The opening chip and OPENING in the status bar open its entry, and ADDING TO names the opening.
+- Purchases: tied cards follow their copies when they move to another collection or change printing.
+- List views in decks, collections, All collections, card search and the print list: Group by Type, SubType, Type and Tag, Rarity, Color, Color Identity, Mana Value, Set, Artist or No grouping; Sort by Name, Mana Value, Price, Rarity or Color; mana symbols as pictures; groups in columns on wide screens; folding headings; and a menu button on each row.
+- Decks: **Send to print list...** in the deck menu asks for the whole deck, the missing cards only or chosen zones.
+- Decks: a missing card whose copies fill other decks shows **In Deck name**, with **Move to this deck**.
+- Change printing: how many to change is its own first step, starting at 1.
+- Wishlists: when an added card is on more than one wishlist, a window asks which wishlist to lower, with None. A batch asks once.
+- Undo of removing deck cards links the same copies again, for 60 minutes after the remove.
+- Prices are in US dollars only. The currency switch, the PRICES status bar item and the `eur` filter are removed, and stored euro prices are deleted when the server starts.
+- Card maker: the Showcase Nickname style, hybrids in every style, a Legendary crown and Power and toughness box (Automatic, On or Off), a Vehicle frame, a Split card kind, the saga layout, **Choose frame...** with pictures of every style and frame, and bundled open-licensed card fonts.
+- Card maker: the card list is grouped under custom set headings with the set's right-click menu, and the card maker opens on the card opened last.
+- Card maker on phones: one page that scrolls, with buttons spaced for fingers.
+- Art library: one library for the server. Each picture shows who added it; that account or an admin can rename or delete it. **Upload art...** takes several files at once. The first start joins every account's library, keeping one copy of each picture.
+- Set completion: child sets are listed under their parent set.
+- Phones: rows of tabs and buttons wrap instead of scrolling sideways, and the pips under card pictures are laid out on tidy lines with the price on its own line.
+- Android app: sharing a CSV or text file into the app opens the Import window; a picture or PDF offers **Read receipt...**.
+- Android app: changes waiting to be sent are synced in the background as soon as the phone is online, even when the app is closed.
+- Android app: card search offline supports the full search syntax, except art and Oracle tags.
+- Android app: connects over https only.
+- Android app: the update check asks your own server, and the download comes from your server.
+
 ## 0.16.1 (2026-11-21): Symbols and suggestions keep the field you chose
 
 - Fixed: after a symbol or a suggestion was put in a field, choosing another field right away could move the cursor back, so the next symbol went into the mana cost instead of the rules text. The field chosen last keeps the cursor.

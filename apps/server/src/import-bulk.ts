@@ -81,7 +81,8 @@ export async function importBulkFile(
     );
     insertExtras.run(card.finishes.join(","), card.promo ? 1 : 0, card.variation ? 1 : 0, card.id);
     const prices = card.prices;
-    insertPrices.run(prices.usd, prices.usd_foil, prices.usd_etched, prices.eur, prices.eur_foil, card.flavorName, card.id);
+    // prices are kept in US dollars only (0.17.0)
+    insertPrices.run(prices.usd, prices.usd_foil, prices.usd_etched, null, null, card.flavorName, card.id);
     insertStats.run(card.power, card.toughness, card.id);
     insertBuilder.run(card.producedMana.join(""), card.tokens.length ? JSON.stringify(card.tokens) : "", card.id);
     insertBack.run(card.backImageUrl, card.id);

@@ -6,9 +6,11 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { DatabaseSync } from "node:sqlite";
 import { access } from "./library.js";
 import { type CopyKey, readCopyKey } from "./copies.js";
-import { type CopyChange, onCopiesAdded, onCopiesLowered, onTradeDone, onTradeReopened, type TradeSide } from "./copy-events.js";
-import { trimLinks } from "./links.js";
+import { type CopyChange, onCopiesAdded, onCopiesLowered, onCopiesMoved, onTradeDone, onTradeReopened, type TradeSide } from "./copy-events.js";
+import { relinkRemoved, trimLinks } from "./links.js";
 import { mergeHooks } from "./scryfall-extras.js";
+import { isAdmin } from "./admin.js";
+import { parseReceipt, pdfText, pictureText } from "./receipts.js";
 
 export const ENTRY_KINDS = ["purchase", "card_sale", "product_sale", "trade"] as const;
 export type EntryKind = (typeof ENTRY_KINDS)[number];
@@ -116,8 +118,53 @@ export function initializePurchases(database: DatabaseSync): void {
       value REAL NOT NULL,
       PRIMARY KEY (line_id, date)
     );
+    CREATE TABLE IF NOT EXISTS places (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      match_key TEXT NOT NULL UNIQUE,
+      kind TEXT NOT NULL DEFAULT 'store' CHECK(kind IN ('store', 'website', 'person', 'other')),
+      note TEXT NOT NULL DEFAULT '',
+      created_by INTEGER,
+      created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%f', 'now'))
+    );
+    CREATE TABLE IF NOT EXISTS purchase_receipts (
+      entry_id TEXT PRIMARY KEY REFERENCES purchase_entries(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      type TEXT NOT NULL,
+      data BLOB NOT NULL,
+      added_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%d %H:%M:%f', 'now'))
+    );
   `);
+  // 0.17.0: places shared on the server, who paid shipping on a sale, and the trade price of cards got in a trade
+  const entryColumns = new Set(database.prepare("PRAGMA table_info(purchase_entries)").all().map((row) => String(row.name)));
+  if (!entryColumns.has("place_id")) database.exec("ALTER TABLE purchase_entries ADD COLUMN place_id TEXT");
+  if (!entryColumns.has("shipping_by")) database.exec("ALTER TABLE purchase_entries ADD COLUMN shipping_by TEXT NOT NULL DEFAULT 'me'");
+  const tieColumns = new Set(database.prepare("PRAGMA table_info(purchase_ties)").all().map((row) => String(row.name)));
+  if (!tieColumns.has("price")) database.exec("ALTER TABLE purchase_ties ADD COLUMN price REAL");
+  for (const row of database.prepare("SELECT DISTINCT place, user_id FROM purchase_entries WHERE place_id IS NULL AND place != ''").all()) {
+    const placeId = placeFor(database, String(row.place), Number(row.user_id));
+    database.prepare("UPDATE purchase_entries SET place_id = ?, place = (SELECT name FROM places WHERE id = ?) WHERE place_id IS NULL AND place = ?").run(placeId, placeId, String(row.place));
+  }
 }
+
+// ---------- places: stores, websites and people, shared by every account ----------
+
+export const PLACE_KINDS = ["store", "website", "person", "other"] as const;
+/** Names match ignoring capitals and extra spaces. */
+export const placeKey = (name: string) => name.replace(/\s+/g, " ").trim().toLowerCase();
+
+/** The place with this name, made when there is none. */
+export function placeFor(database: DatabaseSync, name: string, userId: number | null): string | null {
+  const clean = name.replace(/\s+/g, " ").trim().slice(0, 120);
+  if (!clean) return null;
+  const found = database.prepare("SELECT id FROM places WHERE match_key = ?").get(placeKey(clean));
+  if (found) return String(found.id);
+  const id = randomUUID();
+  database.prepare("INSERT INTO places (id, name, match_key, created_by) VALUES (?, ?, ?, ?)").run(id, clean, placeKey(clean), userId);
+  return id;
+}
+
+const placeName = (database: DatabaseSync, id: string | null) => (id ? String(database.prepare("SELECT name FROM places WHERE id = ?").get(id)?.name ?? "") : "");
 
 // ---------- reading what is sent ----------
 
@@ -133,9 +180,13 @@ const count = (value: unknown, max = 100_000): number | null => {
 };
 const readDate = (value: unknown): string | null => (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) && Number.isFinite(Date.parse(value)) ? value : null);
 
-type Header = { date: string; place: string; note: string; currency: "usd" | "eur"; tax: number; shipping: number; fees: number; cashOut: number; cashIn: number };
+type Header = {
+  date: string; place: string; placeId: string | null; note: string; currency: "usd"; tax: number; shipping: number; fees: number; cashOut: number; cashIn: number;
+  shippingBy: "me" | "buyer";
+};
 
-function readHeader(body: Record<string, unknown>, base?: Header): Header | string {
+/** Reads the entry fields. The place is a place id or a name (a new name becomes a place). Amounts are always in USD. */
+function readHeader(database: DatabaseSync, userId: number, body: Record<string, unknown>, base?: Header): Header | string {
   const date = body.date === undefined && base ? base.date : readDate(body.date);
   if (!date) return "Enter the date as a calendar date";
   const figures: Record<string, number> = {};
@@ -144,10 +195,16 @@ function readHeader(body: Record<string, unknown>, base?: Header): Header | stri
     if (value === null) return "Amounts must be 0 or more";
     figures[field] = value;
   }
+  let placeId: string | null;
+  if (typeof body.placeId === "string" && body.placeId) {
+    if (!database.prepare("SELECT 1 FROM places WHERE id = ?").get(body.placeId)) return "That place is not in the list of places";
+    placeId = body.placeId;
+  } else if (body.place !== undefined || body.placeId !== undefined) placeId = placeFor(database, text(body.place, 120), userId);
+  else placeId = base?.placeId ?? null;
   return {
-    date, place: body.place === undefined && base ? base.place : text(body.place, 120), note: body.note === undefined && base ? base.note : text(body.note, 1000),
-    currency: (body.currency === undefined && base ? base.currency : body.currency === "eur" ? "eur" : "usd"),
+    date, placeId, place: placeName(database, placeId), note: body.note === undefined && base ? base.note : text(body.note, 1000), currency: "usd",
     tax: figures.tax!, shipping: figures.shipping!, fees: figures.fees!, cashOut: figures.cashOut!, cashIn: figures.cashIn!,
+    shippingBy: body.shippingBy === undefined && base ? base.shippingBy : body.shippingBy === "buyer" ? "buyer" : "me",
   };
 }
 
@@ -212,6 +269,7 @@ function putCopies(database: DatabaseSync, collectionId: string, key: CopyKey, q
      ON CONFLICT(collection_id, card_id, foil, condition, language, proxy) DO UPDATE SET quantity = MIN(10000, quantity + excluded.quantity),
        purchase_price = COALESCE(purchase_price, excluded.purchase_price), price_currency = COALESCE(price_currency, excluded.price_currency)`,
   ).run(collectionId, ...keyValues(key), quantity, price ?? null, price === undefined ? null : currency ?? "usd");
+  relinkRemoved(database, collectionId, key);
   database.prepare(`UPDATE collections SET updated_at = ${now} WHERE id = ?`).run(collectionId);
 }
 
@@ -227,12 +285,11 @@ function ownCollection(database: DatabaseSync, id: unknown, userId: number): boo
 
 // ---------- prices ----------
 
-/** Today's price of a copy in a currency, by its finish. */
-function priceNow(database: DatabaseSync, cardId: string, foil: number, currency: string): number | null {
-  const row = database.prepare("SELECT price_usd, price_usd_foil, price_usd_etched, price_eur, price_eur_foil FROM cards WHERE id = ?").get(cardId);
+/** Today's price of a copy in USD, by its finish. */
+function priceNow(database: DatabaseSync, cardId: string, foil: number, _currency = "usd"): number | null {
+  const row = database.prepare("SELECT price_usd, price_usd_foil, price_usd_etched FROM cards WHERE id = ?").get(cardId);
   if (!row) return null;
-  const value = currency === "eur" ? (foil === 0 ? row.price_eur : row.price_eur_foil)
-    : foil === 0 ? row.price_usd : foil === 1 ? row.price_usd_foil : row.price_usd_etched ?? row.price_usd_foil;
+  const value = foil === 0 ? row.price_usd : foil === 1 ? row.price_usd_foil : row.price_usd_etched ?? row.price_usd_foil;
   return value === null || value === undefined ? null : Number(value);
 }
 
@@ -273,6 +330,7 @@ function entryFigures(database: DatabaseSync, entry: Record<string, unknown>, he
   lines: Array<LineRow & { full: number; sealed: number; sealedValue: number; valueDate: string | null }>;
   ties: Array<Record<string, unknown> & { held: number; price: number | null }>;
   pulledIncome: number;
+  trade: TradeFigures | null;
 } {
   const id = String(entry.id);
   const currency = String(entry.currency);
@@ -288,7 +346,7 @@ function entryFigures(database: DatabaseSync, entry: Record<string, unknown>, he
     if (line.product !== "single") value += sealed * each.value;
     return { ...line, full: money(cost), sealed, sealedValue: money(each.value), valueDate: each.date };
   });
-  const ties = database.prepare("SELECT t.*, c.name, c.set_code, c.collector_number, c.image_url FROM purchase_ties t LEFT JOIN cards c ON c.id = t.card_id WHERE t.entry_id = ? ORDER BY t.id").all(id)
+  const ties = database.prepare("SELECT t.*, t.price AS trade_price, c.name, c.set_code, c.collector_number, c.image_url FROM purchase_ties t LEFT JOIN cards c ON c.id = t.card_id WHERE t.entry_id = ? ORDER BY t.id").all(id)
     .map((tie) => {
       const price = priceNow(database, String(tie.card_id), Number(tie.foil), currency);
       const have = Number(tie.proxy) === 1 ? 0 : held.get(Number(tie.id)) ?? 0;
@@ -304,12 +362,61 @@ function entryFigures(database: DatabaseSync, entry: Record<string, unknown>, he
   let out = 0;
   let incoming = 0;
   const kind = String(entry.kind);
+  let trade: TradeFigures | null = null;
   if (kind === "purchase") out = lines.reduce((sum, line) => sum + Number(line.cost), 0) + Number(entry.tax) + Number(entry.shipping);
   else if (kind === "trade") { out = Number(entry.cash_out); incoming = Number(entry.cash_in); }
-  else incoming = sales.reduce((sum, sale) => sum + Number(sale.price), 0) - Number(entry.fees) - Number(entry.shipping);
-  // a purchase's gain counts what its pulls and products sold for; a sale's gain is what it brought in
-  const gain = kind === "purchase" ? value + pulledIncome - out : incoming + value - out;
-  return { out: money(out), in: money(incoming), value: money(value), gain: money(gain), unpriced, lines: lineFigures, ties, pulledIncome: money(pulledIncome) };
+  else incoming = sales.reduce((sum, sale) => sum + Number(sale.price), 0) - Number(entry.fees) - (entry.shipping_by === "buyer" ? 0 : Number(entry.shipping));
+  let gain: number;
+  if (kind === "purchase") gain = value + pulledIncome - out; // a purchase's gain counts what its pulls and products sold for
+  else if (kind === "trade") {
+    trade = tradeFigures(database, entry, sales, ties);
+    // what the cards got are worth now, against what the cards given first cost (their trade value when no cost is recorded)
+    gain = value + incoming - out - trade.originalCost - trade.noCostValue;
+  } else gain = incoming + value - out; // a sale's gain is what it brought in
+  return { out: money(out), in: money(incoming), value: money(value), gain: money(gain), unpriced, lines: lineFigures, ties, pulledIncome: money(pulledIncome), trade };
+}
+
+type TradeFigures = {
+  gave: number; got: number; net: number; originalCost: number; noCostValue: number; noCost: string[];
+  given: Array<{ saleId: string; cost: number | null; from: { entryId: string; date: string; description: string } | null }>;
+};
+
+/** What the cards of one sale or trade line first cost: their share of the purchase they came from, when known. */
+function costEach(database: DatabaseSync, sale: Record<string, unknown>): number | null {
+  if (!sale.source_entry_id || !sale.card_id) return null;
+  const tie = database.prepare(
+    "SELECT t.line_id, t.opening_id FROM purchase_ties t WHERE t.entry_id = ? AND t.card_id = ? AND t.foil = ? ORDER BY t.id LIMIT 1",
+  ).get(String(sale.source_entry_id), String(sale.card_id), Number(sale.foil ?? 0));
+  if (!tie?.line_id || tie.opening_id) return null;
+  const source = database.prepare("SELECT * FROM purchase_entries WHERE id = ?").get(String(sale.source_entry_id));
+  const line = database.prepare("SELECT * FROM purchase_lines WHERE id = ?").get(String(tie.line_id));
+  if (!source || !line || line.product !== "single") return null;
+  const lines = database.prepare("SELECT * FROM purchase_lines WHERE entry_id = ?").all(String(source.id));
+  const full = fullCosts(lines, source).get(String(line.id)) ?? Number(line.cost);
+  return money(full / Math.max(1, Number(line.quantity)));
+}
+
+/** A trade's Gave, Got, Net and the original cost of the cards given. */
+function tradeFigures(database: DatabaseSync, entry: Record<string, unknown>, sales: Array<Record<string, unknown>>, ties: Array<Record<string, unknown> & { price: number | null }>): TradeFigures {
+  const given = sales.filter((sale) => sale.what === "card");
+  const gave = given.reduce((sum, sale) => sum + Number(sale.price), 0) + Number(entry.cash_out);
+  const got = ties.reduce((sum, tie) => sum + Number(tie.quantity) * Number(tie.trade_price ?? tie.price ?? 0), 0) + Number(entry.cash_in);
+  let originalCost = 0;
+  let noCostValue = 0;
+  const noCost: string[] = [];
+  const rows = given.map((sale) => {
+    const each = costEach(database, sale);
+    if (each === null) {
+      noCost.push(String(sale.name));
+      noCostValue += Number(sale.price);
+    } else originalCost += each * Number(sale.quantity);
+    const source = sale.source_entry_id ? database.prepare("SELECT * FROM purchase_entries WHERE id = ?").get(String(sale.source_entry_id)) : null;
+    return {
+      saleId: String(sale.id), cost: each === null ? null : money(each * Number(sale.quantity)),
+      from: source ? { entryId: String(source.id), date: String(source.date), description: describe(database, source) } : null,
+    };
+  });
+  return { gave: money(gave), got: money(got), net: money(got - gave), originalCost: money(originalCost), noCostValue: money(noCostValue), noCost, given: rows };
 }
 
 const KIND_LABEL: Record<string, string> = { purchase: "Purchase", card_sale: "Card sale", product_sale: "Product sale", trade: "Trade" };
@@ -459,6 +566,8 @@ export function purchaseEntry(database: DatabaseSync, userId: number, id: string
   });
   return {
     id: String(entry.id), kind: String(entry.kind), kindLabel: KIND_LABEL[String(entry.kind)], date: String(entry.date), place: String(entry.place), note: String(entry.note),
+    placeId: entry.place_id ? String(entry.place_id) : null, shippingBy: entry.shipping_by === "buyer" ? "buyer" : "me", trade: figures.trade,
+    receipt: receiptInfo(database, String(entry.id)),
     currency: String(entry.currency), tax: Number(entry.tax), shipping: Number(entry.shipping), fees: Number(entry.fees), cashOut: Number(entry.cash_out), cashIn: Number(entry.cash_in),
     tradeId: entry.trade_id ? String(entry.trade_id) : null, source: entry.source ? String(entry.source) : null, description: describe(database, entry),
     out: figures.out, in: figures.in, value: figures.value, gain: figures.gain, unpriced: figures.unpriced, pulledIncome: figures.pulledIncome,
@@ -480,10 +589,15 @@ export function purchaseEntry(database: DatabaseSync, userId: number, id: string
       id: Number(tie.id), cardId: String(tie.card_id), name: String(tie.name ?? tie.card_id), setCode: String(tie.set_code ?? ""), collectorNumber: String(tie.collector_number ?? ""),
       imageUrl: tie.image_url ? String(tie.image_url) : null, foil: Number(tie.foil), condition: String(tie.condition), language: String(tie.language), proxy: Number(tie.proxy) === 1,
       collectionId: String(tie.collection_id), quantity: Number(tie.quantity), held: tie.held, price: tie.price, lineId: tie.line_id ? String(tie.line_id) : null,
-      openingId: tie.opening_id ? String(tie.opening_id) : null,
+      openingId: tie.opening_id ? String(tie.opening_id) : null, tradePrice: tie.trade_price === null || tie.trade_price === undefined ? null : Number(tie.trade_price),
     })),
     openings,
   };
+}
+
+function receiptInfo(database: DatabaseSync, entryId: string) {
+  const row = database.prepare("SELECT name, type, length(data) AS bytes, added_at FROM purchase_receipts WHERE entry_id = ?").get(entryId);
+  return row ? { name: String(row.name), type: String(row.type), bytes: Number(row.bytes), addedAt: String(row.added_at) } : null;
 }
 
 // ---------- the whole entry as kept, for undo of a delete and for backups ----------
@@ -501,17 +615,20 @@ export function entrySnapshot(database: DatabaseSync, id: string) {
     purchase_openings: database.prepare("SELECT * FROM purchase_openings WHERE entry_id = ?").all(id),
     purchase_ties: database.prepare("SELECT * FROM purchase_ties WHERE entry_id = ?").all(id),
     purchase_values: lines.flatMap((line) => database.prepare("SELECT * FROM purchase_values WHERE line_id = ?").all(String(line.id))),
+    purchase_receipts: database.prepare("SELECT entry_id, name, type, data, added_at FROM purchase_receipts WHERE entry_id = ?").all(id)
+      .map((row) => ({ ...row, data: Buffer.from(row.data as Uint8Array).toString("base64") })),
   };
 }
 export type EntrySnapshot = NonNullable<ReturnType<typeof entrySnapshot>>;
 
 const COLUMNS: Record<string, string[]> = {
-  purchase_entries: ["id", "user_id", "kind", "date", "place", "note", "currency", "tax", "shipping", "fees", "cash_out", "cash_in", "trade_id", "source", "created_at"],
+  purchase_entries: ["id", "user_id", "kind", "date", "place", "place_id", "note", "currency", "tax", "shipping", "shipping_by", "fees", "cash_out", "cash_in", "trade_id", "source", "created_at"],
   purchase_lines: ["id", "entry_id", "position", "product", "name", "set_code", "quantity", "cost", "packs", "opened", "sold", "card_id", "foil", "condition", "language", "collection_id"],
   purchase_sales: ["id", "entry_id", "position", "what", "card_id", "foil", "condition", "language", "proxy", "collection_id", "name", "quantity", "price", "source_entry_id", "source_line_id"],
   purchase_openings: ["id", "user_id", "entry_id", "line_id", "count", "name", "collection_id", "active", "created_at", "done_at"],
-  purchase_ties: ["user_id", "entry_id", "line_id", "opening_id", "collection_id", "card_id", "foil", "condition", "language", "proxy", "quantity", "created_at"],
+  purchase_ties: ["user_id", "entry_id", "line_id", "opening_id", "collection_id", "card_id", "foil", "condition", "language", "proxy", "quantity", "price", "created_at"],
   purchase_values: ["line_id", "date", "value"],
+  purchase_receipts: ["entry_id", "name", "type", "data", "added_at"],
 };
 
 const cell = (value: unknown) => (value === undefined ? null : value as string | number | null);
@@ -520,11 +637,22 @@ const cell = (value: unknown) => (value === undefined ? null : value as string |
 export function restoreSnapshot(database: DatabaseSync, userId: number, snapshot: EntrySnapshot): void {
   const insert = (table: string, row: Record<string, unknown>) => {
     const columns = COLUMNS[table]!;
-    const values = columns.map((column) => (column === "user_id" ? userId : cell(row[column])));
-    database.prepare(`INSERT INTO ${table} (${columns.join(", ")}) VALUES (${columns.map(() => "?").join(", ")})`).run(...values);
+    const values = columns.map((column) => {
+      if (column === "user_id") return userId;
+      if (table === "purchase_receipts" && column === "data") return Buffer.from(String(row.data ?? ""), "base64");
+      if (table === "purchase_entries" && column === "shipping_by") return row.shipping_by === "buyer" ? "buyer" : "me";
+      if (table === "purchase_entries" && column === "currency") return "usd";
+      return cell(row[column]);
+    });
+    database.prepare(`INSERT INTO ${table} (${columns.join(", ")}) VALUES (${columns.map(() => "?").join(", ")})`).run(...values as Array<string | number | null | Buffer>);
   };
-  insert("purchase_entries", snapshot.entry);
-  for (const table of [...TABLES, "purchase_values"] as const) for (const row of (snapshot as unknown as Record<string, Array<Record<string, unknown>>>)[table] ?? []) insert(table, row);
+  // the place follows by name, so a backup from another server joins the places here
+  const entry = { ...snapshot.entry } as Record<string, unknown>;
+  const known = entry.place_id ? database.prepare("SELECT name FROM places WHERE id = ?").get(String(entry.place_id)) : null;
+  entry.place_id = known ? String(entry.place_id) : placeFor(database, String(entry.place ?? ""), userId);
+  entry.place = placeName(database, entry.place_id as string | null);
+  insert("purchase_entries", entry);
+  for (const table of [...TABLES, "purchase_values", "purchase_receipts"] as const) for (const row of (snapshot as unknown as Record<string, Array<Record<string, unknown>>>)[table] ?? []) insert(table, row);
 }
 
 function readSnapshot(value: unknown): EntrySnapshot | null {
@@ -533,7 +661,7 @@ function readSnapshot(value: unknown): EntrySnapshot | null {
   if (!snapshot.entry || typeof snapshot.entry !== "object") return null;
   const entry = snapshot.entry as Record<string, unknown>;
   if (typeof entry.id !== "string" || !ENTRY_KINDS.includes(entry.kind as EntryKind) || !readDate(entry.date)) return null;
-  for (const table of [...TABLES, "purchase_values"]) if (snapshot[table] !== undefined && !Array.isArray(snapshot[table])) return null;
+  for (const table of [...TABLES, "purchase_values", "purchase_receipts"]) if (snapshot[table] !== undefined && !Array.isArray(snapshot[table])) return null;
   return snapshot as unknown as EntrySnapshot;
 }
 
@@ -542,9 +670,9 @@ function readSnapshot(value: unknown): EntrySnapshot | null {
 function insertEntry(database: DatabaseSync, userId: number, kind: EntryKind, header: Header, extra: { tradeId?: string; source?: string } = {}): string {
   const id = randomUUID();
   database.prepare(
-    `INSERT INTO purchase_entries (id, user_id, kind, date, place, note, currency, tax, shipping, fees, cash_out, cash_in, trade_id, source)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  ).run(id, userId, kind, header.date, header.place, header.note, header.currency, header.tax, header.shipping, header.fees, header.cashOut, header.cashIn,
+    `INSERT INTO purchase_entries (id, user_id, kind, date, place, place_id, note, currency, tax, shipping, shipping_by, fees, cash_out, cash_in, trade_id, source)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(id, userId, kind, header.date, header.place, header.placeId, header.note, "usd", header.tax, header.shipping, header.shippingBy, header.fees, header.cashOut, header.cashIn,
     extra.tradeId ?? null, extra.source ?? null);
   return id;
 }
@@ -561,10 +689,10 @@ function insertLine(database: DatabaseSync, entryId: string, position: number, l
   return id;
 }
 
-function insertTie(database: DatabaseSync, userId: number, entryId: string, place: { lineId?: string | null; openingId?: string | null }, collectionId: string, key: CopyKey, quantity: number): void {
+function insertTie(database: DatabaseSync, userId: number, entryId: string, place: { lineId?: string | null; openingId?: string | null }, collectionId: string, key: CopyKey, quantity: number, price: number | null = null): void {
   database.prepare(
-    `INSERT INTO purchase_ties (user_id, entry_id, line_id, opening_id, collection_id, card_id, foil, condition, language, proxy, quantity) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  ).run(userId, entryId, place.lineId ?? null, place.openingId ?? null, collectionId, ...keyValues(key), quantity);
+    `INSERT INTO purchase_ties (user_id, entry_id, line_id, opening_id, collection_id, card_id, foil, condition, language, proxy, quantity, price) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(userId, entryId, place.lineId ?? null, place.openingId ?? null, collectionId, ...keyValues(key), quantity, price);
 }
 
 /** The purchase a copy came from: the newest tie of the same copy in the same collection. */
@@ -645,7 +773,8 @@ export function purchasesFromPrices(database: DatabaseSync, userId: number, mode
     const first = group[0]!;
     const date = mode === "date" ? first.added : group.reduce((latest, item) => (item.added > latest ? item.added : latest), first.added);
     const entryId = insertEntry(database, userId, "purchase", {
-      date, place: options.source, note: "", currency: first.currency as "usd" | "eur", tax: 0, shipping: 0, fees: 0, cashOut: 0, cashIn: 0,
+      date, place: placeName(database, placeFor(database, options.source, userId)), placeId: placeFor(database, options.source, userId), note: "", currency: "usd",
+      tax: 0, shipping: 0, fees: 0, cashOut: 0, cashIn: 0, shippingBy: "me",
     }, { source: options.source });
     group.forEach((item, position) => {
       const lineId = insertLine(database, entryId, position, { product: "single", name: "", setCode: null, quantity: item.quantity, cost: money(item.price * item.quantity), packs: 0, single: { key: item.key, collectionId: item.collectionId } });
@@ -666,7 +795,7 @@ const csv = (rows: unknown[][]) => rows.map((row) => row.map(csvCell).join(","))
 
 // ---------- routes ----------
 
-export function registerPurchaseRoutes(app: FastifyInstance, database: DatabaseSync) {
+export function registerPurchaseRoutes(app: FastifyInstance, database: DatabaseSync, ocrFolder = "") {
   const userOf = (request: FastifyRequest) => request.user!.id;
   const fail = (reply: FastifyReply, error: unknown, fallback: string) => reply.code(400).send({ error: error instanceof Error ? error.message : fallback });
   const own = (request: FastifyRequest<{ Params: { entryId: string } }>) =>
@@ -679,7 +808,7 @@ export function registerPurchaseRoutes(app: FastifyInstance, database: DatabaseS
     const active = database.prepare("SELECT * FROM purchase_openings WHERE user_id = ? AND active = 1").get(userId);
     return {
       ...result,
-      places: database.prepare("SELECT place, MAX(date) AS last FROM purchase_entries WHERE user_id = ? AND place != '' GROUP BY place ORDER BY last DESC LIMIT 50").all(userId).map((row) => String(row.place)),
+      places: listPlaces(database, userId),
       activeOpening: active ? { id: String(active.id), entryId: String(active.entry_id), name: String(active.name), collectionId: active.collection_id ? String(active.collection_id) : null } : null,
       products: Object.entries(PRODUCTS).map(([id, product]) => ({ id, ...product })),
     };
@@ -695,7 +824,7 @@ export function registerPurchaseRoutes(app: FastifyInstance, database: DatabaseS
     const body = request.body ?? {};
     const kind = String(body.kind ?? "purchase") as EntryKind;
     if (!ENTRY_KINDS.includes(kind)) return reply.code(400).send({ error: "Choose Purchase, Card sale, Product sale or Trade" });
-    const header = readHeader(body);
+    const header = readHeader(database, userId, body);
     if (typeof header === "string") return reply.code(400).send({ error: header });
     try {
       const id = transaction(database, () => {
@@ -758,15 +887,15 @@ export function registerPurchaseRoutes(app: FastifyInstance, database: DatabaseS
     const entry = own(request);
     if (!entry) return missing(reply);
     const base: Header = {
-      date: String(entry.date), place: String(entry.place), note: String(entry.note), currency: entry.currency === "eur" ? "eur" : "usd", tax: Number(entry.tax),
-      shipping: Number(entry.shipping), fees: Number(entry.fees), cashOut: Number(entry.cash_out), cashIn: Number(entry.cash_in),
+      date: String(entry.date), place: String(entry.place), placeId: entry.place_id ? String(entry.place_id) : null, note: String(entry.note), currency: "usd", tax: Number(entry.tax),
+      shipping: Number(entry.shipping), fees: Number(entry.fees), cashOut: Number(entry.cash_out), cashIn: Number(entry.cash_in), shippingBy: entry.shipping_by === "buyer" ? "buyer" : "me",
     };
-    const header = readHeader(request.body ?? {}, base);
+    const header = readHeader(database, userId, request.body ?? {}, base);
     if (typeof header === "string") return reply.code(400).send({ error: header });
     try {
       transaction(database, () => {
-        database.prepare("UPDATE purchase_entries SET date = ?, place = ?, note = ?, currency = ?, tax = ?, shipping = ?, fees = ?, cash_out = ?, cash_in = ? WHERE id = ?")
-          .run(header.date, header.place, header.note, header.currency, header.tax, header.shipping, header.fees, header.cashOut, header.cashIn, String(entry.id));
+        database.prepare("UPDATE purchase_entries SET date = ?, place = ?, place_id = ?, note = ?, currency = 'usd', tax = ?, shipping = ?, shipping_by = ?, fees = ?, cash_out = ?, cash_in = ? WHERE id = ?")
+          .run(header.date, header.place, header.placeId, header.note, header.tax, header.shipping, header.shippingBy, header.fees, header.cashOut, header.cashIn, String(entry.id));
         if (entry.kind === "purchase" && request.body?.lines !== undefined) {
           const lines = readLines(request.body.lines);
           if (typeof lines === "string") throw new Error(lines);
@@ -995,6 +1124,153 @@ export function registerPurchaseRoutes(app: FastifyInstance, database: DatabaseS
     return csv([["Date", "Kind", "Place", "Description", "Note", "Money out", "Money in", "Value now", "Gain or loss", "Currency"],
       ...entries.map((entry) => [entry.date, entry.kindLabel, entry.place, entry.description, entry.note, entry.out, entry.in, entry.value, entry.gain, entry.currency.toUpperCase()])]);
   });
+  // ---------- places ----------
+
+  app.get("/api/places", async (request) => listPlaces(database, userOf(request)));
+
+  app.post<{ Body: { name?: unknown; kind?: unknown; note?: unknown } }>("/api/places", async (request, reply) => {
+    const name = text(request.body?.name, 120);
+    if (!name) return reply.code(400).send({ error: "Enter the name of the place" });
+    if (database.prepare("SELECT 1 FROM places WHERE match_key = ?").get(placeKey(name))) return reply.code(409).send({ error: `${name} is already in the list of places` });
+    const id = placeFor(database, name, userOf(request))!;
+    database.prepare("UPDATE places SET kind = ?, note = ? WHERE id = ?").run(readKind(request.body?.kind), text(request.body?.note, 500), id);
+    return reply.code(201).send(listPlaces(database, userOf(request)).find((place) => place.id === id));
+  });
+
+  // any account can fix a place's name, kind or note; every entry shows the new name at once
+  app.patch<{ Params: { placeId: string }; Body: { name?: unknown; kind?: unknown; note?: unknown } }>("/api/places/:placeId", async (request, reply) => {
+    const place = database.prepare("SELECT * FROM places WHERE id = ?").get(request.params.placeId);
+    if (!place) return reply.code(404).send({ error: "That place is not in the list of places" });
+    const name = request.body?.name === undefined ? String(place.name) : text(request.body.name, 120);
+    if (!name) return reply.code(400).send({ error: "Enter the name of the place" });
+    const other = database.prepare("SELECT name FROM places WHERE match_key = ? AND id != ?").get(placeKey(name), String(place.id));
+    if (other) return reply.code(409).send({ error: `${String(other.name)} is already in the list of places. Merge the two places instead.` });
+    const kind = request.body?.kind === undefined ? String(place.kind) : readKind(request.body.kind);
+    const note = request.body?.note === undefined ? String(place.note) : text(request.body.note, 500);
+    transaction(database, () => {
+      database.prepare("UPDATE places SET name = ?, match_key = ?, kind = ?, note = ? WHERE id = ?").run(name, placeKey(name), kind, note, String(place.id));
+      database.prepare("UPDATE purchase_entries SET place = ? WHERE place_id = ?").run(name, String(place.id));
+    });
+    return { before: { name: String(place.name), kind: String(place.kind), note: String(place.note) } };
+  });
+
+  const adminOnly = (request: FastifyRequest, reply: FastifyReply) => {
+    if (isAdmin(database, request.user?.id)) return true;
+    void reply.code(403).send({ error: "Only an admin can merge or delete places" });
+    return false;
+  };
+
+  // merges a place into another: every entry moves to the place kept; returns what is needed to undo it
+  app.post<{ Params: { placeId: string }; Body: { into?: unknown } }>("/api/places/:placeId/merge", async (request, reply) => {
+    if (!adminOnly(request, reply)) return reply;
+    const place = database.prepare("SELECT * FROM places WHERE id = ?").get(request.params.placeId);
+    const into = database.prepare("SELECT * FROM places WHERE id = ?").get(String(request.body?.into ?? ""));
+    if (!place || !into || place.id === into.id) return reply.code(400).send({ error: "Choose two different places to merge" });
+    const entryIds = database.prepare("SELECT id FROM purchase_entries WHERE place_id = ?").all(String(place.id)).map((row) => String(row.id));
+    transaction(database, () => {
+      database.prepare("UPDATE purchase_entries SET place_id = ?, place = ? WHERE place_id = ?").run(String(into.id), String(into.name), String(place.id));
+      database.prepare("DELETE FROM places WHERE id = ?").run(String(place.id));
+    });
+    return { place: placeRow(place), entryIds };
+  });
+
+  // a place no entry uses can be deleted; one in use is merged into another first
+  app.delete<{ Params: { placeId: string } }>("/api/places/:placeId", async (request, reply) => {
+    if (!adminOnly(request, reply)) return reply;
+    const place = database.prepare("SELECT * FROM places WHERE id = ?").get(request.params.placeId);
+    if (!place) return reply.code(404).send({ error: "That place is not in the list of places" });
+    const uses = Number(database.prepare("SELECT COUNT(*) AS n FROM purchase_entries WHERE place_id = ?").get(String(place.id))?.n ?? 0);
+    if (uses) return reply.code(409).send({ error: `${String(place.name)} is used by ${uses} ${uses === 1 ? "entry" : "entries"}. Merge it into another place first.` });
+    database.prepare("DELETE FROM places WHERE id = ?").run(String(place.id));
+    return { place: placeRow(place), entryIds: [] };
+  });
+
+  // undo of a merge or delete: the place comes back and its entries move back to it
+  app.post<{ Body: { place?: Record<string, unknown>; entryIds?: unknown } }>("/api/places/restore", async (request, reply) => {
+    if (!adminOnly(request, reply)) return reply;
+    const place = request.body?.place;
+    const name = text(place?.name, 120);
+    if (!place || typeof place.id !== "string" || !name) return reply.code(400).send({ error: "That place cannot be put back" });
+    if (database.prepare("SELECT 1 FROM places WHERE id = ? OR match_key = ?").get(place.id, placeKey(name))) return reply.code(409).send({ error: `${name} is already in the list of places` });
+    const entryIds = Array.isArray(request.body?.entryIds) ? request.body!.entryIds.map(String) : [];
+    transaction(database, () => {
+      database.prepare("INSERT INTO places (id, name, match_key, kind, note, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)")
+        .run(place.id as string, name, placeKey(name), readKind(place.kind), text(place.note, 500), place.createdBy === null || place.createdBy === undefined ? null : Number(place.createdBy), String(place.createdAt ?? new Date().toISOString()));
+      for (const id of entryIds) database.prepare("UPDATE purchase_entries SET place_id = ?, place = ? WHERE id = ?").run(place.id as string, name, id);
+    });
+    return reply.code(201).send({ status: "restored" });
+  });
+
+  // ---------- receipts ----------
+
+  const receiptTypes = /^(application\/pdf|image\/(png|jpeg|webp|gif|bmp))$/;
+  app.addContentTypeParser(/^(application\/pdf|image\/.*)$/, { parseAs: "buffer", bodyLimit: 20 * 1024 * 1024 }, (_request, body, done) => done(null, body));
+
+  // reads a receipt and returns the purchase fields found in it; nothing is saved
+  app.post<{ Body: Buffer }>("/api/purchases/receipts/read", async (request, reply) => {
+    const type = String(request.headers["content-type"] ?? "").split(";")[0]!.trim();
+    if (!receiptTypes.test(type) || !Buffer.isBuffer(request.body)) return reply.code(400).send({ error: "Choose a PDF or a picture of the receipt" });
+    try {
+      const textRead = type === "application/pdf" ? await pdfText(new Uint8Array(request.body)) : await pictureText(request.body, ocrFolder);
+      return { text: textRead, fields: parseReceipt(textRead, receiptSets(database)) };
+    } catch (error) {
+      return reply.code(422).send({ error: error instanceof Error && /missing/.test(error.message) ? error.message : "The receipt could not be read. Enter the purchase by hand." });
+    }
+  });
+
+  // reads text a phone already recognized
+  app.post<{ Body: { text?: unknown } }>("/api/purchases/receipts/parse", async (request) => ({ fields: parseReceipt(String(request.body?.text ?? "").slice(0, 200_000), receiptSets(database)) }));
+
+  app.get<{ Params: { entryId: string } }>("/api/purchases/:entryId/receipt", async (request, reply) => {
+    if (!own(request)) return missing(reply);
+    const row = database.prepare("SELECT * FROM purchase_receipts WHERE entry_id = ?").get(request.params.entryId);
+    if (!row) return reply.code(404).send({ error: "This entry has no receipt" });
+    reply.header("Content-Type", String(row.type));
+    reply.header("Content-Disposition", `inline; filename="${String(row.name).replace(/["\\\r\n]/g, "")}"`);
+    return reply.send(Buffer.from(row.data as Uint8Array));
+  });
+
+  // keeps a receipt with an entry (replacing one kept before, which is returned so the change can be undone)
+  app.put<{ Params: { entryId: string }; Body: Buffer }>("/api/purchases/:entryId/receipt", async (request, reply) => {
+    if (!own(request)) return missing(reply);
+    const type = String(request.headers["content-type"] ?? "").split(";")[0]!.trim();
+    if (!receiptTypes.test(type) || !Buffer.isBuffer(request.body)) return reply.code(400).send({ error: "Choose a PDF or a picture of the receipt" });
+    const name = String(request.headers["x-file-name"] ?? "").replace(/[^\w .()-]+/g, "").slice(0, 120) || (type === "application/pdf" ? "receipt.pdf" : "receipt");
+    const before = takeReceipt(database, request.params.entryId);
+    database.prepare("INSERT INTO purchase_receipts (entry_id, name, type, data) VALUES (?, ?, ?, ?)").run(request.params.entryId, name, type, request.body);
+    return { before };
+  });
+
+  app.delete<{ Params: { entryId: string } }>("/api/purchases/:entryId/receipt", async (request, reply) => {
+    if (!own(request)) return missing(reply);
+    return { before: takeReceipt(database, request.params.entryId) };
+  });
+}
+
+const readKind = (value: unknown) => (PLACE_KINDS.includes(value as (typeof PLACE_KINDS)[number]) ? String(value) : "store");
+const placeRow = (place: Record<string, unknown>) => ({
+  id: String(place.id), name: String(place.name), kind: String(place.kind), note: String(place.note),
+  createdBy: place.created_by === null || place.created_by === undefined ? null : Number(place.created_by), createdAt: String(place.created_at),
+});
+
+/** Every place, the ones this account used most recently first, with how many entries (of every account) use each. */
+export function listPlaces(database: DatabaseSync, userId: number) {
+  return database.prepare(
+    `SELECT p.*, (SELECT COUNT(*) FROM purchase_entries e WHERE e.place_id = p.id) AS uses,
+            (SELECT MAX(date) FROM purchase_entries e WHERE e.place_id = p.id AND e.user_id = ?) AS last
+     FROM places p ORDER BY last IS NULL, last DESC, p.name COLLATE NOCASE`,
+  ).all(userId).map((row) => ({ ...placeRow(row), uses: Number(row.uses), lastUsed: row.last ? String(row.last) : null }));
+}
+
+function takeReceipt(database: DatabaseSync, entryId: string) {
+  const row = database.prepare("SELECT * FROM purchase_receipts WHERE entry_id = ?").get(entryId);
+  if (!row) return null;
+  database.prepare("DELETE FROM purchase_receipts WHERE entry_id = ?").run(entryId);
+  return { name: String(row.name), type: String(row.type), data: Buffer.from(row.data as Uint8Array).toString("base64") };
+}
+
+function receiptSets(database: DatabaseSync): Array<{ code: string; name: string }> {
+  return database.prepare("SELECT code, name FROM sets WHERE COALESCE(digital, 0) = 0").all().map((row) => ({ code: String(row.code), name: String(row.name) }));
 }
 
 // ---------- listening to the rest of the program ----------
@@ -1005,6 +1281,32 @@ onCopiesAdded((database, userId, collectionId, items) => {
   if (!opening) return;
   for (const item of items) {
     insertTie(database, userId, String(opening.entry_id), { lineId: String(opening.line_id), openingId: String(opening.id) }, collectionId, item.key, item.quantity);
+  }
+});
+
+/** Copies that move to another collection or change printing keep their ties: the copies not tied move first. */
+onCopiesMoved((database, from, to, quantity) => {
+  const ties = database.prepare(`SELECT * FROM purchase_ties WHERE collection_id = ? AND ${KEY} ORDER BY id`).all(from.collectionId, ...keyValues(from.key));
+  if (!ties.length) return;
+  const have = heldQuantity(database, from.collectionId, from.key);
+  const tied = Math.min(have, ties.reduce((sum, tie) => sum + Number(tie.quantity), 0));
+  let left = Math.min(tied, quantity - Math.max(0, have - tied));
+  // the newest ties move first, so the oldest keep the copies that stay
+  for (const tie of [...ties].reverse()) {
+    if (left <= 0) break;
+    const take = Math.min(left, Number(tie.quantity));
+    if (take < Number(tie.quantity)) {
+      database.prepare("UPDATE purchase_ties SET quantity = quantity - ? WHERE id = ?").run(take, Number(tie.id));
+      database.prepare(
+        `INSERT INTO purchase_ties (user_id, entry_id, line_id, opening_id, collection_id, card_id, foil, condition, language, proxy, quantity, price, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ).run(Number(tie.user_id), String(tie.entry_id), tie.line_id as string | null, tie.opening_id as string | null, to.collectionId, ...keyValues(to.key), take,
+        tie.price as number | null, String(tie.created_at));
+    } else {
+      database.prepare(`UPDATE purchase_ties SET collection_id = ?, card_id = ?, foil = ?, condition = ?, language = ?, proxy = ? WHERE id = ?`)
+        .run(to.collectionId, ...keyValues(to.key), Number(tie.id));
+    }
+    left -= take;
   }
 });
 
@@ -1027,8 +1329,9 @@ onCopiesLowered((database, userId, collectionId, items) => {
 onTradeDone((database: DatabaseSync, side: TradeSide) => {
   const currency = "usd";
   const priced = (cardId: string, foil: number, price: number | null) => price ?? priceNow(database, cardId, foil, currency) ?? 0;
+  const placeId = side.partnerName ? placeFor(database, side.partnerName, side.userId) : null;
   const entryId = insertEntry(database, side.userId, "trade", {
-    date: today(), place: side.partnerName ?? "", note: side.name, currency, tax: 0, shipping: 0, fees: 0, cashOut: 0, cashIn: 0,
+    date: today(), place: placeName(database, placeId), placeId, note: side.name, currency, tax: 0, shipping: 0, fees: 0, cashOut: 0, cashIn: 0, shippingBy: "me",
   }, { tradeId: side.tradeId });
   side.given.forEach((item, position) => {
     database.prepare(
@@ -1037,7 +1340,7 @@ onTradeDone((database: DatabaseSync, side: TradeSide) => {
     ).run(randomUUID(), entryId, position, ...keyValues(item.key), item.collectionId, item.key.cardId, item.quantity, money(priced(item.key.cardId, item.key.foil, item.price) * item.quantity),
       sourceOf(database, side.userId, item.collectionId, item.key));
   });
-  if (side.collectionId) for (const item of side.got) insertTie(database, side.userId, entryId, {}, side.collectionId, item.key, item.quantity);
+  if (side.collectionId) for (const item of side.got) insertTie(database, side.userId, entryId, {}, side.collectionId, item.key, item.quantity, money(priced(item.key.cardId, item.key.foil, item.price)));
 });
 
 onTradeReopened((database, tradeId) => {

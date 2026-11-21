@@ -4,26 +4,23 @@ Mana Vault shows a price for each printing, the value of every collection and de
 
 ## Where prices come from
 
-Prices are part of the card database. Each update stores Scryfall's prices for every printing: a regular, foil and etched price in US dollars, and a regular and foil price in euros. Prices change only when the card database is updated, so they are as old as the last update shown in the status bar. A printing without a price shows "No price".
+Prices are part of the card database. Each update stores Scryfall's prices for every printing: a regular, foil and etched price in US dollars. Prices are in US dollars only. Prices change only when the card database is updated, so they are as old as the last update shown in the status bar. A printing without a price shows "No price".
 
 ## Price history
 
-Each card database update also saves the day's prices of every printing whose price changed since the last saved day, so the history grows only with changes. The **Price history** tab of the card page shows a line chart of the price over time for the printing shown, one line per finish (Regular, Foil, Etched) in the chosen currency. Moving over the chart shows the day and price under the pointer. **Show table** lists every saved day with each finish's price. A printing with no saved history shows "No price history yet. Prices are saved with each card database update."
+Each card database update also saves the day's prices of every printing whose price changed since the last saved day, so the history grows only with changes. The **Price history** tab of the card page shows a line chart of the price over time for the printing shown, one line per finish (Regular, Foil, Etched) Moving over the chart shows the day and price under the pointer. **Show table** lists every saved day with each finish's price. A printing with no saved history shows "No price history yet. Prices are saved with each card database update."
 
 ## Currency
 
-**Prices** chooses the currency for every price and value on screen: US dollars or euros. The choice is kept for your account.
-
-- Change it with **Prices in US dollars** or **Prices in euros** (View menu), with PRICES in the status bar, or with **Show in euros** or **Show in US dollars** on a Statistics tab.
-- Values are never converted between currencies. A printing with a dollar price but no euro price has no value in euros.
+Every price and value is in US dollars. Euro prices are not stored; euro prices saved by versions before 0.17.0 are removed when the server starts with 0.17.0.
 
 ## The price of a copy
 
-| Copy | US dollars | Euros |
-|---|---|---|
-| Regular | Regular price | Regular price |
-| Foil | Foil price | Foil price |
-| Etched | Etched price, or the foil price when there is no etched price | Foil price |
+| Copy | Price |
+|---|---|
+| Regular | Regular price |
+| Foil | Foil price |
+| Etched | Etched price, or the foil price when there is no etched price |
 
 Search results, which are not yet copies, show the regular price, or the foil price for printings that only come in foil.
 
@@ -46,7 +43,7 @@ The **Sort** list above a collection's rows orders them by Name (the default), P
 
 ## Searching by price
 
-The filters `usd` and `eur` compare a printing's price, for example `usd<1` or `eur>=20`; see [Card search](/about/card-search).
+The filter `usd` compares a printing's price, for example `usd<1`; see [Card search](/about/card-search).
 
 ## Statistics
 
@@ -57,7 +54,7 @@ The filters `usd` and `eur` compare a printing's price, for example `usd<1` or `
 | Tile | Shows |
 |---|---|
 | Cards | Number of cards, and the number of rows (deck entries for a deck) |
-| Value | Total value in the chosen currency, and how many cards have no price |
+| Value | Total value in US dollars, and how many cards have no price |
 | Average per card | Total value divided by the priced cards, and the median price per card. A row of four copies counts four times |
 | Most valuable | The highest price of one card, and its name |
 

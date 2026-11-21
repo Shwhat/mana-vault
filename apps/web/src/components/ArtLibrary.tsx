@@ -1,11 +1,11 @@
-// ---------- the art library: pictures an account keeps for the card maker ----------
+// ---------- the art library: pictures for the card maker, one library shared by every account (0.17.0) ----------
 import { useCallback, useEffect, useState } from "react";
-import { fetchFile, pickFile, request } from "../api";
+import { fetchFile, pickFile, pickFiles, request } from "../api";
 import { type Store } from "../store";
 import { rowMenu } from "./ContextMenu";
 import { blobToData } from "./CustomSets";
 
-export type ArtItem = { id: string; name: string; type: string; bytes: number; createdAt: string; url: string };
+export type ArtItem = { id: string; name: string; type: string; bytes: number; createdAt: string; url: string; addedBy?: string | null; canChange?: boolean };
 
 /** Adds a picture file to the account's art library. Returns the saved art, or null when none was chosen. */
 export async function uploadToLibrary(store: Store): Promise<{ art: ArtItem; data: string } | null> {
@@ -45,15 +45,25 @@ export function ArtLibrary({ store, onUse, canUse }: { store: Store; onUse: (art
   const [error, setError] = useState("");
   const load = useCallback(async () => setItems(await request<ArtItem[]>("/api/art")), []);
   useEffect(() => { void load().catch((reason: unknown) => setError(reason instanceof Error ? reason.message : "Could not load the art library.")); }, [load]);
+  // several pictures can be chosen at once; each is added in turn
   const upload = async () => {
-    try {
-      const added = await uploadToLibrary(store);
-      if (!added) return;
-      await load();
-      store.flash(`${added.art.name} added to the art library`);
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Could not add the art.");
+    const files = await pickFiles("image/jpeg,image/png,image/webp");
+    if (!files.length) return;
+    setError("");
+    let added = 0;
+    const skipped: string[] = [];
+    for (const file of files) {
+      if (file.size > 10 * 1024 * 1024) { skipped.push(file.name); continue; }
+      try {
+        await request<ArtItem>("/api/art", { method: "POST", body: JSON.stringify({ name: file.name.replace(/\.[a-z0-9]+$/i, ""), picture: await blobToData(file) }) });
+        added += 1;
+      } catch {
+        skipped.push(file.name);
+      }
     }
+    await load();
+    if (skipped.length) setError(`Not added (art can be up to 10 MB and a JPEG, PNG or WebP picture): ${skipped.join(", ")}`);
+    if (added) store.flash(`${added} ${added === 1 ? "picture" : "pictures"} added to the art library`);
   };
   const rename = async () => {
     if (!renaming) return;
@@ -77,8 +87,8 @@ export function ArtLibrary({ store, onUse, canUse }: { store: Store; onUse: (art
   };
   const menu = (art: ArtItem) => rowMenu(store, art.name, () => [
     canUse && { label: "Use on this card", run: () => onUse(art) },
-    { label: "Rename...", run: () => setRenaming({ id: art.id, name: art.name }) },
-    { label: "Delete...", run: () => setDeleting(art) },
+    art.canChange !== false && { label: "Rename...", run: () => setRenaming({ id: art.id, name: art.name }) },
+    art.canChange !== false && { label: "Delete...", run: () => setDeleting(art) },
   ]);
   const words = term.trim().toLowerCase();
   const shown = (items ?? []).filter((art) => art.name.toLowerCase().includes(words));
@@ -105,10 +115,10 @@ export function ArtLibrary({ store, onUse, canUse }: { store: Store; onUse: (art
         </div>
       )}
       {items === null && <p className="note">Loading the art library</p>}
-      {items?.length === 0 && <p className="note">No art yet. Art uploaded to a card, or here, is kept in the art library.</p>}
+      {items?.length === 0 && <p className="note">No art yet. Art uploaded to a card, or here, is kept in the art library for every account.</p>}
       <div className="artgrid">
         {shown.map((art) => (
-          <button key={art.id} type="button" className="artpick" title={art.name} {...menu(art)} onClick={() => { if (canUse) onUse(art); }}>
+          <button key={art.id} type="button" className="artpick" title={art.addedBy ? `${art.name}, added by ${art.addedBy}` : art.name} {...menu(art)} onClick={() => { if (canUse) onUse(art); }}>
             <ArtThumb art={art} /><span className="artname">{art.name}</span>
           </button>
         ))}

@@ -1,86 +1,29 @@
 // ---------- deck rules: grouping, sorting, legality, mana and the deck as text ----------
-import { capitalize, COLOR_NAMES, type Currency, type DeckCard, type DeckGroup, type DeckSort, formatName, priceOf, type Zone } from "./types";
+import { groupList, type ListSection, mainType, sortList } from "./list-groups";
+import { COLOR_NAMES, type Currency, type DeckCard, type DeckGroup, type DeckSort, formatName, priceOf, type Zone } from "./types";
 
 export const ZONE_ORDER: Zone[] = ["commander", "main", "sideboard", "maybeboard"];
 
 const frontType = (typeLine: string) => typeLine.split(" // ")[0] ?? typeLine;
-
-/** The heading a card is listed under in Type groups. Creatures win over other types ("Artifact Creature" is a creature). */
-export const TYPE_ORDER = ["Creature", "Planeswalker", "Battle", "Instant", "Sorcery", "Artifact", "Enchantment", "Land", "Other"] as const;
-export function mainType(typeLine: string): string {
-  const front = frontType(typeLine);
-  if (front.includes("Land") && !front.includes("Creature")) return "Land";
-  return TYPE_ORDER.find((type) => front.includes(type)) ?? "Other";
-}
-
-const plural: Record<string, string> = {
-  Creature: "Creatures", Planeswalker: "Planeswalkers", Battle: "Battles", Instant: "Instants", Sorcery: "Sorceries", Artifact: "Artifacts",
-  Enchantment: "Enchantments", Land: "Lands", Other: "Other",
-};
-
-/** The groups a card is listed under. A card with several tags is listed under each tag. */
-export function groupsOf(card: DeckCard, group: DeckGroup): Array<{ key: string; label: string; order: number }> {
-  switch (group) {
-    case "type": {
-      const type = mainType(card.type_line);
-      return [{ key: type, label: plural[type] ?? type, order: TYPE_ORDER.indexOf(type as (typeof TYPE_ORDER)[number]) }];
-    }
-    case "mana": {
-      if (mainType(card.type_line) === "Land") return [{ key: "land", label: "Lands", order: 99 }];
-      const value = Math.floor(card.mana_value ?? 0);
-      const key = value >= 7 ? "7+" : String(Math.max(0, value));
-      return [{ key, label: `Mana value ${key}`, order: Math.min(7, Math.max(0, value)) }];
-    }
-    case "color": {
-      const colors = card.colors ?? "";
-      const key = colors.length === 0 ? "C" : colors.length > 1 ? "M" : colors;
-      return [{ key, label: COLOR_NAMES[key] ?? key, order: "WUBRGMC".indexOf(key) }];
-    }
-    case "rarity": {
-      const rarity = card.rarity ?? "common";
-      return [{ key: rarity, label: capitalize(rarity), order: ["common", "uncommon", "rare", "mythic", "special", "bonus"].indexOf(rarity) }];
-    }
-    case "tag": {
-      const tags = card.tags ?? [];
-      return tags.length ? tags.map((tag) => ({ key: `t:${tag.toLowerCase()}`, label: tag, order: 0 })) : [{ key: "none", label: "No tag", order: 1 }];
-    }
-    default:
-      return [{ key: "all", label: "Cards", order: 0 }];
-  }
-}
+export { mainType, TYPE_ORDER } from "./list-groups";
 
 /** A deck card's price in its finish, or in another finish of the printing when that one has no price. */
 export const cardPrice = (card: DeckCard, currency: Currency) => {
   const prices = {
     price_usd: card.price_usd ?? null, price_usd_foil: card.price_usd_foil ?? null, price_usd_etched: card.price_usd_etched ?? null,
-    price_eur: card.price_eur ?? null, price_eur_foil: card.price_eur_foil ?? null,
   };
   const finish = card.finish ?? 0;
   return priceOf(prices, finish, currency) ?? priceOf(prices, 0, currency) ?? priceOf(prices, 1, currency) ?? priceOf(prices, 2, currency);
 };
 
 export function sortCards(cards: DeckCard[], sort: DeckSort, currency: Currency): DeckCard[] {
-  const byName = (a: DeckCard, b: DeckCard) => a.name.localeCompare(b.name);
-  if (sort === "mana") return [...cards].sort((a, b) => (a.mana_value ?? 0) - (b.mana_value ?? 0) || byName(a, b));
-  if (sort === "price") return [...cards].sort((a, b) => (cardPrice(b, currency) ?? -1) - (cardPrice(a, currency) ?? -1) || byName(a, b));
-  return [...cards].sort(byName);
+  return sortList(cards, sort, (card) => cardPrice(card, currency));
 }
 
-export type Section = { key: string; label: string; count: number; cards: DeckCard[] };
-/** The cards of one zone, grouped and sorted. Groups are in a fixed order; tag groups are alphabetical with No tag last. */
+export type Section = ListSection<DeckCard>;
+/** The cards of one zone, grouped and sorted (the rules every list view shares, in list-groups.ts). */
 export function sections(cards: DeckCard[], group: DeckGroup, sort: DeckSort, currency: Currency): Section[] {
-  const map = new Map<string, Section & { order: number }>();
-  for (const card of cards) {
-    for (const item of groupsOf(card, group)) {
-      const section = map.get(item.key) ?? { key: item.key, label: item.label, order: item.order, count: 0, cards: [] };
-      section.cards.push(card);
-      section.count += card.quantity;
-      map.set(item.key, section);
-    }
-  }
-  return [...map.values()]
-    .sort((a, b) => a.order - b.order || a.label.localeCompare(b.label))
-    .map(({ order: _order, ...section }) => ({ ...section, cards: sortCards(section.cards, sort, currency) }));
+  return groupList(cards, group, sort, (card) => cardPrice(card, currency), (card) => card.quantity);
 }
 
 // ---------- legality ----------
