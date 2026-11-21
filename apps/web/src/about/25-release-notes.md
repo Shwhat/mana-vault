@@ -2,6 +2,11 @@
 
 The installed version is shown at the top of this guide.
 
+## 0.16.1 (2026-11-21): Symbols and suggestions keep the field you chose
+
+- Fixed: after a symbol or a suggestion was put in a field, choosing another field right away could move the cursor back, so the next symbol went into the mana cost instead of the rules text. The field chosen last keeps the cursor.
+- The Symbols window also follows a field reached with the keyboard.
+
 ## 0.16.0 (2026-11-21): Purchase history
 
 - Purchases mode tab (key 6; on phones a Home button and Purchases view in the Menu) with Summary, History and entry pages.

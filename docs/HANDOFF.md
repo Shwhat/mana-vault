@@ -1,6 +1,6 @@
 # Mana Vault handoff
 
-Last updated: 2026-11-21, version 0.16.0.
+Last updated: 2026-11-21, version 0.16.1.
 
 ## Project
 
@@ -26,6 +26,7 @@ Mana Vault is Devon's self-hosted Magic: The Gathering collection and deck manag
 
 - Nothing is specified. Follow-ups to ask Devon: whether the pip bar, one tap to open in the app, the Symbols window, the art library and the custom set menu work as wanted (0.15.0), and whether purchase history (openings, sales, the summary and chart) works the way Devon wants (0.16.0).
 - Parts of `docs/SPEC-0.14.1.md` left for later: the right-click menu on custom sets in the card maker's Custom set list (it is in the Custom sets window), symbols as pictures in deck list rows (done on the card page and Card panel), several files at once in Upload art..., child sets under their parent in set completion (sets are grouped by block).
+- Parts of `docs/SPEC-0.15.0.md` left for later: the set picker with search on purchase lines (a set code box with the set symbol is used), a chart of one entry's value over time on the entry page, and adding existing copies to an opening from the entry page (Continue opening and adding the cards does it; the server route `POST /api/purchases/openings/:id/ties` exists).
 
 ## Decisions (0.16.0 purchase history)
 
@@ -366,4 +367,4 @@ None known.
 
 ## Where work stopped
 
-0.1.0 to 0.16.0 are merged to main (0.15.0 in pull request 24, 0.16.0 in the pull request for branch `v0.16.0`). All checks pass (`PW_CHANNEL=chrome npm run test:all`: typecheck, 218 server tests, 35 web tests, 61 browser tests). The debug APK comes from the `Android app` workflow on the merge to main (Debug build pre-release). Next: ask Devon the follow-ups under Next. Still to check from earlier versions: run a card database update on the server (with 0.15.0 set symbols, symbols, printing changes, lists and the card back), tick picture sizes and watch the download, print a test sheet with card backs on both sides and check the alignment on paper, try a MakePlayingCards upload with back.jpg, make a custom card on a phone, try one tap to open in the app, record a real purchase and open it with the scanner, try trading between two accounts, then create the release key and the four repository secrets and tag a release.
+0.1.0 to 0.16.1 are merged to main (0.15.0 in pull request 24, 0.16.0 in pull request 25, 0.16.1 in the pull request for branch `v0.16.1`). 0.16.1 fixes a focus race found by the container workflow's browser tests (Playwright's Chromium): the deferred refocus after a symbol or suggestion took the cursor back from a field chosen since; it now leaves another focused field alone. All checks pass (`PW_CHANNEL=chrome npm run test:all`: typecheck, 218 server tests, 35 web tests, 61 browser tests). The debug APK comes from the `Android app` workflow on the merge to main (Debug build pre-release). Next: ask Devon the follow-ups under Next. Still to check from earlier versions: run a card database update on the server (with 0.15.0 set symbols, symbols, printing changes, lists and the card back), tick picture sizes and watch the download, print a test sheet with card backs on both sides and check the alignment on paper, try a MakePlayingCards upload with back.jpg, make a custom card on a phone, try one tap to open in the app, record a real purchase and open it with the scanner, try trading between two accounts, then create the release key and the four repository secrets and tag a release.

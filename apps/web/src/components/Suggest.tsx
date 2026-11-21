@@ -98,7 +98,13 @@ export const Suggest = forwardRef<HTMLInputElement | HTMLTextAreaElement, InputP
     onValue(next);
     onPicked?.(next);
     const cursor = part.start + inserted.length;
-    window.setTimeout(() => { field.current?.focus(); field.current?.setSelectionRange(cursor, cursor); }, 0);
+    window.setTimeout(() => {
+      // a field chosen since the suggestion was taken keeps the focus
+      const active = document.activeElement;
+      if (active && active !== field.current && active !== document.body && (active.tagName === "INPUT" || active.tagName === "TEXTAREA")) return;
+      field.current?.focus();
+      field.current?.setSelectionRange(cursor, cursor);
+    }, 0);
   };
   const keys = (event: KeyboardEvent<HTMLInputElement & HTMLTextAreaElement>) => {
     if (items.length) {
