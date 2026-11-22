@@ -10,7 +10,7 @@ import { type CopyChange, onCopiesAdded, onCopiesLowered, onCopiesMoved, onTrade
 import { relinkRemoved, trimLinks } from "./links.js";
 import { mergeHooks } from "./scryfall-extras.js";
 import { isAdmin } from "./admin.js";
-import { parseReceipt, pdfText, pictureText } from "./receipts.js";
+import { CONDITION_NOTE, conditionOf, finishOf, parseReceipt, pdfText, pictureText, setOf } from "./receipts.js";
 
 export const ENTRY_KINDS = ["purchase", "card_sale", "product_sale", "trade"] as const;
 export type EntryKind = (typeof ENTRY_KINDS)[number];
@@ -141,6 +141,20 @@ export function initializePurchases(database: DatabaseSync): void {
   if (!entryColumns.has("shipping_by")) database.exec("ALTER TABLE purchase_entries ADD COLUMN shipping_by TEXT NOT NULL DEFAULT 'me'");
   const tieColumns = new Set(database.prepare("PRAGMA table_info(purchase_ties)").all().map((row) => String(row.name)));
   if (!tieColumns.has("price")) database.exec("ALTER TABLE purchase_ties ADD COLUMN price REAL");
+  // 0.19.0: packs opened one at a time. An opening of a product with packs is one pack (count is in packs); the packs of
+  // one Open... share a group and wait in order. Older openings of such products are counted in packs from now on.
+  const openingColumns = new Set(database.prepare("PRAGMA table_info(purchase_openings)").all().map((row) => String(row.name)));
+  if (!openingColumns.has("pack_number")) {
+    database.exec("ALTER TABLE purchase_openings ADD COLUMN pack_number INTEGER");
+    database.exec("ALTER TABLE purchase_openings ADD COLUMN group_id TEXT");
+    database.exec("ALTER TABLE purchase_openings ADD COLUMN waiting INTEGER NOT NULL DEFAULT 0");
+    database.exec("UPDATE purchase_openings SET count = count * (SELECT packs FROM purchase_lines l WHERE l.id = line_id) WHERE (SELECT packs FROM purchase_lines l WHERE l.id = line_id) > 0");
+  }
+  const lineColumns = new Set(database.prepare("PRAGMA table_info(purchase_lines)").all().map((row) => String(row.name)));
+  if (!lineColumns.has("packs_opened")) {
+    database.exec("ALTER TABLE purchase_lines ADD COLUMN packs_opened INTEGER NOT NULL DEFAULT 0");
+    database.exec("UPDATE purchase_lines SET packs_opened = opened * packs WHERE packs > 0");
+  }
   // 0.18.0: each tie keeps the card's price on the day it was added (Value when pulled), from the price history for older ties
   if (!tieColumns.has("value_then")) {
     database.exec("ALTER TABLE purchase_ties ADD COLUMN value_then REAL");
@@ -364,7 +378,10 @@ function entryFigures(database: DatabaseSync, entry: Record<string, unknown>, he
     const cost = full.get(String(line.id)) ?? 0;
     const sealed = Math.max(0, Number(line.quantity) - Number(line.opened) - Number(line.sold));
     const each = line.product === "single" ? { value: 0, date: null } : sealedEach(database, line, cost);
-    if (line.product !== "single") value += sealed * each.value;
+    // the packs not yet opened of a box that is partly opened still count, at the box's value per pack (0.19.0)
+    const packs = Number(line.packs);
+    const partPacks = packs > 0 ? Math.max(0, Number(line.opened) * packs - Number(line.packs_opened ?? 0)) : 0;
+    if (line.product !== "single") value += sealed * each.value + (packs > 0 ? partPacks * each.value / packs : 0);
     return { ...line, full: money(cost), sealed, sealedValue: money(each.value), valueDate: each.date };
   });
   const ties = database.prepare("SELECT t.*, t.price AS trade_price, c.name, c.set_code, c.collector_number, c.image_url FROM purchase_ties t LEFT JOIN cards c ON c.id = t.card_id WHERE t.entry_id = ? ORDER BY t.id").all(id)
@@ -560,8 +577,13 @@ export function purchaseChart(database: DatabaseSync, userId: number, currency: 
       if (String(line.entry_date) > day) continue;
       const set = database.prepare("SELECT value FROM purchase_values WHERE line_id = ? AND date <= ? ORDER BY date DESC LIMIT 1").get(String(line.id), day);
       const opened = Number(database.prepare("SELECT COALESCE(SUM(count), 0) AS n FROM purchase_openings WHERE line_id = ? AND substr(created_at, 1, 10) <= ?").get(String(line.id), day)?.n ?? 0);
-      const sealed = Math.max(0, Number(line.quantity) - opened - (day === today() ? Number(line.sold) : 0));
-      value += sealed * (set ? Number(set.value) : Number(line.cost) / Number(line.quantity));
+      const each = set ? Number(set.value) : Number(line.cost) / Number(line.quantity);
+      const packs = Number(line.packs);
+      // openings of products with packs count packs (0.19.0)
+      const sealed = packs > 0
+        ? Math.max(0, Number(line.quantity) * packs - opened - (day === today() ? Number(line.sold) * packs : 0)) / packs
+        : Math.max(0, Number(line.quantity) - opened - (day === today() ? Number(line.sold) : 0));
+      value += sealed * each;
     }
     return { date: day, spent: money(spent), value: money(value) };
   });
@@ -574,7 +596,38 @@ export function purchaseEntry(database: DatabaseSync, userId: number, id: string
   const entry = database.prepare("SELECT * FROM purchase_entries WHERE id = ? AND user_id = ?").get(id, userId);
   if (!entry) return null;
   const figures = entryFigures(database, entry, heldByTie(database, userId));
-  const openings = database.prepare("SELECT * FROM purchase_openings WHERE entry_id = ? ORDER BY created_at").all(id).map((opening) => {
+  // where the copies no longer held went (0.18.0): sold, traded, or gone (removed from the collection); oldest ties first
+  const left = new Map<string, { sold: number; traded: number; income: number; count: number }>();
+  for (const row of database.prepare(
+    `SELECT e.kind, s.card_id, s.foil, SUM(s.quantity) AS n, SUM(s.price) AS income FROM purchase_sales s JOIN purchase_entries e ON e.id = s.entry_id
+     WHERE s.source_entry_id = ? AND s.what = 'card' GROUP BY e.kind, s.card_id, s.foil`,
+  ).all(id)) {
+    const key = `${String(row.card_id)}|${Number(row.foil ?? 0)}`;
+    const pool = left.get(key) ?? { sold: 0, traded: 0, income: 0, count: 0 };
+    if (row.kind === "trade") pool.traded += Number(row.n);
+    else pool.sold += Number(row.n);
+    // what the cards brought in, as an average per card, for the gain or loss of each pack (0.19.0)
+    pool.income += Number(row.income ?? 0);
+    pool.count += Number(row.n);
+    left.set(key, pool);
+  }
+  const outs = new Map<number, { sold: number; traded: number; gone: number; soldFor: number }>();
+  for (const tie of figures.ties) {
+    let gone = Math.max(0, Number(tie.quantity) - tie.held);
+    const pool = left.get(`${String(tie.card_id)}|${Number(tie.foil)}`) ?? { sold: 0, traded: 0, income: 0, count: 0 };
+    const sold = Math.min(gone, pool.sold);
+    pool.sold -= sold;
+    gone -= sold;
+    const traded = Math.min(gone, pool.traded);
+    pool.traded -= traded;
+    gone -= traded;
+    outs.set(Number(tie.id), { sold, traded, gone, soldFor: pool.count ? money((sold + traded) * pool.income / pool.count) : 0 });
+  }
+  const outOf = (tie: Record<string, unknown>) => {
+    const out = outs.get(Number(tie.id)) ?? { sold: 0, traded: 0, gone: 0, soldFor: 0 };
+    return { sold: out.sold, traded: out.traded, gone: out.gone };
+  };
+  const openings = database.prepare("SELECT * FROM purchase_openings WHERE entry_id = ? ORDER BY created_at, pack_number").all(id).map((opening) => {
     const ties = figures.ties.filter((tie) => tie.opening_id === opening.id);
     // Pulled value: every pull at today's price, owned or not; Value now: the pulls still held; Value when pulled: fixed
     const pulled = ties.reduce((sum, tie) => sum + Number(tie.quantity) * (Number(tie.price ?? 0)), 0);
@@ -582,38 +635,22 @@ export function purchaseEntry(database: DatabaseSync, userId: number, id: string
     const then = ties.reduce((sum, tie) => sum + Number(tie.quantity) * Number(tie.value_then ?? 0), 0);
     const thenUnpriced = ties.filter((tie) => tie.value_then === null || tie.value_then === undefined).reduce((sum, tie) => sum + Number(tie.quantity), 0);
     const line = figures.lines.find((item) => item.id === opening.line_id);
-    const packs = Number(opening.count) * Math.max(1, Number(line?.packs ?? 1));
+    // count is in packs for products with packs (0.19.0), in units for the others
+    const packs = Number(opening.count);
+    const linePacks = Number(line?.packs ?? 0);
+    const packCost = line ? money(Number(line.full) / Math.max(1, Number(line.quantity) * (linePacks > 0 ? linePacks : 1)) * packs) : 0;
+    const soldFor = money(ties.reduce((sum, tie) => sum + (outs.get(Number(tie.id))?.soldFor ?? 0), 0));
     return {
       id: String(opening.id), lineId: String(opening.line_id), count: Number(opening.count), name: String(opening.name), collectionId: opening.collection_id ? String(opening.collection_id) : null,
       active: Number(opening.active) === 1, createdAt: String(opening.created_at), doneAt: opening.done_at ? String(opening.done_at) : null,
       cards: ties.reduce((sum, tie) => sum + Number(tie.quantity), 0), valuePulled: money(pulled), perPack: money(pulled / packs), packs,
       valueNow: money(now), valueWhenPulled: money(then), whenPulledUnpriced: thenUnpriced,
       gone: ties.reduce((sum, tie) => sum + Math.max(0, Number(tie.quantity) - tie.held), 0),
+      packNumber: opening.pack_number === null || opening.pack_number === undefined ? null : Number(opening.pack_number),
+      groupId: opening.group_id ? String(opening.group_id) : null, waiting: Number(opening.waiting ?? 0) === 1,
+      packCost, soldFor, gain: money(now + soldFor - packCost),
     };
   });
-  // where the copies no longer held went (0.18.0): sold, traded, or gone (removed from the collection); oldest ties first
-  const left = new Map<string, { sold: number; traded: number }>();
-  for (const row of database.prepare(
-    `SELECT e.kind, s.card_id, s.foil, SUM(s.quantity) AS n FROM purchase_sales s JOIN purchase_entries e ON e.id = s.entry_id
-     WHERE s.source_entry_id = ? AND s.what = 'card' GROUP BY e.kind, s.card_id, s.foil`,
-  ).all(id)) {
-    const key = `${String(row.card_id)}|${Number(row.foil ?? 0)}`;
-    const pool = left.get(key) ?? { sold: 0, traded: 0 };
-    if (row.kind === "trade") pool.traded += Number(row.n);
-    else pool.sold += Number(row.n);
-    left.set(key, pool);
-  }
-  const outOf = (tie: Record<string, unknown> & { held: number }) => {
-    let gone = Math.max(0, Number(tie.quantity) - tie.held);
-    const pool = left.get(`${String(tie.card_id)}|${Number(tie.foil)}`) ?? { sold: 0, traded: 0 };
-    const sold = Math.min(gone, pool.sold);
-    pool.sold -= sold;
-    gone -= sold;
-    const traded = Math.min(gone, pool.traded);
-    pool.traded -= traded;
-    gone -= traded;
-    return { sold, traded, gone };
-  };
   return {
     id: String(entry.id), kind: String(entry.kind), kindLabel: KIND_LABEL[String(entry.kind)], date: String(entry.date), place: String(entry.place), note: String(entry.note),
     placeId: entry.place_id ? String(entry.place_id) : null, shippingBy: entry.shipping_by === "buyer" ? "buyer" : "me", trade: figures.trade,
@@ -625,6 +662,7 @@ export function purchaseEntry(database: DatabaseSync, userId: number, id: string
       id: String(line.id), product: String(line.product), productLabel: line.product === "other" ? String(line.name) : PRODUCTS[String(line.product)]?.label ?? String(line.product),
       name: String(line.name), setCode: line.set_code ? String(line.set_code) : null, quantity: Number(line.quantity), cost: Number(line.cost), full: line.full,
       packs: Number(line.packs), opened: Number(line.opened), sold: Number(line.sold), sealed: line.sealed, sealedValue: line.sealedValue, valueDate: line.valueDate,
+      packsOpened: Number(line.packs_opened ?? 0), packsLeft: Number(line.packs) > 0 ? packsLeft(line) : line.sealed,
       cardId: line.card_id ? String(line.card_id) : null, foil: line.foil === null ? null : Number(line.foil), condition: line.condition ? String(line.condition) : null,
       language: line.language ? String(line.language) : null, collectionId: line.collection_id ? String(line.collection_id) : null,
       values: database.prepare("SELECT date, value FROM purchase_values WHERE line_id = ? ORDER BY date").all(String(line.id)).map((row) => ({ date: String(row.date), value: Number(row.value) })),
@@ -675,9 +713,9 @@ export type EntrySnapshot = NonNullable<ReturnType<typeof entrySnapshot>>;
 
 const COLUMNS: Record<string, string[]> = {
   purchase_entries: ["id", "user_id", "kind", "date", "place", "place_id", "note", "currency", "tax", "shipping", "shipping_by", "fees", "cash_out", "cash_in", "trade_id", "source", "created_at"],
-  purchase_lines: ["id", "entry_id", "position", "product", "name", "set_code", "quantity", "cost", "packs", "opened", "sold", "card_id", "foil", "condition", "language", "collection_id"],
+  purchase_lines: ["id", "entry_id", "position", "product", "name", "set_code", "quantity", "cost", "packs", "opened", "sold", "card_id", "foil", "condition", "language", "collection_id", "packs_opened"],
   purchase_sales: ["id", "entry_id", "position", "what", "card_id", "foil", "condition", "language", "proxy", "collection_id", "name", "quantity", "price", "source_entry_id", "source_line_id"],
-  purchase_openings: ["id", "user_id", "entry_id", "line_id", "count", "name", "collection_id", "active", "created_at", "done_at"],
+  purchase_openings: ["id", "user_id", "entry_id", "line_id", "count", "name", "collection_id", "active", "created_at", "done_at", "pack_number", "group_id", "waiting"],
   purchase_ties: ["user_id", "entry_id", "line_id", "opening_id", "collection_id", "card_id", "foil", "condition", "language", "proxy", "quantity", "price", "created_at", "value_then"],
   purchase_values: ["line_id", "date", "value"],
   purchase_receipts: ["entry_id", "name", "type", "data", "added_at"],
@@ -857,11 +895,10 @@ export function registerPurchaseRoutes(app: FastifyInstance, database: DatabaseS
   app.get<{ Querystring: { currency?: string; from?: string; to?: string } }>("/api/purchases", async (request) => {
     const userId = userOf(request);
     const result = purchaseSummary(database, userId, { currency: request.query.currency, from: readDate(request.query.from), to: readDate(request.query.to) });
-    const active = database.prepare("SELECT * FROM purchase_openings WHERE user_id = ? AND active = 1").get(userId);
     return {
       ...result,
       places: listPlaces(database, userId),
-      activeOpening: active ? { id: String(active.id), entryId: String(active.entry_id), name: String(active.name), collectionId: active.collection_id ? String(active.collection_id) : null } : null,
+      activeOpening: activeOpeningOf(database, userId),
       products: Object.entries(PRODUCTS).map(([id, product]) => ({ id, ...product })),
     };
   });
@@ -1008,30 +1045,90 @@ export function registerPurchaseRoutes(app: FastifyInstance, database: DatabaseS
     }
   });
 
-  // opens part of a product line: the opening becomes where pulled cards are tied
+  // opens part of a product line. A product with packs (0.19.0) opens a number of packs, each its own opening: the first
+  // is where pulled cards are tied, the others wait in order for Next pack. A product without packs opens as one opening.
   app.post<{ Params: { entryId: string; lineId: string }; Body: { count?: unknown; collectionId?: unknown } }>("/api/purchases/:entryId/lines/:lineId/open", async (request, reply) => {
     const userId = userOf(request);
     const entry = own(request);
     if (!entry) return missing(reply);
     const line = database.prepare("SELECT * FROM purchase_lines WHERE id = ? AND entry_id = ?").get(request.params.lineId, String(entry.id));
     if (!line || line.product === "single") return reply.code(404).send({ error: "Choose a product line to open" });
-    const sealed = Number(line.quantity) - Number(line.opened) - Number(line.sold);
+    const packs = Number(line.packs);
+    const left = packs > 0 ? packsLeft(line) : Number(line.quantity) - Number(line.opened) - Number(line.sold);
     const opened = count(request.body?.count, 10_000);
-    if (!opened || opened > sealed) return reply.code(400).send({ error: `Open from 1 to ${sealed}` });
+    if (!opened || opened > left) return reply.code(400).send({ error: packs > 0 ? `Open from 1 to ${left} packs` : `Open from 1 to ${left}` });
     if (!ownCollection(database, request.body?.collectionId, userId)) return reply.code(400).send({ error: "Choose the collection the pulled cards go to" });
     const label = line.product === "other" ? String(line.name) : PRODUCTS[String(line.product)]!.label;
-    const plural = opened === 1 ? label : label.endsWith("x") ? `${label}es` : `${label}s`;
     const setName = line.set_code ? String(database.prepare("SELECT name FROM sets WHERE code = ?").get(String(line.set_code))?.name ?? String(line.set_code).toUpperCase()) : "";
     const date = new Date(`${String(entry.date)}T12:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
-    const name = `${opened} ${plural}${setName ? `, ${setName}` : ""} (Purchase of ${date})`;
-    const id = randomUUID();
+    const collectionId = String(request.body!.collectionId);
+    const created: Array<{ id: string; name: string }> = [];
     transaction(database, () => {
       database.prepare("UPDATE purchase_openings SET active = 0 WHERE user_id = ?").run(userId);
-      database.prepare("UPDATE purchase_lines SET opened = opened + ? WHERE id = ?").run(opened, String(line.id));
-      database.prepare("INSERT INTO purchase_openings (id, user_id, entry_id, line_id, count, name, collection_id, active) VALUES (?, ?, ?, ?, ?, ?, ?, 1)")
-        .run(id, userId, String(entry.id), String(line.id), opened, name, String(request.body!.collectionId));
+      const insert = database.prepare(
+        "INSERT INTO purchase_openings (id, user_id, entry_id, line_id, count, name, collection_id, active, pack_number, group_id, waiting) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      );
+      if (packs > 0) {
+        const total = Number(line.quantity) * packs;
+        const first = Number(line.packs_opened ?? 0) + 1;
+        const group = randomUUID();
+        for (let index = 0; index < opened; index += 1) {
+          const id = randomUUID();
+          const name = `Pack ${first + index} of ${total}, ${label}${setName ? `, ${setName}` : ""} (Purchase of ${date})`;
+          insert.run(id, userId, String(entry.id), String(line.id), 1, name, collectionId, index === 0 ? 1 : 0, first + index, group, index === 0 ? 0 : 1);
+          created.push({ id, name });
+        }
+      } else {
+        const plural = opened === 1 ? label : label.endsWith("x") ? `${label}es` : `${label}s`;
+        const id = randomUUID();
+        const name = `${opened} ${plural}${setName ? `, ${setName}` : ""} (Purchase of ${date})`;
+        insert.run(id, userId, String(entry.id), String(line.id), opened, name, collectionId, 1, null, null, 0);
+        created.push({ id, name });
+      }
+      syncOpened(database, String(line.id));
     });
-    return reply.code(201).send({ id, name, collectionId: String(request.body!.collectionId), entryId: String(entry.id) });
+    const first = created[0]!;
+    return reply.code(201).send({ id: first.id, name: first.name, collectionId, entryId: String(entry.id), packs: created });
+  });
+
+  // Next pack (0.19.0): the current pack is done and the next waiting pack of its group is where cards are tied
+  app.post<{ Params: { openingId: string } }>("/api/purchases/openings/:openingId/next", async (request, reply) => {
+    const opening = ownOpening(request);
+    if (!opening) return reply.code(404).send({ error: "That opening is not in your purchase history" });
+    const next = opening.group_id
+      ? database.prepare("SELECT * FROM purchase_openings WHERE group_id = ? AND waiting = 1 ORDER BY pack_number LIMIT 1").get(String(opening.group_id))
+      : null;
+    transaction(database, () => {
+      database.prepare(`UPDATE purchase_openings SET active = 0, waiting = 0, done_at = COALESCE(done_at, ${now}) WHERE id = ?`).run(String(opening.id));
+      if (next) {
+        database.prepare("UPDATE purchase_openings SET active = 0 WHERE user_id = ?").run(userOf(request));
+        database.prepare("UPDATE purchase_openings SET active = 1, waiting = 0, done_at = NULL WHERE id = ?").run(String(next.id));
+      }
+    });
+    return { next: next ? { id: String(next.id), name: String(next.name) } : null, opening: activeOpeningOf(database, userOf(request)) };
+  });
+
+  // Move to pack... (0.19.0): cards scanned into the wrong pack move to another pack of the same product line
+  app.post<{ Body: { ties?: unknown; openingId?: unknown } }>("/api/purchases/ties/move", async (request, reply) => {
+    const userId = userOf(request);
+    const target = database.prepare("SELECT * FROM purchase_openings WHERE id = ? AND user_id = ?").get(String(request.body?.openingId ?? ""), userId);
+    if (!target) return reply.code(404).send({ error: "Choose the pack to move the cards to" });
+    const ids = Array.isArray(request.body?.ties) ? (request.body!.ties as unknown[]).map(Number).filter(Number.isInteger) : [];
+    const moved: Array<{ id: number; from: string | null }> = [];
+    try {
+      transaction(database, () => {
+        for (const id of ids) {
+          const tie = database.prepare("SELECT * FROM purchase_ties WHERE id = ? AND user_id = ?").get(id, userId);
+          if (!tie) throw new Error("A card is no longer on its pack");
+          if (String(tie.line_id ?? "") !== String(target.line_id)) throw new Error("Cards move only between packs of the same product");
+          moved.push({ id, from: tie.opening_id ? String(tie.opening_id) : null });
+          database.prepare("UPDATE purchase_ties SET opening_id = ? WHERE id = ?").run(String(target.id), id);
+        }
+      });
+    } catch (error) {
+      return fail(reply, error, "Could not move the cards");
+    }
+    return { moved };
   });
 
   const ownOpening = (request: FastifyRequest<{ Params: { openingId: string } }>) =>
@@ -1044,7 +1141,7 @@ export function registerPurchaseRoutes(app: FastifyInstance, database: DatabaseS
     const active = request.body?.active === true;
     transaction(database, () => {
       if (active) database.prepare("UPDATE purchase_openings SET active = 0 WHERE user_id = ?").run(userOf(request));
-      database.prepare(`UPDATE purchase_openings SET active = ?, done_at = CASE WHEN ? THEN NULL ELSE ${now} END WHERE id = ?`).run(active ? 1 : 0, active ? 1 : 0, String(opening.id));
+      database.prepare(`UPDATE purchase_openings SET active = ?, waiting = 0, done_at = CASE WHEN ? THEN NULL ELSE ${now} END WHERE id = ?`).run(active ? 1 : 0, active ? 1 : 0, String(opening.id));
     });
     return { active };
   });
@@ -1053,10 +1150,16 @@ export function registerPurchaseRoutes(app: FastifyInstance, database: DatabaseS
   app.delete<{ Params: { openingId: string } }>("/api/purchases/openings/:openingId", async (request, reply) => {
     const opening = ownOpening(request);
     if (!opening) return reply.code(404).send({ error: "That opening is not in your purchase history" });
+    // the packs of one Open... go together (0.19.0)
+    const group = opening.group_id
+      ? database.prepare("SELECT id FROM purchase_openings WHERE group_id = ?").all(String(opening.group_id)).map((row) => String(row.id))
+      : [String(opening.id)];
     transaction(database, () => {
-      database.prepare("UPDATE purchase_lines SET opened = MAX(0, opened - ?) WHERE id = ?").run(Number(opening.count), String(opening.line_id));
-      database.prepare("DELETE FROM purchase_ties WHERE opening_id = ?").run(String(opening.id));
-      database.prepare("DELETE FROM purchase_openings WHERE id = ?").run(String(opening.id));
+      for (const id of group) {
+        database.prepare("DELETE FROM purchase_ties WHERE opening_id = ?").run(id);
+        database.prepare("DELETE FROM purchase_openings WHERE id = ?").run(id);
+      }
+      syncOpened(database, String(opening.line_id));
     });
     return { status: "deleted" };
   });
@@ -1067,6 +1170,7 @@ export function registerPurchaseRoutes(app: FastifyInstance, database: DatabaseS
     const opening = ownOpening(request);
     if (!opening) return reply.code(404).send({ error: "That opening is not in your purchase history" });
     const items = Array.isArray(request.body?.items) ? request.body!.items as Array<Record<string, unknown>> : [];
+    const ids: number[] = [];
     try {
       transaction(database, () => {
         for (const item of items) {
@@ -1074,9 +1178,11 @@ export function registerPurchaseRoutes(app: FastifyInstance, database: DatabaseS
           const quantity = count(item.quantity, 10_000);
           if (!key || !quantity || !ownCollection(database, item.collectionId, userId)) throw new Error("Each card needs its collection and a count");
           insertTie(database, userId, String(opening.entry_id), { lineId: String(opening.line_id), openingId: String(opening.id) }, String(item.collectionId), key, quantity);
+          ids.push(Number(database.prepare("SELECT last_insert_rowid() AS id").get()!.id));
         }
       });
-      return { tied: items.length };
+      // the new ties, so undo can remove them (0.19.0)
+      return { tied: items.length, ids };
     } catch (error) {
       return fail(reply, error, "Could not tie the cards");
     }
@@ -1194,6 +1300,42 @@ export function registerPurchaseRoutes(app: FastifyInstance, database: DatabaseS
       setCode: String(row.set_code), collectorNumber: String(row.collector_number),
       prices: { usd: row.price_usd, usdFoil: row.price_usd_foil, usdEtched: row.price_usd_etched, eur: row.price_eur, eurFoil: row.price_eur_foil },
     }));
+  });
+
+  // Add existing copies... (0.19.0): the copies of one collection with how many are free (not tied to a pack or purchase),
+  // and where the tied ones are
+  app.get<{ Querystring: { collectionId?: string; q?: string } }>("/api/purchases/collection-copies", async (request, reply) => {
+    const userId = userOf(request);
+    const collectionId = String(request.query.collectionId ?? "");
+    if (!ownCollection(database, collectionId, userId)) return reply.code(404).send({ error: "Choose one of your collections" });
+    const term = `%${String(request.query.q ?? "").trim().replace(/[\\%_]/g, (match) => `\\${match}`)}%`;
+    const held = heldByTie(database, userId);
+    const tied = new Map<string, { count: number; places: Set<string> }>();
+    for (const tie of database.prepare(
+      `SELECT t.id, t.card_id, t.foil, t.condition, t.language, t.proxy, o.name AS opening_name, e.kind, e.date FROM purchase_ties t
+       JOIN purchase_entries e ON e.id = t.entry_id LEFT JOIN purchase_openings o ON o.id = t.opening_id WHERE t.user_id = ? AND t.collection_id = ?`,
+    ).all(userId, collectionId)) {
+      const count = held.get(Number(tie.id)) ?? 0;
+      if (!count) continue;
+      const id = `${String(tie.card_id)}|${Number(tie.foil)}|${String(tie.condition)}|${String(tie.language)}|${Number(tie.proxy)}`;
+      const item = tied.get(id) ?? { count: 0, places: new Set<string>() };
+      item.count += count;
+      item.places.add(tie.opening_name ? String(tie.opening_name) : `the ${KIND_LABEL[String(tie.kind)]!.toLowerCase()} of ${String(tie.date)}`);
+      tied.set(id, item);
+    }
+    return database.prepare(
+      `SELECT i.card_id, i.foil, i.condition, i.language, i.proxy, i.quantity, c.name, c.set_code, c.set_name, c.collector_number, c.image_url, c.promo_types
+       FROM collection_cards i JOIN cards c ON c.id = i.card_id WHERE i.collection_id = ? AND c.name LIKE ? ESCAPE '\\' ORDER BY c.name, c.set_code, c.collector_number LIMIT 2000`,
+    ).all(collectionId, term).map((row) => {
+      const id = `${String(row.card_id)}|${Number(row.foil)}|${String(row.condition)}|${String(row.language)}|${Number(row.proxy)}`;
+      const tie = tied.get(id);
+      return {
+        collectionId, cardId: String(row.card_id), foil: Number(row.foil), condition: String(row.condition), language: String(row.language), proxy: Number(row.proxy) === 1,
+        quantity: Number(row.quantity), free: Math.max(0, Number(row.quantity) - (tie?.count ?? 0)), tiedTo: tie ? [...tie.places] : [],
+        name: String(row.name), setCode: String(row.set_code), setName: String(row.set_name ?? ""), collectorNumber: String(row.collector_number),
+        imageUrl: row.image_url ? String(row.image_url) : null, promoTypes: row.promo_types ? String(row.promo_types) : null,
+      };
+    });
   });
 
   // sealed lines that can be sold
@@ -1315,14 +1457,14 @@ export function registerPurchaseRoutes(app: FastifyInstance, database: DatabaseS
     if (!receiptTypes.test(type) || !Buffer.isBuffer(request.body)) return reply.code(400).send({ error: "Choose a PDF or a picture of the receipt" });
     try {
       const textRead = type === "application/pdf" ? await pdfText(new Uint8Array(request.body)) : await pictureText(request.body, ocrFolder);
-      return { text: textRead, fields: parseReceipt(textRead, receiptSets(database)) };
+      return { text: textRead, fields: matchReceiptCards(database, parseReceipt(textRead, receiptSets(database))) };
     } catch (error) {
       return reply.code(422).send({ error: error instanceof Error && /missing/.test(error.message) ? error.message : "The receipt could not be read. Enter the purchase by hand." });
     }
   });
 
   // reads text a phone already recognized
-  app.post<{ Body: { text?: unknown } }>("/api/purchases/receipts/parse", async (request) => ({ fields: parseReceipt(String(request.body?.text ?? "").slice(0, 200_000), receiptSets(database)) }));
+  app.post<{ Body: { text?: unknown } }>("/api/purchases/receipts/parse", async (request) => ({ fields: matchReceiptCards(database, parseReceipt(String(request.body?.text ?? "").slice(0, 200_000), receiptSets(database))) }));
 
   app.get<{ Params: { entryId: string } }>("/api/purchases/:entryId/receipt", async (request, reply) => {
     if (!own(request)) return missing(reply);
@@ -1370,6 +1512,61 @@ function takeReceipt(database: DatabaseSync, entryId: string) {
   if (!row) return null;
   database.prepare("DELETE FROM purchase_receipts WHERE entry_id = ?").run(entryId);
   return { name: String(row.name), type: String(row.type), data: Buffer.from(row.data as Uint8Array).toString("base64") };
+}
+
+/** Store notes on a card line that are not part of the card's name: bracketed set names, versions, conditions and finishes. */
+const VERSION_WORDS: Array<[RegExp, string]> = [
+  [/\bshowcase\b/i, "showcase"], [/\bborderless\b/i, "borderless"], [/\bextended(\s+art)?\b/i, "extendedart"], [/\bfull\s+art\b/i, "fullart"],
+  [/\bretro(\s+frame)?\b/i, "retro"], [/\betched\b/i, "etched"],
+];
+
+/**
+ * Receipt lines that are single cards (0.19.0): a line whose name, with store notes removed, is a card name, or that
+ * carries a condition or finish note, is card-like; when the name is a card, the best printing is guessed from a set named
+ * in brackets (or anywhere in the line), a version word (Showcase, Borderless, Extended Art), and the finish and condition.
+ */
+export function matchReceiptCards(database: DatabaseSync, fields: ReturnType<typeof parseReceipt>): ReturnType<typeof parseReceipt> {
+  const sets = receiptSets(database);
+  for (const line of fields.lines) {
+    if (line.product !== "other") continue;
+    const all = `${line.name} ${line.note}`;
+    const bracket = [...line.name.matchAll(/[[(]([^\])]+)[\])]/g)].map((match) => match[1]!);
+    const bare = line.name.replace(/[[(][^\])]*[\])]/g, " ").replace(new RegExp(CONDITION_NOTE.source, "gi"), " ").replace(/\s*[-/|:]\s*$/g, "").replace(/\s+/g, " ").trim();
+    const printings = bare.length >= 2
+      ? database.prepare(
+        `SELECT id, name, set_code, set_name, collector_number, image_url, finishes, promo_types, frame_effects, border_color, full_art, released_at FROM cards
+         WHERE removed = 0 AND lang = 'en' AND (lower(name) = lower(?) OR lower(name) LIKE lower(?) || ' // %' OR lower(flavor_name) = lower(?)) ORDER BY released_at DESC LIMIT 400`,
+      ).all(bare, bare, bare)
+      : [];
+    line.cardLike = printings.length > 0 || CONDITION_NOTE.test(line.note) || /\b(near\s+mint|lightly\s+played)\b/i.test(all);
+    if (!printings.length) continue;
+    const setCode = bracket.map((text) => setOf(text, sets) ?? sets.find((set) => set.code.toLowerCase() === text.trim().toLowerCase())?.code ?? null).find(Boolean) ?? line.setCode;
+    const version = VERSION_WORDS.find(([pattern]) => pattern.test(all))?.[1] ?? null;
+    const finish = finishOf(all);
+    const score = (row: Record<string, unknown>) => {
+      let points = 0;
+      if (setCode && row.set_code === setCode) points += 100;
+      const effects = `${String(row.frame_effects ?? "")} ${String(row.promo_types ?? "")}`;
+      const special = effects.includes("showcase") || effects.includes("extendedart") || row.border_color === "borderless" || Number(row.full_art) === 1;
+      if (version === "showcase" && effects.includes("showcase")) points += 20;
+      else if (version === "borderless" && row.border_color === "borderless") points += 20;
+      else if (version === "extendedart" && effects.includes("extendedart")) points += 20;
+      else if (version === "fullart" && Number(row.full_art) === 1) points += 20;
+      else if (!version && !special) points += 10;
+      const finishes = String(row.finishes ?? "");
+      if (finish === 1 && finishes.includes("foil")) points += 5;
+      if (finish === 2 && finishes.includes("etched")) points += 5;
+      if (finish === 0 && finishes.includes("nonfoil")) points += 5;
+      return points;
+    };
+    const best = [...printings].sort((a, b) => score(b) - score(a))[0]!;
+    line.card = {
+      cardId: String(best.id), name: String(best.name), setCode: String(best.set_code), setName: String(best.set_name), collectorNumber: String(best.collector_number),
+      imageUrl: best.image_url ? String(best.image_url) : null, finish, condition: conditionOf(all), promoTypes: String(best.promo_types ?? ""), finishes: String(best.finishes ?? ""),
+    };
+    line.setCode = String(best.set_code);
+  }
+  return fields;
 }
 
 function receiptSets(database: DatabaseSync): Array<{ code: string; name: string }> {
@@ -1495,4 +1692,37 @@ export function purchaseCardIds(database: DatabaseSync, userId: number): string[
      UNION SELECT l.card_id FROM purchase_lines l JOIN purchase_entries e ON e.id = l.entry_id WHERE e.user_id = ? AND l.card_id IS NOT NULL
      UNION SELECT s.card_id FROM purchase_sales s JOIN purchase_entries e ON e.id = s.entry_id WHERE e.user_id = ? AND s.card_id IS NOT NULL`,
   ).all(userId, userId, userId).map((row) => String(row.card_id));
+}
+
+// ---------- packs (0.19.0) ----------
+
+/** The packs of a product line still sealed: its packs, less those opened and those of units sold. */
+function packsLeft(line: Record<string, unknown>): number {
+  return Math.max(0, Number(line.quantity) * Number(line.packs) - Number(line.packs_opened ?? 0) - Number(line.sold) * Number(line.packs));
+}
+
+/** Counts a line's opened packs and units from its openings. A unit counts as opened from its first pack. */
+function syncOpened(database: DatabaseSync, lineId: string): void {
+  const line = database.prepare("SELECT packs FROM purchase_lines WHERE id = ?").get(lineId);
+  if (!line) return;
+  const opened = Number(database.prepare("SELECT COALESCE(SUM(count), 0) AS n FROM purchase_openings WHERE line_id = ?").get(lineId)?.n ?? 0);
+  const packs = Number(line.packs);
+  if (packs > 0) database.prepare("UPDATE purchase_lines SET packs_opened = ?, opened = ? WHERE id = ?").run(opened, Math.ceil(opened / packs), lineId);
+  else database.prepare("UPDATE purchase_lines SET opened = ? WHERE id = ?").run(opened, lineId);
+}
+
+export type ActiveOpening = {
+  id: string; entryId: string; name: string; collectionId: string | null; packNumber: number | null; groupIndex: number; groupSize: number; hasNext: boolean;
+} | null;
+
+/** The opening cards are tied to now, with where it is in its group of packs (Pack 2 of 3) and whether a pack waits after it. */
+export function activeOpeningOf(database: DatabaseSync, userId: number): ActiveOpening {
+  const row = database.prepare("SELECT * FROM purchase_openings WHERE user_id = ? AND active = 1").get(userId);
+  if (!row) return null;
+  const group = row.group_id ? database.prepare("SELECT id, waiting FROM purchase_openings WHERE group_id = ? ORDER BY pack_number").all(String(row.group_id)) : [row];
+  return {
+    id: String(row.id), entryId: String(row.entry_id), name: String(row.name), collectionId: row.collection_id ? String(row.collection_id) : null,
+    packNumber: row.pack_number === null || row.pack_number === undefined ? null : Number(row.pack_number),
+    groupIndex: Math.max(1, group.findIndex((item) => item.id === row.id) + 1), groupSize: group.length, hasNext: group.some((item) => Number(item.waiting) === 1),
+  };
 }

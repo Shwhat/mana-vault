@@ -19,7 +19,7 @@ Click a menu to open it. While a menu is open, pointing at another menu opens th
 | View | Purchases view (Purchases); Light theme, Dark theme, System theme; Prices on pictures; Card layout...; Filters panel, Collections panel, Decks panel, Card panel, Deck list panel, Import review panel |
 | Help | Keyboard shortcuts, About Mana Vault |
 
-Undo and Redo show the change they will reverse or repeat, for example "Undo Add Sol Ring". **Import...** and **Export...** open the import and export windows; see [Import and export](/about/import-and-export).
+Undo and Redo show the change they will reverse or repeat, for example "Undo Add Sol Ring". The same two commands are arrow buttons in the title bar right after the Help menu (and in the phone's top bar): the tooltip names the change, such as "Undo Add Sol Ring (Ctrl+Z)", and a button is greyed out when there is nothing to undo or redo. **Import...** and **Export...** open the import and export windows; see [Import and export](/about/import-and-export).
 
 ## Mode tabs
 
@@ -220,7 +220,8 @@ The things that can be placed:
 | Printings | N printings in card search |
 | Finish and copy details | FOIL, ETCHED and special foils, condition, language, Proxy and the number for trade |
 | Status marks | Missing, Upgrade wanted, Owned and Other version owned, In deck, Printing removed, Custom |
+| Finish lines | The lines under a picture that stands for more than one kind of copy (such as REGULAR 1 and FOIL 1), one per kind, to pick one. With Finish lines hidden, clicking such a picture asks which kind of copy, listing each with its finish and count |
 | Price | The price, when Prices on pictures is on |
 | Buttons | The add buttons (+ name, + Wishlist) or the print list count and Remove |
 
-Drag an item to a place, or click an item and then a place; dropping it on another item puts it before that one. **Same layout everywhere** (on by default) uses one layout for every section; turned off, a section choice (Card search, Collections, Decks, Trade, Proxies) sets each on its own, starting from the current layout. **Reset to default** puts the pips in one row under the picture with the price at its right and the buttons at the bottom. The layout is kept per account and used on every device.
+Drag an item to a place, or click an item and then a place; dropping it on another item puts it before that one. **Same layout everywhere** (on by default) uses one layout for every section; turned off, a section choice (Card search, Collections, Decks, Trade, Proxies) sets each on its own, starting from the current layout. **Reset to default** puts the pips in one row under the picture with the price at its right, the finish lines on the second line and the buttons at the bottom. Layouts saved before Finish lines existed show them on the second line. The layout is kept per account and used on every device.

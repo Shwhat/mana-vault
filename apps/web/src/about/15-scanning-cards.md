@@ -167,4 +167,4 @@ The set filter stays on until it is changed.
 
 ## Scanning into an opening
 
-While an opening is active (see [Purchases](/about/purchases)), the scanner shows **Scanning into: name** over the camera, and **Add to...** fills in the opening's collection, named "collection (Opening: name)". Cards added there are tied to the opening. An opening started on another device works the same way: start it on the web page and scan on the phone.
+While an opening is active (see [Purchases](/about/purchases)), the scanner shows **Scanning into: name** over the camera (with "(1 of 3)" when several packs were opened together, and a **Next pack** button while a pack waits), and **Add to...** fills in the opening's collection, named "collection (Opening: name)". Cards added there are tied to the opening. An opening started on another device works the same way: start it on the web page and scan on the phone.

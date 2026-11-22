@@ -5,8 +5,13 @@ import { request } from "../api";
 import type { ScanCard } from "../scan-state";
 import { type Currency, type FinishCode, finishLabel, money, priceOf } from "../types";
 import { customDialog } from "./Dialog";
+import { useApp } from "../store";
+import { LayoutRows, OptionsButton } from "./Options";
 
 export type Printing = ScanCard;
+
+/** The printing chooser is wide enough for a grid of card pictures (0.19.0); narrower screens fit it to the window. */
+const CHOOSER_WIDTH = 980;
 
 const FINISH_CODES: Record<string, FinishCode> = { nonfoil: 0, foil: 1, etched: 2 };
 
@@ -57,9 +62,11 @@ export function PrintingList({ cardId, currentId, finish, currency, onPick, sing
   /** Adding a card (0.18.0): one printing in one finish is taken at once, one printing in several finishes asks only the finish. */
   single?: boolean;
 }) {
+  const store = useApp();
   const [printings, setPrintings] = useState<Printing[] | null>(null);
   const [error, setError] = useState("");
   const [term, setTerm] = useState("");
+  const [page, setPage] = useState(0);
   useEffect(() => {
     let active = true;
     request<Printing[]>(`/api/cards/${encodeURIComponent(cardId)}/printings`)
@@ -72,6 +79,7 @@ export function PrintingList({ cardId, currentId, finish, currency, onPick, sing
     const text = `${card.set_name} ${card.set_code} ${card.collector_number} ${card.released_at ?? ""} ${(card as { lang?: string }).lang ?? ""}`.toLowerCase();
     return words.every((word) => text.includes(word));
   }), [printings, words]);
+  useEffect(() => setPage(0), [term]);
   useEffect(() => {
     if (single && printings?.length === 1 && finishesOf(printings[0]!).length === 1) onPick(printings[0]!, finishesOf(printings[0]!)[0]!);
   }, [single, printings]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -81,61 +89,102 @@ export function PrintingList({ cardId, currentId, finish, currency, onPick, sing
     const only = printings[0]!;
     return finishesOf(only).length === 1 ? <p className="note">Adding</p> : <FinishChoice printing={only} currency={currency} preferred={finish} onPick={(code) => onPick(only, code)} />;
   }
+  const layout = store.prefs.chooserLayout;
+  const size = store.prefs.chooserSize;
   const priceIn = (card: Printing, code: FinishCode) => money(priceOf({
     price_usd: card.price_usd ?? null, price_usd_foil: card.price_usd_foil ?? null, price_usd_etched: card.price_usd_etched ?? null,
   }, code, currency), currency);
-  return (
-    <div className="printpick">
-      <input className="search" autoFocus value={term} onChange={(event) => setTerm(event.target.value)}
-        onKeyDown={(event) => {
-          // Enter takes the printing shown selected (or the first one found); Down moves into the list
-          if (event.key === "Enter") {
-            event.preventDefault();
-            event.stopPropagation();
-            const pick = shown.find((card) => card.id === currentId) ?? shown[0];
-            if (pick) {
-              const finishes = finishesOf(pick);
-              onPick(pick, finishes.includes(finish) ? finish : finishes[0]!);
-            }
-          } else if (event.key === "ArrowDown") {
-            event.preventDefault();
-            (event.currentTarget.parentElement?.querySelector(".printrow") as HTMLElement | null)?.focus();
-          }
-        }}
-        placeholder="Find a set, code or number" aria-label="Find a printing" />
-      <p className="note">{shown.length} of {printings.length} printings</p>
-      <div className="printlist" role="listbox" aria-label="Printings">
-        {shown.map((card) => {
-          const finishes = finishesOf(card);
-          const isCurrent = card.id === currentId;
-          // clicking the row picks the finish in use when the printing has it, otherwise its first finish
-          const rowFinish = finishes.includes(finish) ? finish : finishes[0]!;
+  // clicking a printing picks the finish in use when it has it, otherwise its first finish
+  const finishFor = (card: Printing) => {
+    const finishes = finishesOf(card);
+    return finishes.includes(finish) ? finish : finishes[0]!;
+  };
+  const finishButtons = (card: Printing, isCurrent: boolean) => {
+    const rowFinish = finishFor(card);
+    return (
+      <span className="pfinishes" role="group" aria-label={`Finishes of ${card.set_code.toUpperCase()} ${card.collector_number}`}>
+        {finishesOf(card).map((code) => {
+          const on = isCurrent && code === finish;
           return (
-            <div key={card.id} role="option" aria-selected={isCurrent} tabIndex={0}
-              className={isCurrent ? "printrow active" : "printrow"}
-              onClick={() => onPick(card, rowFinish)} onKeyDown={(event) => { if (event.key === "Enter") onPick(card, rowFinish); }}>
-              {card.image_url ? <img src={card.image_url} alt="" loading="lazy" /> : <span className="noimg" />}
-              <span className="pinfo">
-                <b><SetIcon code={card.set_code} />{card.set_name} <LanguagePip lang={(card as { lang?: string }).lang} /></b>
-                <span className="muted">({card.set_code.toUpperCase()}) {card.collector_number}{card.released_at ? `, ${card.released_at.slice(0, 4)}` : ""}</span>
-                <span className="pfinishes" role="group" aria-label={`Finishes of ${card.set_code.toUpperCase()} ${card.collector_number}`}>
-                  {finishes.map((code) => {
-                    const on = isCurrent && code === finish;
-                    return (
-                      <button key={code} type="button" className={on ? "btn small on" : "btn small"} aria-pressed={on}
-                        aria-label={`${finishLabel(code, card.promo_types)} ${card.set_code.toUpperCase()} ${card.collector_number}`}
-                        onClick={(event) => { event.stopPropagation(); onPick(card, code); }}>
-                        {finishLabel(code, card.promo_types)} <span className="muted">{priceIn(card, code)}</span>
-                      </button>
-                    );
-                  })}
-                </span>
-              </span>
-              {isCurrent && <span className="badge">Current: {finishLabel(finish, card.promo_types).toLowerCase()}</span>}
-            </div>
+            <button key={code} type="button" className={on ? "btn small on" : code === rowFinish && layout !== "list" ? "btn small hi" : "btn small"} aria-pressed={on}
+              aria-label={`${finishLabel(code, card.promo_types)} ${card.set_code.toUpperCase()} ${card.collector_number}`}
+              onClick={(event) => { event.stopPropagation(); onPick(card, code); }}>
+              {finishLabel(code, card.promo_types)} <span className="muted">{priceIn(card, code)}</span>
+            </button>
           );
         })}
+      </span>
+    );
+  };
+  const info = (card: Printing) => (
+    <>
+      <b><SetIcon code={card.set_code} />{card.set_name} <LanguagePip lang={(card as { lang?: string }).lang} /></b>
+      <span className="muted">({card.set_code.toUpperCase()}) {card.collector_number}{card.released_at ? `, ${card.released_at.slice(0, 4)}` : ""}</span>
+    </>
+  );
+  // one printing: a row in List, a card picture with its details and finish buttons in Grid and Binder
+  const item = (card: Printing) => {
+    const isCurrent = card.id === currentId;
+    const rowFinish = finishFor(card);
+    const common = {
+      role: "option", "aria-selected": isCurrent, tabIndex: 0,
+      onClick: () => onPick(card, rowFinish),
+      onKeyDown: (event: React.KeyboardEvent) => { if (event.key === "Enter") onPick(card, rowFinish); },
+    } as const;
+    if (layout === "list") {
+      return (
+        <div key={card.id} {...common} className={isCurrent ? "printrow active" : "printrow"}>
+          {card.image_url ? <img className="pthumb" src={card.image_url} alt="" loading="lazy" /> : <span className="noimg" />}
+          <span className="pinfo">{info(card)}{finishButtons(card, isCurrent)}</span>
+          {isCurrent && <span className="badge">Current: {finishLabel(finish, card.promo_types).toLowerCase()}</span>}
+        </div>
+      );
+    }
+    return (
+      <div key={card.id} {...common} className={isCurrent ? "printrow printcard active" : "printrow printcard"} title={`${card.set_name} ${card.collector_number}`}>
+        <span className="pcpic">
+          {card.image_url ? <img src={card.image_url} alt={`${card.name}, ${card.set_name} ${card.collector_number}`} loading="lazy" draggable={false} /> : <span className="pocketname">{card.name}</span>}
+          {isCurrent && <span className="badge pccurrent">Current</span>}
+        </span>
+        <span className="pinfo">{info(card)}</span>
+        {finishButtons(card, isCurrent)}
       </div>
+    );
+  };
+  const pages = Math.max(1, Math.ceil(shown.length / 9));
+  const pageShown = layout === "binder" ? shown.slice(page * 9, page * 9 + 9) : shown;
+  return (
+    <div className={`printpick layout-${layout}`}>
+      <div className="printhead">
+        <input className="search" autoFocus value={term} onChange={(event) => setTerm(event.target.value)}
+          onKeyDown={(event) => {
+            // Enter takes the printing shown selected (or the first one found); Down moves into the list
+            if (event.key === "Enter") {
+              event.preventDefault();
+              event.stopPropagation();
+              const pick = shown.find((card) => card.id === currentId) ?? shown[0];
+              if (pick) onPick(pick, finishFor(pick));
+            } else if (event.key === "ArrowDown") {
+              event.preventDefault();
+              (event.currentTarget.closest(".printpick")?.querySelector(".printrow") as HTMLElement | null)?.focus();
+            }
+          }}
+          placeholder="Find a set, code or number" aria-label="Find a printing" />
+        <OptionsButton title="Printing chooser options">
+          <LayoutRows name="Printings" layout={layout} size={size} onLayout={(chooserLayout) => store.setPrefs({ chooserLayout })} onSize={(chooserSize) => store.setPrefs({ chooserSize })} />
+        </OptionsButton>
+      </div>
+      <p className="note">{shown.length} of {printings.length} printings</p>
+      <div className={`printlist ${layout === "list" ? "" : `printgrid size-${layout === "binder" ? "binder" : size}`}`} role="listbox" aria-label="Printings">
+        {pageShown.map(item)}
+      </div>
+      {layout === "binder" && pages > 1 && (
+        <div className="binderpager">
+          <button type="button" className="btn small" disabled={page === 0} onClick={() => setPage(page - 1)}>Previous page</button>
+          <span>Page {page + 1} of {pages}</span>
+          <button type="button" className="btn small" disabled={page >= pages - 1} onClick={() => setPage(page + 1)}>Next page</button>
+        </div>
+      )}
     </div>
   );
 }
@@ -178,14 +227,14 @@ export function choosePrinting(name: string, cardId: string, currentId: string,
   if (max <= 1) {
     customDialog(title, (close) => (
       <PrintingList cardId={cardId} currentId={currentId} finish={current} currency={options.currency} onPick={pickWith(close, 1)} />
-    ), 600, "Cancel");
+    ), CHOOSER_WIDTH, "Cancel");
     return;
   }
   customDialog(title, (close) => (
     <TwoSteps name={name} max={max} render={(count) => (
       <PrintingList cardId={cardId} currentId={currentId} finish={current} currency={options.currency} onPick={pickWith(close, count)} />
     )} />
-  ), 600, "Cancel");
+  ), CHOOSER_WIDTH, "Cancel");
 }
 
 /** The how-many step, then the printing list for that many copies, in one window. */

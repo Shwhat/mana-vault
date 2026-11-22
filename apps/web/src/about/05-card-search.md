@@ -141,7 +141,7 @@ The desktop and phones each remember their own layout. The deck's Add tab and bo
 | Grid, Binder | The card picture, an **N printings** badge when the card has more than one printing, and OWNED with every copy you own (the tooltip splits it by finish), the price when Prices on pictures is on, and the buttons (in Binder, under the selected one). Where each sits follows View, Card layout... |
 | List | The image, name, mana cost, type line, set, set code, collector number, rarity, price and an OWNED badge with your copies. Clicking the set code fills the Set code filter; clicking the rarity sets the Rarity filter |
 
-The add button names where the card goes: **+ name** of the collection or deck selected last, then **+ Wishlist**. It opens the printing chooser titled "Add card name to name" with the printing shown already selected and the finish set by Add as foil, so Enter adds it; another printing or finish can be picked first. A card made in only one printing and one finish is added at once. Owned counts are real copies in your collections and collections shared with you, not wishlists or proxies.
+The add button names where the card goes: **+ name** of the collection or deck selected last, then **+ Wishlist**. It opens the printing chooser titled "Add card name to name" with the printing shown already selected and the finish set by Add as foil, so Enter adds it; another printing or finish can be picked first. A card made in only one printing is added at once when it has one finish; with more finishes only the finish is asked. Owned counts are real copies in your collections and collections shared with you, not wishlists or proxies.
 
 ## One result per card
 
@@ -162,3 +162,14 @@ Click a result (or move to it with Up and Down) to select it. The Card panel sho
 ## Empty results
 
 When the card database has no printings, the results area says so and offers **Update card database**. Otherwise it shows "No matching cards" or "No cards found".
+
+## The printing chooser
+
+The printing chooser lists every printing of a card when adding it, in Change printing..., Upgrade wanted..., Find cards in a purchase, Match cards after reading a receipt, and the print list.
+
+| Part | What it does |
+|---|---|
+| Find box | Narrows the printings by set name, set code, collector number, year or language. Enter takes the printing shown selected (or the first found); Down moves into the list |
+| Options | Layout (Grid, List or Binder) and, in Grid, card size (Small, Medium or Large). The chooser opens in Grid; the choice is kept for your account, separate from card search |
+| Grid and Binder | Each printing's picture, with its set symbol, set name, language pip, set code, collector number and year under it, and a button for each finish it is made in with its price (such as Regular $2.50 and Foil $12.00). Clicking the picture takes the highlighted finish (the current finish, or the one Add as foil chooses). The current printing is marked Current. Binder shows nine a page with Previous page and Next page |
+| List | One row per printing with a larger picture, the same details and the finish buttons |

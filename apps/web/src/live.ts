@@ -3,7 +3,7 @@ import { useEffect, useRef } from "react";
 import { CLIENT_ID } from "./api";
 import { apiUrl, appSettings, isApp, saveSettings } from "./android/platform";
 import { loadPrefs, prefsPending, type Prefs } from "./prefs";
-import { currentOpening, type Opening, reloadOpening, setActiveOpening } from "./purchase-state";
+import { currentOpening, nextPack, type Opening, reloadOpening, setActiveOpening } from "./purchase-state";
 import type { Store } from "./store";
 import { confirmDialog } from "./components/Dialog";
 
@@ -124,4 +124,17 @@ export function useLiveUpdates(store: Store) {
       document.removeEventListener("visibilitychange", visible);
     };
   }, []);
+}
+
+/** Next pack from anywhere it is offered (0.19.0): the entry page, the status bar, the Purchases header and the scanner. */
+export async function goNextPack(store: Store) {
+  const opening = currentOpening();
+  if (!opening) return store.flash("No opening is active", "err");
+  try {
+    const next = await nextPack(opening);
+    window.dispatchEvent(new Event(PURCHASES_CHANGED));
+    store.flash(next ? `Now opening ${next.name}` : `${opening.name} done`);
+  } catch (reason) {
+    store.fail(reason, "Could not move to the next pack.");
+  }
 }

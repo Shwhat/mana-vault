@@ -8,7 +8,8 @@ import { formatDialog, tagsDialog } from "../components/DeckDialogs";
 import { linkDialog } from "../components/LibraryDialogs";
 import { choosePrinting } from "../components/PrintingDialog";
 import { addCard } from "../components/AddButtons";
-import { CardFrame } from "../components/CardFrame";
+import { CardFrame, chooseKind, useCardLayout } from "../components/CardFrame";
+import { isPlaced } from "../card-layout";
 import { InDeckMarks, CountPip, FinishBadge, FinishPip, finishName, OwnedMarks, PricePip, RemovedPip, ownedVersions, removeCard, switchVersionDialog, linkExact, UpgradeBadge, wantedLabel } from "../components/CardMarks";
 import { Switcher } from "../components/Switcher";
 import { Suggest } from "../components/Suggest";
@@ -185,11 +186,20 @@ function Picture({ cards, flag, lines = false }: { cards: DeckCard[]; flag?: str
   const total = cards.reduce((sum, item) => sum + item.quantity, 0);
   const missing = cards.reduce((sum, item) => sum + (item.missing ?? 0), 0);
   const split = lines && cards.length > 1;
+  const linesShown = isPlaced(useCardLayout("deck"), "lines");
   // Grid: the pips under the picture; Stacks: above it, in the strip that stays in view while the cards overlap
   const picture = (
     <div data-key={split ? undefined : String(card.entry_id)} role={split ? undefined : "option"} aria-selected={split ? undefined : active}
       className={`dcard${active ? " active" : ""}${flag ? " bad" : ""}`} title={flag ? `${card.name}: ${flag}` : card.name}
-      onClick={() => pick(store, card)} {...cardMenu(store, card)}>
+      onClick={() => {
+        // with Finish lines hidden (0.19.0) a picture of more than one finish asks which one
+        if (split && !linesShown) {
+          void chooseKind(cards.map((item) => ({ key: String(item.entry_id), finish: item.finish ?? 0, promoTypes: item.promo_types, count: item.quantity, detail: (item.missing ?? 0) > 0 ? `${item.missing} missing` : "" })), card.name)
+            .then((key) => { const item = cards.find((other) => String(other.entry_id) === key); if (item) pick(store, item); });
+          return;
+        }
+        pick(store, card);
+      }} {...cardMenu(store, card)}>
       {card.image_url ? <img src={card.image_url} alt={card.name} loading="lazy" draggable={false} /> : <span className="pocketname">{card.name}</span>}
     </div>
   );
@@ -208,7 +218,7 @@ function Picture({ cards, flag, lines = false }: { cards: DeckCard[]; flag?: str
         </>
       ),
       price: <PricePip price={cardPrice(card, store.prefs.currency)} />,
-    }} after={split && (
+      lines: split && (
       <div className="slines" role="group" aria-label={`${card.name} (${card.set_code.toUpperCase()}) ${card.collector_number}`}>
         {cards.map((item) => {
           const on = isActive(store, item);
@@ -222,7 +232,8 @@ function Picture({ cards, flag, lines = false }: { cards: DeckCard[]; flag?: str
           );
         })}
       </div>
-    )} />
+      ),
+    }} />
   );
 }
 

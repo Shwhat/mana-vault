@@ -36,9 +36,10 @@ test("a purchase with tax spread over its lines, opened with pulled cards tied t
   const entry = page.locator(".purchaseentry");
   await expect(entry.locator(".pfigs")).toContainText("Cost$44.00");
   await entry.locator("tbody tr", { hasText: "Play booster" }).getByRole("button", { name: "Open..." }).click();
-  await page.locator("#op-count").fill("3");
+  await page.locator("#op-count").fill("1");
   await page.locator("dialog#dlg[open]").getByRole("button", { name: "Open", exact: true }).click();
-  await expect(page.locator("#st-opening")).toContainText("OPENING: 3 PLAY BOOSTERS");
+  // 0.19.0: each pack is its own opening, named by its number in the product
+  await expect(page.locator("#st-opening")).toContainText("OPENING: PACK 1 OF 6, PLAY BOOSTER");
   // a card added from search is tied to the opening
   const collections = await (await page.request.get("/api/collections")).json() as Array<{ id: string }>;
   await page.request.post(`/api/collections/${collections[0]!.id}/cards`, { headers: { "x-mana-vault": "1" }, data: { cardId: "sol-ring", quantity: 1, foil: false } });

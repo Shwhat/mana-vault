@@ -20,7 +20,7 @@ import { registerTradeRoutes } from "./trades.js";
 import { CUSTOM_PUBLIC, registerCustomRoutes } from "./custom.js";
 import { EXTRAS_PUBLIC, registerExtrasRoutes } from "./extras.js";
 import { copiesAdded } from "./copy-events.js";
-import { initializePurchases, purchasesFromPrices, registerPurchaseRoutes } from "./purchases.js";
+import { activeOpeningOf, initializePurchases, purchasesFromPrices, registerPurchaseRoutes } from "./purchases.js";
 import { type Fetcher, registerProxyRoutes } from "./proxies.js";
 import { deviceUser, handleCrossOrigin, registerMobileRoutes, Revision } from "./mobile.js";
 import { areasOf, CLIENT_HEADER, Events, type OpeningNote, registerEventRoutes } from "./events.js";
@@ -129,10 +129,7 @@ export async function buildApp(
   // live updates (0.18.0): every change is told to the open pages and apps of the people it concerns
   const events = new Events(database);
   app.decorate("events", events);
-  const activeOpening = (userId: number): OpeningNote => {
-    const row = database.prepare("SELECT id, entry_id, name, collection_id FROM purchase_openings WHERE user_id = ? AND active = 1").get(userId);
-    return row ? { id: String(row.id), entryId: String(row.entry_id), name: String(row.name), collectionId: row.collection_id ? String(row.collection_id) : null } : null;
-  };
+  const activeOpening = (userId: number): OpeningNote => activeOpeningOf(database, userId);
   app.addHook("onResponse", async (request, reply) => {
     if (request.method !== "GET" && request.method !== "HEAD" && request.method !== "OPTIONS" && reply.statusCode < 400 && request.url.startsWith("/api/")) {
       revision.bump();

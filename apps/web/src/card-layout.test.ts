@@ -25,8 +25,11 @@ describe("card layout", () => {
     const layout = readPipLayout({ tl: ["count", "nonsense"], left: ["count", "price"], nowhere: ["finish"] });
     expect(layout.tl).toEqual(["count"]);
     expect(layout.left).toEqual(["price"]);
-    expect(hiddenItems(layout)).toEqual(["printings", "finish", "marks", "buttons"]);
+    expect(hiddenItems(layout)).toEqual(["printings", "finish", "marks", "lines", "buttons"]);
     expect(readCardLayout(null)).toEqual(defaultCardLayout());
+    // 0.19.0: a layout saved before Finish lines shows them on the second line; a newer one keeps them hidden
+    expect(readCardLayout({ all: { left: ["count"] } }).all.full).toEqual(["lines"]);
+    expect(readCardLayout({ version: 2, all: { left: ["count"] } }).all.full).toEqual([]);
   });
 
   it("keeps one layout for all sections, or one per section starting from the current one", () => {

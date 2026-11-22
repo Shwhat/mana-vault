@@ -7,7 +7,9 @@ export type ChangeArea = "library" | "decks" | "purchases" | "trades" | "inbox" 
 
 export type ChangeEvent = { areas: ChangeArea[]; by: number; client: string | null; at: number; opening?: OpeningNote | null };
 /** The active opening of an account (item 7): sent when an opening starts or ends. */
-export type OpeningNote = { id: string; entryId: string; name: string; collectionId: string | null } | null;
+export type OpeningNote = {
+  id: string; entryId: string; name: string; collectionId: string | null; packNumber?: number | null; groupIndex?: number; groupSize?: number; hasNext?: boolean;
+} | null;
 
 type Stream = { reply: FastifyReply; client: string | null };
 

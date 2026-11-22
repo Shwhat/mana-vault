@@ -130,7 +130,7 @@ test("card search groups printings, adding opens the chooser, and the collection
   await expect(lines.nth(0)).toHaveText("REGULAR1");
   await expect(lines.nth(1)).toHaveText("FOIL1");
   await expect(page.locator(".cardgrid .pipbar .pipcount")).toHaveText("2x");
-  await expect(page.locator(".cardgrid .pipbar .badge.foil")).toHaveText("FOIL");
+  await expect(page.locator(".cardgrid .cfrow .badge.foil")).toHaveText("FOIL");
   // clicking a line selects that copy
   await lines.nth(1).click();
   await expect(lines.nth(1)).toHaveClass(/active/);

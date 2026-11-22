@@ -1,5 +1,6 @@
 // ---------- status bar ----------
-import { openOpeningEntry, useActiveOpening } from "../purchase-state";
+import { openOpeningEntry, packLabel, useActiveOpening } from "../purchase-state";
+import { goNextPack } from "../live";
 import { request } from "../api";
 import type { Action } from "../actions";
 import { customDialog } from "./Dialog";
@@ -69,8 +70,11 @@ export function StatusBar({ actions }: { actions: Record<string, Action> }) {
       {opening && (
         <span id="st-opening" className="pt on" role="button" title="Cards added to the collection are tied to this opening. Click to open its purchase"
           onClick={() => openOpeningEntry(store, opening.entryId)}>
-          OPENING: {opening.name.toUpperCase()}
+          OPENING: {opening.name.toUpperCase()}{packLabel(opening) ? ` (${packLabel(opening).toUpperCase()})` : ""}
         </span>
+      )}
+      {opening?.hasNext && (
+        <span id="st-nextpack" className="pt" role="button" title="This pack is done: the next pack becomes where cards are tied" onClick={() => void goNextPack(store)}>NEXT PACK</span>
       )}
       <span id="st-toggles">
         <span id="st-target" className="pt on-plain addingto" role="button"

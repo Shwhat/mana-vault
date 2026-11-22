@@ -10,13 +10,19 @@ export type EntrySummary = {
   id: string; kind: EntryKind; kindLabel: string; date: string; place: string; note: string; currency: "usd"; description: string; source: string | null;
   sets: string[]; products: string[]; out: number; in: number; value: number; gain: number; unpriced: number;
 };
-export type Opening = { id: string; entryId: string; name: string; collectionId: string | null };
+/** The opening cards are tied to; a pack of a group (0.19.0) knows where it is (Pack 2 of 3) and whether a pack waits after it. */
+export type Opening = { id: string; entryId: string; name: string; collectionId: string | null; packNumber?: number | null; groupIndex?: number; groupSize?: number; hasNext?: boolean };
 export type PlaceKind = "store" | "website" | "person" | "other";
 export const PLACE_KINDS: Record<PlaceKind, string> = { store: "Store", website: "Website", person: "Person", other: "Other" };
 export type Place = { id: string; name: string; kind: PlaceKind; note: string; createdBy: number | null; createdAt: string; uses: number; lastUsed: string | null };
+/** The card a receipt line was matched to (0.19.0). */
+export type ReceiptCard = {
+  cardId: string; name: string; setCode: string; setName: string; collectorNumber: string; imageUrl: string | null; finish: number; condition: string; promoTypes: string; finishes: string;
+};
+export type ReceiptLine = { text: string; product: string; name: string; setCode: string | null; quantity: number; cost: number; note: string; cardLike: boolean; card: ReceiptCard | null };
 export type ReceiptFields = {
-  date: string | null; place: string | null; tax: number | null; shipping: number | null; total: number | null; linesTotal: number;
-  lines: Array<{ text: string; product: string; name: string; setCode: string | null; quantity: number; cost: number }>;
+  date: string | null; place: string | null; note: string | null; tax: number | null; shipping: number | null; total: number | null; linesTotal: number;
+  lines: ReceiptLine[];
 };
 export type TradeFigures = {
   gave: number; got: number; net: number; originalCost: number; noCostValue: number; noCost: string[];
@@ -31,6 +37,8 @@ export type EntryLine = {
   id: string; product: string; productLabel: string; name: string; setCode: string | null; quantity: number; cost: number; full: number; packs: number;
   opened: number; sold: number; sealed: number; sealedValue: number; valueDate: string | null; cardId: string | null; foil: number | null;
   condition: string | null; language: string | null; collectionId: string | null; values: Array<{ date: string; value: number }>;
+  /** Packs opened and packs still sealed, for products with packs (0.19.0). */
+  packsOpened: number; packsLeft: number;
 };
 export type EntrySale = {
   id: string; what: "card" | "product"; cardId: string | null; name: string; setCode: string | null; foil: number | null; condition: string | null;
@@ -49,6 +57,8 @@ export type EntryOpening = {
   cards: number; valuePulled: number; perPack: number; packs: number;
   /** 0.18.0: the pulls still held at today's prices, every pull at its price the day it was added, and how many are gone. */
   valueNow: number; valueWhenPulled: number; whenPulledUnpriced: number; gone: number;
+  /** 0.19.0: the pack's number in its product, its group of packs opened together, whether it waits, its cost, what its cards sold for and its gain or loss. */
+  packNumber: number | null; groupId: string | null; waiting: boolean; packCost: number; soldFor: number; gain: number;
 };
 export type Entry = Omit<EntrySummary, "sets" | "products"> & {
   tax: number; shipping: number; fees: number; cashOut: number; cashIn: number; tradeId: string | null; pulledIncome: number;
@@ -115,3 +125,13 @@ export async function packNote(items: Array<{ collectionId: string; cardId: stri
     return "";
   }
 }
+
+/** Next pack (0.19.0): the current pack is done and the next one waiting in its group becomes where cards are tied. */
+export async function nextPack(opening: Opening): Promise<Opening | null> {
+  const answer = await request<{ next: { id: string; name: string } | null; opening: Opening | null }>(`/api/purchases/openings/${opening.id}/next`, { method: "POST", body: "{}" });
+  setActiveOpening(answer.opening);
+  return answer.opening;
+}
+
+/** "Pack 2 of 3" while packs opened together are in use, or the opening's name. */
+export const packLabel = (opening: Opening) => (opening.groupSize && opening.groupSize > 1 ? `${opening.groupIndex} of ${opening.groupSize}` : "");

@@ -1,5 +1,6 @@
 // ---------- card scanner: live camera, continuous recognition, and the scanned list ----------
-import { currentOpening, useActiveOpening } from "../purchase-state";
+import { currentOpening, packLabel, useActiveOpening } from "../purchase-state";
+import { goNextPack } from "../live";
 import { choices, Picker } from "./Picker";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type PointerEvent } from "react";
 import { request } from "../api";
@@ -398,7 +399,10 @@ export default function CardScanner({ phone = false, onClose }: { phone?: boolea
       {focus && <div className="scanfocus" key={focus.id} style={{ left: focus.x - 30, top: focus.y - 30 }} aria-hidden="true" />}
       <p className={warning && !camera.status ? "scanstatus warn" : "scanstatus"} role="status">{status}</p>
       {prefs.scanShowTotal && <p className="scantotal">{money(total, prefs.currency)}</p>}
-      {opening && <p className="scanopening" role="note">Scanning into: {opening.name}</p>}
+      {opening && (
+        <p className="scanopening" role="note">Scanning into: {opening.name}{packLabel(opening) ? ` (${packLabel(opening)})` : ""}
+          {opening.hasNext && <button type="button" className="btn small" onClick={(event) => { event.stopPropagation(); void goNextPack(store); }}>Next pack</button>}</p>
+      )}
       <div className="scanrail">
         <div className="scantools">
           {phone && (

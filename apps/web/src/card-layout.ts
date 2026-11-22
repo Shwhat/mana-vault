@@ -1,19 +1,21 @@
 // ---------- card layout (0.18.0): where the pips and buttons sit around a card picture, set in View, Card layout... ----------
 
 /** The things that can be placed around a card picture. */
-export type PipItem = "count" | "printings" | "finish" | "marks" | "price" | "buttons";
+export type PipItem = "count" | "printings" | "finish" | "marks" | "lines" | "price" | "buttons";
 /** The places around a card picture: the four corners on it, the row under it (left and right), a second line, and the bottom. */
 export type PipSlot = "tl" | "tr" | "bl" | "br" | "left" | "right" | "full" | "bottom";
 export type PipLayout = Record<PipSlot, PipItem[]>;
 /** The parts of the program that show card pictures with pips. */
 export type LayoutSection = "search" | "collection" | "deck" | "trade" | "proxies";
-export type CardLayoutPrefs = { same: boolean; all: PipLayout; sections: Record<LayoutSection, PipLayout> };
+/** `version` 2 (0.19.0) added Finish lines; older saved layouts get them in the second line. */
+export type CardLayoutPrefs = { same: boolean; all: PipLayout; sections: Record<LayoutSection, PipLayout>; version?: number };
 
 export const PIP_ITEMS: Array<[PipItem, string]> = [
   ["count", "Count and Owned"],
   ["printings", "Printings"],
   ["finish", "Finish and copy details"],
   ["marks", "Status marks"],
+  ["lines", "Finish lines"],
   ["price", "Price"],
   ["buttons", "Buttons"],
 ];
@@ -42,12 +44,12 @@ const ITEM_IDS = PIP_ITEMS.map(([item]) => item);
 
 /** Pips in one row under the picture with the price at its right, and the buttons in one row at the bottom. */
 export function defaultPipLayout(): PipLayout {
-  return { tl: [], tr: [], bl: [], br: [], left: ["count", "printings", "finish", "marks"], right: ["price"], full: [], bottom: ["buttons"] };
+  return { tl: [], tr: [], bl: [], br: [], left: ["count", "printings", "finish", "marks"], right: ["price"], full: ["lines"], bottom: ["buttons"] };
 }
 
 export function defaultCardLayout(): CardLayoutPrefs {
   const sections = Object.fromEntries(LAYOUT_SECTIONS.map(([section]) => [section, defaultPipLayout()])) as Record<LayoutSection, PipLayout>;
-  return { same: true, all: defaultPipLayout(), sections };
+  return { same: true, all: defaultPipLayout(), sections, version: 2 };
 }
 
 /** A saved layout, with unknown places and things dropped and each thing in one place at most. */
@@ -72,9 +74,11 @@ export function readCardLayout(value: unknown): CardLayoutPrefs {
   const base = defaultCardLayout();
   if (!value || typeof value !== "object") return base;
   const saved = value as Partial<CardLayoutPrefs>;
-  const all = saved.all ? readPipLayout(saved.all) : base.all;
-  const sections = Object.fromEntries(LAYOUT_SECTIONS.map(([section]) => [section, saved.sections?.[section] ? readPipLayout(saved.sections[section]) : all])) as Record<LayoutSection, PipLayout>;
-  return { same: saved.same !== false, all, sections };
+  // layouts saved before Finish lines existed show them where they always were
+  const upgrade = (layout: PipLayout) => ((saved.version ?? 1) < 2 && !SLOT_IDS.some((slot) => layout[slot].includes("lines")) ? { ...layout, full: [...layout.full, "lines" as PipItem] } : layout);
+  const all = saved.all ? upgrade(readPipLayout(saved.all)) : base.all;
+  const sections = Object.fromEntries(LAYOUT_SECTIONS.map(([section]) => [section, saved.sections?.[section] ? upgrade(readPipLayout(saved.sections[section])) : all])) as Record<LayoutSection, PipLayout>;
+  return { same: saved.same !== false, all, sections, version: 2 };
 }
 
 /** The layout used by one section. */
@@ -105,3 +109,6 @@ export function setSame(prefs: CardLayoutPrefs, same: boolean, section: LayoutSe
   if (same) return { ...prefs, same: true, all: current };
   return { ...prefs, same: false, sections: Object.fromEntries(LAYOUT_SECTIONS.map(([id]) => [id, readPipLayout(current)])) as Record<LayoutSection, PipLayout> };
 }
+
+/** Whether an item is shown anywhere in a layout. */
+export const isPlaced = (layout: PipLayout, item: PipItem): boolean => SLOT_IDS.some((slot) => layout[slot].includes(item));

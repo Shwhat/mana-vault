@@ -4,6 +4,7 @@ import type { Action } from "../actions";
 import { ACCOUNT_MENU, MENUS, MODE_TABS } from "../menus";
 import { PRESET_NAMES } from "../dock";
 import { useApp } from "../store";
+import { Icon } from "../icons";
 
 type Open = { id: string; x: number; y: number; items: string[] } | null;
 
@@ -83,6 +84,7 @@ export function TitleBar({ actions }: { actions: Record<string, Action> }) {
           </div>
         ))}
       </nav>
+      <UndoButtons actions={actions} />
       <div id="docname">{store.deck ? `Deck: ${store.deck.name}` : ""}</div>
       <div
         id="acct"
@@ -122,5 +124,29 @@ export function ModeTabs({ actions }: { actions: Record<string, Action> }) {
         );
       })}
     </div>
+  );
+}
+
+/**
+ * Undo and Redo as arrow buttons in the top bar (0.19.0), on the desktop after the Help menu and in the phone's top bar.
+ * The tooltip names the change; a button with nothing to undo or redo is greyed out.
+ */
+export function UndoButtons({ actions, phone = false }: { actions: Record<string, Action>; phone?: boolean }) {
+  const store = useApp();
+  const button = (id: "undo" | "redo", can: boolean) => {
+    const action = actions[id];
+    const tip = `${action?.label ?? (id === "undo" ? "Undo" : "Redo")} (${id === "undo" ? "Ctrl+Z" : "Ctrl+Y"})`;
+    return (
+      <button key={id} type="button" className={phone ? "pbtn undobtn" : "tbicon"} data-action={id} title={tip} aria-label={tip} disabled={!can}
+        onMouseDown={(event) => event.stopPropagation()} onClick={() => action?.run()}>
+        <Icon name={id} />
+      </button>
+    );
+  };
+  return (
+    <span className={phone ? "pundo" : "tbundo"} role="group" aria-label="Undo and redo">
+      {button("undo", store.undoStack.length > 0)}
+      {button("redo", store.redoStack.length > 0)}
+    </span>
   );
 }

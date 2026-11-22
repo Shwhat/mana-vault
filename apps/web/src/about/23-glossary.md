@@ -2,6 +2,10 @@
 
 | Term | Meaning in Mana Vault |
 |---|---|
+| Pack | One pack of a product with packs in it, opened as its own opening and named with its number (Pack 3 of 36) |
+| Pack cost | A product's full cost divided by its packs |
+| Finish lines | The lines under a picture that stands for more than one kind of copy, one per finish |
+| Match cards | The step after reading a receipt that matches card lines to printings |
 | Card layout | Where the pips and buttons sit around card pictures, set in View, Card layout... |
 | Gone | A card pulled from a pack or bought that is no longer in its collection and was not sold or traded; it stays listed on its pack |
 | Live updates | Changes made on another device or by someone sharing a collection or deck, shown on open pages at once |

@@ -1,5 +1,6 @@
 // ---------- Purchases: the summary with its chart, the history of every entry, and one entry in full ----------
-import { PURCHASES_CHANGED } from "../live";
+import { PickBar, usePicks } from "../components/Picks";
+import { goNextPack, PURCHASES_CHANGED } from "../live";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { downloadBlob, fetchFile, request } from "../api";
 import { isApp } from "../android/platform";
@@ -12,7 +13,7 @@ import {
   entryDialog, fromPricesDialog, keepReceipt, openDialog, pickReceipt, placesDialog, purchaseFromReceipt, removeReceipt, type SaleCopy, tieCopiesDialog, useProductOptions, valueDialog,
 } from "../components/PurchaseDialogs";
 import {
-  type ChartPoint, type Entry, type EntryKind, type EntryTie, type EntrySummary, KIND_LABELS, type PurchaseList, reloadOpening, setActiveOpening, useActiveOpening,
+  type ChartPoint, type Entry, type EntryKind, type EntryOpening, type EntryTie, type EntrySummary, KIND_LABELS, type PurchaseList, packLabel, reloadOpening, setActiveOpening, useActiveOpening,
 } from "../purchase-state";
 import { type Store, useApp } from "../store";
 import { copyPrice, type Currency, money } from "../types";
@@ -152,7 +153,7 @@ function Tiles({ list, currency }: { list: PurchaseList; currency: Currency }) {
   );
 }
 
-function History({ list, currency, onOpen }: { list: PurchaseList; currency: Currency; onOpen: (id: string) => void }) {
+function History({ list, currency, onOpen, onChanged }: { list: PurchaseList; currency: Currency; onOpen: (id: string) => void; onChanged: () => void }) {
   const store = useApp();
   const [term, setTerm] = useState("");
   const [kind, setKind] = useState("");
@@ -173,6 +174,39 @@ function History({ list, currency, onOpen }: { list: PurchaseList; currency: Cur
     return [...rows].sort(order[sort]);
   }, [list, term, kind, product, setCode, from, to, sort]);
   const menu = (entry: EntrySummary) => rowMenu(store, `${entry.kindLabel} of ${entry.date}`, () => [{ label: "Open", run: () => onOpen(entry.id) }]);
+  const picks = usePicks(shown.map((entry) => entry.id));
+  // Delete picked... (0.19.0): one question and one undo step for every picked entry
+  const deletePicked = async () => {
+    const entries = shown.filter((entry) => picks.picked.has(entry.id));
+    if (!entries.length) return;
+    const sales = entries.some((entry) => entry.kind === "card_sale") ? " The sold copies of card sales go back to their collections." : "";
+    const names = entries.slice(0, 6).map((entry) => `${entry.kindLabel.toLowerCase()} of ${entry.date}`).join(", ") + (entries.length > 6 ? `, and ${entries.length - 6} more` : "");
+    if (!(await confirmDialog("Delete entries", `Delete ${entries.length} ${entries.length === 1 ? "entry" : "entries"} (${names})?${sales}`, "Delete"))) return;
+    try {
+      const snapshots: unknown[] = [];
+      for (const entry of entries) snapshots.push((await request<{ snapshot: unknown }>(`/api/purchases/${entry.id}`, { method: "DELETE" })).snapshot);
+      store.pushUndo({
+        label: `Delete ${entries.length} ${entries.length === 1 ? "entry" : "entries"}`,
+        undo: async () => {
+          for (const snapshot of snapshots) await request("/api/purchases/restore", { method: "POST", body: JSON.stringify({ snapshot }) });
+          onChanged();
+          await store.refreshAfterChange();
+        },
+        redo: async () => {
+          for (const entry of entries) await request(`/api/purchases/${entry.id}`, { method: "DELETE" }).catch(() => undefined);
+          onChanged();
+          await store.refreshAfterChange();
+        },
+      });
+      picks.clear();
+      onChanged();
+      await store.refreshAfterChange();
+      store.flash(`${entries.length} ${entries.length === 1 ? "entry" : "entries"} deleted`);
+    } catch (reason) {
+      onChanged();
+      store.fail(reason, "Could not delete the entries.");
+    }
+  };
   return (
     <div className="purchasehistory">
       <div className="btnrow phfilters">
@@ -184,12 +218,15 @@ function History({ list, currency, onOpen }: { list: PurchaseList; currency: Cur
         <input aria-label="To date" type="date" value={to} onChange={(event) => setTo(event.target.value)} />
         <Picker label="Sort" value={sort} options={choices(SORTS)} onChange={setSort} />
       </div>
+      <PickBar picks={picks}><button type="button" className="btn small" onClick={() => void deletePicked()}>Delete picked...</button></PickBar>
       <table className="dtable ptable grid">
-        <thead><tr><th>Date</th><th>Kind</th><th>Description</th><th>Place</th><th className="numcell">Money out</th><th className="numcell">Money in</th><th className="numcell">Value now</th><th className="numcell">Gain or loss</th></tr></thead>
+        <thead><tr><th className="pickcell">{picks.allBox("Pick every entry shown")}</th><th>Date</th><th>Kind</th><th>Description</th><th>Place</th><th className="numcell">Money out</th><th className="numcell">Money in</th><th className="numcell">Value now</th><th className="numcell">Gain or loss</th></tr></thead>
         <tbody>
-          {!shown.length && <tr><td colSpan={8} className="sub">{list.entries.length ? "No entries match" : "No entries yet. Use New entry to record a purchase, a sale or a trade."}</td></tr>}
+          {!shown.length && <tr><td colSpan={9} className="sub">{list.entries.length ? "No entries match" : "No entries yet. Use New entry to record a purchase, a sale or a trade."}</td></tr>}
           {shown.map((entry) => (
-            <tr key={entry.id} className="prow-entry" tabIndex={0} onClick={() => onOpen(entry.id)} onKeyDown={(event) => { if (event.key === "Enter") onOpen(entry.id); }} {...menu(entry)}>
+            <tr key={entry.id} className={picks.picked.has(entry.id) ? "prow-entry picked" : "prow-entry"} tabIndex={0}
+              onClick={(event) => { if (!picks.clickPicks(entry.id, event)) onOpen(entry.id); }} onKeyDown={(event) => { if (event.key === "Enter") onOpen(entry.id); }} {...menu(entry)}>
+              <td className="pickcell">{picks.box(entry.id, `${entry.kindLabel} of ${entry.date}`)}</td>
               <td>{entry.date}</td>
               <td><span className={`badge kind-${entry.kind}`}>{entry.kindLabel}</span></td>
               <td>{entry.sets.slice(0, 3).map((code) => <SetIcon key={code} code={code} />)}{entry.description}{entry.note ? <span className="sub"> ({entry.note})</span> : null}</td>
@@ -219,6 +256,7 @@ function EntryPage({ id, list, onClose, onChanged }: { id: string; list: Purchas
     }
   }, [id]);
   useEffect(() => { void load(); }, [load]);
+  const tiePicks = usePicks((entry?.ties ?? []).map((tie) => String(tie.id)));
   // a change made on another device (0.18.0) loads the entry again
   useEffect(() => {
     const reload = () => void load();
@@ -264,33 +302,91 @@ function EntryPage({ id, list, onClose, onChanged }: { id: string; list: Purchas
    * Remove from pack (0.18.0): the only way a card leaves the pack or purchase it came from. The person chooses to keep the
    * card in the collection or to delete it too. Both can be undone.
    */
-  const removeFromPack = async (row: EntryTie) => {
-    const where = entry.kind === "purchase" && row.openingId ? "pack" : "entry";
-    const answer = await choiceDialog(`Remove ${row.name} from this ${where}`, (
-      <>Remove {row.quantity > 1 ? `${row.quantity} copies of ${row.name}` : row.name} from this {where}?{row.held ? ` ${row.held === 1 ? "The card is" : `${row.held} copies are`} still in the collection.` : ""}</>
-    ), [["keep", "Remove from pack, keep the card", true], ...(row.held ? [["delete", "Remove from pack and delete the card"] as ["delete", string]] : [])]);
+  /**
+   * Remove from pack (0.18.0), for one card or every picked card (0.19.0): the only way cards leave the pack or purchase
+   * they came from. One question for all of them: keep the cards in their collections or delete them too. One undo step.
+   */
+  const removeFromPack = async (rows: EntryTie[]) => {
+    if (!rows.length) return;
+    const where = entry.kind === "purchase" && rows.some((row) => row.openingId) ? "pack" : "entry";
+    const one = rows.length === 1 ? rows[0]! : null;
+    const held = rows.reduce((sum, row) => sum + row.held, 0);
+    const what = one ? (one.quantity > 1 ? `${one.quantity} copies of ${one.name}` : one.name) : `${rows.length} cards`;
+    const answer = await choiceDialog(one ? `Remove ${one.name} from this ${where}` : `Remove ${rows.length} cards from this ${where}`, (
+      <>Remove {what} from this {where}?{held ? ` ${held === 1 ? "1 copy is" : `${held} copies are`} still in the collection.` : ""}</>
+    ), [["keep", one ? "Remove from pack, keep the card" : "Remove from pack, keep the cards", true], ...(held ? [["delete", one ? "Remove from pack and delete the card" : "Remove from pack and delete the cards"] as ["delete", string]] : [])]);
     if (!answer) return;
+    const deleting = answer === "delete" && held > 0;
+    type Removed = { tie: Record<string, unknown> & { collectionId: string }; held: number; have: number; row: EntryTie };
+    const removed: Removed[] = [];
+    // copies of one kind in one collection are lowered together
+    const groups = new Map<string, { collectionId: string; key: Record<string, unknown>; have: number; lower: number }>();
     try {
-      const { tie, held, have } = await request<{ tie: Record<string, unknown> & { collectionId: string }; held: number; have: number }>(`/api/purchases/ties/${row.id}`, { method: "DELETE" });
-      const key = { cardId: row.cardId, foil: row.foil, condition: row.condition, language: row.language, proxy: row.proxy };
-      const counts = (quantity: number) => request(`/api/collections/${encodeURIComponent(tie.collectionId)}/cards`, { method: "PUT", body: JSON.stringify({ items: [{ ...key, quantity }] }) });
-      const deleting = answer === "delete" && held > 0;
-      if (deleting) await counts(Math.max(0, have - held));
+      for (const row of rows) {
+        const answerRow = await request<Omit<Removed, "row">>(`/api/purchases/ties/${row.id}`, { method: "DELETE" });
+        removed.push({ ...answerRow, row });
+        const key = { cardId: row.cardId, foil: row.foil, condition: row.condition, language: row.language, proxy: row.proxy };
+        const id = `${answerRow.tie.collectionId}|${JSON.stringify(key)}`;
+        const group = groups.get(id) ?? { collectionId: answerRow.tie.collectionId, key, have: answerRow.have, lower: 0 };
+        group.lower += answerRow.held;
+        groups.set(id, group);
+      }
+      const counts = async (which: "before" | "after") => {
+        for (const group of groups.values()) {
+          if (!group.lower) continue;
+          await request(`/api/collections/${encodeURIComponent(group.collectionId)}/cards`, {
+            method: "PUT", body: JSON.stringify({ items: [{ ...group.key, quantity: which === "before" ? group.have : Math.max(0, group.have - group.lower) }] }),
+          });
+        }
+      };
+      if (deleting) await counts("after");
+      const label = one ? one.name : `${rows.length} cards`;
       store.pushUndo({
-        label: deleting ? `Remove ${row.name} from the ${where} and delete it` : `Remove ${row.name} from the ${where}`,
+        label: deleting ? `Remove ${label} from the ${where} and delete` : `Remove ${label} from the ${where}`,
         undo: async () => {
-          if (deleting) await counts(have);
-          await request("/api/purchases/ties/restore", { method: "POST", body: JSON.stringify({ tie }) });
+          if (deleting) await counts("before");
+          for (const item of removed) await request("/api/purchases/ties/restore", { method: "POST", body: JSON.stringify({ tie: item.tie }) });
           changed();
           await store.refreshAfterChange();
         },
-        redo: async () => { store.flash(`Remove ${row.name} again from the ${where} page`, "err"); },
+        redo: async () => { store.flash(`Remove ${label} again from the ${where} page`, "err"); },
       });
+      tiePicks.clear();
       changed();
       await store.refreshAfterChange();
-      store.flash(deleting ? `${row.name} removed from the ${where} and deleted` : `${row.name} removed from the ${where}`);
+      store.flash(deleting ? `${label} removed from the ${where} and deleted` : `${label} removed from the ${where}`);
     } catch (reason) {
+      changed();
       store.fail(reason, "Could not remove the card.");
+    }
+  };
+  /** Move to pack... (0.19.0): cards scanned into the wrong pack move to another pack of the same product, as one undo step. */
+  const moveToPack = async (rows: EntryTie[]) => {
+    const lineIds = [...new Set(rows.map((row) => row.lineId))];
+    if (lineIds.length !== 1 || !lineIds[0]) return store.flash("Pick cards from the packs of one product", "err");
+    const packs = entry.openings.filter((opening) => opening.lineId === lineIds[0] && rows.some((row) => row.openingId !== opening.id));
+    if (!packs.length) return store.flash("This product has no other pack", "err");
+    const target = await choiceDialog(rows.length === 1 ? `Move ${rows[0]!.name} to pack` : `Move ${rows.length} cards to pack`, "Which pack did the cards come from?",
+      packs.map((opening) => [opening.id, opening.name] as [string, string]));
+    if (!target) return;
+    try {
+      const { moved } = await request<{ moved: Array<{ id: number; from: string | null }> }>("/api/purchases/ties/move", { method: "POST", body: JSON.stringify({ ties: rows.map((row) => row.id), openingId: target }) });
+      const back = async () => {
+        for (const from of new Set(moved.map((item) => item.from))) {
+          if (from) await request("/api/purchases/ties/move", { method: "POST", body: JSON.stringify({ ties: moved.filter((item) => item.from === from).map((item) => item.id), openingId: from }) });
+        }
+      };
+      const name = rows.length === 1 ? rows[0]!.name : `${rows.length} cards`;
+      store.pushUndo({
+        label: `Move ${name} to another pack`,
+        undo: async () => { await back(); changed(); },
+        redo: async () => { await request("/api/purchases/ties/move", { method: "POST", body: JSON.stringify({ ties: rows.map((row) => row.id), openingId: target }) }); changed(); },
+      });
+      tiePicks.clear();
+      changed();
+      store.flash(`${name} moved to ${packs.find((opening) => opening.id === target)?.name ?? "the pack"}`);
+    } catch (reason) {
+      store.fail(reason, "Could not move the cards.");
     }
   };
   const addReceipt = async () => {
@@ -372,10 +468,13 @@ function EntryPage({ id, list, onClose, onChanged }: { id: string; list: Purchas
                   <td>{line.setCode && <><SetIcon code={line.setCode} />{line.setCode.toUpperCase()}</>}</td>
                   <td className="numcell">{line.quantity}</td>
                   <td className="numcell">{money(line.full, currency)}</td>
-                  <td>{line.product === "single" ? stateOf(entry.ties.filter((tie) => tie.lineId === line.id)) : [line.sealed ? `${line.sealed} sealed` : "", line.opened ? `${line.opened} opened` : "", line.sold ? `${line.sold} sold` : ""].filter(Boolean).join(", ")}</td>
+                  <td>{line.product === "single" ? stateOf(entry.ties.filter((tie) => tie.lineId === line.id))
+                    : line.packs > 0 && line.packsOpened > 0
+                      ? [`${line.packsOpened} of ${line.quantity * line.packs} packs opened`, line.packsLeft ? `${line.packsLeft} left` : "", line.sold ? `${line.sold} sold` : ""].filter(Boolean).join(", ")
+                      : [line.sealed ? `${line.sealed} sealed` : "", line.opened ? `${line.opened} opened` : "", line.sold ? `${line.sold} sold` : ""].filter(Boolean).join(", ")}</td>
                   <td className="numcell">{line.product === "single" ? valueThenOf(entry.ties.filter((tie) => tie.lineId === line.id), currency) : <>{money(line.sealedValue, currency)}{line.valueDate ? <span className="sub"> ({line.valueDate})</span> : <span className="sub"> (cost)</span>}</>}</td>
-                  <td>{line.product !== "single" && line.sealed > 0 && <span className="btnrow">
-                    <button type="button" className="btn small" onClick={() => openDialog(store, entry, line, changed)}>Open...</button>
+                  <td>{line.product !== "single" && (line.packs > 0 ? line.packsLeft > 0 : line.sealed > 0) && <span className="btnrow">
+                    <button type="button" className="btn small" onClick={() => openDialog(store, entry, line, changed)}>{line.packs > 0 && line.packsOpened > 0 ? "Open more packs..." : "Open..."}</button>
                     <button type="button" className="btn small" onClick={() => valueDialog(store, entry, line, changed)}>Set current value...</button>
                   </span>}</td>
                 </tr>
@@ -387,44 +486,81 @@ function EntryPage({ id, list, onClose, onChanged }: { id: string; list: Purchas
       {entry.openings.length > 0 && (
         <section>
           <h4>Openings</h4>
-          {entry.openings.map((opening) => (
-            <div key={opening.id} className="wsrow">
-              <span className="openinghead"><b>{opening.name}</b> <span className="sub">{opening.cards} cards{opening.gone ? `, ${opening.gone} gone` : ""}, {money(opening.perPack, currency)} per pack</span>
-                <span className="openfigs">
-                  <span title="Every pull at its price on the day it was added. This figure does not change.">Value when pulled <b>{money(opening.valueWhenPulled, currency)}</b></span>
-                  <span title="Every pull at today's price, owned or not">Pulled value <b>{money(opening.valuePulled, currency)}</b></span>
-                  <span title="The pulls you still have, at today's price">Value now <b>{money(opening.valueNow, currency)}</b></span>
-                </span>
-              </span>
-              {opening.active ? (
-                <span className="btnrow">
-                  <span className="badge opening">Adding here</span>
-                  <button type="button" className="btn small" onClick={() => goAdd(opening, false)}>Add cards</button>
-                  <button type="button" className="btn small" onClick={() => goAdd(opening, true)}>Scan</button>
-                  <button type="button" className="btn small" onClick={() => tieCopiesDialog(store, opening.id, changed)}>Add existing copies...</button>
-                  <button type="button" className="btn small primary" onClick={() => void setOpening(opening.id, false)}>Done opening</button>
-                </span>
-              ) : (
-                <span className="btnrow">
-                  <button type="button" className="btn small" onClick={() => tieCopiesDialog(store, opening.id, changed)}>Add existing copies...</button>
-                  <button type="button" className="btn small" onClick={() => void setOpening(opening.id, true)}>Continue opening</button>
-                </span>
-              )}
-            </div>
-          ))}
+          {entry.lines.filter((line) => entry.openings.some((opening) => opening.lineId === line.id)).map((line) => {
+            const packs = entry.openings.filter((opening) => opening.lineId === line.id);
+            const sum = (pick: (opening: EntryOpening) => number) => packs.reduce((total, opening) => total + pick(opening), 0);
+            const opened = sum((opening) => opening.packs);
+            return (
+              <div key={line.id} className="openingline">
+                {/* the line's figures added up over its opened packs (0.19.0) */}
+                <div className="openlinehead">
+                  <b>{line.productLabel}{line.setCode ? `, ${line.setCode.toUpperCase()}` : ""}</b>
+                  <span className="sub">{sum((opening) => opening.cards)} cards from {opened} {line.packs > 0 ? (opened === 1 ? "pack" : "packs") : "opened"}, {money(opened ? sum((opening) => opening.valuePulled) / opened : 0, currency)} per pack</span>
+                  <span className="openfigs">
+                    <span>Cost <b>{money(sum((opening) => opening.packCost), currency)}</b></span>
+                    <span>Value when pulled <b>{money(sum((opening) => opening.valueWhenPulled), currency)}</b></span>
+                    <span>Pulled value <b>{money(sum((opening) => opening.valuePulled), currency)}</b></span>
+                    <span>Value now <b>{money(sum((opening) => opening.valueNow), currency)}</b></span>
+                    <span>Gain or loss <b className={gainClass(sum((opening) => opening.gain))}>{signed(sum((opening) => opening.gain), currency)}</b></span>
+                  </span>
+                </div>
+                {packs.map((opening) => (
+                  <div key={opening.id} className={`wsrow packrow${opening.active ? " active" : ""}${opening.waiting ? " waiting" : ""}`}>
+                    <span className="openinghead"><b>{opening.name}</b>
+                      <span className="sub">{opening.waiting ? "Waiting" : `${opening.cards} cards${opening.gone ? `, ${opening.gone} gone` : ""}`}{opening.packNumber === null ? `, ${money(opening.perPack, currency)} per pack` : ""}</span>
+                      {!opening.waiting && (
+                        <span className="openfigs">
+                          <span title={line.packs > 0 ? "The product's full cost divided by its packs" : "The product's full cost for what was opened"}>{line.packs > 0 ? "Pack cost" : "Cost"} <b>{money(opening.packCost, currency)}</b></span>
+                          <span title="Every pull at its price on the day it was added. This figure does not change.">Value when pulled <b>{money(opening.valueWhenPulled, currency)}</b></span>
+                          <span title="Every pull at today's price, owned or not">Pulled value <b>{money(opening.valuePulled, currency)}</b></span>
+                          <span title="The pulls you still have, at today's price">Value now <b>{money(opening.valueNow, currency)}</b></span>
+                          <span title="Value now + what its cards sold for - cost">Gain or loss <b className={gainClass(opening.gain)}>{signed(opening.gain, currency)}</b></span>
+                        </span>
+                      )}
+                    </span>
+                    {opening.active ? (
+                      <span className="btnrow">
+                        <span className="badge opening">Adding here</span>
+                        <button type="button" className="btn small" onClick={() => goAdd(opening, false)}>Add cards</button>
+                        <button type="button" className="btn small" onClick={() => goAdd(opening, true)}>Scan</button>
+                        <button type="button" className="btn small" onClick={() => tieCopiesDialog(store, opening.id, changed, opening.collectionId)}>Add existing copies...</button>
+                        {packs.some((other) => other.groupId && other.groupId === opening.groupId && other.waiting)
+                          ? <button type="button" className="btn small primary" onClick={() => void goNextPack(store).then(changed)}>Next pack</button>
+                          : <button type="button" className="btn small primary" onClick={() => void setOpening(opening.id, false)}>Done opening</button>}
+                      </span>
+                    ) : (
+                      <span className="btnrow">
+                        {!opening.waiting && <button type="button" className="btn small" onClick={() => tieCopiesDialog(store, opening.id, changed, opening.collectionId)}>Add existing copies...</button>}
+                        <button type="button" className="btn small" onClick={() => void setOpening(opening.id, true)}>{opening.waiting ? "Start this pack" : "Continue opening"}</button>
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            );
+          })}
         </section>
       )}
       {entry.ties.length > 0 && (
         <section>
           <h4>{entry.kind === "trade" ? "Cards got" : "Cards from this purchase"}</h4>
+          <PickBar picks={tiePicks}>
+            <button type="button" className="btn small" onClick={() => void removeFromPack(entry.ties.filter((tie) => tiePicks.picked.has(String(tie.id))))}>
+              {entry.ties.some((tie) => tie.openingId) ? "Remove picked from pack..." : "Remove picked from purchase..."}
+            </button>
+            {entry.openings.length > 1 && <button type="button" className="btn small" onClick={() => void moveToPack(entry.ties.filter((tie) => tiePicks.picked.has(String(tie.id))))}>Move to pack...</button>}
+          </PickBar>
           <div className="gridwrapper"><table className="dtable grid">
-            <thead><tr><th>Card</th><th>Finish</th><th>Set</th><th className="numcell">Count</th><th className="numcell">Still held</th>
+            <thead><tr><th className="pickcell">{tiePicks.allBox("Pick every card")}</th><th>Card</th>{entry.openings.length > 0 && <th>Pack</th>}<th>Finish</th><th>Set</th><th className="numcell">Count</th><th className="numcell">Still held</th>
               <th className="numcell">{entry.kind === "purchase" ? (entry.ties.some((tie) => tie.openingId) ? "Value when pulled" : "Value when added") : "Value when added"}</th>
               {entry.kind === "trade" && <th className="numcell">Trade price</th>}<th className="numcell">Price now</th><th>State</th><th /></tr></thead>
             <tbody>
               {entry.ties.map((tie) => (
-                <tr key={tie.id} className={tie.held === 0 ? "gonerow" : ""}>
+                <tr key={tie.id} className={`${tie.held === 0 ? "gonerow" : ""}${tiePicks.picked.has(String(tie.id)) ? " picked" : ""}`}
+                  onClick={(event) => { tiePicks.clickPicks(String(tie.id), event); }}>
+                  <td className="pickcell">{tiePicks.box(String(tie.id), tie.name)}</td>
                   <td><button type="button" className="lnk" onClick={() => store.setCardPage(tie.cardId)}>{tie.name}</button></td>
+                  {entry.openings.length > 0 && <td>{packName(entry.openings.find((opening) => opening.id === tie.openingId))}</td>}
                   <td>{tie.foil ? <span className="badge foil">{tie.foil === 1 ? "FOIL" : "ETCHED"}</span> : <span className="sub">Regular</span>}</td>
                   <td className="nowrap"><SetIcon code={tie.setCode} />{tie.setCode.toUpperCase()} #{tie.collectorNumber}</td>
                   <td className="numcell">{tie.quantity}</td>
@@ -433,7 +569,7 @@ function EntryPage({ id, list, onClose, onChanged }: { id: string; list: Purchas
                   {entry.kind === "trade" && <td className="numcell">{money(tie.tradePrice, currency)}</td>}
                   <td className="numcell">{money(tie.price, currency)}</td>
                   <td>{stateOf([tie])}</td>
-                  <td>{(tie.openingId || entry.kind === "purchase") && <button type="button" className="btn small" onClick={() => void removeFromPack(tie)}>{tie.openingId ? "Remove from pack..." : "Remove from purchase..."}</button>}</td>
+                  <td>{(tie.openingId || entry.kind === "purchase") && <button type="button" className="btn small" onClick={(event) => { event.stopPropagation(); void removeFromPack([tie]); }}>{tie.openingId ? "Remove from pack..." : "Remove from purchase..."}</button>}{tie.openingId && entry.openings.filter((opening) => opening.lineId === tie.lineId).length > 1 && <button type="button" className="btn small" onClick={(event) => { event.stopPropagation(); void moveToPack([tie]); }}>Move to pack...</button>}</td>
                 </tr>
               ))}
             </tbody>
@@ -555,7 +691,8 @@ export function PurchasesView({ actions: _actions }: { actions: Record<string, A
         <button type="button" className="btn small" onClick={() => void pickReceipt().then((file) => { if (file) void purchaseFromReceipt(store, file, saved); })}>Read receipt...</button>
         <button type="button" className="btn small" onClick={() => placesDialog(store)}>Places...</button>
         <button type="button" className="btn small" onClick={() => void exportPurchases(store, "entries")}>Export...</button>
-        {opening && <button type="button" className="badge opening openingchip" title="Cards added to its collection are tied to this opening. Click to open its purchase" onClick={() => setOpen(opening.entryId)}>Opening: {opening.name}</button>}
+        {opening && <button type="button" className="badge opening openingchip" title="Cards added to its collection are tied to this opening. Click to open its purchase" onClick={() => setOpen(opening.entryId)}>Opening: {opening.name}{packLabel(opening) ? ` (${packLabel(opening)})` : ""}</button>}
+        {opening?.hasNext && <button type="button" className="btn small" onClick={() => void goNextPack(store)}>Next pack</button>}
       </div>
       <div className="list purchasewrap">
         {error && <p className="note err">{error}</p>}
@@ -571,8 +708,14 @@ export function PurchasesView({ actions: _actions }: { actions: Record<string, A
             <SpendChart key={`${currency}-${list.entries.length}`} currency={currency} />
           </>
         )}
-        {list && !open && tab === "history" && <History list={list} currency={currency} onOpen={setOpen} />}
+        {list && !open && tab === "history" && <History list={list} currency={currency} onOpen={setOpen} onChanged={() => void load()} />}
       </div>
     </div>
   );
+}
+
+/** The short name of the pack a card came from: "Pack 3", or the opening's name for products without packs. */
+function packName(opening: EntryOpening | undefined): string {
+  if (!opening) return "";
+  return opening.packNumber !== null ? `Pack ${opening.packNumber}` : opening.name.replace(/\s*\(Purchase of [^)]*\)$/, "");
 }
