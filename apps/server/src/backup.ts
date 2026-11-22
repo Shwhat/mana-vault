@@ -1,6 +1,7 @@
 import { cleanSvg } from "./svg.js";
 import { purchaseBackup, restorePurchases } from "./purchases.js";
 import { randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
 import type { DatabaseSync } from "node:sqlite";
 import { cardInsertStatement } from "./database.js";
 import { readCondition, readLanguage } from "./copies.js";
@@ -34,9 +35,23 @@ type BackupCustomCard = {
   tokens: string; price_usd: number | null; price_usd_foil: number | null; price_eur: number | null; price_eur_foil: number | null;
 };
 
+/** The Mana Vault version running (from the server's package.json). Since 0.17.1 a backup is marked with the version that made it. */
+export const APP_VERSION = (JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as { version: string }).version;
+
+/** -1, 0 or 1 as version a is older than, equal to or newer than version b (X.Y.Z). */
+export function compareVersions(a: string, b: string): number {
+  const parts = (value: string) => value.split(".").map((part) => Number.parseInt(part, 10) || 0);
+  const [x, y] = [parts(a), parts(b)];
+  for (let index = 0; index < 3; index += 1) {
+    if ((x[index] ?? 0) !== (y[index] ?? 0)) return (x[index] ?? 0) < (y[index] ?? 0) ? -1 : 1;
+  }
+  return 0;
+}
+
 export interface ManaVaultBackup {
   format: "mana-vault-backup";
-  version: 5 | 6 | 7;
+  /** The Mana Vault version that made the backup (0.17.1 and later). Older backups hold a number 1 to 7; once read, the number is kept as the layout. */
+  version: string | 5 | 6 | 7;
   createdAt: string;
   cards: BackupCard[];
   collections: BackupCollection[];
@@ -119,7 +134,7 @@ export function createBackup(database: DatabaseSync, userId: number): ManaVaultB
   const back = database.prepare("SELECT bytes, type FROM card_backs WHERE id = ?").get(`user:${userId}`);
   return {
     format: "mana-vault-backup",
-    version: 7,
+    version: APP_VERSION,
     purchases: purchaseBackup(database, userId),
     customSets,
     customCards,
@@ -173,7 +188,7 @@ export function restoreBackup(database: DatabaseSync, source: string, userId: nu
         set.symbol_type === "image/svg+xml" ? (symbol ? new Uint8Array(Buffer.from(symbol, "utf8")) : null) : bytes(set.symbol), set.symbol_type === "image/svg+xml" && !symbol ? null : set.symbol_type);
     }
     // version 6: the art library and the card back are replaced by the backup's (older backups leave them as they are)
-    if (backup.version >= 6) {
+    if (layoutOf(backup) >= 6) {
       database.prepare("DELETE FROM art_library WHERE user_id = ?").run(userId);
       const insertArt = database.prepare("INSERT INTO art_library (id, user_id, name, bytes, type, created_at) VALUES (?, ?, ?, ?, ?, ?)");
       // the library is shared: a picture someone else already added stays theirs
@@ -282,7 +297,7 @@ export function restoreBackup(database: DatabaseSync, source: string, userId: nu
       if (card && collectionId) insertLink.run(Number(card.id), collectionId, link.card_id, link.foil, link.condition, link.language, link.proxy, link.quantity);
     }
     // version 7: the purchase history is replaced by the backup's, tied to the restored collections
-    if (backup.version === 7) restorePurchases(database, userId, backup.purchases, (id) => collectionIds.get(id) ?? null);
+    if (layoutOf(backup) >= 7) restorePurchases(database, userId, backup.purchases, (id) => collectionIds.get(id) ?? null);
     database.exec("COMMIT");
   } catch (error) {
     database.exec("ROLLBACK");
@@ -312,10 +327,24 @@ function summarizeBackup(backup: ManaVaultBackup): BackupSummary {
   };
 }
 
+/** The layout of a backup once read: 5, 6 or 7 (a backup marked with an app version has the newest layout). */
+function layoutOf(backup: ManaVaultBackup): number {
+  return typeof backup.version === "string" ? 7 : backup.version;
+}
+
 function validateBackup(value: unknown): ManaVaultBackup {
-  if (!isRecord(value) || value.format !== "mana-vault-backup" || ![1, 2, 3, 4, 5, 6, 7].includes(Number(value.version))) {
+  if (!isRecord(value) || value.format !== "mana-vault-backup") throw new Error("Unsupported backup file format or version");
+  // since 0.17.1 a backup names the Mana Vault version that made it; a backup from a newer version is refused
+  if (typeof value.version === "string") {
+    if (!/^\d+\.\d+\.\d+$/.test(value.version)) throw new Error("Unsupported backup file format or version");
+    if (compareVersions(value.version, APP_VERSION) > 0) {
+      throw new Error(`This backup was made by Mana Vault ${value.version}. Update this server (${APP_VERSION}) to ${value.version} or later to restore it.`);
+    }
+    value = { ...value, version: 7 };
+  } else if (![1, 2, 3, 4, 5, 6, 7].includes(Number(value.version))) {
     throw new Error("Unsupported backup file format or version");
   }
+  if (!isRecord(value)) throw new Error("Unsupported backup file format or version");
   if (typeof value.createdAt !== "string" || !Number.isFinite(Date.parse(value.createdAt))) {
     throw new Error("Backup file has an invalid creation date");
   }

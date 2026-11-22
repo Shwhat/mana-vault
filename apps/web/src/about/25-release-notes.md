@@ -2,6 +2,11 @@
 
 The installed version is shown at the top of this guide.
 
+## 0.17.1 (2026-11-22): Backups marked with the app version
+
+- Account backups are marked with the Mana Vault version that made them, instead of a separate backup number. A server restores backups from its own version and earlier, and refuses a backup from a newer version with "This backup was made by Mana Vault X. Update this server (Y) to X or later to restore it."
+- Backups made before 0.17.1 (numbered 1 to 7) restore as before.
+
 ## 0.17.0 (2026-11-21): Purchases, list views and the card maker
 
 - Purchases: single cards are chosen with **Find cards** (card search with pictures and every printing), **Scan** (the scanner with This purchase as the target) or **From scanned list...**, never typed.

@@ -1,3 +1,4 @@
+import { APP_VERSION } from "./backup.js";
 // Tests for 0.16.0: purchase history (purchases, tax and shipping spread, openings and tied pulls, sealed values, card
 // and product sales, trades, imported prices, figures, undo, CSV and backups version 7).
 import { describe, expect, it } from "vitest";
@@ -129,7 +130,7 @@ describe("purchases", () => {
     expect(entries.split("\n")[1]).toBe('2026-11-01,Purchase,"Shop, Main St","Sauron, the Dark Lord",,3,0,1,-2,USD');
     expect((await call("GET", "/api/purchases/export?what=lines")).body).toContain("Single cards");
     const backup = (await call("GET", "/api/backup")).body;
-    expect(JSON.parse(backup)).toMatchObject({ version: 7, purchases: [{ entry: { id: entry.id } }] });
+    expect(JSON.parse(backup)).toMatchObject({ version: APP_VERSION, purchases: [{ entry: { id: entry.id } }] });
     await call("DELETE", `/api/purchases/${entry.id}`);
     expect((await call("POST", "/api/backup/restore", backup)).statusCode).toBe(200);
     const restored = (await call("GET", "/api/purchases")).json();
