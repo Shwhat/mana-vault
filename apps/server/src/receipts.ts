@@ -95,7 +95,7 @@ const PRODUCT_WORDS: Array<[RegExp, string]> = [
   [/booster|\bpack\b/i, "other_booster"],
   [/\bdeck\b/i, "deck"],
 ];
-const SKIP = /\b(sub\s?-?total|total|tax(es)?|sales\s+tax|vat|gst|shipping|delivery|pick\s?-?up|postage|handling|change|cash|tender|visa|mastercard|amex|discover|debit|credit|card\s+ending|balance|payment|paid|tip|gratuity|savings|you\s+saved|refund|points|rewards|discount)\b/i;
+const SKIP = /\b(sub\s?-?total|total|tax(es)?|sales\s+tax|vat|gst|shipping|delivery|pick\s?-?up|postage|handling|change|cash|tender|visa|mastercard|amex|discover|debit|credit|card\s+ending|balance|payment|paid|tip|gratuity|savings|you\s+saved|refund|points|rewards|discount)(?![a-z])/i;
 /** Buttons, links and status text of order pages (0.19.0): never products, places or notes. */
 const IGNORED = /\b(buy\s+again|track\s+(all\s+)?(your\s+)?orders?|view\s+(order|details|receipt)|re-?order|order\s+again|picked\s+up|ready\s+for\s+pickup|confirmed|shipped|delivered|out\s+for\s+delivery|write\s+a\s+review|return\s+items?|contact\s+(us|store|seller)|need\s+help|continue\s+shopping|sign\s+in|log\s+in|shop\s+now|\bat\s+\d{1,2}:\d{2})\b/i;
 /** A condition or finish note, such as "Near Mint Foil", "NM", "Lightly Played Etched". */
@@ -153,7 +153,11 @@ export function parseReceipt(text: string, sets: Array<{ code: string; name: str
   // shipping and store pickup (a "Free" pickup counts as 0)
   const shipping = pick(/\bshipping\b|\bdelivery\b|\bpostage\b|\bhandling\b|\bpick\s?-?up\b/i, /free\s+shipping/i)
     ?? (rows.some((row) => /\b(shipping|delivery|pick\s?-?up)\b.*\bfree\b/i.test(row)) ? 0 : null);
-  const place = rows.slice(0, 6).find((row) => /[a-z]{3}/i.test(row) && !/\d{3,}/.test(row) && !IGNORED.test(row)
+  // the place is never a row with a price or a product name (0.19.1: "MAGIC Magic the Gathering: Star $64.99" is the first row of a cropped screenshot)
+  // only rows above the first line with a price can name the place
+  const firstPrice = rows.findIndex((row) => !SKIP.test(row) && (lastAmount(row) ?? 0) > 0);
+  const place = rows.slice(0, Math.min(6, firstPrice < 0 ? 6 : firstPrice)).find((row) => /[a-z]{3}/i.test(row) && !/\d{3,}/.test(row) && !IGNORED.test(row)
+    && lastAmount(row) === null && productOf(row) === "other" && !/magic\s*(:|the\s+gathering)|\bmtg\b|\btcg\b/i.test(row)
     && !/receipt|invoice|order|thank|welcome|date|tel|phone|www\.|http|track|shop\b/i.test(row) && row.length <= 60) ?? null;
   const orderNumber = text.match(/\border\s*(?:#|no\.?|number)\s*:?\s*#?\s*([A-Z0-9][A-Z0-9-]{3,})/i);
   const lines: ReceiptLine[] = [];
@@ -167,8 +171,19 @@ export function parseReceipt(text: string, sets: Array<{ code: string; name: str
       last.text = `${last.text} ${row}`;
       continue;
     }
-    if (cost === null || cost <= 0) continue;
-    let name = row.replace(AMOUNT, " ").replace(/^[|!\]\[}{()•·*-]+\s*/, "").replace(/\s+/g, " ").trim();
+    // a name that wraps onto the next rows (0.19.1): "Magic the Gathering: Star $64.99", "Trek: Commander Deck:", "Landing Party"
+    if (cost === null || cost <= 0) {
+      const last = lines.at(-1);
+      const text = cleanRow(row);
+      if (last && !last.note && /[a-z]{3}/i.test(text) && (unfinished(last.name) || /[:,&-]\s*$/.test(text))) {
+        last.name = `${last.name} ${text}`.replace(/\s+/g, " ").slice(0, 160);
+        last.text = `${last.text} ${row}`;
+        last.product = productOf(last.name);
+        last.setCode = setOf(last.name, sets);
+      }
+      continue;
+    }
+    let name = cleanRow(row.replace(AMOUNT, " "));
     if (!/[a-z]{3}/i.test(name)) continue;
     let quantity = 1;
     const quantityMatch = name.match(/^(\d{1,3})\s*(?:x|@|ea\b)\s*/i) ?? name.match(/\b(?:qty|quantity)[:\s]*(\d{1,3})\b/i) ?? name.match(/\s(?:x|@)\s*(\d{1,3})$/i);
@@ -185,6 +200,24 @@ export function parseReceipt(text: string, sets: Array<{ code: string; name: str
     date: findOrderDate(text), place, note: orderNumber ? `Order #${orderNumber[1]}` : null, lines, tax, shipping, total,
     linesTotal: money(lines.reduce((sum, line) => sum + line.cost, 0)),
   };
+}
+
+/**
+ * A row of text without leading marks, and without a word in capitals that repeats the next word (0.19.1: the text on a
+ * product's picture, "MAGIC Magic the Gathering", read beside its name).
+ */
+function cleanRow(row: string): string {
+  let text = row.replace(/^[|!\]\[}{()•·*-]+\s*/, "").replace(/\s+/g, " ").trim();
+  const words = text.split(" ");
+  while (words.length > 1 && /^[A-Z]{2,}$/.test(words[0]!) && words[0]!.toLowerCase() === words[1]!.toLowerCase()) words.shift();
+  text = words.join(" ");
+  return text;
+}
+
+/** A line name that goes on: an open bracket, or an ending such as ":", ",", "&", "-", "of", "the" or "and". */
+function unfinished(name: string): boolean {
+  const open = (name.match(/[[(]/g) ?? []).length > (name.match(/[\])]/g) ?? []).length;
+  return open || /[:,&-]\s*$|\b(the|of|and|a|an|for)\s*$/i.test(name);
 }
 
 // ---------- reading text from files ----------
