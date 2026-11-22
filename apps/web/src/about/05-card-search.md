@@ -107,7 +107,7 @@ Each view keeps its own filters. A collection's filters stay when another collec
 
 ## Results
 
-The count line after the search box shows the number of matching cards (or printings, with Show every printing), and while more are still to load, how many are loaded. More results load as you scroll, or as you turn binder pages.
+The count line after the search box shows the number of matching cards (or printings, with Show every printing), and while more are still to load, how many are loaded. More results load as you scroll, or as you turn binder pages. Leaving card search for another tab and coming back keeps the search, the filters, the results and where the list was scrolled to; owned counts are loaded again in place when cards change on another device.
 
 **Sort** beside the search box orders the results:
 
@@ -138,7 +138,7 @@ The desktop and phones each remember their own layout. The deck's Add tab and bo
 
 | Layout | Each result shows |
 |---|---|
-| Grid, Binder | The card picture, an **N printings** badge when the card has more than one printing, and a pip bar under the picture for the copies you own by finish (OWNED with the regular count, FOIL and ETCHED counts); the buttons are under the picture (in Binder, under the selected one). Pictures show no price; the List layout has it |
+| Grid, Binder | The card picture, an **N printings** badge when the card has more than one printing, and OWNED with every copy you own (the tooltip splits it by finish), the price when Prices on pictures is on, and the buttons (in Binder, under the selected one). Where each sits follows View, Card layout... |
 | List | The image, name, mana cost, type line, set, set code, collector number, rarity, price and an OWNED badge with your copies. Clicking the set code fills the Set code filter; clicking the rarity sets the Rarity filter |
 
 The add button names where the card goes: **+ name** of the collection or deck selected last, then **+ Wishlist**. It opens the printing chooser titled "Add card name to name" with the printing shown already selected and the finish set by Add as foil, so Enter adds it; another printing or finish can be picked first. A card made in only one printing and one finish is added at once. Owned counts are real copies in your collections and collections shared with you, not wishlists or proxies.

@@ -15,6 +15,16 @@ The view has two tabs and an entry page:
 | History | Every entry, newest first, with its date, kind, description, place, money out, money in, value now and gain or loss |
 | Entry | One entry, opened from the history with a click or Enter: its figures, products, openings, cards and sales, with Edit... and Delete... |
 
+The tables on the entry page and the history are grids: every cell is bordered, the heading row stays in view while scrolling, text columns are left aligned and numbers right aligned, and alternate rows are shaded. A table wider than the page scrolls sideways inside its own frame.
+
+| Table | Columns |
+|---|---|
+| Products | Product, Set, Quantity, Full cost, State (sealed, opened and sold counts; for a single card, where it is now), Value each (sealed value with its date, cost, or for a single card its price when added), buttons |
+| Cards from this purchase (Cards got on a trade) | Card, Finish, Set, Count, Still held, Value when pulled (Value when added for single cards and trades), Trade price (trades), Price now, State, Remove from pack... |
+| Sold (Cards given on a trade) | Card or Product, Count, Price or Trade value, Original cost (trades), From |
+
+State is **In collection**, **Sold**, **Traded** or **Gone** (deleted from the collection), or a mix such as "1 in collection, 1 gone". Rows of cards no longer held are shown in a lighter color. Changes made on another device show at once.
+
 The header holds **New entry...** (it asks for the kind: Purchase, Card sale, Product sale or Trade), **Make purchases from imported prices...**, **Read receipt...**, **Places...** and **Export...**. While an opening is where pulled cards go, the header shows it as a chip, **Opening: name**; a click on the chip opens its entry.
 
 ## Entry kinds
@@ -89,7 +99,7 @@ A product line is sealed until it is opened.
 
 1. On the entry page, **Open...** on a line asks how many to open (for example 3 of 6 packs, or 1 box) and the collection the pulled cards go to.
 2. The opened part becomes an **opening**, named like "3 Play boosters, Foundations (Purchase of Nov 20)". It becomes where pulled cards are tied, and its collection becomes where new cards go.
-3. While the opening is active, every card added to that collection is tied to it: from card search, Quick add, the scanner, pasted lists, imports and count changes. The status bar shows **OPENING: name**, and ADDING TO names the opening. Lowering a count (or undoing an add) unties the copies taken away.
+3. While the opening is active, every card added to that collection is tied to it: from card search, Quick add, the scanner, pasted lists, imports and count changes. The status bar shows **OPENING: name**, and ADDING TO names the opening. A pulled card stays on its pack for good: removing it from the collection, moving it, changing its printing, selling it or trading it never takes it off the pack. Only **Remove from pack...** on the entry page does, and an undo of adding the card (the card was added by mistake).
 4. The opening on the entry page has buttons to fill it:
 
 | Button | What it does |
@@ -101,9 +111,34 @@ A product line is sealed until it is opened.
 
 5. A click on **OPENING** in the status bar, or on the opening chip in the Purchases header, opens the entry. **Continue opening** makes an ended opening active again, so a box of 36 packs can be recorded over several days.
 
-Only one opening is active at a time; opening another ends the one before. **Untie** on a card of an opening takes it off the purchase; the copy stays in the collection.
+Only one opening is active at a time; opening another ends the one before. An opening started on one device is the opening on every device: the phone's scanner shows **Scanning into: name** and fills it in as where scanned cards go (see [Scanning cards](/about/scanning-cards)), and ending it on one device ends it on all of them.
 
-Each opening shows its card count, the value pulled (the cards tied to it at today's price) and the value per pack (the value pulled ÷ the packs opened, where packs opened is the count opened × Packs in it, or the count when Packs in it is 0).
+### Removing a card from its pack
+
+**Remove from pack...** on a card of an opening (or **Remove from purchase...** on a single card bought) asks each time:
+
+| Choice | What happens |
+|---|---|
+| Remove from pack, keep the card | The card leaves the pack's list and stays in the collection |
+| Remove from pack and delete the card | The card leaves the pack's list and its copies still in the collection are deleted (shown only while copies are held) |
+
+Both can be undone; undo puts the card back on the pack with its date and its Value when pulled.
+
+Removing a copy from a collection when it came from a pack or purchase says so in the question, for example "1 card came from 3 Play boosters, Foundations (Purchase of Nov 20). It stays listed on that pack."
+
+### Opening figures
+
+Each opening shows its card count, how many of its cards are gone, the value per pack, and three values:
+
+| Figure | Rule |
+|---|---|
+| Value when pulled | Every card pulled at its price for its finish on the day it was added to the pack. It never changes after that day. A card with no price that day counts as 0 |
+| Pulled value | Every card pulled at today's price for its finish, held or not |
+| Value now | Only the pulled cards still held, at today's price for their finish |
+
+The value per pack is the pulled value ÷ the packs opened (the count opened × Packs in it, or the count when Packs in it is 0). Gain or loss uses Value now, so cards no longer held do not count as owned.
+
+Worked example: a pack pulls 2 copies of a card worth 2.00 that day. Value when pulled is 4.00. The price rises to 5.00 and one copy is deleted from the collection: Pulled value is 10.00, Value now is 5.00, and Value when pulled stays 4.00.
 
 ## Sealed product kept
 
@@ -159,7 +194,7 @@ Imports that carry a purchase price per card (ManaBox files, for example) can be
 | Value now | Tied cards still owned at today's price for their finish, plus sealed lines at their current value |
 | Gain or loss | Received + Value now - Spent |
 
-- A tied card counts while its copy is still owned. When copies move to another collection, or become another printing, their ties move with them. When several purchases tied the same copy, the oldest purchase keeps the copies first.
+- A tied card counts in Value now while its copy is still owned; a deleted copy stays listed on its pack as Gone. When copies move to another collection, or become another printing, their ties move with them. When several purchases tied the same copy, the oldest purchase keeps the copies first.
 - Proxies and cards without a price count as 0; the Value now tile counts the cards without a price.
 - The summary counts the entries for the period chosen. All amounts are in US dollars.
 - Per purchase, the entry page shows its cost, the value of its pulls and sealed product still held, what its pulls and products sold for, and its gain or loss (value now + sold for - cost).

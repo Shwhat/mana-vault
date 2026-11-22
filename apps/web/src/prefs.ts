@@ -1,4 +1,5 @@
 // ---------- preferences: saved per user on the server ----------
+import { type CardLayoutPrefs, defaultCardLayout, readCardLayout } from "./card-layout";
 import { request, APP_VERSION } from "./api";
 import { isApp } from "./android/platform";
 import { DEFAULT_WORKSPACE, isOpen, openPanel, PRESETS, type Layout, type Workspace, validLayout } from "./dock";
@@ -87,6 +88,8 @@ export type Prefs = {
   /** Proxies: the sheet settings for printing, and the tab shown (Print or Card maker). */
   proxySheet: SheetSettings;
   proxyTab: "print" | "maker";
+  /** Where pips and buttons sit around card pictures (0.18.0), one layout for all or one per section. */
+  cardLayout: CardLayoutPrefs;
   appVersion: string;
 };
 
@@ -102,7 +105,7 @@ export function defaultPrefs(): Prefs {
     listGroups: { collection: "none", search: "none", print: "none" }, listFolds: [],
     scanVibrate: true, scanFoil: false, scanCamera: "environment", scanQuick: false, scanSounds: true, scanSets: [], scanIgnorePromos: false,
     scanProxy: false, scanCondition: "NM", scanLanguage: "en", scanShowTotal: false, scanShowOwned: false, pricesOnPictures: false, printSort: "added", printLayout: "list", printSize: "m",
-    proxySheet: DEFAULT_SHEET, proxyTab: "print", appVersion: APP_VERSION,
+    proxySheet: DEFAULT_SHEET, proxyTab: "print", cardLayout: defaultCardLayout(), appVersion: APP_VERSION,
   };
 }
 
@@ -172,6 +175,7 @@ export function mergePrefs(saved: unknown): Prefs {
     printSort: PRINT_SORTS.find(([sort]) => sort === value.printSort)?.[0] ?? "added",
     printLayout: value.printLayout === "grid" || value.printLayout === "binder" ? value.printLayout : "list",
     printSize: value.printSize === "s" || value.printSize === "l" ? value.printSize : "m",
+    cardLayout: readCardLayout(value.cardLayout),
     appVersion: APP_VERSION,
   };
 }
@@ -186,6 +190,8 @@ export async function loadPrefs(): Promise<Prefs> {
 
 let timer: number | undefined;
 let pending: Prefs | null = null;
+/** Whether a change of preferences is still waiting to be saved. */
+export const prefsPending = () => pending !== null;
 /** Saves preferences after a short pause, so quick changes are sent once; `now` sends at once (the open deck or collection). */
 export function savePrefs(prefs: Prefs, now = false) {
   window.clearTimeout(timer);

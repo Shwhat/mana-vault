@@ -68,8 +68,11 @@ export const row = (page: Page, name: string) => page.locator(".view .row", { ha
 export async function search(page: Page, text: string) {
   await page.keyboard.press("Escape");
   await page.keyboard.press("/");
-  await expect(page.getByRole("textbox", { name: "Search cards" })).toBeFocused();
-  const done = page.waitForResponse((response) => {
+  const box = page.getByRole("textbox", { name: "Search cards" });
+  await expect(box).toBeFocused();
+  // 0.18.0: a search that did not change keeps its results without asking the server again
+  const same = (await box.inputValue()) === text && !(await page.locator("#view-cards .phpos").textContent())?.startsWith("Searching");
+  const done = same ? Promise.resolve() : page.waitForResponse((response) => {
     const url = new URL(response.url());
     return url.pathname === "/api/cards" && url.searchParams.get("q") === text;
   });
@@ -94,9 +97,15 @@ export async function menu(page: Page, menuName: string, item: string) {
   await page.locator("#dropdown .dd", { hasText: item }).first().click();
 }
 
-/** Applies a workspace from the View menu. */
+/** Opens the account menu (the user name at the top right) and chooses an item. */
+export async function accountMenu(page: Page, item: string) {
+  await page.locator("#acct").dispatchEvent("mousedown");
+  await page.locator("#dropdown .dd", { hasText: item }).first().click();
+}
+
+/** Applies a workspace from the account menu (0.18.0). */
 export async function useWorkspace(page: Page, name: string) {
-  await menu(page, "View", `${name} workspace`);
+  await accountMenu(page, `${name} workspace`);
 }
 
 /** Clicks a mode tab (Home, Search, Collection, Decks, Trade, Proxies). */
@@ -104,11 +113,20 @@ export async function modeTab(page: Page, name: string) {
   await page.locator("#modetabs .mtab", { hasText: name }).first().click();
 }
 
-/** Takes the printing shown selected in the printing chooser that adding a card opens (Enter in its find box). */
+/**
+ * Takes the printing shown selected in the printing chooser that adding a card opens (Enter in its find box). A card with
+ * one printing (0.18.0) asks only for the finish, with the preferred finish focused: Enter takes it.
+ */
 export async function takePrinting(page: Page) {
-  const chooser = page.locator("dialog#dlg[open] .printpick");
-  await expect(chooser.locator("input.search")).toBeFocused();
-  await expect(chooser.locator(".printrow").first()).toBeVisible();
+  const dialog = page.locator("dialog#dlg[open]");
+  await expect(dialog.locator(".printpick, .finishchoice")).toBeVisible();
+  if (await dialog.locator(".finishchoice").count()) {
+    await expect(dialog.locator(".finishchoice button:focus")).toHaveCount(1);
+  } else {
+    const chooser = dialog.locator(".printpick");
+    await expect(chooser.locator("input.search")).toBeFocused();
+    await expect(chooser.locator(".printrow").first()).toBeVisible();
+  }
   await page.keyboard.press("Enter");
   // the next key is only handled once the window is closed
   await expect(page.locator("dialog#dlg[open]")).toHaveCount(0);

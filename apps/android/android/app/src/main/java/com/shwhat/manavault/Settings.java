@@ -44,6 +44,13 @@ final class Settings {
         store.edit().putString("lastOffer", value).apply();
     }
 
+    /** The last opening a Start scanning notification was shown for (0.18.0). */
+    String lastOpening() { return store.getString("lastOpening", ""); }
+
+    void setLastOpening(String value) {
+        store.edit().putString("lastOpening", value == null ? "" : value).apply();
+    }
+
     /** Changes made on the phone that wait for the server, as the JSON list the app sends to /api/sync (0.17.0). */
     String pendingSync() { return store.getString("pendingSync", "[]"); }
 
@@ -57,6 +64,8 @@ final class Settings {
             if (change.has(key)) editor.putString(key, change.getString(key, ""));
         }
         if (change.has("userId")) editor.putInt("userId", change.getInteger("userId", 0));
+        // the opening the app already knows about: no Start scanning notification for it
+        if (change.has("lastOpening")) editor.putString("lastOpening", change.getString("lastOpening", ""));
         for (String key : new String[] { "notifications", "wifiOnly" }) {
             if (change.has(key)) editor.putBoolean(key, Boolean.TRUE.equals(change.getBoolean(key, false)));
         }

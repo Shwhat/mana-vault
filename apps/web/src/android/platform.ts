@@ -9,6 +9,8 @@ export type AppSettings = {
   userId: number;
   notifications: boolean;
   wifiOnly: boolean;
+  /** The active opening the app already knows about (0.18.0), so the background check does not offer it again. */
+  lastOpening?: string;
 };
 
 export type TextLine = { text: string; left: number; top: number; right: number; bottom: number };

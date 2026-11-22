@@ -100,7 +100,7 @@ function useLocalSearch(cards: FoundCard[]): CardSearch {
   useEffect(() => setCount(60), [cards]);
   return useMemo(() => ({
     cards: cards.slice(0, count), total: cards.length, loading: false, error: "",
-    more: () => setCount((value) => value + 60), refresh: () => undefined, owned: () => undefined,
+    more: () => setCount((value) => value + 60), refresh: () => undefined, owned: () => undefined, reload: () => undefined,
   }), [cards, count]);
 }
 
@@ -167,7 +167,7 @@ function SideSearch({ side, search, trade, editable, onAdd, buttonText, extra, d
         <span className="sub">{countLine(search)}</span>
       </div>
       {extra}
-      <CardResults search={search} layout={store.searchLayout} size={store.prefs.searchSize} label={side === "give" ? "Cards you can give" : "Cards you can get"}
+      <CardResults section="trade" search={search} layout={store.searchLayout} size={store.prefs.searchSize} label={side === "give" ? "Cards you can give" : "Cards you can get"}
         resetKey={filters} onPick={() => store.setTradeSide(scope)} onOpen={(card) => { if (can) onAdd(card); }}
         menu={(card) => [can && { label: side === "give" ? "Add to what you give" : "Add to what you get", run: () => onAdd(card) }]}
         buttons={(card) => (

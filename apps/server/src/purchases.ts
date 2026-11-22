@@ -141,6 +141,13 @@ export function initializePurchases(database: DatabaseSync): void {
   if (!entryColumns.has("shipping_by")) database.exec("ALTER TABLE purchase_entries ADD COLUMN shipping_by TEXT NOT NULL DEFAULT 'me'");
   const tieColumns = new Set(database.prepare("PRAGMA table_info(purchase_ties)").all().map((row) => String(row.name)));
   if (!tieColumns.has("price")) database.exec("ALTER TABLE purchase_ties ADD COLUMN price REAL");
+  // 0.18.0: each tie keeps the card's price on the day it was added (Value when pulled), from the price history for older ties
+  if (!tieColumns.has("value_then")) {
+    database.exec("ALTER TABLE purchase_ties ADD COLUMN value_then REAL");
+    for (const tie of database.prepare("SELECT id, card_id, foil, created_at FROM purchase_ties").all()) {
+      database.prepare("UPDATE purchase_ties SET value_then = ? WHERE id = ?").run(priceOnDay(database, String(tie.card_id), Number(tie.foil), String(tie.created_at).slice(0, 10)), Number(tie.id));
+    }
+  }
   for (const row of database.prepare("SELECT DISTINCT place, user_id FROM purchase_entries WHERE place_id IS NULL AND place != ''").all()) {
     const placeId = placeFor(database, String(row.place), Number(row.user_id));
     database.prepare("UPDATE purchase_entries SET place_id = ?, place = (SELECT name FROM places WHERE id = ?) WHERE place_id IS NULL AND place = ?").run(placeId, placeId, String(row.place));
@@ -286,6 +293,20 @@ function ownCollection(database: DatabaseSync, id: unknown, userId: number): boo
 // ---------- prices ----------
 
 /** Today's price of a copy in USD, by its finish. */
+/** A card's price on a day from the price history (the last one on or before it), or today's price when there is none. */
+function priceOnDay(database: DatabaseSync, cardId: string, foil: number, day: string): number | null {
+  try {
+    const row = database.prepare("SELECT usd, usd_foil, usd_etched FROM price_history WHERE card_id = ? AND day <= ? ORDER BY day DESC LIMIT 1").get(cardId, day);
+    if (row) {
+      const value = foil === 0 ? row.usd : foil === 1 ? row.usd_foil : row.usd_etched ?? row.usd_foil;
+      if (value !== null && value !== undefined) return Number(value);
+    }
+  } catch {
+    // no price history table yet
+  }
+  return priceNow(database, cardId, foil);
+}
+
 function priceNow(database: DatabaseSync, cardId: string, foil: number, _currency = "usd"): number | null {
   const row = database.prepare("SELECT price_usd, price_usd_foil, price_usd_etched FROM cards WHERE id = ?").get(cardId);
   if (!row) return null;
@@ -555,15 +576,44 @@ export function purchaseEntry(database: DatabaseSync, userId: number, id: string
   const figures = entryFigures(database, entry, heldByTie(database, userId));
   const openings = database.prepare("SELECT * FROM purchase_openings WHERE entry_id = ? ORDER BY created_at").all(id).map((opening) => {
     const ties = figures.ties.filter((tie) => tie.opening_id === opening.id);
+    // Pulled value: every pull at today's price, owned or not; Value now: the pulls still held; Value when pulled: fixed
     const pulled = ties.reduce((sum, tie) => sum + Number(tie.quantity) * (Number(tie.price ?? 0)), 0);
+    const now = ties.reduce((sum, tie) => sum + tie.held * (Number(tie.price ?? 0)), 0);
+    const then = ties.reduce((sum, tie) => sum + Number(tie.quantity) * Number(tie.value_then ?? 0), 0);
+    const thenUnpriced = ties.filter((tie) => tie.value_then === null || tie.value_then === undefined).reduce((sum, tie) => sum + Number(tie.quantity), 0);
     const line = figures.lines.find((item) => item.id === opening.line_id);
     const packs = Number(opening.count) * Math.max(1, Number(line?.packs ?? 1));
     return {
       id: String(opening.id), lineId: String(opening.line_id), count: Number(opening.count), name: String(opening.name), collectionId: opening.collection_id ? String(opening.collection_id) : null,
       active: Number(opening.active) === 1, createdAt: String(opening.created_at), doneAt: opening.done_at ? String(opening.done_at) : null,
       cards: ties.reduce((sum, tie) => sum + Number(tie.quantity), 0), valuePulled: money(pulled), perPack: money(pulled / packs), packs,
+      valueNow: money(now), valueWhenPulled: money(then), whenPulledUnpriced: thenUnpriced,
+      gone: ties.reduce((sum, tie) => sum + Math.max(0, Number(tie.quantity) - tie.held), 0),
     };
   });
+  // where the copies no longer held went (0.18.0): sold, traded, or gone (removed from the collection); oldest ties first
+  const left = new Map<string, { sold: number; traded: number }>();
+  for (const row of database.prepare(
+    `SELECT e.kind, s.card_id, s.foil, SUM(s.quantity) AS n FROM purchase_sales s JOIN purchase_entries e ON e.id = s.entry_id
+     WHERE s.source_entry_id = ? AND s.what = 'card' GROUP BY e.kind, s.card_id, s.foil`,
+  ).all(id)) {
+    const key = `${String(row.card_id)}|${Number(row.foil ?? 0)}`;
+    const pool = left.get(key) ?? { sold: 0, traded: 0 };
+    if (row.kind === "trade") pool.traded += Number(row.n);
+    else pool.sold += Number(row.n);
+    left.set(key, pool);
+  }
+  const outOf = (tie: Record<string, unknown> & { held: number }) => {
+    let gone = Math.max(0, Number(tie.quantity) - tie.held);
+    const pool = left.get(`${String(tie.card_id)}|${Number(tie.foil)}`) ?? { sold: 0, traded: 0 };
+    const sold = Math.min(gone, pool.sold);
+    pool.sold -= sold;
+    gone -= sold;
+    const traded = Math.min(gone, pool.traded);
+    pool.traded -= traded;
+    gone -= traded;
+    return { sold, traded, gone };
+  };
   return {
     id: String(entry.id), kind: String(entry.kind), kindLabel: KIND_LABEL[String(entry.kind)], date: String(entry.date), place: String(entry.place), note: String(entry.note),
     placeId: entry.place_id ? String(entry.place_id) : null, shippingBy: entry.shipping_by === "buyer" ? "buyer" : "me", trade: figures.trade,
@@ -590,6 +640,8 @@ export function purchaseEntry(database: DatabaseSync, userId: number, id: string
       imageUrl: tie.image_url ? String(tie.image_url) : null, foil: Number(tie.foil), condition: String(tie.condition), language: String(tie.language), proxy: Number(tie.proxy) === 1,
       collectionId: String(tie.collection_id), quantity: Number(tie.quantity), held: tie.held, price: tie.price, lineId: tie.line_id ? String(tie.line_id) : null,
       openingId: tie.opening_id ? String(tie.opening_id) : null, tradePrice: tie.trade_price === null || tie.trade_price === undefined ? null : Number(tie.trade_price),
+      valueThen: tie.value_then === null || tie.value_then === undefined ? null : Number(tie.value_then),
+      ...outOf(tie),
     })),
     openings,
   };
@@ -626,7 +678,7 @@ const COLUMNS: Record<string, string[]> = {
   purchase_lines: ["id", "entry_id", "position", "product", "name", "set_code", "quantity", "cost", "packs", "opened", "sold", "card_id", "foil", "condition", "language", "collection_id"],
   purchase_sales: ["id", "entry_id", "position", "what", "card_id", "foil", "condition", "language", "proxy", "collection_id", "name", "quantity", "price", "source_entry_id", "source_line_id"],
   purchase_openings: ["id", "user_id", "entry_id", "line_id", "count", "name", "collection_id", "active", "created_at", "done_at"],
-  purchase_ties: ["user_id", "entry_id", "line_id", "opening_id", "collection_id", "card_id", "foil", "condition", "language", "proxy", "quantity", "price", "created_at"],
+  purchase_ties: ["user_id", "entry_id", "line_id", "opening_id", "collection_id", "card_id", "foil", "condition", "language", "proxy", "quantity", "price", "created_at", "value_then"],
   purchase_values: ["line_id", "date", "value"],
   purchase_receipts: ["entry_id", "name", "type", "data", "added_at"],
 };
@@ -691,8 +743,8 @@ function insertLine(database: DatabaseSync, entryId: string, position: number, l
 
 function insertTie(database: DatabaseSync, userId: number, entryId: string, place: { lineId?: string | null; openingId?: string | null }, collectionId: string, key: CopyKey, quantity: number, price: number | null = null): void {
   database.prepare(
-    `INSERT INTO purchase_ties (user_id, entry_id, line_id, opening_id, collection_id, card_id, foil, condition, language, proxy, quantity, price) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  ).run(userId, entryId, place.lineId ?? null, place.openingId ?? null, collectionId, ...keyValues(key), quantity, price);
+    `INSERT INTO purchase_ties (user_id, entry_id, line_id, opening_id, collection_id, card_id, foil, condition, language, proxy, quantity, price, value_then) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(userId, entryId, place.lineId ?? null, place.openingId ?? null, collectionId, ...keyValues(key), quantity, price, priceNow(database, key.cardId, key.foil));
 }
 
 /** The purchase a copy came from: the newest tie of the same copy in the same collection. */
@@ -1030,11 +1082,62 @@ export function registerPurchaseRoutes(app: FastifyInstance, database: DatabaseS
     }
   });
 
+  // the packs and purchases the copies about to be removed came from (0.18.0), for the note in the remove question
+  app.post<{ Body: { items?: unknown } }>("/api/purchases/ties/packs", async (request) => {
+    const userId = userOf(request);
+    const items = Array.isArray(request.body?.items) ? (request.body!.items as Array<Record<string, unknown>>).slice(0, 500) : [];
+    const held = heldByTie(database, userId);
+    const found = new Map<string, number>();
+    for (const item of items) {
+      const key = readCopyKey(item);
+      if (!key || typeof item.collectionId !== "string") continue;
+      const rows = database.prepare(
+        `SELECT t.id, t.entry_id, o.name AS opening_name FROM purchase_ties t LEFT JOIN purchase_openings o ON o.id = t.opening_id
+         WHERE t.user_id = ? AND t.collection_id = ? AND ${KEY.replace(/\b(card_id|foil|condition|language|proxy)\b/g, "t.$1")}`,
+      ).all(userId, item.collectionId, ...keyValues(key));
+      for (const row of rows) {
+        const count = held.get(Number(row.id)) ?? 0;
+        if (!count) continue;
+        const entry = database.prepare("SELECT * FROM purchase_entries WHERE id = ?").get(String(row.entry_id));
+        const name = row.opening_name ? String(row.opening_name) : entry ? `the ${KIND_LABEL[String(entry.kind)]!.toLowerCase()} of ${String(entry.date)}` : "a purchase";
+        found.set(name, (found.get(name) ?? 0) + count);
+      }
+    }
+    return { packs: [...found].map(([name, quantity]) => ({ name, quantity })) };
+  });
+
+  // undo of Remove from pack (0.18.0): the tie comes back as it was, with its date and Value when pulled
+  app.post<{ Body: { tie?: Record<string, unknown> } }>("/api/purchases/ties/restore", async (request, reply) => {
+    const userId = userOf(request);
+    const tie = request.body?.tie;
+    const key = tie ? readCopyKey(tie) : null;
+    const quantity = tie ? count(tie.quantity, 10_000) : 0;
+    if (!tie || !key || !quantity || typeof tie.entryId !== "string" || !ownCollection(database, tie.collectionId, userId)) return reply.code(400).send({ error: "Send the card to put back" });
+    if (!database.prepare("SELECT 1 FROM purchase_entries WHERE id = ? AND user_id = ?").get(tie.entryId, userId)) return missing(reply);
+    const number = (value: unknown) => (typeof value === "number" && Number.isFinite(value) ? value : null);
+    database.prepare(
+      `INSERT INTO purchase_ties (user_id, entry_id, line_id, opening_id, collection_id, card_id, foil, condition, language, proxy, quantity, price, value_then, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, strftime('%Y-%m-%d %H:%M:%f', 'now')))`,
+    ).run(userId, tie.entryId, typeof tie.lineId === "string" ? tie.lineId : null, typeof tie.openingId === "string" ? tie.openingId : null, String(tie.collectionId),
+      ...keyValues(key), quantity, number(tie.price), number(tie.valueThen), typeof tie.createdAt === "string" ? tie.createdAt : null);
+    return reply.code(201).send({ status: "restored" });
+  });
+
   app.delete<{ Params: { tieId: string } }>("/api/purchases/ties/:tieId", async (request, reply) => {
     const tie = database.prepare("SELECT * FROM purchase_ties WHERE id = ? AND user_id = ?").get(Number(request.params.tieId), userOf(request));
     if (!tie) return reply.code(404).send({ error: "That card is not tied to your purchases" });
+    // the copies of this tie still in the collection, and all copies of that kind there, so Remove from pack and delete the card can lower them
+    const held = heldByTie(database, userOf(request)).get(Number(tie.id)) ?? 0;
+    const have = heldQuantity(database, String(tie.collection_id), keyOfRow(tie));
     database.prepare("DELETE FROM purchase_ties WHERE id = ?").run(Number(tie.id));
-    return { tie: { collectionId: String(tie.collection_id), cardId: String(tie.card_id), foil: Number(tie.foil), condition: String(tie.condition), language: String(tie.language), proxy: Number(tie.proxy) === 1, quantity: Number(tie.quantity), openingId: tie.opening_id ? String(tie.opening_id) : null } };
+    return {
+      tie: {
+        collectionId: String(tie.collection_id), cardId: String(tie.card_id), foil: Number(tie.foil), condition: String(tie.condition), language: String(tie.language), proxy: Number(tie.proxy) === 1,
+        quantity: Number(tie.quantity), openingId: tie.opening_id ? String(tie.opening_id) : null, lineId: tie.line_id ? String(tie.line_id) : null,
+        entryId: String(tie.entry_id), valueThen: tie.value_then === null || tie.value_then === undefined ? null : Number(tie.value_then), createdAt: String(tie.created_at), price: tie.price === null || tie.price === undefined ? null : Number(tie.price),
+      },
+      held, have,
+    };
   });
 
   // Set current value... of a sealed line: one value per day, kept as history
@@ -1276,7 +1379,9 @@ function receiptSets(database: DatabaseSync): Array<{ code: string; name: string
 // ---------- listening to the rest of the program ----------
 
 /** Copies added while an opening is where pulled cards go are tied to it; copies taken away again (undo) are untied. */
-onCopiesAdded((database, userId, collectionId, items) => {
+onCopiesAdded((database, userId, collectionId, items, step) => {
+  // copies that come back by an undo were removed by hand: they kept their ties, so nothing is tied again
+  if (step === "undo") return;
   const opening = database.prepare("SELECT * FROM purchase_openings WHERE user_id = ? AND active = 1 AND collection_id = ?").get(userId, collectionId);
   if (!opening) return;
   for (const item of items) {
@@ -1298,10 +1403,10 @@ onCopiesMoved((database, from, to, quantity) => {
     if (take < Number(tie.quantity)) {
       database.prepare("UPDATE purchase_ties SET quantity = quantity - ? WHERE id = ?").run(take, Number(tie.id));
       database.prepare(
-        `INSERT INTO purchase_ties (user_id, entry_id, line_id, opening_id, collection_id, card_id, foil, condition, language, proxy, quantity, price, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO purchase_ties (user_id, entry_id, line_id, opening_id, collection_id, card_id, foil, condition, language, proxy, quantity, price, created_at, value_then)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       ).run(Number(tie.user_id), String(tie.entry_id), tie.line_id as string | null, tie.opening_id as string | null, to.collectionId, ...keyValues(to.key), take,
-        tie.price as number | null, String(tie.created_at));
+        tie.price as number | null, String(tie.created_at), tie.value_then as number | null);
     } else {
       database.prepare(`UPDATE purchase_ties SET collection_id = ?, card_id = ?, foil = ?, condition = ?, language = ?, proxy = ? WHERE id = ?`)
         .run(to.collectionId, ...keyValues(to.key), Number(tie.id));
@@ -1310,7 +1415,12 @@ onCopiesMoved((database, from, to, quantity) => {
   }
 });
 
-onCopiesLowered((database, userId, collectionId, items) => {
+/**
+ * Pulled cards stay on their pack (0.18.0): copies deleted from a collection keep their ties and show as Gone. Only an
+ * undo of adding them unties them (the card was scanned or added by mistake); the pack's entry page removes pulls by hand.
+ */
+onCopiesLowered((database, userId, collectionId, items, step) => {
+  if (step !== "undo") return;
   const opening = database.prepare("SELECT id FROM purchase_openings WHERE user_id = ? AND active = 1 AND collection_id = ?").get(userId, collectionId);
   if (!opening) return;
   for (const item of items) {

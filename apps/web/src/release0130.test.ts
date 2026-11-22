@@ -2,7 +2,8 @@
 // and the saved sort choices.
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { matchRank, plainWords, sortFound } from "./search-sort";
-import { DOUBLE_CLICK_MS, pickOrOpen } from "./components/PickOpen";
+import type { MouseEvent, PointerEvent } from "react";
+import { DOUBLE_TAP_MS, pickOrOpen } from "./components/PickOpen";
 import type { Card } from "./types";
 
 const card = (name: string, extra: Partial<Card> = {}): Card => ({
@@ -28,28 +29,47 @@ describe("search sorting in the browser", () => {
   });
 });
 
-describe("pick or open", () => {
+describe("pick or open (0.18.0)", () => {
   afterEach(() => vi.useRealTimers());
+  const click = (detail: number) => ({ detail }) as unknown as MouseEvent<Element>;
+  const down = (pointerType: string) => ({ pointerType }) as unknown as PointerEvent<Element>;
 
-  it("picks on one click and opens on a second click soon after, on the same row only", () => {
-    vi.useFakeTimers();
+  it("picks on a single click, opens only on a true double click, and a slow second click only picks", () => {
     const pick = vi.fn();
     const open = vi.fn();
     const a = pickOrOpen("row-a", pick, open);
-    const b = pickOrOpen("row-b", pick, open);
-    a.onClick();
+    a.onPointerDown(down("mouse"));
+    a.onClick(click(1));
     expect([pick.mock.calls.length, open.mock.calls.length]).toEqual([1, 0]);
+    a.onClick(click(1));
+    expect([pick.mock.calls.length, open.mock.calls.length]).toEqual([2, 0]);
+    a.onClick(click(2));
+    expect(open).toHaveBeenCalledTimes(1);
+  });
+
+  it("opens on one click in the Collection and Deck tabs", () => {
+    const pick = vi.fn();
+    const open = vi.fn();
+    pickOrOpen("row-a", pick, open, true).onClick(click(1));
+    expect([pick.mock.calls.length, open.mock.calls.length]).toEqual([0, 1]);
+  });
+
+  it("picks on a tap and opens on a double tap of the same row", () => {
+    vi.useFakeTimers();
+    const pick = vi.fn();
+    const open = vi.fn();
+    const a = pickOrOpen("row-t", pick, open);
+    const b = pickOrOpen("row-u", pick, open);
+    a.onPointerDown(down("touch"));
+    a.onClick(click(1));
     vi.advanceTimersByTime(100);
-    a.onClick();
+    a.onClick(click(1));
     expect(open).toHaveBeenCalledTimes(1);
-    b.onClick();
-    vi.advanceTimersByTime(100);
-    a.onClick();
+    b.onClick(click(1));
+    vi.advanceTimersByTime(DOUBLE_TAP_MS + 10);
+    b.onClick(click(1));
     expect(open).toHaveBeenCalledTimes(1);
-    vi.advanceTimersByTime(DOUBLE_CLICK_MS + 10);
-    a.onClick();
-    expect(open).toHaveBeenCalledTimes(1);
-    expect(pick).toHaveBeenCalledTimes(4);
+    expect(pick).toHaveBeenCalledTimes(3);
   });
 });
 

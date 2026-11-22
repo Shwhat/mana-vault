@@ -8,7 +8,7 @@ From top to bottom: the title bar with the menus, the mode tabs, the main area (
 
 ## Title bar and menus
 
-The title bar shows the program name, the server name when one is set in Administration, the **File**, **Edit**, **View** and **Help** menus, the name of the open deck, and the account menu on the right (your user name). An amber count beside your user name shows offers waiting in your Inbox. The account menu holds **Inbox...** (with the number waiting), **Change password...**, **Devices...**, **Administration...** (admins only, see [Administration](/about/administration)) and **Sign out**.
+The title bar shows the program name, the server name when one is set in Administration, the **File**, **Edit**, **View** and **Help** menus, the name of the open deck, and the account menu on the right (your user name). An amber count beside your user name shows offers waiting in your Inbox. The account menu holds **Inbox...** (with the number waiting), **Change password...**, **Devices...**, **Administration...** (admins only, see [Administration](/about/administration)), every workspace (such as Deck building workspace, checked when in use), **Save workspace...**, **Manage workspaces...**, **Reset panels** and **Sign out**.
 
 Click a menu to open it. While a menu is open, pointing at another menu opens that one. Each command shows its shortcut on the right, and a check mark shows a choice that is on. Esc or a click elsewhere closes the menu. A command that cannot be used right now is not shown.
 
@@ -16,7 +16,7 @@ Click a menu to open it. While a menu is open, pointing at another menu opens th
 |---|---|
 | File | New collection..., New deck..., Import..., Export..., Export purchase history... (Export purchases), New purchase..., New card sale... or Sell selected cards... when cards are picked in a collection (Sell), Scan card..., Download backup, Restore backup..., Update card database (Update database, admins only), Sign out |
 | Edit | Undo, Redo, Find, Select all cards, Clear filters |
-| View | Purchases view (Purchases); Light theme, Dark theme, System theme; Prices on pictures; Filters panel, Collections panel, Decks panel, Card panel, Deck list panel, Import review panel; every workspace (such as Deck building workspace); Save workspace..., Manage workspaces..., Reset panels |
+| View | Purchases view (Purchases); Light theme, Dark theme, System theme; Prices on pictures; Card layout...; Filters panel, Collections panel, Decks panel, Card panel, Deck list panel, Import review panel |
 | Help | Keyboard shortcuts, About Mana Vault |
 
 Undo and Redo show the change they will reverse or repeat, for example "Undo Add Sol Ring". **Import...** and **Export...** open the import and export windows; see [Import and export](/about/import-and-export).
@@ -112,8 +112,8 @@ The card page shows one card in full. It opens from **Card page** in a right-cli
 | Panel | Shows |
 |---|---|
 | Filters | Type, set code, color, rarity, legal format and mana value range filters for the open view (card search, collection, deck or a search inside them), with a Filtering line naming it, and **Clear filters** |
-| Collections | Your collections with card counts, values, completion bars and percentages, Wishlist and Shared badges, and **New...**. Click a collection once to make it where new cards go (it is highlighted and marked Adding here); double-click it to open it |
-| Decks | Every deck grouped by format (Commander, Standard and the other formats, Casual last, each heading with its number of decks), with its card count and value under its name and a Shared badge for shared decks, a box to find a deck by name or commander, and **New...**. Click a deck once to make it where new cards go (it is highlighted and marked Adding here); double-click it to open it |
+| Collections | Your collections with card counts, values, completion bars and percentages, Wishlist and Shared badges, and **New...**. In the Collection and Decks tabs one click opens a collection. Elsewhere, click it once to make it where new cards go (it is highlighted and marked Adding here) and double-click it to open it in the Collection tab |
+| Decks | Every deck grouped by format (Commander, Standard and the other formats, Casual last, each heading with its number of decks), with its card count and value under its name and a Shared badge for shared decks, a box to find a deck by name or commander, and **New...**. In the Collection and Decks tabs one click opens a deck. Elsewhere, click it once to make it where new cards go (it is highlighted and marked Adding here) and double-click it to open it in the Decks tab |
 | Card | The selected card: image, name (with FOIL, ETCHED or Upgrade wanted for the selected copy or deck card), type, the **Add to name** button for where cards go (it opens the printing chooser), **Add to wishlist**, **You get**, mana cost, mana value, rules text, set, number, rarity, artist, release date, flavor name, regular, foil and etched prices, copies owned of this printing (regular, foil and etched), of all printings and in each of your collections with the number for trade, and copies wanted in each wishlist |
 | Deck list | The open deck in compact form by zone, with FOIL, ETCHED, Upgrade wanted and Missing marks, plus and minus buttons, the deck card menu on right-click, and the All, Commander, Main, Sideboard and Maybe buttons: each shows only that zone and is where Add puts cards (All shows every zone and adds to Main) |
 | Import review | The rows skipped by the latest import or import preview, with row number, card name and reason, and **Clear** |
@@ -134,6 +134,8 @@ Panels sit in three dock areas (left, right and bottom) or float above the work 
 - The **x** on a tab closes the panel. The Panels list on the View tab opens and closes panels.
 
 ### Workspaces
+
+Workspaces are in the account menu (your name at the top right).
 
 A workspace is a saved panel layout and view. Three are built in:
 
@@ -175,7 +177,7 @@ Below 900 pixels wide, and always in the Android app, the title bar, menus, mode
 - In a collection, **Select several cards** in **Options** turns on checkboxes; tap rows to pick them and use the bar above the list to move or remove them.
 - Messages appear as a short banner above the tab bar.
 - Rows of tabs and buttons wrap onto more lines when they do not fit, instead of scrolling sideways.
-- On card pictures, the pip bar stays under the card: the count and marks on one line, and the price on its own line.
+- On card pictures, the pips and buttons follow the card layout (see Card layout below).
 
 Panels (including the Collections panel) and workspaces are desktop only; on the phone, switch collections and decks with the switcher at the top of the view, which opens as a full sheet. Choices made on one layout are kept for the other, except the collection layout and the search layout (Grid, Binder or List), which each layout remembers on its own.
 
@@ -197,3 +199,28 @@ Type groups are Creatures, Planeswalkers, Battles, Instants, Sorceries, Artifact
 ## Choice lists
 
 Every list of choices (in windows, Options, the Filters panel, the scanner and the deck) is the app's own list: click or tap the button showing the current choice, then the choice you want. Up and Down move through the list, Enter chooses and Esc closes it. Long lists have a **Find** box at the top. On a phone the list opens as a sheet with **Close**. In a window, Enter on a list button confirms the window.
+
+## Card layout
+
+**View, Card layout...** sets where the pips and buttons sit around every card picture. The window shows a sample card with its places:
+
+| Place | Where |
+|---|---|
+| Top left, Top right, Bottom left, Bottom right | On the corners of the picture |
+| Under the picture, left and right | One row under the picture |
+| Second line | A row under that |
+| Bottom | The last row of the card, lined up across a row of cards |
+| Hidden | Not shown |
+
+The things that can be placed:
+
+| Item | Holds |
+|---|---|
+| Count and Owned | The number of copies (such as 2x) or, in card search, OWNED with every copy you own (the tooltip splits it by finish) |
+| Printings | N printings in card search |
+| Finish and copy details | FOIL, ETCHED and special foils, condition, language, Proxy and the number for trade |
+| Status marks | Missing, Upgrade wanted, Owned and Other version owned, In deck, Printing removed, Custom |
+| Price | The price, when Prices on pictures is on |
+| Buttons | The add buttons (+ name, + Wishlist) or the print list count and Remove |
+
+Drag an item to a place, or click an item and then a place; dropping it on another item puts it before that one. **Same layout everywhere** (on by default) uses one layout for every section; turned off, a section choice (Card search, Collections, Decks, Trade, Proxies) sets each on its own, starting from the current layout. **Reset to default** puts the pips in one row under the picture with the price at its right and the buttons at the bottom. The layout is kept per account and used on every device.

@@ -1,4 +1,5 @@
 // ---------- library state: collections, row picking, bulk edits, decks admin and offers ----------
+import { packNote } from "./purchase-state";
 import { useCallback, useEffect, useRef, useState, type MutableRefObject } from "react";
 import { csvCell, downloadText, request, slugify } from "./api";
 import { choiceDialog, confirmDialog } from "./components/Dialog";
@@ -177,8 +178,10 @@ export function useLibraryState(deps: LibraryDeps) {
     const name = groups.size === 1 ? collectionName([...groups.keys()][0]!) : `${groups.size} collections`;
     const label = entries.length === 1 ? copyLabel(entries[0]!) : "";
     const what = entries.length === 1 ? `${entries[0]!.name}${label ? ` (${label.toLowerCase()})` : ""} (${cards} ${cards === 1 ? "card" : "cards"})` : `${entries.length} entries (${cards} cards)`;
+    // copies that came from a pack or purchase stay listed there (0.18.0): the question says so
+    const note = await packNote([...groups].flatMap(([target, rows]) => rows.map((entry) => ({ collectionId: target, ...copyKey(entry) }))));
     // several copies of a card can also be lowered to one instead of removed
-    const answer = await choiceDialog("Remove cards", <>Remove {what} from {name}?</>, [
+    const answer = await choiceDialog("Remove cards", <>Remove {what} from {name}?{note ? ` ${note}` : ""}</>, [
       ["all", "Remove all", true], ...(entries.some((entry) => entry.quantity > 1) ? [["one", "Reduce to 1"] as ["one", string]] : []),
     ]);
     if (!answer) return;

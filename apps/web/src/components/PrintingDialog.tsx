@@ -1,6 +1,6 @@
 // ---------- the printing chooser: every printing of a card, newest first, with a search box ----------
 import { LanguagePip, SetIcon } from "./CardMarks";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { request } from "../api";
 import type { ScanCard } from "../scan-state";
 import { type Currency, type FinishCode, finishLabel, money, priceOf } from "../types";
@@ -17,8 +17,45 @@ export const finishesOf = (printing: Pick<Printing, "finishes">): FinishCode[] =
 };
 const FINISH_LABEL: Record<FinishCode, string> = { 0: "Regular", 1: "Foil", 2: "Etched" };
 
-export function PrintingList({ cardId, currentId, finish, currency, onPick }: {
+/**
+ * The finish buttons of a card with only one printing (0.18.0): adding it needs no printing list, only the finish, such
+ * as Regular, Foil or Surge foil, each with its price.
+ */
+export function FinishChoice({ printing, currency, onPick, preferred = 0 }: { printing: Printing; currency: Currency; onPick: (finish: FinishCode) => void; preferred?: FinishCode }) {
+  const finishes = finishesOf(printing);
+  const focus = finishes.includes(preferred) ? preferred : finishes[0];
+  // the preferred finish takes the focus once the window has opened, so Enter adds it
+  const first = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    const timer = window.setTimeout(() => first.current?.focus(), 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+  const price = (code: FinishCode) => money(priceOf({
+    price_usd: printing.price_usd ?? null, price_usd_foil: printing.price_usd_foil ?? null, price_usd_etched: printing.price_usd_etched ?? null,
+  }, code, currency), currency);
+  return (
+    <div className="finishchoice">
+      <p className="note">{printing.name} has one printing: ({printing.set_code.toUpperCase()}) {printing.collector_number}, {printing.set_name}. Choose the finish.</p>
+      <div className="btnrow" role="group" aria-label="Finish">
+        {finishes.map((code) => (
+          <button key={code} ref={code === focus ? first : undefined} type="button" className={code === focus ? "btn primary" : "btn"} onClick={() => onPick(code)}>
+            {finishLabel(code, printing.promo_types)} <span className="muted">{price(code)}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** Asks only for the finish of a card with one printing. */
+export function chooseFinish(title: string, printing: Printing, currency: Currency, onPick: (finish: FinishCode) => void, preferred: FinishCode = 0) {
+  customDialog(title, (close) => <FinishChoice printing={printing} currency={currency} preferred={preferred} onPick={(finish) => { close(); onPick(finish); }} />, 460, "Cancel");
+}
+
+export function PrintingList({ cardId, currentId, finish, currency, onPick, single = false }: {
   cardId: string; currentId: string; finish: FinishCode; currency: Currency; onPick: (printing: Printing, finish: FinishCode) => void;
+  /** Adding a card (0.18.0): one printing in one finish is taken at once, one printing in several finishes asks only the finish. */
+  single?: boolean;
 }) {
   const [printings, setPrintings] = useState<Printing[] | null>(null);
   const [error, setError] = useState("");
@@ -35,8 +72,15 @@ export function PrintingList({ cardId, currentId, finish, currency, onPick }: {
     const text = `${card.set_name} ${card.set_code} ${card.collector_number} ${card.released_at ?? ""} ${(card as { lang?: string }).lang ?? ""}`.toLowerCase();
     return words.every((word) => text.includes(word));
   }), [printings, words]);
+  useEffect(() => {
+    if (single && printings?.length === 1 && finishesOf(printings[0]!).length === 1) onPick(printings[0]!, finishesOf(printings[0]!)[0]!);
+  }, [single, printings]); // eslint-disable-line react-hooks/exhaustive-deps
   if (error) return <p className="note err">{error}</p>;
   if (!printings) return <p className="note">Loading printings</p>;
+  if (single && printings.length === 1) {
+    const only = printings[0]!;
+    return finishesOf(only).length === 1 ? <p className="note">Adding</p> : <FinishChoice printing={only} currency={currency} preferred={finish} onPick={(code) => onPick(only, code)} />;
+  }
   const priceIn = (card: Printing, code: FinishCode) => money(priceOf({
     price_usd: card.price_usd ?? null, price_usd_foil: card.price_usd_foil ?? null, price_usd_etched: card.price_usd_etched ?? null,
   }, code, currency), currency);

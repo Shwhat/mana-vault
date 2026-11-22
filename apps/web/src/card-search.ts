@@ -18,6 +18,8 @@ export type CardSearch = {
   refresh: () => void;
   /** Changes the owned count shown on a printing, after copies are added or removed. */
   owned: (id: string, change: number) => void;
+  /** Loads the results already shown again in place (0.18.0), keeping the scroll position: owned counts changed elsewhere. */
+  reload: () => void;
 };
 
 export const SEARCH_PAGE = 60;
@@ -39,11 +41,14 @@ export function useCardSearch(filters: Filters, enabled: boolean, options: { gro
   const group = !!options.group;
   const currency = options.currency ?? "usd";
   const sort = options.sort ?? "best";
-  const state = useRef({ cards, total, loading, filters, group, currency, sort, generation: 0 });
+  // the search last completed: coming back to a view whose search did not change keeps its results (0.18.0)
+  const state = useRef({ cards, total, loading, filters, group, currency, sort, generation: 0, done: "" });
   state.current = { ...state.current, cards, total, loading, filters, group, currency, sort };
 
   useEffect(() => {
     if (!enabled) return;
+    const key = JSON.stringify([filters, group, currency, sort, round]);
+    if (state.current.done === key) return;
     const controller = new AbortController();
     const generation = ++state.current.generation;
     const timer = window.setTimeout(async () => {
@@ -54,6 +59,7 @@ export function useCardSearch(filters: Filters, enabled: boolean, options: { gro
         if (generation !== state.current.generation) return;
         setCards(page.cards);
         setTotal(page.total);
+        state.current.done = key;
       } catch (reason) {
         if (!controller.signal.aborted) {
           setCards([]);
@@ -90,6 +96,25 @@ export function useCardSearch(filters: Filters, enabled: boolean, options: { gro
   }, []);
 
   const refresh = useCallback(() => setRound((value) => value + 1), []);
+  const reload = useCallback(() => {
+    const current = state.current;
+    if (current.loading || !current.cards.length) return;
+    const generation = current.generation;
+    const count = Math.min(current.cards.length, 600);
+    void (async () => {
+      const found: FoundCard[] = [];
+      let total = current.total;
+      for (let offset = 0; offset < count; offset += 100) {
+        const page = await request<{ total: number; cards: FoundCard[] }>(`/api/cards?${searchParams(current.filters, offset, Math.min(100, count - offset), { group: current.group, currency: current.currency, sort: current.sort })}`);
+        found.push(...page.cards);
+        total = page.total;
+      }
+      if (generation !== state.current.generation) return;
+      const fresh = new Map(found.map((card) => [card.id, card]));
+      setCards((list) => list.map((card) => fresh.get(card.id) ?? card));
+      setTotal(total);
+    })().catch(() => undefined);
+  }, []);
   useEffect(() => {
     openSearches.add(refresh);
     return () => { openSearches.delete(refresh); };
@@ -103,6 +128,6 @@ export function useCardSearch(filters: Filters, enabled: boolean, options: { gro
       finishes[key] = Math.max(0, finishes[key] + change);
       return { ...card, owned: Math.max(0, (card.owned ?? 0) + change), ownedFinishes: finishes };
     })), []);
-  return { cards, total, loading, error, more, refresh, owned };
+  return { cards, total, loading, error, more, refresh, owned, reload };
 }
 

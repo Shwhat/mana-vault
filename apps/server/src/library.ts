@@ -1,5 +1,5 @@
 // ---------- library: collections, set completion, bulk edits, ownership and sending ----------
-import { copiesAdded, copiesLowered, copiesMoved } from "./copy-events.js";
+import { copiesAdded, copiesLowered, copiesMoved, undoStepOf } from "./copy-events.js";
 import { randomUUID } from "node:crypto";
 import type { FastifyInstance, FastifyReply } from "fastify";
 import type { DatabaseSync } from "node:sqlite";
@@ -522,7 +522,7 @@ export function registerLibraryRoutes(app: FastifyInstance, database: DatabaseSy
         ).run(id, ...keyValues(key), quantity, ...extraValues(extras), key.cardId);
         if (!result.changes) return null;
         touch(database, "collection", id);
-        copiesAdded(database, request.user?.id, id, [{ key, quantity }]);
+        copiesAdded(database, request.user?.id, id, [{ key, quantity }], undoStepOf(request.headers));
         return isWishlist(database, id) ? Object.assign([], { ask: [] }) as WishResult : lowerWishlists(database, userOf(request), [{ cardId: key.cardId, quantity, proxy: key.proxy }]);
       });
       if (!wishlist) return reply.code(404).send({ error: "Card printing not found" });
@@ -555,7 +555,7 @@ export function registerLibraryRoutes(app: FastifyInstance, database: DatabaseSy
         after.push({ ...key, quantity: Math.min(10_000, have + item.quantity), trade: Number(row?.trade ?? 0) });
       }
       touch(database, "collection", id);
-      copiesAdded(database, request.user?.id, id, after.map((item, index) => ({ key: item, quantity: item.quantity - before[index]!.quantity })));
+      copiesAdded(database, request.user?.id, id, after.map((item, index) => ({ key: item, quantity: item.quantity - before[index]!.quantity })), undoStepOf(request.headers));
       const lowered = wishlistTarget ? null : lowerWishlists(database, userOf(request),
         after.map((item, index) => ({ cardId: item.cardId, quantity: item.quantity - before[index]!.quantity, proxy: item.proxy })));
       return { before, after, wishlist: lowered ? [...lowered] : [], wishAsk: lowered?.ask ?? [] };
@@ -625,9 +625,9 @@ export function registerLibraryRoutes(app: FastifyInstance, database: DatabaseSy
       // copies that come back (undo of a lower count) take back the deck links removed with them
       for (const raised of changes.filter((change) => change.item.quantity > change.before)) relinkRemoved(database, id, raised.item);
       copiesLowered(database, request.user?.id, id, changes.filter((change) => change.item.quantity < change.before)
-        .map((change) => ({ key: change.item, quantity: change.before - change.item.quantity })));
+        .map((change) => ({ key: change.item, quantity: change.before - change.item.quantity })), undoStepOf(request.headers));
       copiesAdded(database, request.user?.id, id, changes.filter((change) => change.item.quantity > change.before)
-        .map((change) => ({ key: change.item, quantity: change.item.quantity - change.before })));
+        .map((change) => ({ key: change.item, quantity: change.item.quantity - change.before })), undoStepOf(request.headers));
       touch(database, "collection", id);
     });
     return { status: "saved", count: items.length };

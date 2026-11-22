@@ -1,6 +1,6 @@
 // ---------- state: the one place that holds the app's data and changes it ----------
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { csvCell, downloadBlob, fetchFile, downloadText, pickFile, request, slugify } from "./api";
+import { asUndo, csvCell, downloadBlob, fetchFile, downloadText, pickFile, request, slugify } from "./api";
 import { confirmDialog, dialog } from "./components/Dialog";
 import { activatePanel, clone, type Layout, openPanel, type PanelId, PRESETS, type Workspace } from "./dock";
 import { type Counts, entryKey, useLibraryState, type WishChange } from "./library-state";
@@ -97,6 +97,8 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
   live.current = { deck, collection, selection, prefs, collections, view, collectionTab, completion, collectionStats, deckStats, ownership, tradeList, deckTab, filterScope: live.current?.filterScope ?? "cards" };
 
   // ---------- preferences and layout ----------
+  /** Takes preferences changed on another device (0.18.0) without sending them back. */
+  const adoptPrefs = useCallback((change: Partial<Prefs>) => setPrefsState((current) => ({ ...current, ...change })), []);
   const setPrefs = useCallback((change: Partial<Prefs> | ((current: Prefs) => Partial<Prefs>)) => {
     setPrefsState((current) => {
       const delta = typeof change === "function" ? change(current) : change;
@@ -527,7 +529,7 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
       const entry = from[from.length - 1];
       if (!entry) return;
       try {
-        await (direction === "undo" ? entry.undo() : entry.redo());
+        await asUndo(direction, () => (direction === "undo" ? entry.undo() : entry.redo()));
         stacks.current = direction === "undo"
           ? { undo: stacks.current.undo.slice(0, -1), redo: [...stacks.current.redo, entry] }
           : { undo: [...stacks.current.undo, entry], redo: stacks.current.redo.slice(0, -1) };
@@ -1240,7 +1242,7 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
   }, [selection, cards, collection, deck, cardDetail]);
 
   return {
-    user, prefs, setPrefs, setLayout, showPanel, focusPanel,
+    user, prefs, setPrefs, adoptPrefs, setLayout, showPanel, focusPanel,
     view, setView, lastView, aboutSlug, openAbout, closeAbout, adminTab, setAdminTab, openAdmin, closeAdmin, serverName, pictureProgress,
     filters, setFilters, filtersActive, cards, loading, searchError, searchInput, search,
     ownedHooks, filterSets, filterScope, scopeFilters, setScopeFilters, clearFilters, tradeSide, setTradeSide,

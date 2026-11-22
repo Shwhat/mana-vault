@@ -1102,7 +1102,7 @@ ul.skipped{max-height:40vh;overflow:auto;margin:6px 0 0;padding-left:18px;font-s
 .admtable tr.off td { opacity: .6; }
 .admtable tr.warn td { color: var(--warn); }
 .admtable .badge { margin-left: 6px; }
-.admacts { white-space: nowrap; }
+.admacts { white-space: normal; }
 .admacts .btn { margin: 0 4px 4px 0; }
 .btnrow { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
 .pathtext { font-family: Consolas, monospace; font-size: 12px; word-break: break-all; }
@@ -1296,3 +1296,73 @@ input.setcode{width:60px}
 .frameauto{font-weight:600;font-size:13px;padding:30px 0 6px}
 .badge.indeck{background:#efe7fb;color:#4b2a86;border:1px solid #c7b4ea;cursor:pointer}
 :root[data-theme=dark] .badge.indeck{background:#36295a;color:#dccff7}
+
+/* 0.18.0: the center area never runs under the dock panels; wide pages scroll inside their own area */
+#center{overflow:hidden}
+.admpage{overflow-x:auto}
+.admtable td.admacts{min-width:150px}
+
+/* 0.18.0 card frame: a card picture with pips and buttons placed by the card layout */
+.cardframe{display:flex;flex-direction:column;gap:3px;min-width:0;height:100%}
+.cfpic{position:relative}
+.cfcorner{position:absolute;display:flex;flex-wrap:wrap;gap:3px;max-width:calc(100% - 8px);pointer-events:none;z-index:1}
+.cfcorner>*{pointer-events:auto}
+.cfcorner:empty{display:none}
+.cfcorner.tl{top:4px;left:4px}.cfcorner.tr{top:4px;right:4px;justify-content:flex-end}
+.cfcorner.bl{bottom:4px;left:4px}.cfcorner.br{bottom:4px;right:4px;justify-content:flex-end}
+.cfcorner .badge,.cfcorner .pricepip{font-size:10.5px;padding:1px 6px;line-height:15px;box-shadow:0 1px 3px rgba(0,0,0,.35);white-space:nowrap}
+.cfcorner .badge:not(.foil):not(.miss):not(.own):not(.upgrade){background:var(--panel2)}
+.cfrow{justify-content:space-between}
+.cfleft,.cfright{display:flex;flex-wrap:wrap;gap:3px;align-items:center}
+.cfright{margin-left:auto;justify-content:flex-end}
+.cfrow:has(> .cfleft:empty):has(> .cfright:empty){display:none}
+.cffull:empty,.cfbottom:empty{display:none}
+.cfbottom{margin-top:auto;display:flex;flex-direction:column;gap:3px}
+.binder .rescard .cfbottom{display:none}
+.binder .rescard.active .cfbottom{display:flex}
+/* the Card layout window */
+.cleditor .clsample{width:300px;margin:8px auto;display:flex;flex-direction:column;gap:4px}
+.clpicture{position:relative;aspect-ratio:63/70;border:1px solid var(--line);border-radius:8px;background:repeating-linear-gradient(135deg,var(--panel),var(--panel) 8px,var(--panel2) 8px,var(--panel2) 16px)}
+.clpicname{position:absolute;inset:0;display:grid;place-items:center;color:var(--muted);pointer-events:none}
+.clzone{min-height:30px;border:1px dashed var(--line);border-radius:4px;padding:3px;display:flex;flex-wrap:wrap;gap:3px;align-content:flex-start;background:var(--panel2)}
+.clzone.ready{border-color:var(--accent);cursor:pointer}
+.clzone.corner{position:absolute;width:44%;min-height:46px;z-index:1}
+.clzone.corner.tl{top:6px;left:6px}.clzone.corner.tr{top:6px;right:6px;justify-content:flex-end}
+.clzone.corner.bl{bottom:6px;left:6px}.clzone.corner.br{bottom:6px;right:6px;justify-content:flex-end}
+.clrow{display:flex;gap:4px}.clrow .clzone{flex:1}.clzone.right{justify-content:flex-end}
+.clhidden{display:flex;flex-direction:column;gap:4px;margin-top:6px}
+.clchip{font:inherit;font-size:11px;padding:2px 8px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--text);cursor:grab}
+.clchip.on{background:var(--accent-soft);border-color:#9dbbe9;color:var(--on-text);font-weight:600}
+.checkrow{display:flex;align-items:center;gap:6px;margin:4px 0 8px}
+/* 0.18.0: the opening the scanner adds to */
+.scanopening{position:absolute;left:10px;top:46px;margin:0;padding:4px 10px;border-radius:8px;background:rgba(31,95,191,.85);color:#fff;font-weight:600;font-size:12px;max-width:80%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;z-index:2}
+.finishchoice .btnrow{justify-content:flex-start}
+/* 0.18.0: purchase tables as a grid; every cell bordered, headers over their columns, numbers right aligned */
+.gridwrapper{overflow-x:auto;max-width:100%;border:1px solid var(--line);border-radius:4px}
+.dtable.grid{border-collapse:separate;border-spacing:0;width:100%;font-variant-numeric:tabular-nums}
+.gridwrapper>.dtable.grid{border:0}
+.dtable.grid th,.dtable.grid td{border-right:1px solid var(--line2);border-bottom:1px solid var(--line2);padding:5px 9px;text-align:left;vertical-align:middle}
+.dtable.grid th:last-child,.dtable.grid td:last-child{border-right:0}
+.dtable.grid tbody tr:last-child td{border-bottom:0}
+.dtable.grid thead th{position:sticky;top:0;z-index:1;background:var(--panel);font-weight:600;white-space:nowrap}
+.dtable.grid th.numcell,.dtable.grid td.numcell{text-align:right}
+.dtable.grid tbody tr:nth-child(even) td{background:color-mix(in srgb,var(--panel) 55%,var(--panel2))}
+.dtable.grid tbody tr:hover td{background:var(--hover)}
+.dtable.grid td .btnrow{margin:0;flex-wrap:nowrap}
+.dtable.grid .nowrap{white-space:nowrap}
+.dtable.grid tr.gonerow td{color:var(--muted)}
+.dtable.grid .setico{vertical-align:-3px;margin-right:4px}
+.openinghead{display:flex;flex-direction:column;gap:3px}
+.openfigs{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:var(--muted)}
+.openfigs b{color:var(--text);margin-left:4px}
+/* buttons under a card picture stay inside the card; a long name (such as an opening) is cut with an ellipsis */
+.resbtns{min-width:0}
+.resbtns .btn{min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dtable.grid td:not(:first-child){white-space:nowrap}
+.dtable.grid td .lnk{text-align:left;padding:0}
+.cleditor .clsample{width:340px}
+.clpicture{aspect-ratio:63/52}
+.clzone .clname{flex-basis:100%;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.3px;pointer-events:none}
+.clzone.right .clname,.clzone.corner.tr .clname,.clzone.corner.br .clname{text-align:right}
+.clzone.corner{min-height:40px}
+.dtable.grid td:first-child{min-width:150px}

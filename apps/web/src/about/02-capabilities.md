@@ -24,7 +24,7 @@ This page lists what Mana Vault does in the current version, followed by what is
 ### Collections
 
 - Keep any number of collections per account, each with a name and description. Every account starts with a Main collection.
-- Add any printing as a regular, foil or etched copy with Enter, a double-click or one add button that names where the card goes (+ name) and opens the printing chooser with the shown printing selected; a card with one printing and one finish is added at once.
+- Add any printing as a regular, foil or etched copy with Enter, a double-click or one add button that names where the card goes (+ name) and opens the printing chooser with the shown printing selected; a card with one printing skips the printing chooser: with one finish it is added at once, with more only the finish is asked.
 - See where cards go: an Adding here mark in the Collections and Decks panels, and ADDING TO in the status bar, which switches between the open deck and the target collection. Cycle the collections with C.
 - See one picture per printing in Grid and Binder, with a pip bar under the picture for the count, FOIL or ETCHED, condition, language, Proxy and the number for trade, so the pips never cover the card. A printing held as more than one kind of copy gets a line under the picture for each, with its pips and count. Card pictures show no prices; the List layout has them.
 - Change the printing or finish of all or some copies (such as one of two copies to the foil version), keeping their count, condition, language, trade marks and details, and choose whether the decks they fill change too or keep their version.
@@ -34,7 +34,7 @@ This page lists what Mana Vault does in the current version, followed by what is
 - Sort entries by name, mana value, price, rarity, color, quantity, or set and number, and group the List layout by type, subtype, rarity, color, color identity, mana value, set or artist, with headings that fold.
 - Narrow the list with filter tags by clicking a set code or rarity on an entry, or a bar in Statistics.
 - Show a collection as a grid of card pictures that loads more while scrolling (Small, Medium or Large), as binder pages of nine cards with a page box, or as a list. Each device type remembers its own layout.
-- Open collections from a switcher with search, five sort orders and the keyboard. One click on a collection in the Collections panel or the switcher makes it where new cards go; a double click opens it.
+- Open collections from a switcher with search, five sort orders and the keyboard. In the Collection tab one click on a collection in the switcher or the Collections panel opens it; elsewhere one click in the panel makes it where new cards go and a double click opens it.
 - All collections, the first entry of the switcher, lists every entry of every collection with its collection, wishlists included when chosen in Options. Edits act on each entry's own collection.
 - Filters, tags and the filter box stay when another collection opens.
 - Show statistics: mana curve, colors, types, rarity, finish, top sets by value, average and median prices.
@@ -73,7 +73,7 @@ This page lists what Mana Vault does in the current version, followed by what is
 ### Decks
 
 - Create decks with a name and one of 21 formats; every deck keeps the printing of each card.
-- Open decks from a switcher with search, six sort orders, cover card, commander, format and card count. One click on a deck in the Decks panel or the switcher makes it where new cards go; a double click opens it.
+- Open decks from a switcher with search, six sort orders, cover card, commander, format and card count. In the Decks tab one click on a deck in the switcher or the Decks panel opens it; elsewhere one click in the panel makes it where new cards go and a double click opens it.
 - Change the printing or finish of all or some of a deck card's cards: free copies of the new printing in that finish are linked, from the collection you choose when several have them.
 - Keep a finish for every deck card (regular, foil or etched), shown as FOIL or ETCHED in every deck view, the Deck list panel and the Card panel, used for its price, set by `*F*` and `*E*` marks, Add as foil, Add as, linked copies and Change printing. A regular and a foil card of the same printing are separate deck cards.
 - Link lines of Edit as text and decklist imports that name a set and number to free copies of exactly that printing and finish; lines without them stay missing until linked. Link owned copies fills every missing card from exact copies.
@@ -154,7 +154,7 @@ This page lists what Mana Vault does in the current version, followed by what is
 - Admins: first-run Setup, and Administration with Accounts, Sign-up, Card database, Pictures, Storage and backups, Devices, Security, Server and Activity. Settings set by environment variables are locked and say which variable sets them.
 - Change your password, which signs out your other devices and phones.
 - See the phones signed in to your account in Devices..., and remove any of them.
-- Keep theme, panel layout, workspace, where new cards go, open collection and proxy sheet choices per account.
+- Keep theme, panel layout, workspace, card layout, where new cards go, open collection and proxy sheet choices per account. Theme, card layout, list groupings, sorts, scanner settings, the proxy sheet and saved workspaces follow the account to other devices at once.
 
 ### Interface
 
@@ -177,6 +177,13 @@ This page lists what Mana Vault does in the current version, followed by what is
 - Notifications for new offers in the Inbox, checked in the background about every 15 minutes, optionally only on Wi-Fi.
 - The Back button, the Android share sheet for exports and backups, sharing lists into the app to import them and pictures or PDFs to read as receipts, background sync as soon as the phone is online, https only, and a daily check of your server for a newer app.
 
+### 0.18.0 additions
+
+- Purchases: pulled cards stay on their pack until removed there with **Remove from pack...**, which keeps or deletes the card; deleted copies stay listed as Gone; each pack shows Value when pulled (fixed), Pulled value and Value now; the entry tables are grids with Finish, Value when pulled and State columns.
+- An opening started on the web page is picked up by the phone: the scanner scans into it, the open app asks to start scanning, and the background check shows Opening started with Start scanning.
+- Workspaces in the account menu.
+- The search, its results and its scroll position are kept when switching tabs.
+
 ### 0.17.0 additions
 
 - Purchases: single cards found by search with pictures and every printing, scanned into the purchase, or taken from the scanned list; a searchable set list; receipts read from a photo, PDF or screenshot and kept with the entry; places shared on the server, editable by every account, merged and deleted by admins; who paid shipping on each sale; trade entries with Gave, Got, Net and Original cost; opening buttons Add cards, Scan, Add existing copies... and Done opening.
@@ -191,6 +198,8 @@ This page lists what Mana Vault does in the current version, followed by what is
 ### 0.15.0 additions
 
 - A pip bar under every card picture (above each picture in deck Stacks) holds all the pips, so nothing covers the card.
+- Card layout (View menu): drag the count, printings, finish, status marks, price and buttons to the corners of the picture, the row under it (left or right), a second line or the bottom, or hide them; one layout for every section or one per section (Card search, Collections, Decks, Trade, Proxies).
+- Live updates: changes made in the app, on another device or by someone sharing a collection or deck show on open pages within a second or two, without reloading.
 - In the Android app one tap opens a collection or deck.
 - Custom sets have a right-click menu (Edit set..., Show its cards, New card in this set, Delete...); Edit set changes the name, code, release date and symbol, with undo. Set symbols can be SVG, a Scryfall set symbol or a picture, drawn in rarity colors.
 - One Symbols window in the card maker puts symbols at the cursor of the mana cost or rules text, with Scryfall's full symbol list and names.
@@ -215,4 +224,4 @@ These are part of the release plan and are not available yet.
 
 | Version | Planned features |
 |---|---|
-| Later | Windows, Linux and other installs besides Docker; a built-in demo collection; instant notifications; more than one server or account in the Android app; sharing files into the Android app |
+| Later | Windows, Linux and other installs besides Docker; a built-in demo collection; instant notifications while the Android app is closed; more than one server or account in the Android app |

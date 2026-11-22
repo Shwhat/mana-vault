@@ -39,10 +39,16 @@ export type EntrySale = {
 export type EntryTie = {
   id: number; cardId: string; name: string; setCode: string; collectorNumber: string; imageUrl: string | null; foil: number; condition: string; language: string;
   proxy: boolean; collectionId: string; quantity: number; held: number; price: number | null; lineId: string | null; openingId: string | null; tradePrice: number | null;
+  /** The price on the day the card was added (0.18.0), fixed. */
+  valueThen: number | null;
+  /** The copies no longer held: sold, traded, or gone (removed from the collection). */
+  sold: number; traded: number; gone: number;
 };
 export type EntryOpening = {
   id: string; lineId: string; count: number; name: string; collectionId: string | null; active: boolean; createdAt: string; doneAt: string | null;
   cards: number; valuePulled: number; perPack: number; packs: number;
+  /** 0.18.0: the pulls still held at today's prices, every pull at its price the day it was added, and how many are gone. */
+  valueNow: number; valueWhenPulled: number; whenPulledUnpriced: number; gone: number;
 };
 export type Entry = Omit<EntrySummary, "sets" | "products"> & {
   tax: number; shipping: number; fees: number; cashOut: number; cashIn: number; tradeId: string | null; pulledIncome: number;
@@ -92,4 +98,20 @@ export function useActiveOpening(): Opening | null {
 export function openOpeningEntry(store: { setView: (view: "purchases") => void }, entryId: string) {
   store.setView("purchases");
   window.setTimeout(() => window.dispatchEvent(new CustomEvent("mana-vault:purchases", { detail: entryId })), 0);
+}
+
+/**
+ * The note for a remove question (0.18.0) when copies came from a pack or purchase: they stay listed there, marked Gone.
+ * Empty when none of the copies is tied to a purchase.
+ */
+export async function packNote(items: Array<{ collectionId: string; cardId: string; foil: number; condition: string; language: string; proxy?: boolean }>): Promise<string> {
+  if (!items.length) return "";
+  try {
+    const { packs } = await request<{ packs: Array<{ name: string; quantity: number }> }>("/api/purchases/ties/packs", { method: "POST", body: JSON.stringify({ items }) });
+    if (!packs.length) return "";
+    const parts = packs.map((pack) => `${pack.quantity} ${pack.quantity === 1 ? "card came" : "cards came"} from ${pack.name}`);
+    return `${parts.join("; ")}. ${packs.length === 1 && packs[0]!.quantity === 1 ? "It stays" : "They stay"} listed on ${packs.length === 1 ? "that pack" : "those packs"}.`;
+  } catch {
+    return "";
+  }
 }

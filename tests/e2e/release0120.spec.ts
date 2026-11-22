@@ -116,7 +116,9 @@ test("card search groups printings, adding opens the chooser, and the collection
   await bolt.getByRole("button", { name: "Add Lightning Bolt to Main collection" }).click();
   await page.locator("dialog[open]").getByRole("button", { name: "Foil M10 146" }).click();
   await expect(status(page)).toHaveText("Lightning Bolt (foil) added to Main collection");
-  await expect(bolt.locator(".pipbar .pipgroup")).toHaveText("OWNED 1FOIL 1");
+  // 0.18.0: one OWNED pip counts every finish; its tooltip splits them
+  await expect(bolt.locator(".pipbar .badge.own")).toHaveText("OWNED 2");
+  await expect(bolt.locator(".pipbar .badge.own")).toHaveAttribute("title", "Owned: Regular 1, Foil 1");
   await expect(bolt.locator(".pocket .badge")).toHaveCount(0);
 
   // the collection grid shows one picture with pips and a line per finish with pips and counts, no prices

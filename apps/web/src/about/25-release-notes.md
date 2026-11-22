@@ -2,6 +2,21 @@
 
 The installed version is shown at the top of this guide.
 
+## 0.18.0 (2026-11-22): Card layout, live updates, scanning into an opening and pulls that stay on their pack
+
+- Card layout (View menu): drag the count, printings, finish, status marks, price and buttons to the corners of a card picture, the row under it, a second line or the bottom, or hide them. One layout for every section, or one per section (Card search, Collections, Decks, Trade, Proxies). By default the pips sit in one row with the price at its right and the buttons line up at the bottom of every card.
+- Card search pictures show one OWNED pip with every copy you own; the separate FOIL and ETCHED counts are gone (the tooltip still splits them by finish).
+- Live updates: changes made in the app, on another device or by someone sharing a collection or deck show on open pages within a second or two, without reloading. Theme, card layout, groupings, sorts, scanner settings, the proxy sheet and saved workspaces follow the account at once.
+- Opening a pack on the web page and scanning on the phone: the phone's scanner shows Scanning into: name and fills in the opening's collection; the open app asks to start scanning; the background check shows Opening started with Start scanning.
+- Purchases: a card added to a pack stays on it until **Remove from pack...** on the entry page, which keeps or deletes the card. A copy deleted from its collection stays listed as Gone, and the remove question says which pack it came from. Only an undo of adding a card takes it off the pack.
+- Purchases: each pack shows Value when pulled (the price on the day each card was added, fixed), Pulled value (every pull at today's price) and Value now (the pulls still held). Single cards show their price when added. Ties from before 0.18.0 take their Value when pulled from the price history.
+- Purchases: the entry tables and the history are grids with bordered cells, a heading row that stays in view, numbers right aligned and Finish, Value when pulled and State columns.
+- Clicks: in the Collection and Decks tabs one click in the switcher or the panels opens a collection or deck. In Search and the other tabs one click picks it as where cards go and only a true double click (or a double tap) opens it. Coming back to Search keeps the search, the results and the scroll position.
+- A card with one printing skips the printing chooser: one finish adds it at once, more ask only for the finish.
+- Workspaces moved from the View menu to the account menu.
+- Fixed: Administration's account rows ran under the right side panel; the page now scrolls inside its own area and the buttons wrap.
+- Fixed: a single card bought in a purchase showed In collection after it was deleted; its State now says where it is.
+
 ## 0.17.1 (2026-11-22): Backups marked with the app version
 
 - Account backups are marked with the Mana Vault version that made them, instead of a separate backup number. A server restores backups from its own version and earlier, and refuses a backup from a newer version with "This backup was made by Mana Vault X. Update this server (Y) to X or later to restore it."

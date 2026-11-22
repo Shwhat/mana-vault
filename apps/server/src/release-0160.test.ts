@@ -34,8 +34,14 @@ describe("purchases", () => {
     // value now: 3 sealed packs at their cost (5.5 each) + the bundle (11) + 2 x 1 + 4 x 1 + 1 foil x 2
     expect(full.value).toBe(16.5 + 11 + 2 + 4 + 2);
     expect(full.openings[0]).toMatchObject({ cards: 7, valuePulled: 8, perPack: 2.67, active: true });
-    // lowering a count (undo of an add) unties the cards
+    // 0.18.0: removing a pulled card keeps it on the pack (Gone); only an undo of the add unties it
     await call("PUT", `/api/collections/${main}/cards`, { items: [{ ...copy("is1", 3) }] });
+    full = (await call("GET", `/api/purchases/${entry.id}`)).json();
+    expect(full.ties.find((tie: { cardId: string }) => tie.cardId === "is1")).toMatchObject({ quantity: 4, held: 3, gone: 1 });
+    await call("PUT", `/api/collections/${main}/cards`, { items: [{ ...copy("is1", 4) }] }, { "x-mana-vault-undo": "undo" });
+    full = (await call("GET", `/api/purchases/${entry.id}`)).json();
+    expect(full.ties.filter((tie: { cardId: string }) => tie.cardId === "is1").map((tie: { quantity: number; held: number }) => [tie.quantity, tie.held])).toEqual([[4, 4]]);
+    await call("PUT", `/api/collections/${main}/cards`, { items: [{ ...copy("is1", 3) }] }, { "x-mana-vault-undo": "undo" });
     full = (await call("GET", `/api/purchases/${entry.id}`)).json();
     expect(full.ties.find((tie: { cardId: string }) => tie.cardId === "is1").quantity).toBe(3);
     // Done opening: later cards are not tied

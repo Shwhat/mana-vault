@@ -96,9 +96,19 @@ Messages appear at the right end of the status bar (on the phone, in a banner ab
 | N of M Card name changed to (SET) number | Change printing for some of a card's copies |
 | Card name is now (SET) number, decks kept their version | Change printing of copies in a deck, answered No, show it as missing |
 | Card name reduced to 1 copy, N entries reduced to 1 copy each | Reduce to 1 |
-| Adding to name | Clicking ADDING TO in the status bar, or one click on a collection or deck in a panel or switcher |
+| Adding to name | Clicking ADDING TO in the status bar, or one click on a collection or deck in a panel outside the Collection and Decks tabs |
+| Scanning into name | Scan on an opening, Start scanning, or a tapped Opening started notification |
+| Card name removed from the pack, Card name removed from the entry | Remove from pack..., Remove from pack, keep the card |
+| Card name removed from the pack and deleted | Remove from pack..., Remove from pack and delete the card |
 | N cards added to name, N linked to the deck | Add deck to collection |
 | The deck is not missing any cards | Add deck to collection with Missing cards only when nothing is missing |
+
+## Questions
+
+| Question | Asked by | Choices |
+|---|---|---|
+| Remove Card name? N card came from pack name. It stays listed on that pack. | Removing one copy that came from a pack or purchase | Remove, Cancel |
+| Remove Card name from this pack? | Remove from pack... | Remove from pack, keep the card; Remove from pack and delete the card (while copies are held); Cancel |
 
 ## Problems shown by Mana Vault
 
@@ -161,6 +171,9 @@ Messages appear at the right end of the status bar (on the phone, in a banner ab
 | Enter a number from 1 to N | How many to remove, or Link copies, with a number outside the copies there are | Enter a number in range |
 | No free copies of the missing cards' exact printings are in your collections | Link owned copies with nothing to link | Add the copies, or use Other version owned |
 | No other version of card is free in your collections | Switch to the version owned with no free copy of another version | Add a copy first |
+| No opening is active | Start scanning or a tapped Opening started notification after the opening was ended | Start a new opening from its purchase |
+| Remove Card name again from the pack page | Redo of Remove from pack... | Use Remove from pack... on the entry page again |
+| Could not remove the card. | Remove from pack... failed | Check the connection and try again |
 | Could not copy to the clipboard | The browser refused clipboard access | Allow clipboard access for the site, or use a secure (HTTPS) address |
 | Could not action. | The action failed and the server gave no reason, often because the server could not be reached | Check the connection and try again |
 
@@ -222,6 +235,8 @@ Messages appear at the right end of the status bar (on the phone, in a banner ab
 | Only a copied or transferred collection can be merged | Merging a share |
 | Only the owner can stop sharing with someone | Removing another person from an item shared with you |
 | Choose a supported deck format | The format is not in the list |
+| Send the card to put back | An undo of Remove from pack... sent an incomplete card; reload the page |
+| That card is not tied to your purchases | Remove from pack... on a card already removed on another device; the page reloads with the change |
 | Each card needs a cardId, a finish, a known condition and language, and a quantity from 0 (or 1) to 10,000 | A collection change was sent with a value Mana Vault does not know; reload the page |
 | The number for trade must be a whole number from 0 to the quantity | A number for trade above the count; reload the page |
 | A collection is either a collection or a wishlist | The collection kind was not recognized; reload the page |
@@ -272,6 +287,8 @@ These reasons appear in the import preview and the Import review panel.
 | That card is not on this phone. | A card missing from the phone's card list was added offline | Update the card list by syncing, or add the card online |
 | That card is not in the deck. | A deck card changed offline was already removed | None |
 | Notifications on, Notifications off | Notifications... | None |
+| Opening started: name was opened on another device. Start scanning the cards into it? | An opening was started on the web page or another phone while the app is open | Start scanning opens the scanner on it; Cancel leaves it |
+| Opening started (notification) | The background check found an opening started on another device | Tap it, or Start scanning, to open the scanner on it |
 | Notifications are not allowed for Mana Vault in the Android settings. | Android refused notification permission | Allow notifications for Mana Vault in the Android settings, then turn them on again |
 | Update available | A newer app is on GitHub | Open the download page and install it |
 | This phone has the newest version (N). | Check for updates... found nothing newer | None |

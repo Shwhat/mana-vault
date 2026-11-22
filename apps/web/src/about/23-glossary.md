@@ -2,6 +2,11 @@
 
 | Term | Meaning in Mana Vault |
 |---|---|
+| Card layout | Where the pips and buttons sit around card pictures, set in View, Card layout... |
+| Gone | A card pulled from a pack or bought that is no longer in its collection and was not sold or traded; it stays listed on its pack |
+| Live updates | Changes made on another device or by someone sharing a collection or deck, shown on open pages at once |
+| Pulled value | Every card pulled from an opening at today's price, held or not |
+| Value when pulled | Every card pulled from an opening at its price on the day it was added; it never changes |
 | Card | A card by name, such as Lightning Bolt, across all its printings |
 | Printing | One version of a card in one set, with its own set code, collector number, rarity and artwork |
 | Card database | The local catalog of every printing, downloaded from Scryfall |

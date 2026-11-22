@@ -37,9 +37,9 @@ export async function server(seedCards = seed) {
   const signUp = async (name: string) => {
     const response = await app.inject({ method: "POST", url: "/api/signup", headers: guard, payload: { name, password: "correct horse" } });
     const cookie = String(response.headers["set-cookie"]).split(";")[0]!;
-    return (method: string, url: string, payload?: unknown) => app.inject({
+    return (method: string, url: string, payload?: unknown, headers: Record<string, string> = {}) => app.inject({
       method: method as "GET", url,
-      headers: { ...(method === "GET" ? {} : guard), cookie, ...(typeof payload === "string" ? { "content-type": "text/plain" } : {}) },
+      headers: { ...(method === "GET" ? {} : guard), cookie, ...(typeof payload === "string" ? { "content-type": "text/plain" } : {}), ...headers },
       ...(payload !== undefined ? { payload: payload as object } : {}),
     });
   };

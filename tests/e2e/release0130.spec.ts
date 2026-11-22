@@ -34,15 +34,13 @@ test("one click picks where cards go without leaving card search; a double click
   await decks.locator(".navitem", { hasText: "Burn" }).dblclick();
   await expect(page.locator("#view-deck .switcher")).toContainText("Burn");
 
-  // in the switcher one click marks the collection and keeps the list open; a double click opens it
+  // 0.18.0: in the switcher one click opens the collection
   await page.keyboard.press("2");
   await page.locator("#view-collection .switcher").click();
   const row = page.locator(".swrow", { hasText: "Main collection" });
   await row.click();
-  await expect(page.locator(".swpop")).toBeVisible();
-  await expect(row.locator(".target-mark")).toHaveText("Adding here");
-  await row.dblclick();
   await expect(page.locator(".swpop")).toHaveCount(0);
+  await expect(page.locator("#view-collection .switcher")).toContainText("Main collection");
 
   // Ctrl+N no longer opens New deck
   await page.keyboard.press("1");

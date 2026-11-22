@@ -1,4 +1,5 @@
 // ---------- Purchases: the summary with its chart, the history of every entry, and one entry in full ----------
+import { PURCHASES_CHANGED } from "../live";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { downloadBlob, fetchFile, request } from "../api";
 import { isApp } from "../android/platform";
@@ -11,7 +12,7 @@ import {
   entryDialog, fromPricesDialog, keepReceipt, openDialog, pickReceipt, placesDialog, purchaseFromReceipt, removeReceipt, type SaleCopy, tieCopiesDialog, useProductOptions, valueDialog,
 } from "../components/PurchaseDialogs";
 import {
-  type ChartPoint, type Entry, type EntryKind, type EntrySummary, KIND_LABELS, type PurchaseList, reloadOpening, setActiveOpening, useActiveOpening,
+  type ChartPoint, type Entry, type EntryKind, type EntryTie, type EntrySummary, KIND_LABELS, type PurchaseList, reloadOpening, setActiveOpening, useActiveOpening,
 } from "../purchase-state";
 import { type Store, useApp } from "../store";
 import { copyPrice, type Currency, money } from "../types";
@@ -100,7 +101,7 @@ function SpendChart({ currency }: { currency: Currency }) {
         <button type="button" className="btn small" onClick={() => setTable(!table)}>{table ? "Show chart" : "Show table"}</button>
       </div>
       {table ? (
-        <table className="phtable">
+        <table className="phtable dtable grid">
           <thead><tr><th>Date</th><th>Spent</th><th>Value</th></tr></thead>
           <tbody>{[...points].reverse().map((item) => <tr key={item.date}><td>{item.date}</td><td>{money(item.spent, currency)}</td><td>{money(item.value, currency)}</td></tr>)}</tbody>
         </table>
@@ -183,7 +184,7 @@ function History({ list, currency, onOpen }: { list: PurchaseList; currency: Cur
         <input aria-label="To date" type="date" value={to} onChange={(event) => setTo(event.target.value)} />
         <Picker label="Sort" value={sort} options={choices(SORTS)} onChange={setSort} />
       </div>
-      <table className="dtable ptable">
+      <table className="dtable ptable grid">
         <thead><tr><th>Date</th><th>Kind</th><th>Description</th><th>Place</th><th className="numcell">Money out</th><th className="numcell">Money in</th><th className="numcell">Value now</th><th className="numcell">Gain or loss</th></tr></thead>
         <tbody>
           {!shown.length && <tr><td colSpan={8} className="sub">{list.entries.length ? "No entries match" : "No entries yet. Use New entry to record a purchase, a sale or a trade."}</td></tr>}
@@ -218,6 +219,12 @@ function EntryPage({ id, list, onClose, onChanged }: { id: string; list: Purchas
     }
   }, [id]);
   useEffect(() => { void load(); }, [load]);
+  // a change made on another device (0.18.0) loads the entry again
+  useEffect(() => {
+    const reload = () => void load();
+    window.addEventListener(PURCHASES_CHANGED, reload);
+    return () => window.removeEventListener(PURCHASES_CHANGED, reload);
+  }, [load]);
   if (error) return <p className="note err">{error}</p>;
   if (!entry) return <p className="note">Loading the entry</p>;
   const currency = entry.currency;
@@ -253,18 +260,37 @@ function EntryPage({ id, list, onClose, onChanged }: { id: string; list: Purchas
       store.fail(reason, "Could not change the opening.");
     }
   };
-  const untie = async (tieId: number, name: string) => {
+  /**
+   * Remove from pack (0.18.0): the only way a card leaves the pack or purchase it came from. The person chooses to keep the
+   * card in the collection or to delete it too. Both can be undone.
+   */
+  const removeFromPack = async (row: EntryTie) => {
+    const where = entry.kind === "purchase" && row.openingId ? "pack" : "entry";
+    const answer = await choiceDialog(`Remove ${row.name} from this ${where}`, (
+      <>Remove {row.quantity > 1 ? `${row.quantity} copies of ${row.name}` : row.name} from this {where}?{row.held ? ` ${row.held === 1 ? "The card is" : `${row.held} copies are`} still in the collection.` : ""}</>
+    ), [["keep", "Remove from pack, keep the card", true], ...(row.held ? [["delete", "Remove from pack and delete the card"] as ["delete", string]] : [])]);
+    if (!answer) return;
     try {
-      const { tie } = await request<{ tie: { openingId: string | null } & Record<string, unknown> }>(`/api/purchases/ties/${tieId}`, { method: "DELETE" });
+      const { tie, held, have } = await request<{ tie: Record<string, unknown> & { collectionId: string }; held: number; have: number }>(`/api/purchases/ties/${row.id}`, { method: "DELETE" });
+      const key = { cardId: row.cardId, foil: row.foil, condition: row.condition, language: row.language, proxy: row.proxy };
+      const counts = (quantity: number) => request(`/api/collections/${encodeURIComponent(tie.collectionId)}/cards`, { method: "PUT", body: JSON.stringify({ items: [{ ...key, quantity }] }) });
+      const deleting = answer === "delete" && held > 0;
+      if (deleting) await counts(Math.max(0, have - held));
       store.pushUndo({
-        label: `Untie ${name}`,
-        undo: async () => { if (tie.openingId) await request(`/api/purchases/openings/${tie.openingId}/ties`, { method: "POST", body: JSON.stringify({ items: [tie] }) }); changed(); },
-        redo: async () => { store.flash("Untie the card again from its entry", "err"); },
+        label: deleting ? `Remove ${row.name} from the ${where} and delete it` : `Remove ${row.name} from the ${where}`,
+        undo: async () => {
+          if (deleting) await counts(have);
+          await request("/api/purchases/ties/restore", { method: "POST", body: JSON.stringify({ tie }) });
+          changed();
+          await store.refreshAfterChange();
+        },
+        redo: async () => { store.flash(`Remove ${row.name} again from the ${where} page`, "err"); },
       });
       changed();
-      store.flash(`${name} untied`);
+      await store.refreshAfterChange();
+      store.flash(deleting ? `${row.name} removed from the ${where} and deleted` : `${row.name} removed from the ${where}`);
     } catch (reason) {
-      store.fail(reason, "Could not untie the card.");
+      store.fail(reason, "Could not remove the card.");
     }
   };
   const addReceipt = async () => {
@@ -337,7 +363,7 @@ function EntryPage({ id, list, onClose, onChanged }: { id: string; list: Purchas
       {entry.lines.length > 0 && (
         <section>
           <h4>Products</h4>
-          <table className="dtable">
+          <div className="gridwrapper"><table className="dtable grid">
             <thead><tr><th>Product</th><th>Set</th><th className="numcell">Quantity</th><th className="numcell">Full cost</th><th>State</th><th className="numcell">Value each</th><th /></tr></thead>
             <tbody>
               {entry.lines.map((line) => (
@@ -346,8 +372,8 @@ function EntryPage({ id, list, onClose, onChanged }: { id: string; list: Purchas
                   <td>{line.setCode && <><SetIcon code={line.setCode} />{line.setCode.toUpperCase()}</>}</td>
                   <td className="numcell">{line.quantity}</td>
                   <td className="numcell">{money(line.full, currency)}</td>
-                  <td>{line.product === "single" ? "In collection" : [line.sealed ? `${line.sealed} sealed` : "", line.opened ? `${line.opened} opened` : "", line.sold ? `${line.sold} sold` : ""].filter(Boolean).join(", ")}</td>
-                  <td className="numcell">{line.product === "single" ? "" : <>{money(line.sealedValue, currency)}{line.valueDate ? <span className="sub"> ({line.valueDate})</span> : <span className="sub"> (cost)</span>}</>}</td>
+                  <td>{line.product === "single" ? stateOf(entry.ties.filter((tie) => tie.lineId === line.id)) : [line.sealed ? `${line.sealed} sealed` : "", line.opened ? `${line.opened} opened` : "", line.sold ? `${line.sold} sold` : ""].filter(Boolean).join(", ")}</td>
+                  <td className="numcell">{line.product === "single" ? valueThenOf(entry.ties.filter((tie) => tie.lineId === line.id), currency) : <>{money(line.sealedValue, currency)}{line.valueDate ? <span className="sub"> ({line.valueDate})</span> : <span className="sub"> (cost)</span>}</>}</td>
                   <td>{line.product !== "single" && line.sealed > 0 && <span className="btnrow">
                     <button type="button" className="btn small" onClick={() => openDialog(store, entry, line, changed)}>Open...</button>
                     <button type="button" className="btn small" onClick={() => valueDialog(store, entry, line, changed)}>Set current value...</button>
@@ -355,7 +381,7 @@ function EntryPage({ id, list, onClose, onChanged }: { id: string; list: Purchas
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         </section>
       )}
       {entry.openings.length > 0 && (
@@ -363,7 +389,13 @@ function EntryPage({ id, list, onClose, onChanged }: { id: string; list: Purchas
           <h4>Openings</h4>
           {entry.openings.map((opening) => (
             <div key={opening.id} className="wsrow">
-              <span><b>{opening.name}</b> <span className="sub">{opening.cards} cards, {money(opening.valuePulled, currency)} pulled, {money(opening.perPack, currency)} per pack</span></span>
+              <span className="openinghead"><b>{opening.name}</b> <span className="sub">{opening.cards} cards{opening.gone ? `, ${opening.gone} gone` : ""}, {money(opening.perPack, currency)} per pack</span>
+                <span className="openfigs">
+                  <span title="Every pull at its price on the day it was added. This figure does not change.">Value when pulled <b>{money(opening.valueWhenPulled, currency)}</b></span>
+                  <span title="Every pull at today's price, owned or not">Pulled value <b>{money(opening.valuePulled, currency)}</b></span>
+                  <span title="The pulls you still have, at today's price">Value now <b>{money(opening.valueNow, currency)}</b></span>
+                </span>
+              </span>
               {opening.active ? (
                 <span className="btnrow">
                   <span className="badge opening">Adding here</span>
@@ -385,28 +417,33 @@ function EntryPage({ id, list, onClose, onChanged }: { id: string; list: Purchas
       {entry.ties.length > 0 && (
         <section>
           <h4>{entry.kind === "trade" ? "Cards got" : "Cards from this purchase"}</h4>
-          <table className="dtable">
-            <thead><tr><th>Card</th><th>Set</th><th className="numcell">Count</th><th className="numcell">Still held</th>{entry.kind === "trade" && <th className="numcell">Trade price</th>}<th className="numcell">Price now</th><th /></tr></thead>
+          <div className="gridwrapper"><table className="dtable grid">
+            <thead><tr><th>Card</th><th>Finish</th><th>Set</th><th className="numcell">Count</th><th className="numcell">Still held</th>
+              <th className="numcell">{entry.kind === "purchase" ? (entry.ties.some((tie) => tie.openingId) ? "Value when pulled" : "Value when added") : "Value when added"}</th>
+              {entry.kind === "trade" && <th className="numcell">Trade price</th>}<th className="numcell">Price now</th><th>State</th><th /></tr></thead>
             <tbody>
               {entry.ties.map((tie) => (
-                <tr key={tie.id}>
-                  <td><button type="button" className="lnk" onClick={() => store.setCardPage(tie.cardId)}>{tie.name}</button>{tie.foil ? <span className="badge foil">{tie.foil === 1 ? "FOIL" : "ETCHED"}</span> : null}</td>
-                  <td><SetIcon code={tie.setCode} />{tie.setCode.toUpperCase()} #{tie.collectorNumber}</td>
+                <tr key={tie.id} className={tie.held === 0 ? "gonerow" : ""}>
+                  <td><button type="button" className="lnk" onClick={() => store.setCardPage(tie.cardId)}>{tie.name}</button></td>
+                  <td>{tie.foil ? <span className="badge foil">{tie.foil === 1 ? "FOIL" : "ETCHED"}</span> : <span className="sub">Regular</span>}</td>
+                  <td className="nowrap"><SetIcon code={tie.setCode} />{tie.setCode.toUpperCase()} #{tie.collectorNumber}</td>
                   <td className="numcell">{tie.quantity}</td>
                   <td className="numcell">{tie.held}</td>
+                  <td className="numcell">{tie.valueThen === null ? "" : money(tie.valueThen, currency)}</td>
                   {entry.kind === "trade" && <td className="numcell">{money(tie.tradePrice, currency)}</td>}
                   <td className="numcell">{money(tie.price, currency)}</td>
-                  <td>{tie.openingId && <button type="button" className="btn small" onClick={() => void untie(tie.id, tie.name)}>Untie</button>}</td>
+                  <td>{stateOf([tie])}</td>
+                  <td>{(tie.openingId || entry.kind === "purchase") && <button type="button" className="btn small" onClick={() => void removeFromPack(tie)}>{tie.openingId ? "Remove from pack..." : "Remove from purchase..."}</button>}</td>
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         </section>
       )}
       {entry.sales.length > 0 && (
         <section>
           <h4>{entry.kind === "trade" ? "Cards given" : "Sold"}</h4>
-          <table className="dtable">
+          <div className="gridwrapper"><table className="dtable grid">
             <thead><tr><th>{entry.kind === "product_sale" ? "Product" : "Card"}</th><th className="numcell">Count</th><th className="numcell">{entry.kind === "trade" ? "Trade value" : "Price"}</th>
               {entry.trade && <th className="numcell">Original cost</th>}<th>From</th></tr></thead>
             <tbody>
@@ -426,11 +463,29 @@ function EntryPage({ id, list, onClose, onChanged }: { id: string; list: Purchas
                 );
               })}
             </tbody>
-          </table>
+          </table></div>
         </section>
       )}
     </div>
   );
+}
+
+/** Where the cards of a line or tie are now (0.18.0): In collection, Sold, Traded, Gone, or a mix such as "1 in collection, 1 gone". */
+function stateOf(ties: EntryTie[]): string {
+  const total = (pick: (tie: EntryTie) => number) => ties.reduce((sum, tie) => sum + pick(tie), 0);
+  const parts: Array<[number, string]> = [[total((tie) => tie.held), "in collection"], [total((tie) => tie.sold), "sold"], [total((tie) => tie.traded), "traded"], [total((tie) => tie.gone), "gone"]];
+  const shown = parts.filter(([count]) => count > 0);
+  if (!shown.length) return "";
+  if (shown.length === 1) return shown[0]![1].charAt(0).toUpperCase() + shown[0]![1].slice(1);
+  return shown.map(([count, label]) => `${count} ${label}`).join(", ");
+}
+
+/** The fixed value of a single card line: its card's price on the day it was added. */
+function valueThenOf(ties: EntryTie[], currency: "usd") {
+  const priced = ties.filter((tie) => tie.valueThen !== null);
+  if (!priced.length) return "";
+  const count = priced.reduce((sum, tie) => sum + tie.quantity, 0);
+  return <>{money(priced.reduce((sum, tie) => sum + tie.valueThen! * tie.quantity, 0) / Math.max(1, count), currency)}<span className="sub"> (when added)</span></>;
 }
 
 /** Shows a kept receipt: pictures and PDFs open in a new tab (in the app, the share sheet). */
@@ -472,8 +527,13 @@ export function PurchasesView({ actions: _actions }: { actions: Record<string, A
   useEffect(() => { void load(); }, [load]);
   useEffect(() => {
     const show = (event: Event) => { const id = (event as CustomEvent<string>).detail; void load(); if (id) setOpen(id); };
+    const reload = () => void load();
     window.addEventListener("mana-vault:purchases", show);
-    return () => window.removeEventListener("mana-vault:purchases", show);
+    window.addEventListener(PURCHASES_CHANGED, reload);
+    return () => {
+      window.removeEventListener("mana-vault:purchases", show);
+      window.removeEventListener(PURCHASES_CHANGED, reload);
+    };
   }, [load]);
   // undo and redo change entries: the view reloads with them
   const undoCount = store.undoStack.length + store.redoStack.length;

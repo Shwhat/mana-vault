@@ -170,7 +170,7 @@ function SingleFinder({ onAdd, onClose }: { onAdd: (card: Printing, finish: Fini
     return (
       <div className="singlefind">
         <div className="btnrow"><button type="button" className="btn small" onClick={() => setChosen(null)}>Back to cards</button><b>Choose the printing of {chosen.name}</b></div>
-        <PrintingList cardId={chosen.id} currentId={chosen.id} finish={0} currency={USD} onPick={(printing, finish) => { onAdd(printing, finish); setChosen(null); }} />
+        <PrintingList single cardId={chosen.id} currentId={chosen.id} finish={0} currency={USD} onPick={(printing, finish) => { onAdd(printing, finish); setChosen(null); }} />
       </div>
     );
   }
@@ -951,7 +951,7 @@ function PlacesEditor({ store }: { store: Store }) {
         <button type="button" className="btn small" disabled={!term.trim() || (places ?? []).some((place) => place.name.toLowerCase() === term.trim().toLowerCase())} onClick={() => void add()}>Add place</button>
       </div>
       {!places && !error && <p className="note">Loading the places</p>}
-      <table className="dtable">
+      <table className="dtable grid">
         <thead><tr><th>Name</th><th>Kind</th><th>Note</th><th className="numcell">Entries</th><th /></tr></thead>
         <tbody>
           {places && !shown.length && <tr><td colSpan={5} className="sub">{places.length ? "No place matches" : "No places yet. A place is added when an entry names it."}</td></tr>}

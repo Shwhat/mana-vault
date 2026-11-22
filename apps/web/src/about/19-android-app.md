@@ -45,7 +45,7 @@ The app always uses the phone layout described in [Screen layout](/about/screen-
 | Imports and restores | Use the Android file picker |
 | Trades | Work online only: trades are saved on the server |
 | Card images | Load from the server (its saved pictures, or Scryfall's through it) and are kept by the phone as they are viewed |
-| Opening a collection or deck | One tap in the Collections panel, the Decks panel or a switcher opens it, and the open one is where new cards go (browsers on a phone keep one tap to choose and a double tap to open) |
+| Opening a collection or deck | In a switcher one tap opens it. In the Collection and Decks screens one tap in a list opens it; in the Search screen and elsewhere one tap picks it as where new cards go and a double tap opens it |
 | Suggestions | Card names come from the card list on the phone and the other lists from the copy kept the first time suggestions are used online, so they also work without a connection |
 | Symbols window | Opens as a sheet at the bottom of the screen in the card maker |
 | Purchases | A Purchases button on Home and Purchases view in the Menu. Without a connection the history and summary show from the last copy; changes need a connection |
@@ -141,3 +141,10 @@ Mana Vault is offered in Android's share menu for lists, CSV files, pictures and
 Once a day, when the app opens, it asks your Mana Vault server which version it runs. When the server is newer, the window **Update available** shows both versions and **Download the app for** the server's version. The download comes from your server, which fetches the app for its version from the GitHub release once and keeps it. **Check for updates...** (Menu, Account) checks at once, and says "This phone has the app for the server's version" or "The server could not be reached".
 
 The app's version always matches the server version it was released with. An app and a server of different versions work together as long as both are 0.5.0 or newer.
+
+## Live updates and openings
+
+- While the app is open it hears about changes made on the web page or another phone at once, and loads them.
+- When an opening is started on another device while the app is open, the app asks "Start scanning the cards into it?" with **Start scanning**.
+- With Inbox notifications on, the background check (about every 15 minutes) also shows **Opening started** with a **Start scanning** button for an opening started elsewhere. Tapping it opens the scanner on the opening. Each opening is offered once.
+- In the Search screen a tap on a collection or deck picks it as where cards go, and a double tap opens it. In the Collection and Decks screens one tap opens it.

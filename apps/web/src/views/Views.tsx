@@ -1,4 +1,5 @@
 // ---------- central work area: card search, collection and deck views ----------
+import { useEffect } from "react";
 import type { Action } from "../actions";
 import type { FoundCard } from "../card-search";
 import { ListOptionRows } from "../components/GroupedList";
@@ -48,6 +49,8 @@ export function SearchOptions() {
 export function CardsView({ actions, onFilters }: { actions: Record<string, Action>; onFilters?: () => void }) {
   const store = useApp();
   const { filters, selection, deck, search } = store;
+  // coming back to card search keeps its results (0.18.0); the owned counts are loaded again in place
+  useEffect(() => { search.reload(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const anyFilter = store.filtersActive;
   const catalogEmpty = store.catalog?.printingCount === 0;
   // Enter and a double-click add to where cards go, choosing the printing and finish first

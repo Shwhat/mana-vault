@@ -1,4 +1,5 @@
 // ---------- collection view: cards, set completion and missing cards ----------
+import { packNote } from "../purchase-state";
 import { newEntry } from "./PurchasesView";
 import { SetIcon } from "../components/CardMarks";
 import type { SetProgress } from "../types";
@@ -7,12 +8,13 @@ import type { Action } from "../actions";
 import { rowMenu } from "../components/ContextMenu";
 import { collectionDialog, copyDialog, moveDialog } from "../components/LibraryDialogs";
 import { choosePrinting } from "../components/PrintingDialog";
-import { CountPip, FinishBadge, FinishPip, finishName, PipBar, PricePip, RemovedPip, removeCard } from "../components/CardMarks";
+import { CountPip, FinishBadge, FinishPip, finishName, PricePip, RemovedPip, removeCard } from "../components/CardMarks";
+import { CardFrame } from "../components/CardFrame";
 import { Icon } from "../icons";
 import { entryKey } from "../library-state";
 import { type Store, useApp } from "../store";
 import {
-  ALL_COLLECTIONS, capitalize, COLOR_NAMES, COMPLETION_RULES, conditionName, copyLabel, copyPrice, FINISH_RULES, FINISHES, finishLabel, type Collection, type CollectionEntry,
+  ALL_COLLECTIONS, capitalize, COLOR_NAMES, COMPLETION_RULES, conditionName, copyKey, copyLabel, copyPrice, FINISH_RULES, FINISHES, finishLabel, type Collection, type CollectionEntry,
   type CollectionSort, type GridSize,
   type CollectionTab, type Facets, languageName, money,
 } from "../types";
@@ -83,6 +85,14 @@ const sellEntry = (store: Store, entry: CollectionEntry) => {
 };
 
 /** Change printing... for a copy. */
+/** Remove for a collection row: copies that came from a pack or purchase say so in the question (0.18.0). */
+function removeEntry(store: Store, entry: CollectionEntry) {
+  const collectionId = entry.collection_id ?? store.prefs.openCollection;
+  const apply = (left: number) => void store.setCollectionQuantity(entry, left);
+  if (!collectionId) return removeCard(store, entry.name, entry.quantity, apply);
+  void packNote([{ collectionId, ...copyKey(entry) }]).then((note) => removeCard(store, entry.name, entry.quantity, apply, note));
+}
+
 const changeEntryPrinting = (store: Store, entry: CollectionEntry) => choosePrinting(entry.name, entry.id, entry.id, { finish: entry.foil, currency: store.prefs.currency, quantity: entry.quantity },
   (printing, finish, count) => void store.changeCopyPrinting(entry, printing, finish, count));
 
@@ -99,7 +109,7 @@ function entryMenu(store: Store, entry: CollectionEntry) {
     { label: "Add to print list", run: () => void store.addToPrintList([{ card: entry, count: entry.quantity }], entry.name) },
     !entry.proxy && { label: "Sell...", run: () => sellEntry(store, entry) },
     entry.quantity > 1 && { label: "Reduce to 1", run: () => void store.setCollectionQuantity(entry, 1) },
-    { label: "Remove", run: () => removeCard(store, entry.name, entry.quantity, (left) => void store.setCollectionQuantity(entry, left)) },
+    { label: "Remove", run: () => removeEntry(store, entry) },
   ]);
 }
 
@@ -264,26 +274,25 @@ function Stack({ entries }: { entries: CollectionEntry[] }) {
   const active = entries.some((entry) => store.checked.has(entryKey(entry)));
   const count = entries.reduce((sum, entry) => sum + entry.quantity, 0);
   const split = entries.length > 1;
-  return (
-    <div className={active ? "stackcell active" : "stackcell"}>
-      <div className={active ? "pocket active" : "pocket"} data-key={split ? undefined : entryKey(first)} role={split ? undefined : "option"} aria-selected={split ? undefined : active}
-        title={`${first.name}, ${first.set_name} ${first.collector_number}${first.collection_name ? `, in ${first.collection_name}` : ""}`}
-        onClick={(event) => store.pickRow(first, { ctrl: event.ctrlKey || event.metaKey, shift: event.shiftKey })}
-        onDoubleClick={() => copyDialog(store, first)} {...entryMenu(store, first)}>
-        {first.image_url ? <img src={first.image_url} alt={first.name} loading="lazy" draggable={false} /> : <span className="pocketname">{first.name}</span>}
-      </div>
-      <PipBar>
-        <CountPip count={count} />
-        {split ? entries.map((entry) => <FinishBadge key={entryKey(entry)} finish={entry.foil} promoTypes={entry.promo_types} />) : <CopyPips entry={first} />}
-        {first.removed && <RemovedPip onChange={() => changeEntryPrinting(store, first)} />}
-        <PricePip price={copyPrice(first, store.prefs.currency)} />
-      </PipBar>
-      {split && (
-        <div className="slines" role="group" aria-label={`Copies of ${first.name} (${first.set_code.toUpperCase()}) ${first.collector_number}`}>
-          {entries.map((entry) => <StackLine key={entryKey(entry)} entry={entry} />)}
-        </div>
-      )}
+  const picture = (
+    <div className={active ? "pocket active" : "pocket"} data-key={split ? undefined : entryKey(first)} role={split ? undefined : "option"} aria-selected={split ? undefined : active}
+      title={`${first.name}, ${first.set_name} ${first.collector_number}${first.collection_name ? `, in ${first.collection_name}` : ""}`}
+      onClick={(event) => store.pickRow(first, { ctrl: event.ctrlKey || event.metaKey, shift: event.shiftKey })}
+      onDoubleClick={() => copyDialog(store, first)} {...entryMenu(store, first)}>
+      {first.image_url ? <img src={first.image_url} alt={first.name} loading="lazy" draggable={false} /> : <span className="pocketname">{first.name}</span>}
     </div>
+  );
+  return (
+    <CardFrame section="collection" className={active ? "stackcell active" : "stackcell"} picture={picture} pieces={{
+      count: <CountPip count={count} />,
+      finish: split ? entries.map((entry) => <FinishBadge key={entryKey(entry)} finish={entry.foil} promoTypes={entry.promo_types} />) : <CopyPips entry={first} />,
+      marks: first.removed ? <RemovedPip onChange={() => changeEntryPrinting(store, first)} /> : null,
+      price: <PricePip price={copyPrice(first, store.prefs.currency)} />,
+    }} after={split && (
+      <div className="slines" role="group" aria-label={`Copies of ${first.name} (${first.set_code.toUpperCase()}) ${first.collector_number}`}>
+        {entries.map((entry) => <StackLine key={entryKey(entry)} entry={entry} />)}
+      </div>
+    )} />
   );
 }
 
@@ -428,7 +437,7 @@ function CardsTab({ actions }: { actions: Record<string, Action> }) {
                 disabled={(store.collections?.length ?? 0) < 2}
                 onClick={(event) => { event.stopPropagation(); moveDialog(store, [entry]); }}><Icon name="move" /></button>
               <button type="button" className="btn small icon-only" title={`Remove ${entry.name}`} aria-label={`Remove ${entry.name} from collection`}
-                onClick={(event) => { event.stopPropagation(); removeCard(store, entry.name, entry.quantity, (left) => void store.setCollectionQuantity(entry, left)); }}><Icon name="del" /></button>
+                onClick={(event) => { event.stopPropagation(); removeEntry(store, entry); }}><Icon name="del" /></button>
               <EntryMenuButton menu={entryMenu(store, entry)} name={entry.name} />
             </div>
           );

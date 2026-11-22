@@ -34,6 +34,7 @@ import java.util.concurrent.TimeUnit;
 public class InboxWorker extends Worker {
     private static final String WORK = "mana-vault-inbox";
     private static final String CHANNEL = "inbox";
+    private static final String OPENING_CHANNEL = "openings";
 
     public InboxWorker(@NonNull Context context, @NonNull WorkerParameters parameters) {
         super(context, parameters);
@@ -73,6 +74,11 @@ public class InboxWorker extends Worker {
             }
             if (status != 200) return Result.retry();
             JSONObject state = new JSONObject(read(connection.getInputStream()));
+            // an opening started on another device (0.18.0): offer to start scanning into it, once per opening
+            JSONObject opening = state.optJSONObject("opening");
+            String openingId = opening == null ? "" : opening.optString("id", "");
+            if (!openingId.isEmpty() && !openingId.equals(settings.lastOpening())) showOpening(context, opening);
+            if (!openingId.equals(settings.lastOpening())) settings.setLastOpening(openingId);
             JSONArray offers = state.optJSONArray("offers");
             if (offers == null || offers.length() == 0) return Result.success();
             String seen = settings.lastOffer();
@@ -99,6 +105,31 @@ public class InboxWorker extends Worker {
         byte[] buffer = new byte[8192];
         for (int count; (count = input.read(buffer)) > 0;) out.write(buffer, 0, count);
         return out.toString(StandardCharsets.UTF_8.name());
+    }
+
+    /** "Opening started": tapping it, or Start scanning, opens the app's scanner on the opening. */
+    private static void showOpening(Context context, JSONObject opening) {
+        if (Build.VERSION.SDK_INT >= 33 &&
+            ContextCompat.checkSelfPermission(context, android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return;
+        if (Build.VERSION.SDK_INT >= 26) {
+            NotificationManager manager = context.getSystemService(NotificationManager.class);
+            if (manager != null && manager.getNotificationChannel(OPENING_CHANNEL) == null) {
+                manager.createNotificationChannel(new NotificationChannel(OPENING_CHANNEL, "Openings", NotificationManager.IMPORTANCE_DEFAULT));
+            }
+        }
+        String id = opening.optString("id", "");
+        Intent open = new Intent(context, MainActivity.class);
+        open.putExtra(ManaVaultPlugin.EXTRA_OFFER, "scan:" + id);
+        open.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        PendingIntent tap = PendingIntent.getActivity(context, ("scan:" + id).hashCode(), open, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(context, OPENING_CHANNEL)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle("Opening started")
+            .setContentText(opening.optString("name", ""))
+            .setContentIntent(tap)
+            .addAction(0, "Start scanning", tap)
+            .setAutoCancel(true);
+        NotificationManagerCompat.from(context).notify(("scan:" + id).hashCode(), builder.build());
     }
 
     private static void show(Context context, JSONObject offer) {

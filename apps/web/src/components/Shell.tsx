@@ -104,7 +104,7 @@ function PhoneMenu({ actions, close }: { actions: Record<string, Action>; close:
       ))}
       <details className="pmsection" open>
         <summary>Account: {store.user.name}</summary>
-        {[...ACCOUNT_MENU, ...(isApp() ? APP_MENU : [])].filter(usable).map(row)}
+        {[...ACCOUNT_MENU, ...(isApp() ? APP_MENU : [])].filter((id) => id !== "-" && usable(id)).map(row)}
       </details>
     </div>
   );
