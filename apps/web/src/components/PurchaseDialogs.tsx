@@ -4,12 +4,13 @@ import { pickFile, request, sendFile } from "../api";
 import { isApp, native } from "../android/platform";
 import type { FoundCard } from "../card-search";
 import {
-  type Entry, type EntryKind, type EntryLine, KIND_LABELS, type Place, type PlaceKind, PLACE_KINDS, type Product, type PurchaseList, type ReceiptFields, reloadOpening, setActiveOpening,
+  type Entry, type EntryKind, type EntryLine, KIND_LABELS, type Place, type PlaceKind, PLACE_KINDS, type Product, type PurchaseList, type ReceiptFields, type ReceiptLine, reloadOpening, setActiveOpening,
 } from "../purchase-state";
 import { finishCode, type ScanCard, type ScanItem } from "../scan-state";
 import { type Store } from "../store";
 import { CONDITIONS, type Currency, finishLabel, type FinishCode, LANGUAGES, money } from "../types";
 import { FinishBadge, SetIcon } from "./CardMarks";
+import { LayoutRows, OptionsButton } from "./Options";
 import { customDialog } from "./Dialog";
 import { type Choice, choices, Picker } from "./Picker";
 import { finishesOf, type Printing, PrintingList } from "./PrintingDialog";
@@ -151,8 +152,8 @@ function singleFrom(card: Pick<ScanCard, "id" | "name" | "set_code" | "collector
 }
 
 /** Find cards: a card search with pictures; picking a card shows its printings, and picking a printing adds it. */
-function SingleFinder({ onAdd, onClose }: { onAdd: (card: Printing, finish: FinishCode) => void; onClose: () => void }) {
-  const [term, setTerm] = useState("");
+function SingleFinder({ onAdd, onClose, start = "" }: { onAdd: (card: Printing, finish: FinishCode) => void; onClose: () => void; start?: string }) {
+  const [term, setTerm] = useState(start);
   const [found, setFound] = useState<FoundCard[]>([]);
   const [busy, setBusy] = useState(false);
   const [chosen, setChosen] = useState<FoundCard | null>(null);
@@ -188,6 +189,81 @@ function SingleFinder({ onAdd, onClose }: { onAdd: (card: Printing, finish: Fini
             <span className="singlename">{card.name}</span>
           </button>
         ))}
+      </div>
+    </div>
+  );
+}
+
+/** One card-like receipt line in the Match cards step: the card chosen (or none), as a card or kept as a product. */
+type MatchRow = { key: string; line: ReceiptLine; card: (Pick<ScanCard, "id" | "name" | "set_code" | "collector_number" | "image_url" | "finishes"> & { promo_types?: string | null; set_name?: string }) | null;
+  finish: FinishCode; condition: string; kind: "card" | "product"; ok: boolean; mode: "" | "printing" | "find" };
+
+/**
+ * Match cards (0.19.0): after a receipt is read, each line that looks like a single card shows its best guess. OK keeps
+ * it, Choose printing... picks the exact printing and finish, Keep as product leaves it a product line, and a line with no
+ * match gets a search to find the card. Continue puts the cards into Single cards.
+ */
+function MatchCards({ rows: start, onContinue, onCancel }: { rows: MatchRow[]; onContinue: (rows: MatchRow[]) => void; onCancel: () => void }) {
+  const [rows, setRows] = useState(start);
+  const [error, setError] = useState("");
+  const set = (key: string, change: Partial<MatchRow>) => setRows((list) => list.map((row) => (row.key === key ? { ...row, ...change } : row)));
+  const go = () => {
+    const missing = rows.filter((row) => row.kind === "card" && !row.card);
+    if (missing.length) return setError(`Find the card for ${missing.map((row) => row.line.name).join(", ")}, or keep ${missing.length === 1 ? "it" : "them"} as products.`);
+    onContinue(rows);
+  };
+  return (
+    <div className="matchcards">
+      <p className="note">These receipt lines look like single cards. Check each one; cards go into Single cards with their finish, condition and price.</p>
+      {error && <p className="note err">{error}</p>}
+      {rows.map((row) => (
+        <div key={row.key} className={`matchrow${row.kind === "product" ? " asproduct" : ""}${row.ok ? " ok" : ""}`}>
+          <div className="matchtext">
+            <span className="sub">From the receipt</span>
+            <b>{row.line.name}</b>{row.line.note && <span className="sub"> {row.line.note}</span>}
+            <span className="sub">{row.line.quantity} x {money(row.line.cost / Math.max(1, row.line.quantity), USD)}</span>
+          </div>
+          {row.kind === "product" ? (
+            <div className="matchguess"><span className="sub">Kept as a product line</span>
+              <button type="button" className="btn small" onClick={() => set(row.key, { kind: "card" })}>Match a card</button></div>
+          ) : row.card ? (
+            <div className="matchguess">
+              {row.card.image_url ? <img className="thumb-img" src={row.card.image_url} alt="" /> : <span className="thumb-img none">MV</span>}
+              <span className="matchcard"><b>{row.card.name}</b>
+                <span className="sub"><SetIcon code={row.card.set_code} />({row.card.set_code.toUpperCase()}) {row.card.collector_number}{row.card.set_name ? `, ${row.card.set_name}` : ""}, {row.condition}</span>
+                <FinishBadge finish={row.finish} promoTypes={row.card.promo_types} /></span>
+              <span className="btnrow">
+                <button type="button" className={row.ok ? "btn small primary" : "btn small"} aria-pressed={row.ok} onClick={() => set(row.key, { ok: true, mode: "" })}>OK</button>
+                <button type="button" className="btn small" onClick={() => set(row.key, { mode: row.mode === "printing" ? "" : "printing" })}>Choose printing...</button>
+                <button type="button" className="btn small" onClick={() => set(row.key, { mode: row.mode === "find" ? "" : "find" })}>Another card...</button>
+                <button type="button" className="btn small" onClick={() => set(row.key, { kind: "product", mode: "" })}>Keep as product</button>
+              </span>
+            </div>
+          ) : (
+            <div className="matchguess"><span className="sub">No card found for this line</span>
+              <span className="btnrow">
+                <button type="button" className="btn small primary" onClick={() => set(row.key, { mode: "find" })}>Find the card...</button>
+                <button type="button" className="btn small" onClick={() => set(row.key, { kind: "product", mode: "" })}>Keep as product</button>
+              </span>
+            </div>
+          )}
+          {row.kind === "card" && row.mode === "printing" && row.card && (
+            <div className="matchpanel">
+              <PrintingList cardId={row.card.id} currentId={row.card.id} finish={row.finish} currency={USD}
+                onPick={(printing, finish) => set(row.key, { card: printing, finish, ok: true, mode: "" })} />
+            </div>
+          )}
+          {row.kind === "card" && row.mode === "find" && (
+            <div className="matchpanel">
+              <SingleFinder start={row.line.name.replace(/[[(][^\])]*[\])]/g, " ").trim()} onAdd={(printing, finish) => set(row.key, { card: printing, finish, ok: true, mode: "" })}
+                onClose={() => set(row.key, { mode: "" })} />
+            </div>
+          )}
+        </div>
+      ))}
+      <div className="btnrow end">
+        <button type="button" className="btn" onClick={onCancel}>Cancel</button>
+        <button type="button" className="btn primary" onClick={go}>Continue</button>
       </div>
     </div>
   );
@@ -332,6 +408,11 @@ function PurchaseEditor({ store, list, start, close, onSaved, reopen }: {
   const [singles, setSingles] = useState<SingleDraft[]>(start.singles);
   const [receipt, setReceipt] = useState<File | null>(start.receipt);
   const [panel, setPanel] = useState<"" | "find" | "scanned">("");
+  const [matching, setMatching] = useState<MatchRow[] | null>(null);
+  const lineFromReceipt = (line: ReceiptLine): LineDraft => ({
+    product: line.product, name: line.product === "other" ? `${line.name}${line.note ? ` ${line.note}` : ""}` : "", setCode: line.setCode ?? "", quantity: String(line.quantity),
+    each: fixed(line.cost / Math.max(1, line.quantity)), total: fixed(line.cost), packs: String(list.products.find((item) => item.id === line.product)?.packs ?? 0), locked: 0,
+  });
   const [error, setError] = useState("");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
@@ -378,16 +459,22 @@ function PurchaseEditor({ store, list, start, close, onSaved, reopen }: {
     setReceipt(file);
     try {
       const fields = await readReceipt(file);
-      const found = fields.lines.map((line): LineDraft => ({
-        product: line.product, name: line.product === "other" ? line.name : "", setCode: line.setCode ?? "", quantity: String(line.quantity),
-        each: fixed(line.cost / Math.max(1, line.quantity)), total: fixed(line.cost), packs: String(list.products.find((item) => item.id === line.product)?.packs ?? 0), locked: 0,
-      }));
-      setHead({ date: fields.date ?? head.date, place: head.place || fields.place || "", note: head.note });
+      // single cards go to the Match cards step first (0.19.0)
+      const cards = fields.lines.filter((line) => line.cardLike);
+      if (cards.length) {
+        setMatching(cards.map((line) => ({
+          key: newKey(), line, kind: "card", ok: false, mode: "", finish: (line.card?.finish ?? 0) as FinishCode, condition: line.card?.condition ?? "NM",
+          card: line.card ? { id: line.card.cardId, name: line.card.name, set_code: line.card.setCode, set_name: line.card.setName, collector_number: line.card.collectorNumber,
+            image_url: line.card.imageUrl, finishes: line.card.finishes, promo_types: line.card.promoTypes } : null,
+        })));
+      }
+      const found = fields.lines.filter((line) => !line.cardLike).map(lineFromReceipt);
+      setHead({ date: fields.date ?? head.date, place: head.place || fields.place || "", note: head.note || fields.note || "" });
       if (fields.tax !== null) setTax(fixed(fields.tax));
       if (fields.shipping !== null) setShipping(fixed(fields.shipping));
       const kept = lines.filter((line) => line.id || num(line.total) > 0 || line.name);
       if (found.length) setLines([...kept, ...found]);
-      const read = found.length ? `${found.length} ${found.length === 1 ? "line" : "lines"} read` : "No product lines found";
+      const read = found.length || cards.length ? `${found.length + cards.length} ${found.length + cards.length === 1 ? "line" : "lines"} read` : "No product lines found";
       const total = fields.total === null ? "" : fields.total.toFixed(2) === (fields.linesTotal + (fields.tax ?? 0) + (fields.shipping ?? 0)).toFixed(2)
         ? `, matching the total of ${money(fields.total, USD)}` : `. The receipt total is ${money(fields.total, USD)}; the lines, tax and shipping read add up to ${money(fields.linesTotal + (fields.tax ?? 0) + (fields.shipping ?? 0), USD)}`;
       setNote(`${read}${total}. Check every field before saving.`);
@@ -439,6 +526,22 @@ function PurchaseEditor({ store, list, start, close, onSaved, reopen }: {
       setBusy(false);
     }
   };
+  if (matching) {
+    return (
+      <MatchCards rows={matching} onCancel={() => {
+        // Cancel keeps the lines as products, so nothing read is lost
+        setLines([...lines, ...matching.map((row) => lineFromReceipt(row.line))]);
+        setMatching(null);
+      }} onContinue={(rows) => {
+        const collectionId = singles.at(-1)?.collectionId || defaultCollection;
+        setSingles([...singles, ...rows.filter((row) => row.kind === "card" && row.card).map((row) => singleFrom(row.card!, row.finish, collectionId, {
+          condition: row.condition, quantity: String(row.line.quantity), each: fixed(row.line.cost / Math.max(1, row.line.quantity)), total: fixed(row.line.cost),
+        }))]);
+        setLines([...lines, ...rows.filter((row) => row.kind === "product").map((row) => lineFromReceipt(row.line))]);
+        setMatching(null);
+      }} />
+    );
+  }
   return (
     <div className="purchaseedit">
       {error && <p className="note err">{error}</p>}
@@ -762,16 +865,19 @@ function purchaseWindow(store: Store, list: PurchaseList, draft: PurchaseDraft, 
 /** Open...: how many of a product line to open, and where the pulled cards go. */
 function OpenEditor({ store, entry, line, close, onDone }: { store: Store; entry: Entry; line: EntryLine; close: () => void; onDone: () => void }) {
   const owned = (store.collections ?? []).filter((item) => item.kind === "collection" && item.role === "owner");
-  const [count, setCount] = useState(String(line.sealed));
+  // products with packs open a number of packs, one at a time (0.19.0); others open a number of the product
+  const packs = line.packs > 0;
+  const left = packs ? line.packsLeft : line.sealed;
+  const [count, setCount] = useState(packs ? "1" : String(line.sealed));
   const [collectionId, setCollectionId] = useState(store.prefs.targetCollection && owned.some((item) => item.id === store.prefs.targetCollection) ? store.prefs.targetCollection : owned[0]?.id ?? "");
   const [error, setError] = useState("");
   const open = async () => {
     setError("");
     try {
-      const opening = await request<{ id: string; name: string; collectionId: string; entryId: string }>(`/api/purchases/${entry.id}/lines/${line.id}/open`, {
+      const opening = await request<{ id: string; name: string; collectionId: string; entryId: string; packs: Array<{ id: string; name: string }> }>(`/api/purchases/${entry.id}/lines/${line.id}/open`, {
         method: "POST", body: JSON.stringify({ count: Number(count), collectionId }),
       });
-      setActiveOpening(opening);
+      setActiveOpening({ ...opening, groupIndex: 1, groupSize: opening.packs.length, hasNext: opening.packs.length > 1 });
       store.setTargetCollection(collectionId);
       store.pushUndo({
         label: `Open ${opening.name}`,
@@ -780,7 +886,7 @@ function OpenEditor({ store, entry, line, close, onDone }: { store: Store; entry
       });
       close();
       onDone();
-      store.flash(`Opening ${opening.name}: cards added to ${owned.find((item) => item.id === collectionId)?.name ?? "the collection"} are tied to it`);
+      store.flash(`Opening ${opening.packs.length > 1 ? `Pack 1 of ${opening.packs.length}, ` : ""}${opening.name}: cards added to ${owned.find((item) => item.id === collectionId)?.name ?? "the collection"} are tied to it`);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Could not open the product.");
     }
@@ -788,8 +894,10 @@ function OpenEditor({ store, entry, line, close, onDone }: { store: Store; entry
   return (
     <div className="purchaseedit">
       {error && <p className="note err">{error}</p>}
-      <div className="prow"><label htmlFor="op-count">How many to open</label><input id="op-count" type="number" min={1} max={line.sealed} className="num" value={count} onChange={(event) => setCount(event.target.value)} />
-        <span className="sub">of {line.sealed} sealed</span></div>
+      <div className="prow"><label htmlFor="op-count">{packs ? "Open how many packs?" : "How many to open"}</label>
+        <input id="op-count" type="number" min={1} max={left} className="num" autoFocus value={count} onChange={(event) => setCount(event.target.value)} />
+        <span className="sub">{packs ? `of ${left} ${left === 1 ? "pack" : "packs"} left${line.quantity * line.packs > 1 ? ` in the ${line.productLabel.toLowerCase()}${line.quantity > 1 ? "es" : ""}` : ""}` : `of ${line.sealed} sealed`}</span></div>
+      {packs && Number(count) > 1 && <p className="note">Each pack is its own opening. Cards go to Pack 1 first; Next pack moves on to the next one.</p>}
       <div className="prow"><label htmlFor="op-coll">Pulled cards go to</label>
         <Picker id="op-coll" label="Collection" value={collectionId} options={owned.map((item) => ({ value: item.id, label: item.name }))} onChange={setCollectionId} /></div>
       <div className="btnrow end">
@@ -992,24 +1100,113 @@ function PlacesEditor({ store }: { store: Store }) {
 
 export const placesDialog = (store: Store) => customDialog("Places", () => <PlacesEditor store={store} />, 760);
 
-// ---------- Add existing copies...: copies already in a collection, tied to an opening ----------
+// ---------- Add existing copies... (0.19.0): pick copies from a chosen collection, in List, Grid or Binder ----------
 
-function TieCopies({ store, openingId, close, onDone }: { store: Store; openingId: string; close: () => void; onDone: () => void }) {
+type CollectionCopy = {
+  collectionId: string; cardId: string; foil: number; condition: string; language: string; proxy: boolean; quantity: number; free: number; tiedTo: string[];
+  name: string; setCode: string; setName: string; collectorNumber: string; imageUrl: string | null; promoTypes: string | null;
+};
+const copyKeyOf = (copy: Pick<CollectionCopy, "collectionId" | "cardId" | "foil" | "condition" | "language" | "proxy">) =>
+  `${copy.collectionId}|${copy.cardId}|${copy.foil}|${copy.condition}|${copy.language}|${copy.proxy ? 1 : 0}`;
+
+function TieCopies({ store, openingId, collectionId, close, onDone }: { store: Store; openingId: string; collectionId: string | null; close: () => void; onDone: () => void }) {
+  const own = (store.collections ?? []).filter((item) => item.kind !== "wishlist" && item.role !== "member");
+  const [collection, setCollection] = useState(collectionId && own.some((item) => item.id === collectionId) ? collectionId : own[0]?.id ?? "");
   const [term, setTerm] = useState("");
-  const [found, setFound] = useState<CopyFound[]>([]);
-  const [rows, setRows] = useState<Array<CopyFound & { count: string }>>([]);
+  const [all, setAll] = useState(false);
+  const [copies, setCopies] = useState<CollectionCopy[] | null>(null);
+  const [chosen, setChosen] = useState<Map<string, { copy: CollectionCopy; count: number }>>(new Map());
+  const [anchor, setAnchor] = useState<string | null>(null);
+  const [page, setPage] = useState(0);
   const [error, setError] = useState("");
+  const layout = store.prefs.tieLayout;
+  const size = store.prefs.tieSize;
   useEffect(() => {
-    if (term.trim().length < 2) { setFound([]); return; }
-    const timer = window.setTimeout(() => { void request<CopyFound[]>(`/api/purchases/copies?q=${encodeURIComponent(term.trim())}`).then(setFound).catch(() => setFound([])); }, 200);
-    return () => window.clearTimeout(timer);
-  }, [term]);
+    if (!collection) return;
+    let live = true;
+    setCopies(null);
+    const timer = window.setTimeout(() => {
+      void request<CollectionCopy[]>(`/api/purchases/collection-copies?collectionId=${encodeURIComponent(collection)}&q=${encodeURIComponent(term.trim())}`)
+        .then((list) => { if (live) setCopies(list); })
+        .catch((reason: unknown) => { if (live) { setCopies([]); setError(reason instanceof Error ? reason.message : "Could not load the collection."); } });
+    }, term ? 200 : 0);
+    return () => { live = false; window.clearTimeout(timer); };
+  }, [collection, term]);
+  useEffect(() => setPage(0), [collection, term, all]);
+  const shown = (copies ?? []).filter((copy) => all || copy.free > 0);
+  const pickable = shown.filter((copy) => copy.free > 0);
+  const toggle = (copy: CollectionCopy, on?: boolean) => setChosen((current) => {
+    const next = new Map(current);
+    const key = copyKeyOf(copy);
+    if (on ?? !next.has(key)) next.set(key, { copy, count: next.get(key)?.count ?? copy.free });
+    else next.delete(key);
+    return next;
+  });
+  const click = (copy: CollectionCopy, event: { shiftKey: boolean }) => {
+    if (copy.free <= 0) return;
+    const key = copyKeyOf(copy);
+    if (event.shiftKey && anchor) {
+      const from = pickable.findIndex((item) => copyKeyOf(item) === anchor);
+      const to = pickable.findIndex((item) => copyKeyOf(item) === key);
+      if (from >= 0 && to >= 0) {
+        const [lo, hi] = from < to ? [from, to] : [to, from];
+        for (const item of pickable.slice(lo, hi + 1)) toggle(item, true);
+        return;
+      }
+    }
+    toggle(copy);
+    setAnchor(key);
+  };
+  const allPicked = pickable.length > 0 && pickable.every((copy) => chosen.has(copyKeyOf(copy)));
+  const label = (copy: CollectionCopy) => `${copy.name} (${copy.setCode.toUpperCase()}) ${copy.collectorNumber}${copy.foil ? ` ${copy.foil === 1 ? "foil" : "etched"}` : ""}`;
+  const pickBox = (copy: CollectionCopy) => (
+    <input type="checkbox" className="pickbox" aria-label={`Pick ${label(copy)}`} checked={chosen.has(copyKeyOf(copy))} disabled={copy.free <= 0}
+      onClick={(event) => { event.stopPropagation(); if (event.shiftKey) { event.preventDefault(); click(copy, event); } }}
+      onChange={(event) => { if (!(event.nativeEvent as unknown as { shiftKey?: boolean }).shiftKey) click(copy, { shiftKey: false }); }} />
+  );
+  const tiedNote = (copy: CollectionCopy) => (copy.tiedTo.length ? <span className="sub">{copy.free ? `${copy.quantity - copy.free} on ` : "On "}{copy.tiedTo.join(", ")}</span> : null);
+  const item = (copy: CollectionCopy) => {
+    const key = copyKeyOf(copy);
+    const on = chosen.has(key);
+    const disabled = copy.free <= 0;
+    if (layout === "list") {
+      return (
+        <div key={key} className={`row tierow${on ? " active" : ""}${disabled ? " off" : ""}`} onClick={(event) => click(copy, event)}>
+          {pickBox(copy)}
+          {copy.imageUrl ? <img className="thumb-img" src={copy.imageUrl} alt="" loading="lazy" /> : <span className="thumb-img none">MV</span>}
+          <div className="rowmain">
+            <div className="rowtitle"><b>{copy.name}</b><FinishBadge finish={copy.foil} promoTypes={copy.promoTypes} />{copy.proxy && <span className="badge proxy">Proxy</span>}</div>
+            <div className="rowmeta"><SetIcon code={copy.setCode} />{copy.setName} ({copy.setCode.toUpperCase()}) {copy.collectorNumber}, {copy.condition}{copy.language !== "en" ? `, ${copy.language.toUpperCase()}` : ""} {tiedNote(copy)}</div>
+          </div>
+          <span className="sub">{copy.free} free{copy.free !== copy.quantity ? ` of ${copy.quantity}` : ""}</span>
+        </div>
+      );
+    }
+    return (
+      <div key={key} className={`stackcell tiecell${on ? " active" : ""}${disabled ? " off" : ""}`} onClick={(event) => click(copy, event)} title={label(copy)}>
+        <div className={on ? "pocket active" : "pocket"}>
+          {copy.imageUrl ? <img src={copy.imageUrl} alt={copy.name} loading="lazy" draggable={false} /> : <span className="pocketname">{copy.name}</span>}
+          {on && <span className="badge tiecheck" aria-hidden="true">✓</span>}
+        </div>
+        <div className="pipbar">{pickBox(copy)}<FinishBadge finish={copy.foil} promoTypes={copy.promoTypes} /><span className="sub">{copy.free} free</span></div>
+        {disabled && tiedNote(copy)}
+      </div>
+    );
+  };
+  const pages = Math.max(1, Math.ceil(shown.length / 9));
+  const pageShown = layout === "binder" ? shown.slice(page * 9, page * 9 + 9) : shown;
+  const rows = [...chosen.values()];
   const save = async () => {
     setError("");
     try {
-      const items = rows.map((row) => ({ collectionId: row.collectionId, cardId: row.cardId, foil: row.foil, condition: row.condition, language: row.language, proxy: row.proxy, quantity: Number(row.count) }));
-      await request(`/api/purchases/openings/${openingId}/ties`, { method: "POST", body: JSON.stringify({ items }) });
-      store.flash(`${items.reduce((sum, item) => sum + item.quantity, 0)} cards tied to the opening`);
+      const items = rows.map(({ copy, count }) => ({ collectionId: copy.collectionId, cardId: copy.cardId, foil: copy.foil, condition: copy.condition, language: copy.language, proxy: copy.proxy, quantity: count }));
+      let ids = (await request<{ ids: number[] }>(`/api/purchases/openings/${openingId}/ties`, { method: "POST", body: JSON.stringify({ items }) })).ids ?? [];
+      store.pushUndo({
+        label: `Tie ${items.length} ${items.length === 1 ? "card" : "cards"} to the opening`,
+        undo: async () => { for (const id of ids) await request(`/api/purchases/ties/${id}`, { method: "DELETE" }).catch(() => undefined); onDone(); },
+        redo: async () => { ids = (await request<{ ids: number[] }>(`/api/purchases/openings/${openingId}/ties`, { method: "POST", body: JSON.stringify({ items }) })).ids ?? []; onDone(); },
+      });
+      store.flash(`${items.reduce((sum, row) => sum + row.quantity, 0)} cards tied to the opening`);
       close();
       onDone();
     } catch (reason) {
@@ -1017,24 +1214,44 @@ function TieCopies({ store, openingId, close, onDone }: { store: Store; openingI
     }
   };
   return (
-    <div className="purchaseedit">
+    <div className="purchaseedit tiecopies">
       {error && <p className="note err">{error}</p>}
-      <div className="prow"><label htmlFor="tc-find">Find copies</label><input id="tc-find" autoFocus value={term} placeholder="Card name" onChange={(event) => setTerm(event.target.value)} /></div>
-      {found.length > 0 && (
-        <div className="pefound">{found.map((copy) => (
-          <button key={copyId(copy)} type="button" className="pefoundrow" onClick={() => { if (!rows.some((row) => copyId(row) === copyId(copy))) setRows([...rows, { ...copy, count: "1" }]); }}>
-            <b>{copy.name}</b> <span className="sub">{copy.setCode.toUpperCase()} #{copy.collectorNumber}{copy.foil ? (copy.foil === 1 ? " foil" : " etched") : ""} {copy.condition}, {copy.quantity} in {copy.collectionName}</span>
-          </button>))}</div>
+      <div className="btnrow tiehead">
+        <Picker label="Collection" prefix="Collection: " value={collection} onChange={setCollection} options={own.map((item) => ({ value: item.id, label: item.name }))} />
+        <input aria-label="Find copies" className="grow" autoFocus value={term} placeholder="Find a card in this collection" onChange={(event) => setTerm(event.target.value)} />
+        <label className="check"><input type="checkbox" checked={all} onChange={(event) => setAll(event.target.checked)} /> Show all</label>
+        <OptionsButton title="Add existing copies options">
+          <LayoutRows name="Copies" layout={layout} size={size} onLayout={(tieLayout) => store.setPrefs({ tieLayout })} onSize={(tieSize) => store.setPrefs({ tieSize })} />
+        </OptionsButton>
+      </div>
+      <div className="btnrow">
+        <label className="check"><input type="checkbox" checked={allPicked} disabled={!pickable.length}
+          onChange={() => { for (const copy of pickable) toggle(copy, !allPicked); }} /> Select all</label>
+        <span className="sub">{copies === null ? "Loading" : `${shown.length} ${shown.length === 1 ? "copy" : "copies"}${all ? "" : " not on a pack or purchase"}`}</span>
+      </div>
+      <div className={`tielist ${layout === "list" ? "list" : `cardgrid tiegrid size-${layout === "binder" ? "binder" : size}`}`} role="listbox" aria-label="Copies in the collection">
+        {copies !== null && !shown.length && <p className="note pad">{term ? "No copies match" : "No free copies in this collection"}</p>}
+        {pageShown.map(item)}
+      </div>
+      {layout === "binder" && pages > 1 && (
+        <div className="binderpager">
+          <button type="button" className="btn small" disabled={page === 0} onClick={() => setPage(page - 1)}>Previous page</button>
+          <span>Page {page + 1} of {pages}</span>
+          <button type="button" className="btn small" disabled={page >= pages - 1} onClick={() => setPage(page + 1)}>Next page</button>
+        </div>
       )}
-      <table className="dtable pelines">
-        <thead><tr><th>Card</th><th>Collection</th><th>Count</th><th /></tr></thead>
+      <h4>Chosen</h4>
+      <table className="dtable grid tiechosen">
+        <thead><tr><th>Card</th><th>Collection</th><th className="numcell">Count</th><th /></tr></thead>
         <tbody>
           {!rows.length && <tr><td colSpan={4} className="sub">No copies chosen</td></tr>}
-          {rows.map((row, index) => (
-            <tr key={copyId(row)}>
-              <td>{row.name} <span className="sub">{row.setCode.toUpperCase()} #{row.collectorNumber}</span></td><td>{row.collectionName}</td>
-              <td><input aria-label={`Count of ${row.name}`} type="number" min={1} max={row.quantity} className="num" value={row.count} onChange={(event) => setRows(rows.map((item, at) => (at === index ? { ...item, count: event.target.value } : item)))} /></td>
-              <td><button type="button" className="btn small" onClick={() => setRows(rows.filter((_, at) => at !== index))}>Remove</button></td>
+          {rows.map(({ copy, count }) => (
+            <tr key={copyKeyOf(copy)}>
+              <td>{copy.name} <span className="sub">{copy.setCode.toUpperCase()} #{copy.collectorNumber}</span><FinishBadge finish={copy.foil} promoTypes={copy.promoTypes} /></td>
+              <td>{store.collectionName(copy.collectionId)}</td>
+              <td className="numcell"><input aria-label={`Count of ${copy.name}`} type="number" min={1} max={copy.free} className="num" value={count}
+                onChange={(event) => setChosen((current) => new Map(current).set(copyKeyOf(copy), { copy, count: Math.max(1, Math.min(copy.free, Math.floor(Number(event.target.value)) || 1)) }))} /></td>
+              <td><button type="button" className="btn small" onClick={() => toggle(copy, false)}>Remove</button></td>
             </tr>
           ))}
         </tbody>
@@ -1044,5 +1261,5 @@ function TieCopies({ store, openingId, close, onDone }: { store: Store; openingI
   );
 }
 
-export const tieCopiesDialog = (store: Store, openingId: string, onDone: () => void) =>
-  customDialog("Add existing copies", (close) => <TieCopies store={store} openingId={openingId} close={close} onDone={onDone} />, 720, "Cancel");
+export const tieCopiesDialog = (store: Store, openingId: string, onDone: () => void, collectionId: string | null = null) =>
+  customDialog("Add existing copies", (close) => <TieCopies store={store} openingId={openingId} collectionId={collectionId} close={close} onDone={onDone} />, 980, "Cancel");

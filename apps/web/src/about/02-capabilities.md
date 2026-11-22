@@ -177,6 +177,16 @@ This page lists what Mana Vault does in the current version, followed by what is
 - Notifications for new offers in the Inbox, checked in the background about every 15 minutes, optionally only on Wi-Fi.
 - The Back button, the Android share sheet for exports and backups, sharing lists into the app to import them and pictures or PDFs to read as receipts, background sync as soon as the phone is online, https only, and a daily check of your server for a newer app.
 
+### 0.19.0 additions
+
+- The printing chooser in Grid (the default), List or Binder with a card size, kept for your account, and finish buttons with prices under each picture.
+- Finish lines as a card layout item; hidden, a click on a picture of more than one kind of copy asks which one.
+- Undo and Redo buttons in the top bar.
+- Picking several rows in purchase history: delete several entries, remove several cards from their pack, or move them to another pack.
+- Add existing copies... by collection, in List, Grid or Binder, with free counts and Show all.
+- Read receipt: a Match cards step for single cards (the printing guessed from the set, version, finish and condition), the order date, taxes and pickup, ignored order page buttons, the order number in the Note and sets from product names.
+- Packs opened one at a time: Open how many packs?, each pack its own opening with Next pack, Move to pack..., and cost, values and gain or loss per pack and per product.
+
 ### 0.18.0 additions
 
 - Purchases: pulled cards stay on their pack until removed there with **Remove from pack...**, which keeps or deletes the card; deleted copies stay listed as Gone; each pack shows Value when pulled (fixed), Pulled value and Value now; the entry tables are grids with Finish, Value when pulled and State columns.

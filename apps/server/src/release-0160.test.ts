@@ -26,14 +26,17 @@ describe("purchases", () => {
     const line = entry.lines[0];
     expect((await call("POST", `/api/purchases/${entry.id}/lines/${line.id}/open`, { count: 7, collectionId: main })).statusCode).toBe(400);
     const opening = (await call("POST", `/api/purchases/${entry.id}/lines/${line.id}/open`, { count: 3, collectionId: main })).json();
-    expect(opening.name).toBe("3 Play boosters, HOC (Purchase of Nov 1)");
+    // 0.19.0: three packs, each its own opening; cards go to the first
+    expect(opening.name).toBe("Pack 1 of 6, Play booster, HOC (Purchase of Nov 1)");
+    expect(opening.packs).toHaveLength(3);
     await call("POST", `/api/collections/${main}/cards/add`, { items: [copy("sa1", 2), copy("is1", 4)] });
     await call("POST", `/api/collections/${main}/cards`, { ...copy("bo1"), foil: true });
     let full = (await call("GET", `/api/purchases/${entry.id}`)).json();
     expect(full.ties.map((tie: { cardId: string; quantity: number }) => [tie.cardId, tie.quantity])).toEqual([["sa1", 2], ["is1", 4], ["bo1", 1]]);
     // value now: 3 sealed packs at their cost (5.5 each) + the bundle (11) + 2 x 1 + 4 x 1 + 1 foil x 2
     expect(full.value).toBe(16.5 + 11 + 2 + 4 + 2);
-    expect(full.openings[0]).toMatchObject({ cards: 7, valuePulled: 8, perPack: 2.67, active: true });
+    expect(full.openings[0]).toMatchObject({ cards: 7, valuePulled: 8, perPack: 8, active: true, packNumber: 1, packCost: 5.5 });
+    expect(full.openings.map((item: { waiting: boolean }) => item.waiting)).toEqual([false, true, true]);
     // 0.18.0: removing a pulled card keeps it on the pack (Gone); only an undo of the add unties it
     await call("PUT", `/api/collections/${main}/cards`, { items: [{ ...copy("is1", 3) }] });
     full = (await call("GET", `/api/purchases/${entry.id}`)).json();

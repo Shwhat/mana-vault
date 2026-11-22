@@ -19,7 +19,7 @@ import CardScanner from "./CardScanner";
 import { ContextMenuHost } from "./ContextMenu";
 import { PurchasesView } from "../views/PurchasesView";
 import { Dock } from "./Dock";
-import { ModeTabs, TitleBar, useWorkspaceActions } from "./MenuBar";
+import { ModeTabs, TitleBar, UndoButtons, useWorkspaceActions } from "./MenuBar";
 import { StatusBar } from "./StatusBar";
 import { SyncChip } from "../android/AppScreens";
 import { isApp } from "../android/platform";
@@ -147,6 +147,7 @@ export function PhoneShell({ actions }: { actions: Record<string, Action> }) {
         <span className="brand" aria-hidden="true">M</span>
         <span className="ptitle">{title}</span>
         {isApp() && <SyncChip />}
+        <UndoButtons actions={actions} phone />
         {(store.view === "collection" || store.view === "deck" || store.view === "trade") && !store.cardPage && !store.scannerOpen && (
           <button type="button" className={store.filtersActive ? "pbtn on" : "pbtn"} onClick={() => setSheet(sheet === "filters" ? null : "filters")}>Filters</button>
         )}

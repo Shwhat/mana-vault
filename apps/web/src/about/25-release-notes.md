@@ -2,6 +2,19 @@
 
 The installed version is shown at the top of this guide.
 
+## 0.19.0 (2026-11-22): Printing chooser views, packs one at a time, Match cards and picking in purchases
+
+- Printing chooser: Grid (the default), List or Binder with a card size, through Options in the window and kept for your account. Grid and Binder show each printing's picture with its set, number, year and language, and a finish button with its price for each finish.
+- Fixed: the set symbol beside a printing's set name in the printing chooser was drawn at full size.
+- Card layout: Finish lines (REGULAR 1, FOIL 1 under a picture) is an item that can be placed or hidden. Hidden, a click on a picture of more than one kind of copy asks which one. Saved layouts show Finish lines where they were.
+- Undo and Redo arrow buttons in the top bar after the Help menu, and in the phone's top bar, with the change in the tooltip.
+- Purchases: check boxes, Ctrl+click and Shift+click pick several rows. History has Delete picked...; an entry's cards have Remove picked from pack... and Move to pack..., each one undo step.
+- Purchases: Add existing copies... chooses a collection (the opening's to start with) and lists its free copies in List, Grid or Binder, with Show all, Select all and a count per copy, tied as one undo step.
+- Read receipt: lines that are single cards go to a Match cards step with the printing guessed from the set, version (Showcase, Borderless, Extended Art), finish and condition, to confirm, choose another printing, find the card or keep as a product.
+- Read receipt: the order date instead of today or a pickup date, Taxes and Pickup into Tax and Shipping, order page buttons (Buy again, Track all your orders) ignored, the order number in the Note, and sets found in product names (Star Trek, The Hobbit, Commander decks).
+- Purchases: Open... on a product with packs asks how many packs. Each pack is its own opening (Pack 1 of 36); Next pack moves on, from the entry page, the status bar, the Purchases header and the scanner. Move to pack... fixes a card scanned into the wrong pack. Each pack and each product shows Pack cost, Value when pulled, Pulled value, Value now and Gain or loss.
+- Openings of products with packs from before 0.19.0 are counted in packs; a box counts as opened from its first pack and its packs not yet opened keep their share of its value.
+
 ## 0.18.0 (2026-11-22): Card layout, live updates, scanning into an opening and pulls that stay on their pack
 
 - Card layout (View menu): drag the count, printings, finish, status marks, price and buttons to the corners of a card picture, the row under it, a second line or the bottom, or hide them. One layout for every section, or one per section (Card search, Collections, Decks, Trade, Proxies). By default the pips sit in one row with the price at its right and the buttons line up at the bottom of every card.

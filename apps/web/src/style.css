@@ -966,7 +966,7 @@ button.tag.badge{border:0;cursor:pointer;font:inherit;font-size:10.5px}
 .printrow:last-child{border-bottom:0}
 .printrow:hover,.printrow:focus{background:var(--hover);outline:none}
 .printrow.active{background:var(--accent-soft);color:var(--on-text)}
-.printrow img,.printrow .noimg{width:42px;height:58px;border-radius:3px;object-fit:cover;flex:none;background:var(--line2)}
+.printrow > img,.printrow > .noimg{width:60px;height:84px;border-radius:4px;object-fit:cover;flex:none;background:var(--line2)}
 .printrow .pinfo{display:flex;flex-direction:column;flex:1;min-width:0}
 .printrow .pinfo b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .printrow .muted{color:var(--muted);font-size:11.5px}
@@ -1366,3 +1366,82 @@ input.setcode{width:60px}
 .clzone.right .clname,.clzone.corner.tr .clname,.clzone.corner.br .clname{text-align:right}
 .clzone.corner{min-height:40px}
 .dtable.grid td:first-child{min-width:150px}
+
+/* 0.19.0: the printing chooser in Grid and Binder */
+.printhead{display:flex;gap:6px;align-items:center}.printhead .search{flex:1;min-width:0}
+.printlist.printgrid{display:grid;gap:10px;padding:8px;max-height:62vh;align-items:start}
+.printgrid.size-s{grid-template-columns:repeat(auto-fill,minmax(130px,1fr))}
+.printgrid.size-m{grid-template-columns:repeat(auto-fill,minmax(180px,1fr))}
+.printgrid.size-l{grid-template-columns:repeat(auto-fill,minmax(250px,1fr))}
+.printgrid.size-binder{grid-template-columns:repeat(3,minmax(0,1fr));max-height:none}
+.printgrid .printcard{display:flex;flex-direction:column;align-items:stretch;gap:4px;padding:6px;border:1px solid var(--line2);border-radius:6px;background:var(--panel);cursor:pointer;min-width:0}
+.printgrid .printcard:hover,.printgrid .printcard:focus{border-color:var(--accent);outline:none;background:var(--panel)}
+.printgrid .printcard.active{border-color:var(--sel);box-shadow:0 0 0 2px var(--sel);background:var(--panel)}
+.printcard .pcpic{position:relative;aspect-ratio:63/88;border-radius:5px;overflow:hidden;background:var(--line2);display:block}
+.printcard .pcpic img{width:100%;height:100%;object-fit:cover;display:block}
+.printcard .pcpic .pocketname{position:absolute;inset:0;display:grid;place-items:center;text-align:center;padding:6px;font-weight:600}
+.printcard .pccurrent{position:absolute;top:4px;left:4px;background:var(--panel2)}
+.printcard .pinfo{display:flex;flex-direction:column;min-width:0;font-size:11.5px}
+.printcard .pinfo b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.printcard .muted{color:var(--muted)}
+.printcard .pfinishes{display:flex;flex-wrap:wrap;gap:3px}
+.printcard .pfinishes .btn{flex:1 1 auto;padding:2px 5px;white-space:nowrap}
+.printcard .pfinishes .btn.hi{border-color:var(--accent)}
+.printcard .pfinishes .btn.on{background:var(--accent-soft);border-color:var(--on-line);color:var(--on-text);font-weight:600}
+.phone .printgrid.size-m,.phone .printgrid.size-l{grid-template-columns:repeat(2,minmax(0,1fr))}
+.phone .printgrid.size-s{grid-template-columns:repeat(3,minmax(0,1fr))}
+/* 0.19.0: Finish lines placed by the card layout take a whole row where they sit */
+.cardframe .slines{flex-basis:100%;width:100%}
+.cfcorner .slines{background:var(--panel2);border-radius:4px;width:auto;min-width:70%}
+.kindchoice{display:flex;flex-direction:column;gap:4px}
+.kindrow{display:flex;align-items:center;gap:8px;width:100%;padding:6px 8px;border:1px solid var(--line2);border-radius:4px;background:var(--panel2);color:var(--text);font:inherit;cursor:pointer;text-align:left}
+.kindrow:hover,.kindrow:focus{border-color:var(--accent);outline:none}
+.kindrow .grow{flex:1}
+/* 0.19.0: Undo and Redo in the top bar; the icons are drawn light on the dark title bar */
+.tbundo{display:flex;align-items:center;gap:2px;margin-left:6px;padding-left:6px;border-left:1px solid #46536a}
+.tbicon{display:flex;align-items:center;justify-content:center;width:28px;height:22px;border:0;border-radius:3px;background:none;padding:0;cursor:pointer}
+.tbicon .ico{width:18px;height:18px}.tbicon .ico svg{filter:invert(.92)}
+.tbicon:hover:not(:disabled){background:#3d4a5d}
+.tbicon:disabled{opacity:.35;cursor:default}
+.pundo{display:flex;gap:2px}
+.pundo .undobtn{padding:4px 6px}
+.pundo .undobtn:disabled{opacity:.35}
+/* 0.19.0: picking rows in purchase history */
+.pickbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:5px 8px;margin:4px 0;border:1px solid var(--on-line);border-radius:4px;background:var(--accent-soft);color:var(--on-text)}
+.dtable.grid th.pickcell,.dtable.grid td.pickcell{width:28px;min-width:28px;text-align:center;padding:4px}
+.dtable.grid td.pickcell:first-child{min-width:28px}
+.pickbox{margin:0;cursor:pointer}
+.dtable.grid tr.picked td{background:var(--accent-soft)}
+/* 0.19.0: Add existing copies... */
+.tiecopies .tiehead{align-items:center}.tiecopies .tiehead .grow{flex:1;min-width:140px}
+.tielist{max-height:46vh;overflow:auto;border:1px solid var(--line2);border-radius:4px;background:var(--panel2)}
+.tielist.list .row{cursor:pointer}
+.tierow{display:flex;align-items:center;gap:8px}
+.tierow.off,.tiecell.off{opacity:.55;cursor:default}
+.tiegrid{display:grid;gap:8px;padding:8px}
+.tiegrid.size-s{grid-template-columns:repeat(auto-fill,minmax(110px,1fr))}
+.tiegrid.size-m{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+.tiegrid.size-l{grid-template-columns:repeat(auto-fill,minmax(210px,1fr))}
+.tiegrid.size-binder{grid-template-columns:repeat(3,minmax(0,1fr))}
+.tiecell{cursor:pointer}
+.tiecell .pocket{position:relative}
+.tiecheck{position:absolute;top:4px;right:4px;background:var(--accent);color:#fff;border-color:var(--accent)}
+.tiecopies h4{margin:8px 0 4px}
+/* 0.19.0: Match cards after reading a receipt */
+.matchcards{display:flex;flex-direction:column;gap:8px}
+.matchrow{display:grid;grid-template-columns:minmax(180px,1fr) 2fr;gap:10px;align-items:center;padding:8px;border:1px solid var(--line2);border-radius:5px;background:var(--panel2)}
+.matchrow.ok{border-color:var(--on-line)}
+.matchrow.asproduct{opacity:.75}
+.matchtext{display:flex;flex-direction:column;gap:2px;min-width:0}
+.matchguess{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0}
+.matchguess .thumb-img{width:48px;height:67px}
+.matchcard{display:flex;flex-direction:column;gap:2px;min-width:140px;flex:1}
+.matchpanel{grid-column:1/-1}
+.phone .matchrow{grid-template-columns:1fr}
+.scanopening{white-space:normal;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.scanopening .btn{pointer-events:auto}
+/* 0.19.0: packs opened one at a time */
+.openingline{border:1px solid var(--line2);border-radius:5px;padding:6px 8px;margin:6px 0;background:var(--panel2)}
+.openlinehead{display:flex;flex-direction:column;gap:3px;padding-bottom:4px;border-bottom:1px solid var(--line2)}
+.packrow.active{background:var(--accent-soft)}
+.packrow.waiting{opacity:.7}

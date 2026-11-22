@@ -81,6 +81,28 @@ A purchase can be read from a receipt: a photo, a PDF or a screenshot.
 
 - **Read receipt...** in the Purchases header, or in the purchase window, chooses the file. On the Android app, the camera can take the photo, and a picture or PDF shared into the app offers **Read receipt**.
 - The date, the place, product lines (with set codes when the receipt names a set), single cards, tax and shipping that can be read are filled in the purchase window to check before saving. The status bar says how many lines were read, or "No product lines found".
+- **Date**: the order date (after Confirmed, Ordered, Order date, Placed or Purchased), not a pickup, shipping or delivery date. A date written without a year takes the latest such date not after today.
+- **Tax and shipping**: lines named Tax, Taxes, Sales tax, Shipping, Delivery or Pickup go to Tax and Shipping (Free counts as 0), never to product lines. Subtotal and Total are never lines.
+- **Ignored text**: buttons, links and status text of order pages (such as Buy again, Track all your orders, View order, Reorder, Picked up, Confirmed, times such as "at 5:22 PM") are never read as products or as the place. Bought from is left empty when the receipt names no store.
+- **Order number**: "Order #Z-301783" and the like go into the Note.
+- **Sets**: a set named in a product line fills its set, ignoring punctuation ("Star Trek: Commander Deck" names Star Trek); a Commander product finds the set's Commander companion.
+
+#### Match cards
+
+When lines look like single cards, a **Match cards** step comes first. A line looks like a single card when its name, without store notes (bracketed set names, Showcase, Borderless, Extended Art, conditions and finishes), is a card name, or when it carries a condition or finish note such as "Near Mint Foil" (on the line or on the row under it).
+
+Each line shows the receipt text, the quantity and the price, and the best guess: the card's picture, name, set, collector number, condition and finish. The set comes from a bracketed set name or code, a version word (Showcase, Borderless, Extended Art, Full art) picks the matching printing, Foil or Etched the finish, and the condition word the condition (Near Mint when none).
+
+| Button | What it does |
+|---|---|
+| OK | Keeps the guess |
+| Choose printing... | Opens the printing chooser on the card to pick the exact printing and finish |
+| Another card... | Searches for a different card, then its printing |
+| Find the card... | For a line with no card found: searches for the card, then its printing |
+| Keep as product | Leaves the line as an Other product |
+| Match a card | Undoes Keep as product |
+
+**Continue** puts every matched line into Single cards with its finish, condition, quantity and price, and the rest into Products; a card-like line with no card and not kept as a product is named in "Find the card for name, or keep it as a product." **Cancel** puts every line into Products as read.
 - PDFs and pictures are read by the server. On the Android app, camera photos are read on the phone, and the server reads the rest.
 - The receipt is kept with the entry. The entry page has a **Receipt** section with **View**, **Replace** and **Remove**. A receipt can be added to any saved entry the same way. Replacing or removing a receipt can be undone.
 - Receipts are files up to 20 MB, kept on the server with the account's data.
@@ -97,8 +119,8 @@ Example: 6 Play boosters for 30.00 and a Bundle for 10.00, with 3.00 tax and 1.0
 
 A product line is sealed until it is opened.
 
-1. On the entry page, **Open...** on a line asks how many to open (for example 3 of 6 packs, or 1 box) and the collection the pulled cards go to.
-2. The opened part becomes an **opening**, named like "3 Play boosters, Foundations (Purchase of Nov 20)". It becomes where pulled cards are tied, and its collection becomes where new cards go.
+1. On the entry page, **Open...** on a line asks the collection the pulled cards go to and, for a product with packs in it (Packs in it above 0, such as a booster, a booster box or a bundle), **Open how many packs?** out of the packs left (for example 3 of 36 left in the box). A product with no packs in it (a Commander deck) asks how many of it to open. Once packs are opened the button reads **Open more packs...**.
+2. Each pack opened is its own **opening**, named with its number in the product, like "Pack 1 of 36, Booster box, Foundations (Purchase of Nov 20)". The first is where pulled cards are tied; the other packs opened at the same time wait in order. **Next pack** (on the entry page, NEXT PACK in the status bar, beside the opening chip in the Purchases header, and on the scanner) ends the current pack and moves to the next one; the last pack has **Done opening**. The status bar shows OPENING: name (1 of 3). A product with no packs makes one opening, named like "1 Commander deck, Star Trek (Purchase of Nov 20)".
 3. While the opening is active, every card added to that collection is tied to it: from card search, Quick add, the scanner, pasted lists, imports and count changes. The status bar shows **OPENING: name**, and ADDING TO names the opening. A pulled card stays on its pack for good: removing it from the collection, moving it, changing its printing, selling it or trading it never takes it off the pack. Only **Remove from pack...** on the entry page does, and an undo of adding the card (the card was added by mistake).
 4. The opening on the entry page has buttons to fill it:
 
@@ -110,6 +132,8 @@ A product line is sealed until it is opened.
 | Done opening | Ends the opening |
 
 5. A click on **OPENING** in the status bar, or on the opening chip in the Purchases header, opens the entry. **Continue opening** makes an ended opening active again, so a box of 36 packs can be recorded over several days.
+
+A box counts as opened from its first pack: its State shows packs opened and packs left (such as "3 of 36 packs opened, 33 left"), and its packs not yet opened keep counting at the box's value divided by its packs. A waiting pack has **Start this pack**; an ended pack has **Continue opening**. Undo of Open... removes every pack opened at the same time, with their cards' ties.
 
 Only one opening is active at a time; opening another ends the one before. An opening started on one device is the opening on every device: the phone's scanner shows **Scanning into: name** and fills it in as where scanned cards go (see [Scanning cards](/about/scanning-cards)), and ending it on one device ends it on all of them.
 
@@ -124,21 +148,49 @@ Only one opening is active at a time; opening another ends the one before. An op
 
 Both can be undone; undo puts the card back on the pack with its date and its Value when pulled.
 
+**Move to pack...** on a card (or on picked cards) moves it to another pack of the same product, for a card scanned into the wrong pack. It keeps its date and Value when pulled, and can be undone. The Pack column of the card table shows each card's pack.
+
+### Picking several rows
+
+The History list and the card table of an entry have a check box on each row and one in the heading row that picks or clears every row shown. Ctrl+click (Cmd+click) adds or removes a row and Shift+click picks every row between the last picked and the clicked one; a plain click on a History row still opens it. While rows are picked, a bar shows "N picked" with the actions and **Clear**.
+
+| List | Actions |
+|---|---|
+| History | **Delete picked...** asks once ("Delete N entries?", with the note about card sales) and deletes them as one undo step |
+| Cards from this purchase | **Remove picked from pack...** (Remove picked from purchase... for cards bought) asks once whether to keep or delete the cards, as one undo step; **Move to pack...** moves them to another pack of the same product |
+
+### Add existing copies...
+
+**Add existing copies...** on an opening ties copies already in a collection to it:
+
+| Part | What it does |
+|---|---|
+| Collection | Your collections, starting on the opening's own collection |
+| Find box | Shows only the copies whose name contains the text |
+| Show all | Also lists copies already on a pack or purchase, with where they are; those cannot be picked |
+| Options | Layout (List, Grid or Binder) and card size, kept for your account; the window opens in List |
+| Select all | Picks every copy shown that is free |
+| Check boxes | Pick a copy (Shift+click picks a range). Each picked copy has a count from 1 to its free copies, starting at all of them |
+| Chosen | Every picked copy with its collection and count, across collections |
+| Tie to the opening | Ties them all as one undo step |
+
 Removing a copy from a collection when it came from a pack or purchase says so in the question, for example "1 card came from 3 Play boosters, Foundations (Purchase of Nov 20). It stays listed on that pack."
 
 ### Opening figures
 
-Each opening shows its card count, how many of its cards are gone, the value per pack, and three values:
+Each pack shows its card count, how many of its cards are gone, and its figures. The product above its packs shows the same figures added up over its packs, with the value pulled per pack:
 
 | Figure | Rule |
 |---|---|
 | Value when pulled | Every card pulled at its price for its finish on the day it was added to the pack. It never changes after that day. A card with no price that day counts as 0 |
 | Pulled value | Every card pulled at today's price for its finish, held or not |
 | Value now | Only the pulled cards still held, at today's price for their finish |
+| Pack cost | The product's full cost (with its share of tax and shipping) divided by its packs; for a product without packs, its full cost for what was opened |
+| Gain or loss | Value now + what its cards sold or traded for - Pack cost. A card sold or traded counts at the average price its copies from the purchase brought in |
 
-The value per pack is the pulled value ÷ the packs opened (the count opened × Packs in it, or the count when Packs in it is 0). Gain or loss uses Value now, so cards no longer held do not count as owned.
+The value per pack is the pulled value ÷ the packs opened. Gain or loss uses Value now, so cards no longer held do not count as owned.
 
-Worked example: a pack pulls 2 copies of a card worth 2.00 that day. Value when pulled is 4.00. The price rises to 5.00 and one copy is deleted from the collection: Pulled value is 10.00, Value now is 5.00, and Value when pulled stays 4.00.
+Worked example: a pack pulls 2 copies of a card worth 2.00 that day. Value when pulled is 4.00. The price rises to 5.00 and one copy is deleted from the collection: Pulled value is 10.00, Value now is 5.00, and Value when pulled stays 4.00. The pack came from a 72.00 box of 36 packs, so its Pack cost is 2.00 and its Gain or loss is 5.00 + 0.00 - 2.00 = +3.00.
 
 ## Sealed product kept
 

@@ -166,9 +166,9 @@ test("pulled cards stay on their pack; Remove from pack keeps or deletes; the en
   await expect(cards.locator("table.dtable.grid thead")).toContainText("Value when pulled");
   await expect(cards.locator("tbody tr", { hasText: "Serra Angel" })).toContainText("Gone");
   await expect(cards.locator("tbody tr", { hasText: "Lightning Bolt" })).toContainText("In collection");
-  await expect(page.locator(".openfigs")).toContainText("Value when pulled");
-  await expect(page.locator(".openfigs")).toContainText("Pulled value");
-  await expect(page.locator(".openfigs")).toContainText("Value now");
+  await expect(page.locator(".openfigs").first()).toContainText("Value when pulled");
+  await expect(page.locator(".openfigs").first()).toContainText("Pulled value");
+  await expect(page.locator(".openfigs").first()).toContainText("Value now");
 
   // Remove from pack and delete the card, then undo
   await cards.locator("tbody tr", { hasText: "Lightning Bolt" }).getByRole("button", { name: "Remove from pack..." }).click();

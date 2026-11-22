@@ -7,6 +7,7 @@ import {
 } from "../card-layout";
 import { Segments } from "./Options";
 import { customDialog } from "./Dialog";
+import { FinishPip } from "./CardMarks";
 
 /** The layout one section uses. */
 export function useCardLayout(section: LayoutSection): PipLayout {
@@ -118,4 +119,33 @@ const slotOf = (layout: PipLayout, item: PipItem): PipSlot | undefined => PIP_SL
 
 export function cardLayoutDialog() {
   customDialog("Card layout", () => <CardLayoutEditor />, 560);
+}
+
+/**
+ * With Finish lines hidden (0.19.0): clicking a picture that stands for more than one kind of copy asks which one, listing
+ * each with its finish pip and count. Resolves with the chosen key, or null.
+ */
+export function chooseKind(kinds: Array<{ key: string; finish: number; promoTypes?: string | null; count: number; detail?: string }>, name: string): Promise<string | null> {
+  return new Promise((resolve) => {
+    let answered = false;
+    customDialog(`Which ${name}?`, (close) => (
+      <div className="kindchoice" role="listbox" aria-label={`Kinds of ${name}`}>
+        {kinds.map((kind, index) => (
+          <button key={kind.key} type="button" className="row kindrow" autoFocus={index === 0}
+            onClick={() => { answered = true; close(); resolve(kind.key); }}>
+            <FinishPip finish={kind.finish} promoTypes={kind.promoTypes} />
+            {kind.detail && <span className="sub">{kind.detail}</span>}
+            <span className="grow" />
+            <b>{kind.count}</b>
+          </button>
+        ))}
+      </div>
+    ), 360, "Cancel");
+    // a closed window without a choice resolves with nothing
+    window.setTimeout(function wait() {
+      if (answered) return;
+      if (!document.querySelector("dialog#dlg[open] .kindchoice")) return resolve(null);
+      window.setTimeout(wait, 300);
+    }, 300);
+  });
 }

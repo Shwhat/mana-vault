@@ -97,6 +97,11 @@ Messages appear at the right end of the status bar (on the phone, in a banner ab
 | Card name is now (SET) number, decks kept their version | Change printing of copies in a deck, answered No, show it as missing |
 | Card name reduced to 1 copy, N entries reduced to 1 copy each | Reduce to 1 |
 | Adding to name | Clicking ADDING TO in the status bar, or one click on a collection or deck in a panel outside the Collection and Decks tabs |
+| N entries deleted | Delete picked... in History |
+| N cards removed from the pack, N cards removed from the pack and deleted | Remove picked from pack... |
+| Card name moved to pack name, N cards moved to pack name | Move to pack... |
+| Now opening pack name, or pack name done | Next pack |
+| N cards tied to the opening | Tie to the opening in Add existing copies... |
 | Scanning into name | Scan on an opening, Start scanning, or a tapped Opening started notification |
 | Card name removed from the pack, Card name removed from the entry | Remove from pack..., Remove from pack, keep the card |
 | Card name removed from the pack and deleted | Remove from pack..., Remove from pack and delete the card |
@@ -174,6 +179,10 @@ Messages appear at the right end of the status bar (on the phone, in a banner ab
 | No opening is active | Start scanning or a tapped Opening started notification after the opening was ended | Start a new opening from its purchase |
 | Remove Card name again from the pack page | Redo of Remove from pack... | Use Remove from pack... on the entry page again |
 | Could not remove the card. | Remove from pack... failed | Check the connection and try again |
+| Pick cards from the packs of one product | Move to pack... with cards from more than one product | Pick cards of one product |
+| This product has no other pack | Move to pack... when the product has one pack | Open more packs first |
+| Find the card for name, or keep it as a product. | Continue in Match cards with a line that has no card | Use Find the card... or Keep as product |
+| Could not move the cards. / Could not move to the next pack. / Could not delete the entries. | The change failed | Check the connection and try again |
 | Could not copy to the clipboard | The browser refused clipboard access | Allow clipboard access for the site, or use a secure (HTTPS) address |
 | Could not action. | The action failed and the server gave no reason, often because the server could not be reached | Check the connection and try again |
 
@@ -235,6 +244,9 @@ Messages appear at the right end of the status bar (on the phone, in a banner ab
 | Only a copied or transferred collection can be merged | Merging a share |
 | Only the owner can stop sharing with someone | Removing another person from an item shared with you |
 | Choose a supported deck format | The format is not in the list |
+| Open from 1 to N packs | Open... with more packs than are left |
+| Cards move only between packs of the same product | Move to pack... to a pack of another product; reload the page |
+| Choose one of your collections | Add existing copies... with a collection that is not yours; reload the page |
 | Send the card to put back | An undo of Remove from pack... sent an incomplete card; reload the page |
 | That card is not tied to your purchases | Remove from pack... on a card already removed on another device; the page reloads with the change |
 | Each card needs a cardId, a finish, a known condition and language, and a quantity from 0 (or 1) to 10,000 | A collection change was sent with a value Mana Vault does not know; reload the page |

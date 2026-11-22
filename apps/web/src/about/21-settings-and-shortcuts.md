@@ -31,6 +31,8 @@ Preferences are saved for your account on the server and follow you to every bro
 | Prices on pictures | On, Off | Off | View menu |
 | Print list sort | Order added, Name, Set, Mana value, Rarity, Color, Price, Count | Order added | Sort on the Print tab |
 | Print list layout and card size | List, Grid, Binder; Small, Medium, Large | List, Medium | Options on the Print tab |
+| Printing chooser layout and card size | Grid, List, Binder; Small, Medium, Large | Grid, Medium | Options in the printing chooser |
+| Add existing copies... layout and card size | List, Grid, Binder; Small, Medium, Large | List, Medium | Options in Add existing copies... |
 | Card layout | Where the count, printings, finish, status marks, price and buttons sit; one layout for all sections or one per section | Pips in one row under the picture with the price at its right, buttons at the bottom, same layout everywhere | View, Card layout... |
 | Panel layout | Any arrangement | Deck building workspace | Drag panels, View menu |
 | Workspace | Built-in or saved | Deck building | Account menu, Manage workspaces... |

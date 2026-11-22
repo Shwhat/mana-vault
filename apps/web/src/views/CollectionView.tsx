@@ -9,7 +9,8 @@ import { rowMenu } from "../components/ContextMenu";
 import { collectionDialog, copyDialog, moveDialog } from "../components/LibraryDialogs";
 import { choosePrinting } from "../components/PrintingDialog";
 import { CountPip, FinishBadge, FinishPip, finishName, PricePip, RemovedPip, removeCard } from "../components/CardMarks";
-import { CardFrame } from "../components/CardFrame";
+import { CardFrame, chooseKind, useCardLayout } from "../components/CardFrame";
+import { isPlaced } from "../card-layout";
 import { Icon } from "../icons";
 import { entryKey } from "../library-state";
 import { type Store, useApp } from "../store";
@@ -274,10 +275,17 @@ function Stack({ entries }: { entries: CollectionEntry[] }) {
   const active = entries.some((entry) => store.checked.has(entryKey(entry)));
   const count = entries.reduce((sum, entry) => sum + entry.quantity, 0);
   const split = entries.length > 1;
+  const linesShown = isPlaced(useCardLayout("collection"), "lines");
   const picture = (
     <div className={active ? "pocket active" : "pocket"} data-key={split ? undefined : entryKey(first)} role={split ? undefined : "option"} aria-selected={split ? undefined : active}
       title={`${first.name}, ${first.set_name} ${first.collector_number}${first.collection_name ? `, in ${first.collection_name}` : ""}`}
-      onClick={(event) => store.pickRow(first, { ctrl: event.ctrlKey || event.metaKey, shift: event.shiftKey })}
+      onClick={(event) => {
+        const modifiers = { ctrl: event.ctrlKey || event.metaKey, shift: event.shiftKey };
+        // with Finish lines hidden (0.19.0) a picture of more than one kind of copy asks which one
+        if (split && !linesShown) return void chooseKind(entries.map((entry) => ({ key: entryKey(entry), finish: entry.foil, promoTypes: entry.promo_types, count: entry.quantity, detail: copyLabel(entry) })), first.name)
+          .then((key) => { const entry = entries.find((item) => entryKey(item) === key); if (entry) store.pickRow(entry, modifiers); });
+        store.pickRow(first, modifiers);
+      }}
       onDoubleClick={() => copyDialog(store, first)} {...entryMenu(store, first)}>
       {first.image_url ? <img src={first.image_url} alt={first.name} loading="lazy" draggable={false} /> : <span className="pocketname">{first.name}</span>}
     </div>
@@ -288,11 +296,12 @@ function Stack({ entries }: { entries: CollectionEntry[] }) {
       finish: split ? entries.map((entry) => <FinishBadge key={entryKey(entry)} finish={entry.foil} promoTypes={entry.promo_types} />) : <CopyPips entry={first} />,
       marks: first.removed ? <RemovedPip onChange={() => changeEntryPrinting(store, first)} /> : null,
       price: <PricePip price={copyPrice(first, store.prefs.currency)} />,
-    }} after={split && (
-      <div className="slines" role="group" aria-label={`Copies of ${first.name} (${first.set_code.toUpperCase()}) ${first.collector_number}`}>
-        {entries.map((entry) => <StackLine key={entryKey(entry)} entry={entry} />)}
-      </div>
-    )} />
+      lines: split && (
+        <div className="slines" role="group" aria-label={`Copies of ${first.name} (${first.set_code.toUpperCase()}) ${first.collector_number}`}>
+          {entries.map((entry) => <StackLine key={entryKey(entry)} entry={entry} />)}
+        </div>
+      ),
+    }} />
   );
 }
 

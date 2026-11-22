@@ -66,7 +66,9 @@ test("finish marks, change printing of deck and collection cards, and undo", asy
 
   // the same printing in foil: the copies become foil
   await rightClick(page, page.locator("#view-collection .row", { hasText: "Lightning Bolt" }).first(), "Change printing...");
-  await expect(page.locator(".printrow", { hasText: "Magic 2010" })).toContainText("Current: regular");
+  // 0.19.0: the chooser opens in Grid; the current printing is marked and its current finish is pressed
+  await expect(page.locator(".printrow", { hasText: "Magic 2010" }).locator(".pccurrent")).toHaveText("Current");
+  await expect(page.getByRole("button", { name: "Regular M10 146" })).toHaveAttribute("aria-pressed", "true");
   await page.getByRole("button", { name: "Foil M10 146" }).click();
   await expect(status(page)).toHaveText("Lightning Bolt is now (M10) 146 foil");
   await expect(page.locator("#view-collection .row", { hasText: "Lightning Bolt" }).first().locator(".badge.foil")).toHaveText("FOIL");

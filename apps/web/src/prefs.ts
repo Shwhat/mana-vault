@@ -88,6 +88,12 @@ export type Prefs = {
   /** Proxies: the sheet settings for printing, and the tab shown (Print or Card maker). */
   proxySheet: SheetSettings;
   proxyTab: "print" | "maker";
+  /** The printing chooser's layout and card size (0.19.0), its own setting. */
+  chooserLayout: CollectionLayout;
+  chooserSize: GridSize;
+  /** The Add existing copies... window's layout and card size (0.19.0). */
+  tieLayout: CollectionLayout;
+  tieSize: GridSize;
   /** Where pips and buttons sit around card pictures (0.18.0), one layout for all or one per section. */
   cardLayout: CardLayoutPrefs;
   appVersion: string;
@@ -105,7 +111,7 @@ export function defaultPrefs(): Prefs {
     listGroups: { collection: "none", search: "none", print: "none" }, listFolds: [],
     scanVibrate: true, scanFoil: false, scanCamera: "environment", scanQuick: false, scanSounds: true, scanSets: [], scanIgnorePromos: false,
     scanProxy: false, scanCondition: "NM", scanLanguage: "en", scanShowTotal: false, scanShowOwned: false, pricesOnPictures: false, printSort: "added", printLayout: "list", printSize: "m",
-    proxySheet: DEFAULT_SHEET, proxyTab: "print", cardLayout: defaultCardLayout(), appVersion: APP_VERSION,
+    proxySheet: DEFAULT_SHEET, proxyTab: "print", cardLayout: defaultCardLayout(), chooserLayout: "grid", chooserSize: "m", tieLayout: "list", tieSize: "m", appVersion: APP_VERSION,
   };
 }
 
@@ -176,6 +182,10 @@ export function mergePrefs(saved: unknown): Prefs {
     printLayout: value.printLayout === "grid" || value.printLayout === "binder" ? value.printLayout : "list",
     printSize: value.printSize === "s" || value.printSize === "l" ? value.printSize : "m",
     cardLayout: readCardLayout(value.cardLayout),
+    chooserLayout: layoutOf(value.chooserLayout, "grid"),
+    chooserSize: value.chooserSize === "s" || value.chooserSize === "l" ? value.chooserSize : "m",
+    tieLayout: layoutOf(value.tieLayout, "list"),
+    tieSize: value.tieSize === "s" || value.tieSize === "l" ? value.tieSize : "m",
     appVersion: APP_VERSION,
   };
 }
