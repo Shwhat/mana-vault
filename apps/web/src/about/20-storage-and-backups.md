@@ -19,7 +19,7 @@ Card pictures downloaded to the server are kept in the picture folder: by defaul
 
 ## In-app backup
 
-**Download backup** (File menu) downloads mana-vault-backup.json with the signed-in account's own collections and decks. It contains:
+**Download backup** (File menu) downloads mana-vault-backup.json with the signed-in account's own collections and decks. The file is marked with the Mana Vault version that made it (backups made before 0.17.1 are marked with a number from 1 to 7 instead). It contains:
 
 | Part | Contents |
 |---|---|
@@ -32,7 +32,7 @@ Card pictures downloaded to the server are kept in the picture folder: by defaul
 | Custom sets and custom cards | The custom sets and custom cards you made or use, with their card maker designs, pictures, art and set symbols (SVG symbols included) |
 | Art library | Every picture you added to the art library, with its name (backups made with 0.15.0 and later). A restore keeps pictures other accounts added |
 | Card back | The card back you uploaded for printing, if any (backups made with 0.15.0 and later) |
-| Purchase history | Every entry with its lines, openings, tied cards, sales, sealed values, place, who paid shipping and receipt (backups made with 0.16.0 and later, version 7). On restore each place is matched to the server's places by name, and added when it is new |
+| Purchase history | Every entry with its lines, openings, tied cards, sales, sealed values, place, who paid shipping and receipt (backups made with 0.16.0 and later). On restore each place is matched to the server's places by name, and added when it is new |
 
 A backup does not contain collections or decks shared with you by others, accounts, preferences, prices, deck history, trades, the trade binder link, the print list or the full card database. Prices return with the next card database update.
 
@@ -43,14 +43,15 @@ A backup does not contain collections or decks shared with you by others, accoun
 3. Choose **Restore backup** to go ahead, or **Cancel**.
 4. Your own collections and decks are replaced by the backup's. Items you had shared stop being shared, and offers of them are cancelled. Collections and decks shared with you by others, and other accounts' data, are not changed. The card records in the backup are added to the card database; the rest of the card database is unchanged. Custom sets and custom cards missing on the server are added, made by your account; custom cards already on the server keep their current version.
 
-A restore cannot be undone, and it clears the undo history. Backups made before version 0.2.0 hold a single collection; they restore as a collection named Main collection. Backups made before version 0.3.0 restore every copy as near mint English with none for trade, and every collection as a collection (not a wishlist). Backups made before version 0.6.0 restore without proxies, copy details or deck links, and cards of decks that kept cards by name take the newest printing. A backup made with 0.16.0 or later replaces your purchase history with the backup's, tied to the restored collections; an older backup leaves it as it is, and its ties to collections that the restore replaced count nothing. A backup made with 0.15.0 or later replaces your art library and uploaded card back with the backup's; an older backup leaves them as they are. Download a backup first if the current data might be needed.
+A backup can be restored by the version of Mana Vault that made it or any later version; a backup made by a newer version is refused until the server is updated. A restore cannot be undone, and it clears the undo history. Backups made before version 0.2.0 hold a single collection; they restore as a collection named Main collection. Backups made before version 0.3.0 restore every copy as near mint English with none for trade, and every collection as a collection (not a wishlist). Backups made before version 0.6.0 restore without proxies, copy details or deck links, and cards of decks that kept cards by name take the newest printing. A backup made with 0.16.0 or later replaces your purchase history with the backup's, tied to the restored collections; an older backup leaves it as it is, and its ties to collections that the restore replaced count nothing. A backup made with 0.15.0 or later replaces your art library and uploaded card back with the backup's; an older backup leaves them as they are. Download a backup first if the current data might be needed.
 
 ### Restore messages
 
 | Message | Cause |
 |---|---|
 | Backup file is not valid JSON | The file is damaged or not a backup |
-| Unsupported backup file format or version | The file is not a Mana Vault backup, or is from an unknown version |
+| Unsupported backup file format or version | The file is not a Mana Vault backup, or its version mark cannot be read |
+| This backup was made by Mana Vault X. Update this server (Y) to X or later to restore it. | The backup was made by a newer version of Mana Vault than the server runs. Update the server, then restore |
 | Backup file has an invalid creation date | The file was edited or damaged |
 | Backup file is missing required data | A required part is missing |
 | Backup contains too many records | The file is larger than Mana Vault accepts |

@@ -1,3 +1,4 @@
+import { APP_VERSION } from "./backup.js";
 // Tests for 0.15.0: SVG cleaning, custom set changes, the Scryfall extras (set symbols, symbol list, printing changes,
 // name and keyword lists, card back), card languages, the art library and backups version 6.
 import { describe, expect, it } from "vitest";
@@ -185,7 +186,7 @@ describe("art library and backups", () => {
     expect((await call("POST", "/api/custom/cards", { card: customCard("abc", "Art Card"), picture: PNG, art: dataUrl("other art bytes", "image/png") })).statusCode).toBe(201);
     expect((await call("GET", "/api/art")).json()).toHaveLength(2);
     const backup = (await call("GET", "/api/backup")).body;
-    expect(JSON.parse(backup)).toMatchObject({ version: 7, artLibrary: [{ name: "Deep forest" }, { name: "Art Card" }] });
+    expect(JSON.parse(backup)).toMatchObject({ version: APP_VERSION, artLibrary: [{ name: "Deep forest" }, { name: "Art Card" }] });
     await call("DELETE", `/api/art/${art.id}`);
     expect((await call("GET", "/api/art")).json()).toHaveLength(1);
     expect((await call("POST", "/api/backup/restore", backup)).statusCode).toBe(200);

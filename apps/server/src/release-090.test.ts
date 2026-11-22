@@ -1,3 +1,4 @@
+import { APP_VERSION } from "./backup.js";
 // Tests for 0.9.0: finish marks in deck lists, card database updates that skip bad records, change printing,
 // custom cards and sets, and the print list.
 import { DatabaseSync } from "node:sqlite";
@@ -254,7 +255,7 @@ describe("custom cards and sets", () => {
     const main = (await first.call("GET", "/api/collections")).json()[0].id as string;
     await first.call("POST", `/api/collections/${main}/cards/add`, { items: [{ cardId: id, foil: 1, condition: "NM", language: "en", quantity: 1 }] });
     const backup = (await first.call("GET", "/api/backup")).body;
-    expect(JSON.parse(backup)).toMatchObject({ version: 7, customSets: [{ code: "xxx" }], customCards: [{ id }] });
+    expect(JSON.parse(backup)).toMatchObject({ version: APP_VERSION, customSets: [{ code: "xxx" }], customCards: [{ id }] });
     const second = await server();
     const restored = await second.app.inject({
       method: "POST", url: "/api/backup/restore", payload: backup,

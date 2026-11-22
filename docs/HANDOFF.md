@@ -1,6 +1,6 @@
 # Mana Vault handoff
 
-Last updated: 2026-11-21, version 0.17.0.
+Last updated: 2026-11-22, version 0.17.1.
 
 ## Project
 
@@ -20,6 +20,7 @@ Mana Vault is Devon's self-hosted Magic: The Gathering collection and deck manag
 - Raise the version in every place with each delivered build: `package.json`, `apps/server/package.json`, `apps/web/package.json`, `apps/android/package.json` and `package-lock.json` (run `npm install --package-lock-only`). Patch for fixes, minor for features, major only when Devon says so. A static test checks they match.
 - Every pull request that changes what the app does, or the rules it follows, also updates the About guide: the affected pages, Capabilities, and a new entry in the release notes. It also raises the version. The version is shown in the guide.
 - Every change gets tests; `npm run test:all` must pass before delivery. Where Playwright cannot download its browser, run it with an installed Chrome: `PW_CHANNEL=chrome npm run test:all`.
+- The app is in early development: change things when they need to change. Do not hold back or work around a change to keep older versions, older files or older data working (Devon, 2026-11-22). Mark stored formats with the app version rather than a separate number.
 - Deployment follows the docker-server-setup skill: Dockhand only, no Watchtower, absolute data path, UID 65532, no cloudflared or reverse proxy in the stack.
 
 ## Next (0.18.0)
@@ -43,7 +44,7 @@ Mana Vault is Devon's self-hosted Magic: The Gathering collection and deck manag
 - Card maker frames are drawn by Mana Vault (Devon asked to extract Cardforge's frames; declined because they are not ours to copy, and Devon accepted). Fonts are Crimson Pro and Merriweather Sans (OFL, @fontsource).
 - Art library is one for the server (flag `art_library_shared` joins libraries once, deduped); the uploader or an admin renames and deletes.
 - Android: SEND intent for text, CSV, PDF and pictures; SyncWorker (WorkManager, CONNECTED) sends waiting changes; the server's sync ids make resends harmless. https only, except localhost and 127.0.0.1 so the tests keep working. Android 8.0 stays the minimum. Update checks call `/api/app/latest`; `/api/app/apk` fetches the release APK once into `<data>/apk`.
-- Deviation from the spec: backups stay version 7. Each entry snapshot now carries its place, who paid shipping and its receipt, and a restore joins places by name, so no new backup version was needed. Pictures in the shared art library are backed up by the account that added them.
+- Backups (0.17.1): the `version` field holds the Mana Vault version that made the backup (`APP_VERSION` in backup.ts, read from the server's package.json), not a separate number. A backup from a newer version is refused (`compareVersions`); numbered backups 1 to 7 still restore. Entry snapshots carry the place, who paid shipping and the receipt, and a restore joins places by name. Pictures in the shared art library are backed up by the account that added them.
 - Offline search uses `compileQuery` (query-match.ts), mirroring the server parser; `art:` and `otag:` still need the server.
 
 ## Code map
@@ -82,7 +83,7 @@ Mana Vault is Devon's self-hosted Magic: The Gathering collection and deck manag
 | `apps/web/src/components/PrintingDialog.tsx`, `ItemMenus.tsx` | The printing chooser (How many to change); collection and deck right-click menus and rename dialogs |
 | `apps/web/src/components/CardMarks.tsx`, `AddButtons.tsx` | Shared card marks (finish and Upgrade wanted badges, CountPip and FinishPip for pictures, Owned and Other version owned, Remove how many); Add buttons and menu items with finishes that name the destination |
 | `apps/web/src/components/PickOpen.tsx`, `zones.ts`, `search-sort.ts` | One click picks and a second opens (`pickOrOpen`); the zone button actions; search sorting kept in the browser (`sortFound`, `matchRank`, `plainWords`) |
-| `apps/server/src/backup.ts` | Backup version 5 per account (custom sets and cards); version 4 (proxy, copy details, deck collection, deck links); before that version 3 (collections with kind, copies with finish, condition, language, trade, decks, deck cards, card records); versions 1 and 2 restore with defaults |
+| `apps/server/src/backup.ts` | Account backups marked with the app version since 0.17.1 (`APP_VERSION`, `compareVersions`); numbered layouts before that: 7 purchases, 6 art library, 5 custom sets and cards; version 4 (proxy, copy details, deck collection, deck links); before that version 3 (collections with kind, copies with finish, condition, language, trade, decks, deck cards, card records); versions 1 and 2 restore with defaults |
 | `apps/server/src/collection-import.ts`, `deck-import.ts`, `card-search.ts`, `catalog-updater.ts`, `import-*.ts` | Import (condition, language, etched, tradelist counts, `nameMatch` for flavor and front face names), search (`usd`, `eur`, flavor names) and catalog logic; the bulk import stores prices and flavor names |
 | `apps/server/src/decks.ts` | Deck routes: list, create (id from the caller), rename, format, description, cover card and deck collection, cards with links, tags, legality data and missing counts, link copies (`linkCopies`, switches printing), candidates; `ZONES`, `FORMATS`, `logDeck` |
 | `apps/server/src/deck-builder.ts` | Deck builder routes: `GET /api/cards/resolve`, deck card tags, `replace` (edit as text, `replaceDeck`), history, tokens |
@@ -169,4 +170,4 @@ None known.
 
 ## Where work stopped
 
-0.1.0 to 0.17.0 are merged to main (0.16.1 in pull request 26, 0.17.0 in pull request 27). All checks pass (`PW_CHANNEL=chrome npm run test:all`: typecheck, 241 server tests, 38 web tests, 66 browser tests), and both workflows passed on the merge to main. The debug APK is the `mana-vault-0.17.0-debug` artifact of the `Android app` workflow and the `debug` pre-release on the releases page. Next: ask Devon the follow-ups under Next. Still to check on real devices: Read receipt with real store receipts, sharing a CSV and a picture into the app, background sync after the phone comes back online, the card maker on a phone, a card database update with 0.15.0 extras, picture downloads, a printed test sheet with card backs, a MakePlayingCards upload, trading between two accounts, then the release key, the four repository secrets and a release tag (the update check downloads the APK from the release).
+0.1.0 to 0.17.1 are merged to main (0.17.0 in pull request 27, 0.17.1 marks backups with the app version). All checks pass (`PW_CHANNEL=chrome npm run test:all`: typecheck, 241 server tests, 38 web tests, 66 browser tests), and both workflows passed on the merge to main. The debug APK is the `mana-vault-0.17.0-debug` artifact of the `Android app` workflow and the `debug` pre-release on the releases page. Next: ask Devon the follow-ups under Next. Still to check on real devices: Read receipt with real store receipts, sharing a CSV and a picture into the app, background sync after the phone comes back online, the card maker on a phone, a card database update with 0.15.0 extras, picture downloads, a printed test sheet with card backs, a MakePlayingCards upload, trading between two accounts, then the release key, the four repository secrets and a release tag (the update check downloads the APK from the release).

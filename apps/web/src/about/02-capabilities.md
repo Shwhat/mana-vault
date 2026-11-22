@@ -186,7 +186,7 @@ This page lists what Mana Vault does in the current version, followed by what is
 
 ### 0.16.0 additions
 
-- Purchases: purchases with product lines and single cards, tax and shipping spread over the lines, Open... with pulled cards tied to the opening, sealed values with history, card and product sales that remove copies, trades recorded when completed, imported purchase prices, Spent, Received, Value now and Gain or loss with a chart, History filters, CSV export, undo and backups (version 7).
+- Purchases: purchases with product lines and single cards, tax and shipping spread over the lines, Open... with pulled cards tied to the opening, sealed values with history, card and product sales that remove copies, trades recorded when completed, imported purchase prices, Spent, Received, Value now and Gain or loss with a chart, History filters, CSV export, undo and backups.
 
 ### 0.15.0 additions
 
