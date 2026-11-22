@@ -5,8 +5,13 @@ import type { CopyKey } from "./copies.js";
 
 export type CopyChange = { key: CopyKey; quantity: number };
 
-type Added = (database: DatabaseSync, userId: number, collectionId: string, items: CopyChange[]) => void;
-type Lowered = (database: DatabaseSync, userId: number, collectionId: string, items: CopyChange[]) => void;
+type Added = (database: DatabaseSync, userId: number, collectionId: string, items: CopyChange[], step: UndoStep) => void;
+/**
+ * `step` (0.18.0): "undo" when the change is an undo, "redo" when it is a redo, null for a change made by the person.
+ * Lowered by an undo means adding the copies is taken back; raised by an undo means a removal is taken back.
+ */
+export type UndoStep = "undo" | "redo" | null;
+type Lowered = (database: DatabaseSync, userId: number, collectionId: string, items: CopyChange[], step: UndoStep) => void;
 /** A completed trade, from the side of one account: what it gave and what it got, with the price of each line. */
 export type TradeSide = {
   tradeId: string; userId: number; name: string; partnerName: string | null; collectionId: string | null;
@@ -34,17 +39,23 @@ export const onCopiesLowered = (listener: Lowered) => { lowered.push(listener); 
 export const onTradeDone = (listener: (database: DatabaseSync, side: TradeSide) => void) => { traded.push(listener); };
 export const onTradeReopened = (listener: (database: DatabaseSync, tradeId: string) => void) => { reopened.push(listener); };
 
-export function copiesAdded(database: DatabaseSync, userId: number | undefined, collectionId: string, items: CopyChange[]): void {
+export function copiesAdded(database: DatabaseSync, userId: number | undefined, collectionId: string, items: CopyChange[], step: UndoStep = null): void {
   if (!userId || !items.length) return;
-  for (const listener of added) listener(database, userId, collectionId, items.filter((item) => item.quantity > 0));
+  for (const listener of added) listener(database, userId, collectionId, items.filter((item) => item.quantity > 0), step);
 }
-export function copiesLowered(database: DatabaseSync, userId: number | undefined, collectionId: string, items: CopyChange[]): void {
+export function copiesLowered(database: DatabaseSync, userId: number | undefined, collectionId: string, items: CopyChange[], step: UndoStep = null): void {
   if (!userId || !items.length) return;
-  for (const listener of lowered) listener(database, userId, collectionId, items.filter((item) => item.quantity > 0));
+  for (const listener of lowered) listener(database, userId, collectionId, items.filter((item) => item.quantity > 0), step);
 }
 export function tradeDone(database: DatabaseSync, side: TradeSide): void {
   for (const listener of traded) listener(database, side);
 }
 export function tradeReopened(database: DatabaseSync, tradeId: string): void {
   for (const listener of reopened) listener(database, tradeId);
+}
+
+/** The undo step a request carries in its x-mana-vault-undo header. */
+export function undoStepOf(headers: Record<string, string | string[] | undefined>): UndoStep {
+  const value = headers["x-mana-vault-undo"];
+  return value === "undo" || value === "redo" ? value : null;
 }

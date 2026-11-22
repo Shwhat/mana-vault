@@ -93,7 +93,7 @@ export function TitleBar({ actions }: { actions: Record<string, Action> }) {
           event.stopPropagation();
           if (open?.id === "account") return setOpen(null);
           const rect = event.currentTarget.getBoundingClientRect();
-          setOpen({ id: "account", x: Math.max(4, rect.right - 230), y: rect.bottom, items: ACCOUNT_MENU.filter((id) => id !== "admin" || !!store.user.admin) });
+          setOpen({ id: "account", x: Math.max(4, rect.right - 230), y: rect.bottom, items: expand(ACCOUNT_MENU.filter((id) => id !== "admin" || !!store.user.admin)) });
         }}
       >
         {store.user.name}

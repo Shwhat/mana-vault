@@ -1,4 +1,5 @@
 // ---------- card scanner: live camera, continuous recognition, and the scanned list ----------
+import { currentOpening, useActiveOpening } from "../purchase-state";
 import { choices, Picker } from "./Picker";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type PointerEvent } from "react";
 import { request } from "../api";
@@ -381,6 +382,8 @@ export default function CardScanner({ phone = false, onClose }: { phone?: boolea
   };
 
   const filters = prefs.scanSets.length + (prefs.scanIgnorePromos ? 1 : 0);
+  // the active opening (0.18.0): scanned cards added to its collection are tied to it
+  const opening = useActiveOpening();
   const status = camera.status || camera.note || warning || hint;
   const count = scanCount(store.scanItems);
   const last = store.scanItems[0] ?? null;
@@ -395,6 +398,7 @@ export default function CardScanner({ phone = false, onClose }: { phone?: boolea
       {focus && <div className="scanfocus" key={focus.id} style={{ left: focus.x - 30, top: focus.y - 30 }} aria-hidden="true" />}
       <p className={warning && !camera.status ? "scanstatus warn" : "scanstatus"} role="status">{status}</p>
       {prefs.scanShowTotal && <p className="scantotal">{money(total, prefs.currency)}</p>}
+      {opening && <p className="scanopening" role="note">Scanning into: {opening.name}</p>}
       <div className="scanrail">
         <div className="scantools">
           {phone && (
@@ -704,10 +708,13 @@ function AddToWindow({ items, done }: { items: ScanItem[]; done: () => void }) {
   const store = useApp();
   const collections = (store.collections ?? []).filter((item) => item.kind === "collection" || items.every((scan) => !scan.proxy));
   const owned = collections.filter((item) => item.kind === "collection");
-  const preferred = collections.find((item) => item.id === store.prefs.targetCollection)?.id ?? collections[0]?.id ?? NEW_COLLECTION;
+  // an active opening (0.18.0) fills in its collection, so scanned pulls are tied to it
+  const opening = currentOpening();
+  const openingCollection = opening?.collectionId && collections.some((item) => item.id === opening.collectionId) ? opening.collectionId : null;
+  const preferred = openingCollection ?? collections.find((item) => item.id === store.prefs.targetCollection)?.id ?? collections[0]?.id ?? NEW_COLLECTION;
   // the collection or deck selected last is filled in
   const forPurchase = scanningForPurchase();
-  const [target, setTarget] = useState(forPurchase ? PURCHASE : store.prefs.addTo === "deck" && store.deck ? `deck:${store.deck.id}` : `collection:${preferred}`);
+  const [target, setTarget] = useState(forPurchase ? PURCHASE : openingCollection ? `collection:${openingCollection}` : store.prefs.addTo === "deck" && store.deck ? `deck:${store.deck.id}` : `collection:${preferred}`);
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const [kind, id] = target.split(":") as ["collection" | "deck", string];
@@ -768,7 +775,7 @@ function AddToWindow({ items, done }: { items: ScanItem[]; done: () => void }) {
       <div className="prow"><label htmlFor="add-target">Add {count} to</label>
         <Picker id="add-target" label={`Add ${count} to`} value={target} onChange={setTarget} options={[
           ...(forPurchase ? [{ value: PURCHASE, label: "This purchase", group: "Purchase" }] : []),
-          ...collections.map((item) => ({ value: `collection:${item.id}`, label: item.kind === "wishlist" ? `Wishlist: ${item.name}` : item.name, group: "Collections" })),
+          ...collections.map((item) => ({ value: `collection:${item.id}`, label: item.id === openingCollection ? `${item.name} (Opening: ${opening!.name})` : item.kind === "wishlist" ? `Wishlist: ${item.name}` : item.name, group: "Collections" })),
           { value: `collection:${NEW_COLLECTION}`, label: "New collection...", group: "Collections" },
           ...store.decks.map((item) => ({ value: `deck:${item.id}`, label: item.name, group: "Decks" })),
           { value: `deck:${NEW_DECK}`, label: "New deck...", group: "Decks" },

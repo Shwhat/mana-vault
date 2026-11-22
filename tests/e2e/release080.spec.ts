@@ -14,7 +14,7 @@ test("search shows pictures with owned counts, and the Filters panel filters the
   await page.locator(".optpop").getByRole("button", { name: "Done" }).click();
   // the owned count by finish is a pip on the picture, with no price
   const sol = page.locator("#view-cards .rescard", { has: page.locator('.pocket[title^="Sol Ring,"]') }).first();
-  await expect(sol.locator(".pipbar .pipgroup")).toHaveText("OWNED 1");
+  await expect(sol.locator(".pipbar .badge.own")).toHaveText("OWNED 1");
   await expect(sol.locator(".pocketprice")).toHaveCount(0);
   await expect(sol.locator(".pipcount")).toHaveCount(0);
   await expect(page.locator("#view-cards .phpos")).toHaveText(/^\d+ results?/);

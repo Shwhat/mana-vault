@@ -21,7 +21,8 @@ import type { CardForPrint } from "../proxy-state";
 import { type Store, useApp } from "../store";
 import type { Card, CollectionEntry, DeckDetail } from "../types";
 import { Quantity, Thumb } from "./Views";
-import { CountPip, PipBar, PricePip } from "../components/CardMarks";
+import { CountPip, PricePip } from "../components/CardMarks";
+import { CardFrame } from "../components/CardFrame";
 import { LayoutRows, OptionsButton } from "../components/Options";
 import type { GridSize } from "../types";
 
@@ -257,20 +258,21 @@ const PRINT_PHONE_COLUMNS: Record<GridSize, number> = { s: 4, m: 3, l: 2 };
 function LinePicture({ line }: { line: PrintLine }) {
   const store = useApp();
   return (
-    <div className="stackcell printcell">
+    <CardFrame section="proxies" className="stackcell printcell" picture={(
       <div className="pocket" title={`${line.card.name}, ${line.card.set_name} ${line.card.collector_number}`}>
         {line.card.image_url ? <img src={line.card.image_url} alt={line.card.name} loading="lazy" draggable={false} /> : <span className="pocketname">{line.card.name}</span>}
       </div>
-      <PipBar>
-        <CountPip count={line.count} />
-        {line.card.custom && <span className="badge custom">Custom</span>}
-        <PricePip price={printPrice(line.card, store.prefs.currency)} />
-      </PipBar>
-      <div className="printctl">
-        <Quantity value={line.count} name={line.card.name} max={100} onChange={(count) => (count < 1 ? store.removePrintLine(line.id) : store.setPrintLine(line.id, { count: Math.min(100, count) }))} />
-        <button type="button" className="btn small" aria-label={`Remove ${line.card.name} from the print list`} onClick={() => store.removePrintLine(line.id)}>Remove</button>
-      </div>
-    </div>
+    )} pieces={{
+      count: <CountPip count={line.count} />,
+      marks: line.card.custom ? <span className="badge custom">Custom</span> : null,
+      price: <PricePip price={printPrice(line.card, store.prefs.currency)} />,
+      buttons: (
+        <div className="printctl">
+          <Quantity value={line.count} name={line.card.name} max={100} onChange={(count) => (count < 1 ? store.removePrintLine(line.id) : store.setPrintLine(line.id, { count: Math.min(100, count) }))} />
+          <button type="button" className="btn small" aria-label={`Remove ${line.card.name} from the print list`} onClick={() => store.removePrintLine(line.id)}>Remove</button>
+        </div>
+      ),
+    }} />
   );
 }
 

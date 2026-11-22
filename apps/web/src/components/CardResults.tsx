@@ -5,7 +5,9 @@ import { Icon } from "../icons";
 import { type Store, useApp } from "../store";
 import { anyPrice, capitalize, type CollectionLayout, type Filters, type GridSize, money, pricesOf, SEARCH_SORTS, type SearchSort, type SortScope } from "../types";
 import { choices, Picker } from "./Picker";
-import { PipBar, PricePip } from "./CardMarks";
+import { PricePip } from "./CardMarks";
+import { CardFrame } from "./CardFrame";
+import type { LayoutSection } from "../card-layout";
 import { Thumb } from "../views/Views";
 import { rowMenu } from "./ContextMenu";
 import { EntryMenuButton, GroupedList, ManaCost } from "./GroupedList";
@@ -33,6 +35,8 @@ export type ResultProps = {
   empty: ReactNode;
   /** A change of this value scrolls back to the top. */
   resetKey: unknown;
+  /** Which card layout the pictures follow (0.18.0): card search by default, Trade in the trade searches. */
+  section?: LayoutSection;
 };
 
 const GRID_WIDTHS: Record<GridSize, number> = { s: 120, m: 170, l: 240 };
@@ -46,10 +50,22 @@ export function countLine(search: CardSearch) {
   return `${total} ${search.total === 1 ? "result" : "results"}${search.cards.length < search.total ? `, ${search.cards.length.toLocaleString()} loaded` : ""}`;
 }
 
-/** Loads the next page when the end of the list comes into view. */
-function useMoreOnScroll(search: CardSearch) {
+/** Where each results list was scrolled to, by its name, so coming back to a view keeps the place (0.18.0). */
+const scrolled = new Map<string, number>();
+
+/** Loads the next page when the end of the list comes into view, and keeps the scroll position of the list. */
+function useMoreOnScroll(search: CardSearch, label = "") {
   const root = useRef<HTMLDivElement>(null);
   const end = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const element = root.current;
+    if (!element || !label) return;
+    const top = scrolled.get(label);
+    if (top) element.scrollTop = top;
+    const save = () => scrolled.set(label, element.scrollTop);
+    element.addEventListener("scroll", save, { passive: true });
+    return () => element.removeEventListener("scroll", save);
+  }, [label]);
   useEffect(() => {
     const element = end.current;
     if (!element) return;
@@ -73,17 +89,9 @@ export function ownedLine(card: FoundCard): string {
   return parts.length ? `Owned: ${parts.join(", ")}` : "";
 }
 
-/** Owned copies as pips on a search picture: OWNED with the regular count, then FOIL and ETCHED counts. */
-function OwnedPips({ card }: { card: FoundCard }) {
-  const finishes = card.ownedFinishes;
-  if (!finishes) return <span className="badge own">OWNED {card.owned}</span>;
-  return (
-    <>
-      {finishes.regular > 0 && <span className="badge own">OWNED {finishes.regular}</span>}
-      {finishes.foil > 0 && <span className="badge own foil">FOIL {finishes.foil}</span>}
-      {finishes.etched > 0 && <span className="badge own foil">ETCHED {finishes.etched}</span>}
-    </>
-  );
+/** Owned copies as one pip on a search picture (0.18.0): OWNED with the count of every finish; the tooltip splits it by finish. */
+function OwnedPip({ card }: { card: FoundCard }) {
+  return card.owned ? <span className="badge own" title={ownedLine(card)}>OWNED {card.owned}</span> : null;
 }
 
 /** "12 printings" for a grouped search result with more than one. */
@@ -91,23 +99,34 @@ const PrintingsBadge = ({ card, className = "" }: { card: FoundCard; className?:
   (card.printings && card.printings > 1 ? <span className={`badge prints${className ? ` ${className}` : ""}`} title="Adding asks which printing">{card.printings} printings</span> : null);
 
 /** One card picture with its price and owned count. */
+/** A new search scrolls back to the top; the first render (coming back to the view) keeps the saved place. */
+function useScrollTopOnReset(root: { current: HTMLDivElement | null }, resetKey: unknown, label: string) {
+  const first = useRef(true);
+  useEffect(() => {
+    if (first.current) { first.current = false; return; }
+    root.current?.scrollTo({ top: 0 });
+    scrolled.delete(label);
+  }, [resetKey, root, label]);
+}
+
 function ResultPicture({ card, props, store }: { card: FoundCard; props: ResultProps; store: Store }) {
   const currency = store.prefs.currency;
   const active = props.activeId === card.id;
-  return (
-    <div className={active ? "rescard active" : "rescard"}>
-      <div data-key={card.id} role="option" aria-selected={active} className={active ? "pocket active" : "pocket"}
-        title={`${card.name}, ${card.set_name} ${card.collector_number}`}
-        onClick={() => props.onPick(card)} onDoubleClick={() => props.onOpen(card)} {...rowMenu(store, card.name, () => props.menu(card))}>
-        {card.image_url ? <img src={card.image_url} alt={card.name} loading="lazy" draggable={false} /> : <span className="pocketname">{card.name}</span>}
-      </div>
-      <PipBar>
-        <PrintingsBadge card={card} />
-        {!!card.owned && <span className="pipgroup" title={ownedLine(card)}><OwnedPips card={card} /></span>}
-        <PricePip price={anyPrice(pricesOf(card), currency)} />
-      </PipBar>
-      {props.buttons && <div className="resbtns">{props.buttons(card)}</div>}
+  const picture = (
+    <div data-key={card.id} role="option" aria-selected={active} className={active ? "pocket active" : "pocket"}
+      title={`${card.name}, ${card.set_name} ${card.collector_number}`}
+      onClick={() => props.onPick(card)} onDoubleClick={() => props.onOpen(card)} {...rowMenu(store, card.name, () => props.menu(card))}>
+      {card.image_url ? <img src={card.image_url} alt={card.name} loading="lazy" draggable={false} /> : <span className="pocketname">{card.name}</span>}
     </div>
+  );
+  return (
+    <CardFrame section={props.section ?? "search"} className={active ? "rescard active" : "rescard"} picture={picture} pieces={{
+      printings: <PrintingsBadge card={card} />,
+      count: <OwnedPip card={card} />,
+      marks: card.custom ? <span className="badge custom">Custom</span> : null,
+      price: <PricePip price={anyPrice(pricesOf(card), currency)} />,
+      buttons: props.buttons ? <div className="resbtns">{props.buttons(card)}</div> : null,
+    }} />
   );
 }
 
@@ -142,8 +161,8 @@ function ResultRow({ card, props, store }: { card: FoundCard; props: ResultProps
 }
 
 function ResultGrid({ props, store }: { props: ResultProps; store: Store }) {
-  const { root, end } = useMoreOnScroll(props.search);
-  useEffect(() => { root.current?.scrollTo({ top: 0 }); }, [props.resetKey, root]);
+  const { root, end } = useMoreOnScroll(props.search, `grid:${props.label}`);
+  useScrollTopOnReset(root, props.resetKey, `grid:${props.label}`);
   const size = props.size;
   const columns = store.phone ? `repeat(${PHONE_COLUMNS[size]}, minmax(0, 1fr))` : `repeat(auto-fill, minmax(${GRID_WIDTHS[size]}px, 1fr))`;
   const { cards, total } = props.search;
@@ -158,8 +177,8 @@ function ResultGrid({ props, store }: { props: ResultProps; store: Store }) {
 }
 
 function ResultList({ props, store }: { props: ResultProps; store: Store }) {
-  const { root, end } = useMoreOnScroll(props.search);
-  useEffect(() => { root.current?.scrollTo({ top: 0 }); }, [props.resetKey, root]);
+  const { root, end } = useMoreOnScroll(props.search, `list:${props.label}`);
+  useScrollTopOnReset(root, props.resetKey, `list:${props.label}`);
   const { cards, total } = props.search;
   const group = store.prefs.listGroups.search;
   const currency = store.prefs.currency;

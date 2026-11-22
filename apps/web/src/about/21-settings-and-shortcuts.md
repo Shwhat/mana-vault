@@ -2,7 +2,7 @@
 
 ## Preferences
 
-Preferences are saved for your account on the server and follow you to every browser and device. The scanned list is the exception: it is kept on each device (see [Scanning cards](/about/scanning-cards)).
+Preferences are saved for your account on the server and follow you to every browser and device. Theme, card layout, list groupings, sorts, Show every printing, scanner settings, the proxy sheet and saved workspaces also change at once on the other pages and devices open for your account; where each device is working (the open collection or deck and where new cards go) stays its own until it is reloaded. The scanned list is kept on each device (see [Scanning cards](/about/scanning-cards)).
 
 | Setting | Choices | Default | Where to change it |
 |---|---|---|---|
@@ -11,7 +11,7 @@ Preferences are saved for your account on the server and follow you to every bro
 | Target zone | Main deck, Sideboard, Commander, Maybeboard | Main deck | Zone list beside Quick add on the deck's Add tab, the zone buttons, ZONE in the status bar, Z |
 | Zone shown | All, Commander, Main, Sideboard, Maybe | All | The zone buttons above the deck's cards and in the Deck list panel, Z. A zone also becomes the target zone; All makes it Main deck |
 | Sort | Best match, Name, Newest, Oldest, Price (high or low), Mana value, Rarity, Color, Set, Owned first | Best match | Sort beside each card search; card search, the deck's Add tab and the two trade searches each keep their own |
-| Where new cards go | The collection or deck selected last | Your first collection | Clicking a collection or deck in its panel or switcher, ADDING TO in the status bar, + Add in the collection view, C |
+| Where new cards go | The collection or deck selected last | Your first collection | Clicking a collection or deck in its panel outside the Collection and Decks tabs, ADDING TO in the status bar, + Add in the collection view, C |
 | Target collection | Any of your collections | Your first collection | Collections panel, collection switcher, ADDING TO in the status bar, + Add in the collection view, C |
 | Open collection | Any of your collections, or All collections | Your first collection | Collection switcher, Collections panel |
 | Search layout, desktop and phone | Grid, Binder, List | Grid | Options in card search, the deck's Add tab and the trade view; each device type remembers its own |
@@ -31,8 +31,9 @@ Preferences are saved for your account on the server and follow you to every bro
 | Prices on pictures | On, Off | Off | View menu |
 | Print list sort | Order added, Name, Set, Mana value, Rarity, Color, Price, Count | Order added | Sort on the Print tab |
 | Print list layout and card size | List, Grid, Binder; Small, Medium, Large | List, Medium | Options on the Print tab |
+| Card layout | Where the count, printings, finish, status marks, price and buttons sit; one layout for all sections or one per section | Pips in one row under the picture with the price at its right, buttons at the bottom, same layout everywhere | View, Card layout... |
 | Panel layout | Any arrangement | Deck building workspace | Drag panels, View menu |
-| Workspace | Built-in or saved | Deck building | View menu, Manage workspaces... |
+| Workspace | Built-in or saved | Deck building | Account menu, Manage workspaces... |
 | Saved workspaces | Any number | None | Save workspace..., Manage workspaces... |
 | Last open deck | Any deck | None | Open a deck |
 | Proxies tab | Print, Card maker | Print | The tabs of the Proxies view |
@@ -116,7 +117,7 @@ Shortcuts work when no text box, menu or window has focus, except the Ctrl short
 | Ctrl+O | Open deck... |
 | Q | Go to Quick add in the open deck |
 
-In the collection and deck switchers, type to find, Up and Down move, Enter opens and Esc closes the list. A click on a collection or deck makes it where new cards go; a double click opens it.
+In the collection and deck switchers, type to find, Up and Down move, Enter opens and Esc closes the list. A click on a collection or deck opens it. In the Collections and Decks panels Enter opens and Space picks it as where new cards go.
 
 ### General
 

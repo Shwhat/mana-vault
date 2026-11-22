@@ -26,8 +26,26 @@ export function withServerPictures<T>(value: T): T {
 export { SignedOutError };
 export const APP_VERSION = __APP_VERSION__;
 
+/** This page's own name for live updates (0.18.0): the server does not send a page its own changes back. */
+export const CLIENT_ID = Math.random().toString(36).slice(2, 12) + Date.now().toString(36);
+let undoing: "undo" | "redo" | null = null;
+/**
+ * Runs an undo or redo step; its changes are marked "undo" or "redo" so the server knows they reverse (or repeat) an
+ * earlier change. Purchase history uses it: undoing an added card unties it from its pack, other removals never do.
+ */
+export async function asUndo<T>(direction: "undo" | "redo", run: () => Promise<T>): Promise<T> {
+  undoing = direction;
+  try {
+    return await run();
+  } finally {
+    undoing = null;
+  }
+}
+
 /** Sends a request with the safety header the server requires on every change. A 401 returns to the sign-in page. */
 export async function request<T>(url: string, init: RequestInit = {}): Promise<T> {
+  const change = (init.method ?? "GET").toUpperCase() !== "GET";
+  if (change) init = { ...init, headers: { "x-mana-vault-client": CLIENT_ID, ...(undoing ? { "x-mana-vault-undo": undoing } : {}), ...(init.headers as Record<string, string> | undefined) } };
   if (isApp()) return withServerPictures(await appRequest<T>(url, init));
   const method = (init.method ?? "GET").toUpperCase();
   const response = await fetch(url, {

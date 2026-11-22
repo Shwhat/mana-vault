@@ -22,11 +22,11 @@ A new server starts with an empty card database. Search, imports and decks all n
 
 ## Add cards you own
 
-Cards go into the collection or deck selected last with one click in its panel or switcher (a double click opens it), shown as ADDING TO in the status bar and as **Adding here** in the panel. To keep cards in more than one place, use **New collection...** in the File menu; see [Collections](/about/collections).
+Cards go into the collection or deck selected last with one click in its panel while searching (a double click opens it; in the Collection and Decks tabs one click opens it), shown as ADDING TO in the status bar and as **Adding here** in the panel. To keep cards in more than one place, use **New collection...** in the File menu; see [Collections](/about/collections).
 
 1. Type part of a card name in the search box (press **/** to jump there).
 2. Click a result to select it. Its details appear in the Card panel.
-3. Press **Enter**, choose **+ collection name** under the card, or double-click it. The printing chooser opens with the printing shown already selected; press **Enter** again to add one copy, or pick another printing or finish first. A card made in only one printing and one finish is added at once.
+3. Press **Enter**, choose **+ collection name** under the card, or double-click it. The printing chooser opens with the printing shown already selected; press **Enter** again to add one copy, or pick another printing or finish first. A card made in only one printing is added at once when it has one finish; with more finishes only the finish is asked (such as Regular, Foil or Surge foil).
 4. To start the chooser on the foil finish, turn on **Add as foil** (the FOIL toggle in the status bar, or **F**).
 
 ## Build the first deck
@@ -44,6 +44,7 @@ Cards go into the collection or deck selected last with one click in its panel o
 | Your collections and set completion | Collections panel and the Collection tab |
 | Offers sent to you | Inbox, in the account menu |
 | Imports, exports and backups | File menu |
-| Theme, panels and workspaces | View menu |
+| Theme, panels and card layout | View menu |
+| Workspaces | Account menu (your name, top right) |
 | Your account | The account menu at the right end of the title bar |
 | This guide | Help menu, **About Mana Vault** |

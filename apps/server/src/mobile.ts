@@ -68,7 +68,7 @@ export function handleCrossOrigin(request: FastifyRequest, reply: FastifyReply):
   reply.header("vary", "Origin");
   if (request.method !== "OPTIONS") return false;
   reply.header("access-control-allow-methods", "GET, POST, PUT, PATCH, DELETE");
-  reply.header("access-control-allow-headers", "authorization, content-type, x-mana-vault");
+  reply.header("access-control-allow-headers", "authorization, content-type, x-mana-vault, x-mana-vault-client, x-mana-vault-undo");
   reply.header("access-control-max-age", "86400");
   void reply.code(204).send();
   return true;
@@ -165,7 +165,15 @@ export function registerMobileRoutes(app: FastifyInstance, database: DatabaseSyn
     // a change of custom cards counts as a change of the card list
     const catalog = custom ? `${String(updated ?? "")}|${String(custom)}` : updated;
     const rulings = database.prepare("SELECT value FROM catalog_metadata WHERE key = 'rulings_at'").get()?.value ?? null;
-    return { revision: revision.value, inbox: Number(inbox?.count ?? 0), newestOffer: inbox?.newest ?? null, offers, catalog, rulings };
+    // the active opening (0.18.0): the phone's background check offers Start scanning when one starts on another device
+    let opening: { id: string; name: string; entryId: string } | null = null;
+    try {
+      const row = database.prepare("SELECT id, name, entry_id FROM purchase_openings WHERE user_id = ? AND active = 1").get(me);
+      if (row) opening = { id: String(row.id), name: String(row.name), entryId: String(row.entry_id) };
+    } catch {
+      opening = null;
+    }
+    return { revision: revision.value, inbox: Number(inbox?.count ?? 0), newestOffer: inbox?.newest ?? null, offers, catalog, rulings, opening };
   });
 
   app.post<{ Body: { changes?: unknown } }>("/api/sync", { bodyLimit: 5 * 1024 * 1024 }, async (request, reply) => {

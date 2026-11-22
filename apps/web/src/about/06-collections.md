@@ -25,7 +25,14 @@ A new account starts with an empty collection named **Main collection** that is 
 
 ## Where new cards go
 
-New cards go to the collection or deck **selected last**: the one clicked once in the Collections panel, the Decks panel or a switcher. One click only selects it, so a card search or other view stays open while you change where cards go; a double click (or double tap in a phone's browser) opens it. In the Android app one tap opens it, and the one that is open is where new cards go. Only that one is highlighted and marked **Adding here** in its panel. The status bar shows it as ADDING TO: name, or ADDING TO: DECK name; clicking it with a deck open switches between the deck and the target collection ("Adding to name").
+New cards go to the collection or deck **selected last**. How a click works depends on where you are:
+
+| Where | One click (or tap) | Double click (or double tap) |
+|---|---|---|
+| Collection or Decks tab: the switcher and the Collections and Decks panels | Opens it | Opens it |
+| Search tab and the other tabs: the Collections and Decks panels | Picks it as where new cards go; the search stays open | Opens it in the Collection or Decks tab |
+
+Only a true double click opens (at the computer's double-click speed); a slow second click only picks it again. Coming back to Search keeps the search, the filters, the results and the scroll position. Only that one is highlighted and marked **Adding here** in its panel. The status bar shows it as ADDING TO: name, or ADDING TO: DECK name; clicking it with a deck open switches between the deck and the target collection ("Adding to name").
 
 - With a collection selected, **Add to collection** puts cards into it, the **target collection**.
 - With a deck selected, every add command (**Add to collection**, Enter, a double-click in card search, the Card panel and the scanner's **Add to**, which is filled in with the deck) adds the card to that deck in the target zone. A free collection copy is linked; when free copies are in more than one collection you choose one; with none the card is missing (see [Decks](/about/decks)). **Add as proxy** still adds a proxy copy to the target collection.
@@ -160,7 +167,7 @@ The Cards tab shows the rows in the current sort and filter in one of three layo
 | Binder | Pages of nine printings in three rows, like a binder sheet, as large as the work area allows |
 | List | One row per entry, as described below |
 
-In Grid and Binder each printing has one picture, with a pip bar under it that holds every pip, so nothing covers the card: the count (such as 2x), FOIL or ETCHED (special foils by name, such as SURGE FOIL), the condition and language when not near mint English (such as LP and JA), Proxy, a T badge with the number for trade, **Printing removed** when Scryfall removed the printing (a click opens Change printing...), and the price when Prices on pictures is on. When the printing is held as more than one kind of copy (such as regular and foil), a line for each sits under the picture with its pips (REGULAR, FOIL, ETCHED and the others) and its count. Pictures show no prices; the List layout has them.
+In Grid and Binder each printing has one picture, with a pip bar under it that holds every pip, so nothing covers the card: the count (such as 2x), FOIL or ETCHED (special foils by name, such as SURGE FOIL), the condition and language when not near mint English (such as LP and JA), Proxy, a T badge with the number for trade, **Printing removed** when Scryfall removed the printing (a click opens Change printing...), and the price when Prices on pictures is on. Where each of these sits around the picture is set in **View, Card layout...** (see [Screen layout](/about/screen-layout)). When the printing is held as more than one kind of copy (such as regular and foil), a line for each sits under the picture with its pips (REGULAR, FOIL, ETCHED and the others) and its count. Pictures show no prices; the List layout has them.
 
 Click a picture or line to select it, Ctrl+click or Shift+click to pick several, double-click to open Copy details, and right-click (or long press on a phone) for its menu. Clicking a picture with lines selects the first line; right-clicking it opens the first line's menu. All collections uses the same layout. The List layout keeps one row per entry.
 

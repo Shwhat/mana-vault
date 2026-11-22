@@ -23,6 +23,7 @@ import { copiesAdded } from "./copy-events.js";
 import { initializePurchases, purchasesFromPrices, registerPurchaseRoutes } from "./purchases.js";
 import { type Fetcher, registerProxyRoutes } from "./proxies.js";
 import { deviceUser, handleCrossOrigin, registerMobileRoutes, Revision } from "./mobile.js";
+import { areasOf, CLIENT_HEADER, Events, type OpeningNote, registerEventRoutes } from "./events.js";
 import { registerAppUpdateRoutes } from "./app-updates.js";
 import { access, createCollection, forgetItem, itemSharing, registerLibraryRoutes } from "./library.js";
 import { isAdmin, logActivity, registerAdminRoutes, startBackupSchedule, useInvite } from "./admin.js";
@@ -72,6 +73,7 @@ declare module "fastify" {
   interface FastifyInstance {
     pictures: PictureController;
     serverSettings: Settings;
+    events: Events;
   }
 }
 
@@ -124,8 +126,29 @@ export async function buildApp(
   if (localUser) assignUnowned(database);
 
   const revision = new Revision();
+  // live updates (0.18.0): every change is told to the open pages and apps of the people it concerns
+  const events = new Events(database);
+  app.decorate("events", events);
+  const activeOpening = (userId: number): OpeningNote => {
+    const row = database.prepare("SELECT id, entry_id, name, collection_id FROM purchase_openings WHERE user_id = ? AND active = 1").get(userId);
+    return row ? { id: String(row.id), entryId: String(row.entry_id), name: String(row.name), collectionId: row.collection_id ? String(row.collection_id) : null } : null;
+  };
   app.addHook("onResponse", async (request, reply) => {
-    if (request.method !== "GET" && request.method !== "HEAD" && request.method !== "OPTIONS" && reply.statusCode < 400 && request.url.startsWith("/api/")) revision.bump();
+    if (request.method !== "GET" && request.method !== "HEAD" && request.method !== "OPTIONS" && reply.statusCode < 400 && request.url.startsWith("/api/")) {
+      revision.bump();
+      if (!request.user) return;
+      const path = request.url.split("?")[0] ?? "";
+      const client = request.headers[CLIENT_HEADER];
+      // starting, ending, continuing or undoing an opening also sends the opening, so the phone's scanner follows it
+      const openingChange = /^\/api\/purchases\/(.+\/open$|openings\/)/.test(path);
+      const areas = areasOf(path);
+      if (openingChange) areas.push("opening");
+      try {
+        events.publish(request.user.id, areas, typeof client === "string" ? client : null, openingChange ? activeOpening(request.user.id) : undefined);
+      } catch (error) {
+        request.log.warn({ error }, "Could not send a live update");
+      }
+    }
   });
 
   app.addHook("onRequest", async (request, reply) => {
@@ -145,8 +168,10 @@ export async function buildApp(
     }
     const token = readCookie(request.headers.cookie, COOKIE_NAME);
     request.user = token ? auth.session(token) : null;
-    if (!request.user && request.headers.authorization) {
-      const device = deviceUser(database, request.headers.authorization);
+    // the app's live update stream cannot carry a header, so it signs in with its device token in the address
+    const streamToken = path === "/api/events" && !request.headers.authorization ? new URLSearchParams(request.url.split("?")[1] ?? "").get("device") : null;
+    if (!request.user && (request.headers.authorization || streamToken)) {
+      const device = deviceUser(database, request.headers.authorization ?? `Bearer ${streamToken}`);
       if (device) {
         request.user = { id: device.id, name: device.name };
         request.deviceId = device.deviceId;
@@ -225,7 +250,9 @@ export async function buildApp(
   registerAdminRoutes(app, adminContext);
   registerExtrasRoutes(app, database, settings, options.fetcher as typeof fetch | undefined);
   const stopBackups = startBackupSchedule(adminContext);
+  registerEventRoutes(app, events, activeOpening);
   app.addHook("onClose", async () => {
+    events.close();
     stopBackups();
     pictures.stop();
   });

@@ -1,5 +1,6 @@
 // ---------- actions: every command is defined once and called by name from menus, tabs, buttons and keys ----------
 import { addCard } from "./components/AddButtons";
+import { cardLayoutDialog } from "./components/CardFrame";
 import { useMemo } from "react";
 import { addFromDeckDialog } from "./views/ProxiesView";
 import { exportPurchases, newEntry, saleCopies } from "./views/PurchasesView";
@@ -126,6 +127,7 @@ export function useActions(store: Store): Record<string, Action> {
         label: "Prices on pictures", short: "Prices", icon: prefs.currency, on: prefs.pricesOnPictures,
         run: () => { store.setPrefs({ pricesOnPictures: !prefs.pricesOnPictures }); store.flash(prefs.pricesOnPictures ? "Prices on pictures off" : "Prices on pictures on"); },
       },
+      cardLayout: { label: "Card layout...", short: "Card layout", icon: "panels", run: cardLayoutDialog },
       "view.collection": { label: "Collection view", short: "Collection", icon: "collection", key: "2", on: store.view === "collection", run: () => store.setView("collection") },
       "collection.new": { label: "New collection...", short: "New collection", icon: "newcol", run: () => collectionDialog(store) },
       "collection.settings": {

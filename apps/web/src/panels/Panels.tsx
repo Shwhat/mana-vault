@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { request } from "../api";
 import type { Action } from "../actions";
 import { Icon } from "../icons";
-import { useApp, zoneLabel } from "../store";
+import { type Store, useApp, zoneLabel } from "../store";
 import { capitalize, type Deck, type Filters, FORMATS, formatName, money, type OwnedIn, SPECIAL_FOILS } from "../types";
 import { collectionMenu, deckMenu } from "../components/ItemMenus";
 import { choices, Picker } from "../components/Picker";
@@ -122,8 +122,12 @@ function TagInput({ id, kind, value, placeholder, onChange }: { id: string; kind
   );
 }
 
+/** In the Collection and Deck tabs one click opens a collection or deck; elsewhere one click picks it and a double click opens it. */
+const opensOnClick = (store: Store) => !store.cardPage && (store.view === "collection" || store.view === "deck");
+
 export function CollectionsPanel({ actions }: { actions: Record<string, Action> }) {
   const store = useApp();
+  const oneClick = opensOnClick(store);
   const list = store.collections ?? [];
   return (
     <div className="pbody flush">
@@ -137,7 +141,7 @@ export function CollectionsPanel({ actions }: { actions: Record<string, Action> 
         const selected = store.prefs.addTo === "collection" && store.prefs.targetCollection === item.id;
         return (
           <div key={item.id} className={selected ? "navitem colitem active" : "navitem colitem"} role="button" aria-current={selected || undefined}
-            {...pickOrOpen(`c:${item.id}`, () => store.targetCollection(item.id), () => { store.openCollection(item.id); store.setView("collection"); })} {...collectionMenu(store, item)}>
+            {...pickOrOpen(`c:${item.id}`, () => store.targetCollection(item.id), () => { store.openCollection(item.id); store.setView("collection"); }, oneClick)} {...collectionMenu(store, item)}>
             <span className="colline">
               <span className="nl">{item.name}</span>
               {selected && store.prefs.targetCollection === item.id && <span className="target-mark strong" title="New cards are added here">Adding here</span>}
@@ -168,6 +172,7 @@ export function deckGroups(decks: Deck[]): Array<[string, Deck[]]> {
 
 export function DecksPanel({ actions }: { actions: Record<string, Action> }) {
   const store = useApp();
+  const oneClick = opensOnClick(store);
   const [term, setTerm] = useState("");
   const words = term.trim().toLowerCase();
   const shown = store.decks.filter((deck) => `${deck.name} ${deck.commander ?? ""}`.toLowerCase().includes(words));
@@ -187,7 +192,7 @@ export function DecksPanel({ actions }: { actions: Record<string, Action> }) {
             return (
               <div key={deck.id} className={selected ? "navitem colitem active" : "navitem colitem"} role="button" aria-current={selected || undefined}
                 title={[deck.commander, formatName(deck.format)].filter(Boolean).join(", ")}
-                {...pickOrOpen(`d:${deck.id}`, () => void store.targetDeck(deck.id), () => void store.openDeck(deck.id).then(() => store.setView("deck")))} {...deckMenu(store, deck)}>
+                {...pickOrOpen(`d:${deck.id}`, () => void store.targetDeck(deck.id), () => void store.openDeck(deck.id).then(() => store.setView("deck")), oneClick)} {...deckMenu(store, deck)}>
                 <span className="colline">
                   <span className="nl">{deck.name}</span>
                   {selected && store.deck?.id === deck.id && <span className="target-mark strong" title="New cards are added here">Adding here</span>}

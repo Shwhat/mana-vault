@@ -213,7 +213,8 @@ test("panels close, reopen, float and workspaces apply", async ({ page }) => {
   await expect(page.locator(".dfloat")).toHaveCount(0);
   await expect(page.locator('.dgroup:has(.tab[data-panel="card"]) .tab[data-panel="filters"]')).toBeVisible();
 
-  await menu(page, "View", "Collection workspace");
+  await page.locator("#acct").dispatchEvent("mousedown");
+  await page.locator("#dropdown .dd", { hasText: "Collection workspace" }).first().click();
   await expect(status(page)).toHaveText("Collection workspace");
   await expect(page.locator("#view-collection")).toBeVisible();
   await expect(page.locator(".dfloat")).toHaveCount(0);

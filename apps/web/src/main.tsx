@@ -16,6 +16,8 @@ import { DesktopShell, PhoneShell } from "./components/Shell";
 import { applyTheme, loadPrefs, type Prefs, watchSystemTheme } from "./prefs";
 import { type Store, StoreContext, useStoreState } from "./store";
 import type { User } from "./types";
+import { startOpeningScan, useLiveUpdates } from "./live";
+import { reloadOpening } from "./purchase-state";
 import "./style.css";
 
 function isTyping(target: EventTarget | null) {
@@ -103,6 +105,7 @@ function App({ user, prefs }: { user: User; prefs: Prefs }) {
   useKeyboard(store, actions);
   useEffect(() => watchSystemTheme(() => store.prefs.theme), [store.prefs.theme]);
   useAppFeatures(store, actions);
+  useLiveUpdates(store);
   return (
     <StoreContext.Provider value={store}>
       {narrow ? <PhoneShell actions={actions} /> : <DesktopShell actions={actions} />}
@@ -142,9 +145,18 @@ function useAppFeatures(store: Store, actions: Record<string, Action>) {
     const problems = (event: Event) => showSyncProblems((event as CustomEvent<SyncProblem[]>).detail);
     window.addEventListener(SYNCED_EVENT, synced);
     window.addEventListener(PROBLEM_EVENT, problems);
-    void native().takeLaunchOffer().then(({ offer }) => { if (offer) void live.current.reloadOffers().then(() => liveActions.current.inbox?.run()); }).catch(() => undefined);
+    // a tapped notification: an Inbox offer opens the Inbox; "scan:<opening>" (0.18.0) opens the scanner on the opening
+    const tapped = (offer: string | null) => {
+      if (!offer) return;
+      if (offer.startsWith("scan:")) {
+        void reloadOpening().then(() => startOpeningScan(live.current));
+        return;
+      }
+      void live.current.reloadOffers().then(() => liveActions.current.inbox?.run());
+    };
+    void native().takeLaunchOffer().then(({ offer }) => tapped(offer)).catch(() => undefined);
     let offerHandle: { remove: () => Promise<void> } | null = null;
-    void native().addListener("offer", () => { void live.current.reloadOffers().then(() => liveActions.current.inbox?.run()); })
+    void native().addListener("offer", (data) => tapped(data?.offer ?? null))
       .then((handle) => { offerHandle = handle; }).catch(() => undefined);
     // 0.17.0: a CSV or text list shared into the app opens the Import window; a picture or PDF can be read as a receipt
     const takeShared = () => void native().takeSharedFile?.().then(({ file }) => { if (file) void openShared(live.current, file); }).catch(() => undefined);

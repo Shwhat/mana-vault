@@ -1,29 +1,38 @@
-// ---------- pick or open: one click picks a collection or deck as the add target, a second click soon after opens it ----------
-import type { KeyboardEvent } from "react";
-import { isApp } from "../android/platform";
+// ---------- pick or open: how a click on a collection or deck works (0.18.0) ----------
+import type { KeyboardEvent, MouseEvent, PointerEvent } from "react";
 
-/** How long after the first click a second click on the same row counts as a double click (or double tap). */
-export const DOUBLE_CLICK_MS = 450;
+/** How long between two taps on a touch screen counts as a double tap. */
+export const DOUBLE_TAP_MS = 350;
 
-let last = { key: "", at: 0 };
+let lastTap = { key: "", at: 0 };
+let pointer = "mouse";
 
 /**
- * Props for a collection or deck row. A single click (or tap) runs `pick`; a second click on the same row
- * within DOUBLE_CLICK_MS runs `open`. Mouse and touch behave the same. Enter opens; Space picks.
- * In the Android app one tap opens (0.15.0): the deck or collection that is open is where cards go.
+ * Props for a collection or deck row in the Collections and Decks panels.
+ *
+ * - `opensOnClick` (the Collection and Deck tabs): one click or tap opens it.
+ * - Otherwise (card search and the other tabs): one click or tap picks it as where cards go and the view stays. A true
+ *   double click (the system's double-click speed) or a double tap opens it in its tab. A slow second click only picks
+ *   it again.
+ *
+ * Enter opens; Space picks.
  */
-export function pickOrOpen(key: string, pick: () => void, open: () => void) {
+export function pickOrOpen(key: string, pick: () => void, open: () => void, opensOnClick = false) {
   return {
-    onClick: () => {
-      if (isApp()) return open();
-      const now = Date.now();
-      if (last.key === key && now - last.at < DOUBLE_CLICK_MS) {
-        last = { key: "", at: 0 };
-        open();
-      } else {
-        last = { key, at: now };
-        pick();
+    onPointerDown: (event: PointerEvent) => { pointer = event.pointerType; },
+    onClick: (event: MouseEvent) => {
+      if (opensOnClick) return open();
+      if (pointer === "touch") {
+        const now = Date.now();
+        if (lastTap.key === key && now - lastTap.at < DOUBLE_TAP_MS) {
+          lastTap = { key: "", at: 0 };
+          return open();
+        }
+        lastTap = { key, at: now };
+        return pick();
       }
+      if (event.detail >= 2) return open();
+      pick();
     },
     onKeyDown: (event: KeyboardEvent) => {
       if (event.key === "Enter") { event.preventDefault(); open(); }

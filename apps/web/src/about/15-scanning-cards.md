@@ -164,3 +164,7 @@ The set filter stays on until it is changed.
 | Enter a name for the new collection (or deck) | New collection... or New deck... without a name |
 | Could not add the scanned cards. | Add to failed; the scanned list is unchanged |
 | Scanned list cleared | Clear finished |
+
+## Scanning into an opening
+
+While an opening is active (see [Purchases](/about/purchases)), the scanner shows **Scanning into: name** over the camera, and **Add to...** fills in the opening's collection, named "collection (Opening: name)". Cards added there are tied to the opening. An opening started on another device works the same way: start it on the web page and scan on the phone.

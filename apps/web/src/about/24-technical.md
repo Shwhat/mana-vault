@@ -19,6 +19,7 @@
 | Container | Docker image for amd64 and arm64, running as user 65532, published to ghcr.io/shwhat/mana-vault |
 | Android app | The same interface inside Capacitor, with a Java plugin for text recognition, encrypted settings, the background Inbox check and background sync (WorkManager), files shared in and out, and the Back button. It connects over https only. Its copy of the library is kept in IndexedDB |
 | Phone sign-in | A random device token per phone, sent as a Bearer token; the server stores only its SHA-256 hash. The server accepts requests from the app's page origin (https://localhost) |
+| Live updates | Server-sent events on /api/events. Each change (any request that changes something) is sent to the open pages and apps of the account and of the accounts sharing a collection, deck, trade or offer with it, except the page that made it (named by its x-mana-vault-client header). A comment every 25 seconds keeps tunnels and proxies from closing the stream; the page connects again on its own. The app signs in to the stream with its device token in the address |
 | Sync | Changes made offline are sent in order to /api/sync with a unique id each; the server applies each once and keeps the ids for 30 days. /api/sync/state reports a revision that changes with every change, and new offers |
 
 ## Installation

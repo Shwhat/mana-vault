@@ -8,7 +8,8 @@ import { formatDialog, tagsDialog } from "../components/DeckDialogs";
 import { linkDialog } from "../components/LibraryDialogs";
 import { choosePrinting } from "../components/PrintingDialog";
 import { addCard } from "../components/AddButtons";
-import { InDeckMarks, CountPip, FinishBadge, FinishPip, finishName, OwnedMarks, PipBar, PricePip, RemovedPip, ownedVersions, removeCard, switchVersionDialog, linkExact, UpgradeBadge, wantedLabel } from "../components/CardMarks";
+import { CardFrame } from "../components/CardFrame";
+import { InDeckMarks, CountPip, FinishBadge, FinishPip, finishName, OwnedMarks, PricePip, RemovedPip, ownedVersions, removeCard, switchVersionDialog, linkExact, UpgradeBadge, wantedLabel } from "../components/CardMarks";
 import { Switcher } from "../components/Switcher";
 import { Suggest } from "../components/Suggest";
 import { cardPrice, checkDeck, type Legality, MANA_COLORS, manaBalance, sections, shuffle, ZONE_ORDER } from "../deck-rules";
@@ -184,45 +185,44 @@ function Picture({ cards, flag, lines = false }: { cards: DeckCard[]; flag?: str
   const total = cards.reduce((sum, item) => sum + item.quantity, 0);
   const missing = cards.reduce((sum, item) => sum + (item.missing ?? 0), 0);
   const split = lines && cards.length > 1;
-  // Grid: the pip bar under the picture; Stacks: above it, in the strip that stays in view while the cards overlap
-  const pips = (
-    <PipBar>
-        <CountPip count={total} />
-        {cards.map((item) => <FinishBadge key={item.entry_id} finish={item.finish} promoTypes={item.promo_types} />)}
-        {cards.map((item) => <UpgradeBadge key={item.entry_id} card={item} compact />)}
-        {missing > 0 && <span className="badge miss">{missing < total ? `MISSING ${missing}` : "MISSING"}</span>}
-        {cards.filter((item) => item.removed).slice(0, 1).map((item) => <RemovedPip key="removed" onChange={() => choosePrinting(item.name, item.card_id, item.card_id, { finish: item.finish ?? 0, currency: store.prefs.currency, quantity: item.quantity },
-          (printing, finish, count) => void store.changeDeckPrinting(item, printing, finish, undefined, count))} />)}
-        {cards.map((item) => <OwnedMarks key={item.entry_id} store={store} card={item} compact />)}
-        {cards.map((item) => <InDeckMarks key={`d${item.entry_id}`} store={store} card={item} compact />)}
-        <PricePip price={cardPrice(card, store.prefs.currency)} />
-    </PipBar>
+  // Grid: the pips under the picture; Stacks: above it, in the strip that stays in view while the cards overlap
+  const picture = (
+    <div data-key={split ? undefined : String(card.entry_id)} role={split ? undefined : "option"} aria-selected={split ? undefined : active}
+      className={`dcard${active ? " active" : ""}${flag ? " bad" : ""}`} title={flag ? `${card.name}: ${flag}` : card.name}
+      onClick={() => pick(store, card)} {...cardMenu(store, card)}>
+      {card.image_url ? <img src={card.image_url} alt={card.name} loading="lazy" draggable={false} /> : <span className="pocketname">{card.name}</span>}
+    </div>
   );
   return (
-    <div className={lines ? "stackcell dstack" : "dstack"}>
-      {!lines && pips}
-      <div data-key={split ? undefined : String(card.entry_id)} role={split ? undefined : "option"} aria-selected={split ? undefined : active}
-        className={`dcard${active ? " active" : ""}${flag ? " bad" : ""}`} title={flag ? `${card.name}: ${flag}` : card.name}
-        onClick={() => pick(store, card)} {...cardMenu(store, card)}>
-        {card.image_url ? <img src={card.image_url} alt={card.name} loading="lazy" draggable={false} /> : <span className="pocketname">{card.name}</span>}
+    <CardFrame section="deck" above={!lines} className={lines ? "stackcell dstack" : "dstack"} picture={picture} pieces={{
+      count: <CountPip count={total} />,
+      finish: cards.map((item) => <FinishBadge key={item.entry_id} finish={item.finish} promoTypes={item.promo_types} />),
+      marks: (
+        <>
+          {cards.map((item) => <UpgradeBadge key={item.entry_id} card={item} compact />)}
+          {missing > 0 && <span className="badge miss">{missing < total ? `MISSING ${missing}` : "MISSING"}</span>}
+          {cards.filter((item) => item.removed).slice(0, 1).map((item) => <RemovedPip key="removed" onChange={() => choosePrinting(item.name, item.card_id, item.card_id, { finish: item.finish ?? 0, currency: store.prefs.currency, quantity: item.quantity },
+            (printing, finish, count) => void store.changeDeckPrinting(item, printing, finish, undefined, count))} />)}
+          {cards.map((item) => <OwnedMarks key={item.entry_id} store={store} card={item} compact />)}
+          {cards.map((item) => <InDeckMarks key={`d${item.entry_id}`} store={store} card={item} compact />)}
+        </>
+      ),
+      price: <PricePip price={cardPrice(card, store.prefs.currency)} />,
+    }} after={split && (
+      <div className="slines" role="group" aria-label={`${card.name} (${card.set_code.toUpperCase()}) ${card.collector_number}`}>
+        {cards.map((item) => {
+          const on = isActive(store, item);
+          return (
+            <div key={item.entry_id} data-key={String(item.entry_id)} role="option" aria-selected={on} className={on ? "sline active" : "sline"}
+              aria-label={`${finishLabel(item.finish ?? 0, item.promo_types)}, ${item.quantity}`}
+              onClick={(event) => { event.stopPropagation(); pick(store, item); }} {...cardMenu(store, item)}>
+              <span className="sl-name"><FinishPip finish={item.finish} promoTypes={item.promo_types} />{(item.missing ?? 0) > 0 && <span className="badge miss">Missing {item.missing}</span>}</span>
+              <span className="sl-qty">{item.quantity}</span>
+            </div>
+          );
+        })}
       </div>
-      {lines && pips}
-      {split && (
-        <div className="slines" role="group" aria-label={`${card.name} (${card.set_code.toUpperCase()}) ${card.collector_number}`}>
-          {cards.map((item) => {
-            const on = isActive(store, item);
-            return (
-              <div key={item.entry_id} data-key={String(item.entry_id)} role="option" aria-selected={on} className={on ? "sline active" : "sline"}
-                aria-label={`${finishLabel(item.finish ?? 0, item.promo_types)}, ${item.quantity}`}
-                onClick={(event) => { event.stopPropagation(); pick(store, item); }} {...cardMenu(store, item)}>
-                <span className="sl-name"><FinishPip finish={item.finish} promoTypes={item.promo_types} />{(item.missing ?? 0) > 0 && <span className="badge miss">Missing {item.missing}</span>}</span>
-                <span className="sl-qty">{item.quantity}</span>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
+    )} />
   );
 }
 

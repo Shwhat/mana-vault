@@ -5,7 +5,7 @@ import type { Store } from "../store";
 import type { Card, FinishCode, Zone } from "../types";
 import { currentOpening } from "../purchase-state";
 import { finishName } from "./CardMarks";
-import { choosePrinting, type Printing } from "./PrintingDialog";
+import { chooseFinish, choosePrinting, finishesOf, type Printing } from "./PrintingDialog";
 
 const CODES: Record<string, FinishCode> = { nonfoil: 0, foil: 1, etched: 2 };
 
@@ -59,7 +59,14 @@ export async function addCard(store: Store, card: Pick<Card, "id" | "name" | "fi
       printings = [];
     }
   }
-  if (printings.length <= 1 && finishesOfCard(card).length === 1) return addPrinting(store, card, finishesOfCard(card)[0]!, where, zone);
+  // one printing (0.18.0): no printing list; one finish adds at once, more ask only for the finish
+  if (printings.length === 1) {
+    const only = printings[0]!;
+    const finishes = finishesOf(only);
+    if (finishes.length === 1) return addPrinting(store, only, finishes[0]!, where, zone);
+    return chooseFinish(`Add ${card.name} to ${where.name}`, only, store.prefs.currency, (finish) => addPrinting(store, only, finish, where, zone), defaultFinish(store, card));
+  }
+  if (printings.length === 0 && finishesOfCard(card).length === 1) return addPrinting(store, card, finishesOfCard(card)[0]!, where, zone);
   choosePrinting(card.name, card.id, card.id, {
     finish: defaultFinish(store, card), currency: store.prefs.currency, title: `Add ${card.name} to ${where.name}`, allowCurrent: true,
   }, (printing, finish) => addPrinting(store, printing, finish, where, zone));

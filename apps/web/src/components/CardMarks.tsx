@@ -3,7 +3,7 @@ import type { MouseEvent as ReactMouseEvent, ReactNode } from "react";
 import { type Store, useApp } from "../store";
 import { type Candidate, type DeckCard, type FinishCode, type InOtherDeck, copyLabel, finishLabel, money } from "../types";
 import { request } from "../api";
-import { closeDialog, customDialog, dialog } from "./Dialog";
+import { closeDialog, confirmDialog, customDialog, dialog } from "./Dialog";
 import { apiUrl } from "../android/platform";
 
 const FINISH_WORD: Record<FinishCode, string> = { 0: "regular", 1: "foil", 2: "etched" };
@@ -168,8 +168,12 @@ export function moveToDeckDialog(store: Store, card: DeckCard) {
  * Remove for one card: with one copy it is removed at once; with more the person chooses how many to remove, Reduce to 1
  * or Remove all.
  */
-export function removeCard(store: Store, name: string, quantity: number, apply: (left: number) => void) {
-  if (quantity <= 1) return apply(0);
+export function removeCard(store: Store, name: string, quantity: number, apply: (left: number) => void, note = "") {
+  if (quantity <= 1 && !note) return apply(0);
+  if (quantity <= 1) {
+    void confirmDialog(`Remove ${name}`, <>Remove {name}? {note}</>, "Remove").then((yes) => { if (yes) apply(0); });
+    return;
+  }
   dialog(`Remove ${name}`, [["count", "How many to remove", "1", "number"]], (values) => {
     const count = Number(values.count);
     if (!Number.isInteger(count) || count < 1 || count > quantity) {
@@ -179,7 +183,7 @@ export function removeCard(store: Store, name: string, quantity: number, apply: 
     apply(quantity - count);
   }, "Remove", (
     <div className="choicerow">
-      <span className="note">There are {quantity} copies.</span>
+      <span className="note">There are {quantity} copies.{note ? ` ${note}` : ""}</span>
       <button type="button" className="btn" onClick={() => { closeDialog(); apply(1); }}>Reduce to 1</button>
       <button type="button" className="btn" onClick={() => { closeDialog(); apply(0); }}>Remove all</button>
     </div>
@@ -210,14 +214,14 @@ export function FinishPip({ finish, promoTypes }: { finish: FinishCode | number 
 }
 
 /**
- * The price pip at the bottom right of a card picture, shown when View, Prices on pictures is on. The price is for the
+ * The price pip of a card picture, placed by the card layout and shown when View, Prices on pictures is on. The price is for the
  * copy's finish where there is one, in the chosen currency. Used by every picture view.
  */
 export function PricePip({ price }: { price: number | null | undefined }) {
   const store = useApp();
   if (!store.prefs.pricesOnPictures || price === null || price === undefined) return null;
-  // the price has its own line under the status pips, the same on every card picture
-  return <><span className="pipbreak" aria-hidden="true" /><span className="pricepip" title="Price">{money(price, store.prefs.currency)}</span></>;
+  // where the price sits is set by the card layout (0.18.0)
+  return <span className="pricepip" title="Price">{money(price, store.prefs.currency)}</span>;
 }
 
 /** A set's symbol (its Scryfall symbol, or a custom set's own), hidden when the set has none. */

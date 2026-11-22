@@ -11,9 +11,8 @@ export const MENUS: Menu[] = [
   { id: "edit", name: "Edit", items: ["undo", "redo", "-", "find", "pickAll", "clearFilters"] },
   {
     id: "view", name: "View", items: [
-      "view.purchases", "-", "theme.light", "theme.dark", "theme.system", "-", "prices.pictures", "-",
-      "panel.filters", "panel.collections", "panel.decks", "panel.card", "panel.decklist", "panel.review", "-",
-      "workspaces", "-", "workspace.save", "workspace.manage", "workspace.reset",
+      "view.purchases", "-", "theme.light", "theme.dark", "theme.system", "-", "prices.pictures", "cardLayout", "-",
+      "panel.filters", "panel.collections", "panel.decks", "panel.card", "panel.decklist", "panel.review",
     ],
   },
   { id: "help", name: "Help", items: ["shortcuts", "about"] },
@@ -30,8 +29,11 @@ export const MODE_TABS: Array<{ action: string; name: string; view: string }> = 
   { action: "view.purchases", name: "Purchases", view: "purchases" },
 ];
 
-/** The account menu at the top right (desktop and phone). */
-export const ACCOUNT_MENU = ["inbox", "password", "devices", "admin", "signout"];
+/**
+ * The account menu at the top right (desktop and phone). Workspaces live here since 0.18.0: switching (the list of
+ * workspaces) and saving, managing and resetting them. Workspaces are left out on a phone (DESKTOP_ONLY).
+ */
+export const ACCOUNT_MENU = ["inbox", "password", "devices", "admin", "-", "workspaces", "-", "workspace.save", "workspace.manage", "workspace.reset", "-", "signout"];
 export const APP_MENU = ["app.sync", "app.notifications", "app.update"];
 
 /** Menu items that only make sense with the desktop panels. */
