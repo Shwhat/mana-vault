@@ -83,7 +83,8 @@ A purchase can be read from a receipt: a photo, a PDF or a screenshot.
 - The date, the place, product lines (with set codes when the receipt names a set), single cards, tax and shipping that can be read are filled in the purchase window to check before saving. The status bar says how many lines were read, or "No product lines found".
 - **Date**: the order date (after Confirmed, Ordered, Order date, Placed or Purchased), not a pickup, shipping or delivery date. A date written without a year takes the latest such date not after today.
 - **Tax and shipping**: lines named Tax, Taxes, Sales tax, Shipping, Delivery or Pickup go to Tax and Shipping (Free counts as 0), never to product lines. Subtotal and Total are never lines.
-- **Ignored text**: buttons, links and status text of order pages (such as Buy again, Track all your orders, View order, Reorder, Picked up, Confirmed, times such as "at 5:22 PM") are never read as products or as the place. Bought from is left empty when the receipt names no store.
+- **Wrapped names**: a name that goes on over the next rows (an open bracket, or a row or name ending in ":", ",", "&" or "-") is joined into one line; a word in capitals repeating the next word (text on a product's picture, "MAGIC Magic the Gathering") is dropped.
+- **Ignored text**: buttons, links and status text of order pages (such as Buy again, Track all your orders, View order, Reorder, Picked up, Confirmed, times such as "at 5:22 PM") are never read as products or as the place. Bought from comes only from rows above the first price that are not product names, and is left empty when the receipt names no store; the date is today when the receipt shows none.
 - **Order number**: "Order #Z-301783" and the like go into the Note.
 - **Sets**: a set named in a product line fills its set, ignoring punctuation ("Star Trek: Commander Deck" names Star Trek); a Commander product finds the set's Commander companion.
 

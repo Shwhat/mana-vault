@@ -2,6 +2,12 @@
 
 The installed version is shown at the top of this guide.
 
+## 0.19.1 (2026-11-22): Receipts with names that wrap
+
+- Fixed: a product name that wraps over several rows of a receipt (such as "Magic the Gathering: Star Trek: Commander Deck: Landing Party") was cut to its first row, so the Commander deck became an Other line with no set; the rows are now joined into one line.
+- Fixed: "Subtotal · 3 items" read as "Subtotal3 items" became a product line; Subtotal is now always skipped.
+- Fixed: Bought from took a product name (and the text on the product's picture) from a cropped screenshot; it now comes only from rows above the first price that are not product names, and stays empty otherwise.
+
 ## 0.19.0 (2026-11-22): Printing chooser views, packs one at a time, Match cards and picking in purchases
 
 - Printing chooser: Grid (the default), List or Binder with a card size, through Options in the window and kept for your account. Grid and Binder show each printing's picture with its set, number, year and language, and a finish button with its price for each finish.

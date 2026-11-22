@@ -57,6 +57,33 @@ describe("reading receipts", () => {
     expect(fields.lines[2]).toMatchObject({ note: "Near Mint Foil", cost: 1.8 });
   });
 
+  it("0.19.1: joins names that wrap over rows and skips picture text, Subtotal and product names as the place", () => {
+    // Devon's phone screenshot of the same order, as text recognition reads it
+    const phone = `MAGIC Magic the Gathering: Star $64.99
+Trek: Commander Deck:
+Landing Party
+1
+My Precious (Showcase) [The $4.55
+Hobbit]
+Near Mint Foil
+1
+My Precious [The Hobbit] $1.80
+Near Mint Foil
+Subtotal3 items $71.34
+Pickup Free
+Taxes $7.35
+Total USD $78.69`;
+    const fields = parseReceipt(phone, SETS);
+    expect(fields.place).toBeNull();
+    expect(fields.tax).toBe(7.35);
+    expect(fields.shipping).toBe(0);
+    expect(fields.lines.map((line) => [line.name, line.product, line.setCode, line.cost, line.note])).toEqual([
+      ["Magic the Gathering: Star Trek: Commander Deck: Landing Party", "commander_deck", "trk", 64.99, ""],
+      ["My Precious (Showcase) [The Hobbit]", "other", "hob", 4.55, "Near Mint Foil"],
+      ["My Precious [The Hobbit]", "other", "hob", 1.8, "Near Mint Foil"],
+    ]);
+  });
+
   it("finds sets through punctuation and Commander companions", () => {
     expect(setOf("Star Trek: Commander Deck", SETS)).toBe("trk");
     expect(setOf("Tales of Middle-earth Commander Deck: Riders of Rohan", SETS)).toBe("tlc");
