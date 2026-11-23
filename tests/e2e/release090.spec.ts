@@ -126,14 +126,15 @@ test("the card maker saves a custom card to the card database, and the print lis
   await signUp(page, "v9maker");
   await page.keyboard.press("5");
   await page.getByRole("tab", { name: "Card maker" }).click();
-  // other tests may have made custom sets already: the set is made in the Custom sets window and chosen
-  await page.getByRole("button", { name: "Custom sets..." }).click();
-  await page.locator("#cs-code").fill("XMV");
-  await page.locator("#cs-name").fill("My Test Set");
+  // other tests may have made custom sets already: the set is made in the Custom sets tab (0.20.0) and chosen
+  await page.getByRole("tab", { name: "Custom sets" }).click();
+  await page.locator(".setmaker .makerlist").getByRole("button", { name: "New set" }).click();
+  await page.locator("#sm-code").fill("XMV");
+  await page.locator("#sm-name").fill("My Test Set");
   await page.getByRole("button", { name: "Create set" }).click();
   await expect(status(page)).toHaveText("Custom set XMV created");
-  await expect(page.locator("dialog#dlg[open] .csetrow", { hasText: "XMV" })).toContainText("My Test Set");
-  await page.getByRole("button", { name: "Close" }).click();
+  await expect(page.locator(".setmaker .makerlist .navitem", { hasText: "XMV" })).toContainText("My Test Set");
+  await page.getByRole("tab", { name: "Card maker" }).click();
   await choose(page, page.locator("#cm-set"), "xmv");
 
   await page.locator("#cm-name").fill("Goblin Tester");

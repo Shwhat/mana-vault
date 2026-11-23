@@ -19,7 +19,13 @@ export type Place = { id: string; name: string; kind: PlaceKind; note: string; c
 export type ReceiptCard = {
   cardId: string; name: string; setCode: string; setName: string; collectorNumber: string; imageUrl: string | null; finish: number; condition: string; promoTypes: string; finishes: string;
 };
-export type ReceiptLine = { text: string; product: string; name: string; setCode: string | null; quantity: number; cost: number; note: string; cardLike: boolean; card: ReceiptCard | null };
+/** `productName` is the name of a named product such as "Landing Party" (0.20.0), `sealedId` the product it matched. */
+export type ReceiptLine = {
+  text: string; product: string; name: string; setCode: string | null; quantity: number; cost: number; note: string; cardLike: boolean; card: ReceiptCard | null;
+  productName?: string; sealedId?: string | null;
+};
+/** A named sealed product a line can be (0.20.0). */
+export type SealedChoice = { id: string; name: string; fullName: string; setCode: string; product: string; hasDeck: boolean };
 export type ReceiptFields = {
   date: string | null; place: string | null; note: string | null; tax: number | null; shipping: number | null; total: number | null; linesTotal: number;
   lines: ReceiptLine[];
@@ -39,6 +45,8 @@ export type EntryLine = {
   condition: string | null; language: string | null; collectionId: string | null; values: Array<{ date: string; value: number }>;
   /** Packs opened and packs still sealed, for products with packs (0.19.0). */
   packsOpened: number; packsLeft: number;
+  /** The named sealed product the line's product name matched, and whether it has a decklist (0.20.0). */
+  sealedId: string | null; hasDeck: boolean;
 };
 export type EntrySale = {
   id: string; what: "card" | "product"; cardId: string | null; name: string; setCode: string | null; foil: number | null; condition: string | null;

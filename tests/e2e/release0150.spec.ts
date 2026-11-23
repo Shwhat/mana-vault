@@ -1,4 +1,4 @@
-// Browser tests for 0.15.0: the pip bar, custom set menu and Edit set, the one Symbols window, the art library,
+// Browser tests for 0.15.0: the pip bar, custom set menu and editing a set, the one Symbols window, the art library,
 // suggestions, set symbols, removed printings, card backs and card languages in Administration.
 import type { Page } from "@playwright/test";
 import { closeSuggestions, menu, modeTab, search, signUp, status, test, expect, choose } from "./fixtures";
@@ -20,22 +20,22 @@ test("custom sets: right-click menu, Edit set with a new code and an SVG symbol,
   const code = `q${Date.now().toString(36).slice(-4)}`;
   expect((await api(page, "post", "/api/custom/sets", { code, name: "Quiet Woods", symbol: svgData(SVG) })).status()).toBe(201);
   await openMaker(page);
-  await page.getByRole("button", { name: "Custom sets..." }).click();
-  const row = page.locator("dialog#dlg[open] .csetrow", { hasText: "Quiet Woods" });
+  // custom sets have their own tab (0.20.0)
+  await page.getByRole("tab", { name: "Custom sets" }).click();
+  const row = page.locator(".setmaker .makerlist .navitem", { hasText: "Quiet Woods" });
   await expect(row.locator("img.setsym")).toBeVisible();
   await row.click({ button: "right" });
   await expect(page.locator("#ctxmenu .dd")).toHaveText(["Edit set...", "Show its cards", "New card in this set", "Delete..."]);
   await page.locator("#ctxmenu .dd", { hasText: "Edit set..." }).click();
-  const edit = page.locator("dialog#dlg[open]");
-  await expect(edit.getByRole("checkbox", { name: "Rarity colors (SVG symbols)" })).toBeChecked();
-  await edit.locator("#es-name").fill("Quiet Forest");
+  await expect(page.locator("#sm-name")).toHaveValue("Quiet Woods");
+  await expect(page.getByRole("checkbox", { name: "Rarity colors (a one-color SVG main symbol)" })).toBeChecked();
+  await page.locator("#sm-name").fill("Quiet Forest");
   const next = `${code}x`.slice(0, 6);
-  await edit.locator("#es-code").fill(next.toUpperCase());
-  await edit.getByRole("button", { name: "Save" }).click();
+  await page.locator("#sm-code").fill(next.toUpperCase());
+  await page.getByRole("button", { name: "Save", exact: true }).click();
   await expect(status(page)).toHaveText(`Quiet Forest (${next.toUpperCase()}) saved`);
-  await expect(page.locator("dialog#dlg[open] .csetrow", { hasText: "Quiet Forest" })).toContainText(next.toUpperCase());
+  await expect(page.locator(".setmaker .makerlist .navitem", { hasText: "Quiet Forest" })).toContainText(next.toUpperCase());
   // Edit, Undo puts the name and code back
-  await page.keyboard.press("Escape");
   await menu(page, "Edit", "Undo");
   await expect(status(page)).toHaveText("Undone: Edit set Quiet Woods");
   const sets = await (await page.request.get("/api/custom/sets")).json() as Array<{ code: string; name: string }>;

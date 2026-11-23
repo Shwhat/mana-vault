@@ -21,8 +21,9 @@ Each update also keeps, for use without the internet:
 | Printing changes | Scryfall's list of printing changes | Printings Scryfall merged into another or removed; see [Printing changes](#printing-changes) |
 | Name and keyword lists | Scryfall's catalogs | Card names, artist names, creature, planeswalker, land, artifact, enchantment and spell types, keyword abilities, keyword actions, ability words and watermarks, for suggestions while typing |
 | Card back | Scryfall's card back picture | The standard Magic card back, downloaded once in full size, for printing proxies |
+| Named products | MTGJSON's set list and deck list | The sealed products of every set (Commander decks, bundles, boxes, packs and kits) with their names, and the names of preconstructed decks, for the Product name of purchase lines and reading receipts. A deck's decklist is downloaded the first time the deck is opened from a purchase, and kept; see [Purchases](/about/purchases) |
 
-When one of these parts fails to download, what was stored before is kept and the rest of the update goes on. Tags, special foils, unofficial languages and price history appear after the first card database update with version 0.12.0; set symbols, symbols, printing changes, name and keyword lists, the card back and the other card languages after the first update with version 0.15.0.
+When one of these parts fails to download, what was stored before is kept and the rest of the update goes on. Tags, special foils, unofficial languages and price history appear after the first card database update with version 0.12.0; set symbols, symbols, printing changes, name and keyword lists, the card back and the other card languages after the first update with version 0.15.0; named products after the first update with version 0.20.0.
 
 ## Card languages
 

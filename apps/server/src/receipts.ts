@@ -11,7 +11,11 @@ import { join } from "node:path";
 export type ReceiptCard = {
   cardId: string; name: string; setCode: string; setName: string; collectorNumber: string; imageUrl: string | null; finish: number; condition: string; promoTypes: string; finishes: string;
 };
-export type ReceiptLine = { text: string; product: string; name: string; setCode: string | null; quantity: number; cost: number; note: string; cardLike: boolean; card: ReceiptCard | null };
+/** `productName` is the name of a named product (0.20.0), such as "Landing Party"; `sealedId` the MTGJSON product it matched. */
+export type ReceiptLine = {
+  text: string; product: string; name: string; setCode: string | null; quantity: number; cost: number; note: string; cardLike: boolean; card: ReceiptCard | null;
+  productName: string; sealedId: string | null;
+};
 export type ReceiptFields = {
   date: string | null; place: string | null; note: string | null; lines: ReceiptLine[]; tax: number | null; shipping: number | null; total: number | null; linesTotal: number;
 };
@@ -138,6 +142,32 @@ export function setOf(text: string, sets: Array<{ code: string; name: string }>)
   return best?.code ?? null;
 }
 
+const BRAND = /\b(magic\s*:?\s*the\s+gathering|magic\s+tg|mtg|tcg)\b/gi;
+const FILLER = /\b(the|of|and|a|an|english|en|sealed|new|factory|magic|gathering|edition|product|cards?|game|wotc|wizards|commander|decks?|precon|preconstructed|boosters?|box|display|bundle|fat|packs?|sets?|draft|play|collector'?s?|jump\s?start|pre-?release|kit|secret|lair|starter|qty|quantity|each|item|sku)\b/gi;
+
+/**
+ * The name of a named product (0.20.0) in a line of text: what is left after the brand, the set name and the product
+ * words, from the parts between colons, dashes, commas and brackets. "Magic the Gathering: Star Trek: Commander Deck:
+ * Landing Party" gives "Landing Party"; "Star Trek Beam Me Up Bundle" gives "Beam Me Up Bundle"; "Bloomburrow Bundle"
+ * gives nothing.
+ */
+export function productNameOf(text: string, setNames: string[]): string {
+  let rest = ` ${text} `.replace(BRAND, " ");
+  const names = setNames.flatMap((name) => {
+    const base = name.replace(/\s+commander$/i, "");
+    return base !== name ? [name, base] : [name];
+  });
+  for (const name of names) {
+    const words = name.toLowerCase().replace(/[^a-z0-9 ]+/g, " ").split(/\s+/).filter(Boolean);
+    if (!words.length) continue;
+    rest = rest.replace(new RegExp(`(^|[^a-z0-9])${words.join("[^a-z0-9]+")}(?=$|[^a-z0-9])`, "gi"), "$1 ");
+  }
+  const segments = rest.split(/\s*(?::|\s[-\u2013\u2014|]\s|[()[\],])\s*/)
+    .map((segment) => segment.replace(/^[^a-z0-9]+|[^a-z0-9!?']+$/gi, "").replace(/\s+/g, " ").trim())
+    .filter((segment) => segment.replace(FILLER, " ").replace(/[^a-z]/gi, "").length >= 3);
+  return segments.join(" ").slice(0, 120);
+}
+
 /** Reads the fields of a purchase from the text of a receipt. Fields not found stay empty. */
 export function parseReceipt(text: string, sets: Array<{ code: string; name: string }> = []): ReceiptFields {
   const rows = text.split(/\r?\n/).map((row) => row.replace(/\s+/g, " ").trim()).filter(Boolean);
@@ -194,7 +224,12 @@ export function parseReceipt(text: string, sets: Array<{ code: string; name: str
     name = name.replace(/^[-*#:.|\s]+|[-*#:.|\s]+$/g, "").slice(0, 120);
     const note = CONDITION_NOTE.test(name) && productOf(name) === "other" ? (name.match(/(near\s+mint|lightly\s+played|moderately\s+played|heavily\s+played|damaged)?\s*(foil|etched|non-?foil)?\s*$/i)?.[0] ?? "").trim() : "";
     if (note) name = name.slice(0, name.length - note.length).trim();
-    lines.push({ text: row, product: productOf(name), name, setCode: setOf(name, sets), quantity, cost: money(cost), note, cardLike: false, card: null });
+    lines.push({ text: row, product: productOf(name), name, setCode: setOf(name, sets), quantity, cost: money(cost), note, cardLike: false, card: null, productName: "", sealedId: null });
+  }
+  const setName = (code: string | null) => sets.find((set) => set.code === code)?.name;
+  for (const line of lines) {
+    const named = setName(line.setCode);
+    line.productName = line.product === "other" ? "" : productNameOf(line.name, named ? [named] : []);
   }
   return {
     date: findOrderDate(text), place, note: orderNumber ? `Order #${orderNumber[1]}` : null, lines, tax, shipping, total,

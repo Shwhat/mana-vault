@@ -193,6 +193,10 @@ export function useActions(store: Store): Record<string, Action> {
         label: "Card maker", short: "Card maker", icon: "maker", on: store.view === "proxies" && prefs.proxyTab === "maker",
         run: () => { store.setPrefs({ proxyTab: "maker" }); store.setView("proxies"); },
       },
+      "proxies.sets": {
+        label: "Custom sets", short: "Custom sets", icon: "sets", on: store.view === "proxies" && prefs.proxyTab === "sets",
+        run: () => { store.setPrefs({ proxyTab: "sets" }); store.setView("proxies"); },
+      },
       "proxies.deck": { label: "Print a deck...", short: "Print deck", icon: "printdeck", run: () => addFromDeckDialog(store) },
       "proxies.missing": { label: "Print missing cards...", short: "Print missing", icon: "missing", run: () => addFromDeckDialog(store, true) },
       "collection.stats": {

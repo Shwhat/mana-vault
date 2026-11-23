@@ -225,7 +225,7 @@ export async function buildApp(
   registerDeckBuilderRoutes(app, database);
   registerTradeRoutes(app, database);
   initializePurchases(database);
-  registerPurchaseRoutes(app, database, join(webRoot, "ocr"));
+  registerPurchaseRoutes(app, database, join(webRoot, "ocr"), options.fetcher as ((url: string, init?: RequestInit) => Promise<Response>) | undefined);
   registerInsightRoutes(app, database);
   registerScanRoutes(app, database);
   registerCustomRoutes(app, database);

@@ -97,4 +97,5 @@ The container checks itself every 30 seconds by running the server with `-health
 | Scryfall data and pictures (Art Tags and Oracle Tags included) | Card data, tags, prices and card pictures | Scryfall's API terms; card pictures are by Wizards of the Coast |
 | csv-parse | Reading CSV files | MIT |
 | stream-json, stream-chain | Reading the card catalog | BSD 3-Clause |
+| MTGJSON data | Named sealed products and preconstructed decklists | MIT |
 | Scryfall data | Card information and images | Scryfall data is provided under its own terms. Mana Vault is not produced by or endorsed by Scryfall or Wizards of the Coast |

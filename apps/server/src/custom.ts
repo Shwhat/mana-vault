@@ -7,7 +7,6 @@ import { addToArtLibrary } from "./extras.js";
 import { cleanSvg, SVG_HEADERS } from "./svg.js";
 
 const LEGALITY_FORMATS = FORMATS.filter((format) => format !== "casual");
-const RARITIES = ["common", "uncommon", "rare", "mythic", "special"];
 const FINISHES = ["nonfoil", "foil", "etched"];
 const COLORS = ["W", "U", "B", "R", "G"];
 /** Card pictures and art are sent as data URLs of JPEG, PNG or WebP pictures. */
@@ -122,7 +121,7 @@ export function readCardInput(body: unknown): CardInput | string {
   if (!setCode) return "Choose a custom set";
   const collectorNumber = text(raw.collectorNumber, 10);
   if (!/^[A-Za-z0-9-]{1,10}$/.test(collectorNumber)) return "The collector number can have up to 10 letters, digits and dashes";
-  const rarity = RARITIES.includes(String(raw.rarity)) ? String(raw.rarity) : "common";
+  const rarity = (RARITIES as readonly string[]).includes(String(raw.rarity)) ? String(raw.rarity) : "common";
   const finishes = Array.isArray(raw.finishes) ? FINISHES.filter((finish) => (raw.finishes as unknown[]).includes(finish)) : ["nonfoil"];
   if (!finishes.length) return "Choose at least one finish";
   const legalities: Record<string, string> = {};
@@ -206,8 +205,22 @@ function transaction<T>(database: DatabaseSync, work: () => T): T {
   }
 }
 
+export const RARITIES = ["common", "uncommon", "rare", "mythic", "special"] as const;
+export type Rarity = (typeof RARITIES)[number];
+
+/** The symbols of each rarity of the custom sets (0.20.0), by set code. */
+function raritySymbols(database: DatabaseSync) {
+  const bySet = new Map<string, Partial<Record<Rarity, { url: string; type: string }>>>();
+  for (const row of database.prepare("SELECT code, rarity, symbol_type, length(symbol) AS size FROM custom_set_symbols").all()) {
+    const code = String(row.code);
+    bySet.set(code, { ...bySet.get(code), [String(row.rarity)]: { url: `/api/custom/sets/${code}/symbol?rarity=${String(row.rarity)}&v=${Number(row.size)}`, type: String(row.symbol_type) } });
+  }
+  return bySet;
+}
+
 /** Custom sets with their maker and card count. */
 export function listCustomSets(database: DatabaseSync) {
+  const rarities = raritySymbols(database);
   return database.prepare(
     `SELECT cs.code, s.name, s.released_at, cs.owner_id, u.name AS owner_name, cs.symbol IS NOT NULL AS has_symbol, cs.symbol_type, cs.rarity_colors, length(cs.symbol) AS symbol_size,
             (SELECT COUNT(*) FROM cards c WHERE c.set_code = cs.code AND c.custom = 1) AS card_count
@@ -217,6 +230,7 @@ export function listCustomSets(database: DatabaseSync) {
     ownerName: String(row.owner_name ?? ""), hasSymbol: Number(row.has_symbol) === 1, cardCount: Number(row.card_count),
     symbolUrl: Number(row.has_symbol) === 1 ? `/api/custom/sets/${String(row.code)}/symbol?v=${Number(row.symbol_size)}` : null,
     symbolType: (row.symbol_type as string | null) ?? null, rarityColors: Number(row.rarity_colors) === 1,
+    rarities: rarities.get(String(row.code)) ?? {},
   }));
 }
 
@@ -287,6 +301,18 @@ export function registerCustomRoutes(app: FastifyInstance, database: DatabaseSyn
       : request.body?.symbol === undefined ? undefined : readSymbol(request.body.symbol);
     if (typeof symbol === "string") return reply.code(400).send({ error: symbol });
     const rarityColors = typeof request.body?.rarityColors === "boolean" ? request.body.rarityColors : undefined;
+    // symbols of single rarities (0.20.0): { rare: { symbol: data URL or "" } } or { rare: { symbolFrom: set code } }
+    const rarityChanges: Array<[Rarity, Picture | null]> = [];
+    const rarityBody = request.body?.rarities;
+    if (rarityBody !== undefined) {
+      if (!rarityBody || typeof rarityBody !== "object") return reply.code(400).send({ error: "The rarity symbols are not valid" });
+      for (const [rarity, value] of Object.entries(rarityBody as Record<string, Record<string, unknown> | null>)) {
+        if (!RARITIES.includes(rarity as Rarity) || !value || typeof value !== "object") return reply.code(400).send({ error: "The rarity symbols are not valid" });
+        const picture = value.symbolFrom !== undefined ? scryfallSymbol(value.symbolFrom) : readSymbol(value.symbol);
+        if (typeof picture === "string") return reply.code(400).send({ error: picture });
+        rarityChanges.push([rarity as Rarity, picture]);
+      }
+    }
     // a new set code: free of Scryfall sets and other custom sets, and moved onto every card of the set (0.15.0)
     const newCode = request.body?.code === undefined ? code : text(request.body.code, 6).toLowerCase();
     if (newCode !== code) {
@@ -300,6 +326,15 @@ export function registerCustomRoutes(app: FastifyInstance, database: DatabaseSyn
         database.prepare("UPDATE sets SET code = ? WHERE code = ?").run(newCode, code);
         database.prepare("UPDATE custom_sets SET code = ? WHERE code = ?").run(newCode, code);
         database.prepare("UPDATE cards SET set_code = ? WHERE set_code = ? AND custom = 1").run(newCode, code);
+        database.prepare("UPDATE custom_set_symbols SET code = ? WHERE code = ?").run(newCode, code);
+      }
+      for (const [rarity, picture] of rarityChanges) {
+        if (picture) {
+          database.prepare("INSERT INTO custom_set_symbols (code, rarity, symbol, symbol_type) VALUES (?, ?, ?, ?) ON CONFLICT(code, rarity) DO UPDATE SET symbol = excluded.symbol, symbol_type = excluded.symbol_type")
+            .run(newCode, rarity, picture.bytes, picture.type);
+        } else {
+          database.prepare("DELETE FROM custom_set_symbols WHERE code = ? AND rarity = ?").run(newCode, rarity);
+        }
       }
       if (rarityColors !== undefined) database.prepare("UPDATE custom_sets SET rarity_colors = ? WHERE code = ?").run(rarityColors ? 1 : 0, newCode);
       if (name) {
@@ -326,6 +361,7 @@ export function registerCustomRoutes(app: FastifyInstance, database: DatabaseSyn
     }
     transaction(database, () => {
       database.prepare("DELETE FROM custom_sets WHERE code = ?").run(code);
+      database.prepare("DELETE FROM custom_set_symbols WHERE code = ?").run(code);
       database.prepare("DELETE FROM sets WHERE code = ?").run(code);
     });
     onChange();
@@ -333,8 +369,11 @@ export function registerCustomRoutes(app: FastifyInstance, database: DatabaseSyn
   });
 
   // set symbols are pictures on cards, so they load without sign-in like card pictures
-  app.get<{ Params: { code: string } }>("/api/custom/sets/:code/symbol", async (request, reply) => {
-    const row = database.prepare("SELECT symbol, symbol_type FROM custom_sets WHERE code = ?").get(request.params.code.toLowerCase());
+  // ?rarity= (0.20.0) gives that rarity's own symbol, or the main symbol when it has none
+  app.get<{ Params: { code: string }; Querystring: { rarity?: string } }>("/api/custom/sets/:code/symbol", async (request, reply) => {
+    const code = request.params.code.toLowerCase();
+    const own = request.query.rarity ? database.prepare("SELECT symbol, symbol_type FROM custom_set_symbols WHERE code = ? AND rarity = ?").get(code, String(request.query.rarity)) : undefined;
+    const row = own ?? database.prepare("SELECT symbol, symbol_type FROM custom_sets WHERE code = ?").get(code);
     if (!row?.symbol) return reply.code(404).send({ error: "This set has no symbol" });
     if (String(row.symbol_type) === "image/svg+xml") reply.headers(SVG_HEADERS);
     return reply.header("cache-control", "private, max-age=300").type(String(row.symbol_type)).send(Buffer.from(row.symbol as Uint8Array));

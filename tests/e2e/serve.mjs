@@ -65,6 +65,16 @@ const fetcher = async () => { throw new Error("No internet in the browser tests"
 const app = await buildApp(database, webRoot, undefined, () => false, {
   passwordIterations: 1000, addressAttemptLimit: 10_000, version: "test", fetcher, pictureRetryDelay: 0, pictureDownloads: false, settingsEnv: { forced: {}, locks: {} },
 });
+// 0.20.0: MTGJSON's named products of Limited Edition Alpha, with a decklist already downloaded for Landing Party
+const sealed = database.prepare("INSERT INTO sealed_products (id, set_code, name, short_name, category, subtype, product, card_count, deck_name, deck_code) VALUES (?, 'lea', ?, ?, ?, ?, ?, ?, ?, ?)");
+sealed.run("p-landing", "Alpha Commander Deck - Landing Party", "Landing Party", "deck", "commander", "commander_deck", 100, "Landing Party", "LEA");
+sealed.run("p-warp", "Alpha Commander Deck - Warp Speed", "Warp Speed", "deck", "commander", "commander_deck", 100, null, null);
+sealed.run("p-beam", "Alpha Beam Me Up Bundle", "Beam Me Up Bundle", "bundle", "default", "bundle", null, null, null);
+database.prepare("INSERT INTO sealed_decks (code, name, file_name, type, cards) VALUES ('LEA', 'Landing Party', 'LandingParty_LEA', 'Commander Deck', ?)").run(JSON.stringify([
+  { scryfallId: "serra", setCode: "lea", number: "39", count: 1, foil: true },
+  { scryfallId: "llanowar", setCode: "lea", number: "210", count: 4, foil: false },
+  { scryfallId: "swords", setCode: "lea", number: "40", count: 2, foil: false },
+]));
 // the tests start as if Setup was finished; the Setup test turns it back on
 app.serverSettings.set({ setupDone: true });
 // the first account is the server's admin; the other tests sign up accounts that are not admins

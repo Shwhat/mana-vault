@@ -11,6 +11,7 @@ import { initializeDatabase } from "./database.js";
 import { saveSets } from "./sets.js";
 import { importBulkFile, OFFICIAL_LANGUAGES } from "./import-bulk.js";
 import { importScryfallExtras } from "./scryfall-extras.js";
+import { importSealedData } from "./sealed.js";
 import { chain } from "stream-chain";
 import { parser } from "stream-json";
 import { streamArray } from "stream-json/streamers/stream-array.js";
@@ -279,6 +280,8 @@ export async function importCatalogExtras(database: DatabaseSync, dataPath: stri
     console.warn(`Could not save the price history: ${error instanceof Error ? error.message : String(error)}`);
   }
   await importScryfallExtras(database, (options.fetcher ?? fetch) as unknown as Parameters<typeof importScryfallExtras>[1]);
+  // MTGJSON's named sealed products and preconstructed decks (0.20.0)
+  await importSealedData(database, options.fetcher ?? fetch);
 }
 
 const savedSetting = (database: DatabaseSync, key: string): unknown => {

@@ -10,7 +10,7 @@ import { Icon } from "../icons";
 import { type Store, useApp } from "../store";
 import { type Card, FORMATS, formatName } from "../types";
 import { ArtLibrary, type ArtItem } from "./ArtLibrary";
-import { blobToData, type CustomSet, customSetMenuItems, SetManager } from "./CustomSets";
+import { blobToData, type CustomSet, customSetMenuItems, makerAsked, openSetsTab, symbolFor, takeMakerAsk } from "./CustomSets";
 import { rowMenu } from "./ContextMenu";
 import { loadCardFonts } from "../card-fonts";
 import { confirmDialog, customDialog } from "./Dialog";
@@ -185,6 +185,7 @@ export function CardMaker() {
       const [cardList, setList] = await Promise.all([request<CustomCardSummary[]>("/api/custom/cards"), request<CustomSet[]>("/api/custom/sets")]);
       setCards(cardList);
       setSets(setList);
+      if (fresh.current && makerAsked()) fresh.current = false;
       if (fresh.current) {
         fresh.current = false;
         let last: string | null = null;
@@ -200,6 +201,16 @@ export function CardMaker() {
     }
   }, [store]);
   useEffect(() => { void loadLists(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // the Custom sets tab asked for a new card in a set or for a card (0.20.0)
+  useEffect(() => {
+    if (!cards || !makerAsked()) return;
+    const ask = takeMakerAsk();
+    if (ask?.newIn) void newInSet(ask.newIn);
+    else if (ask?.open) {
+      const summary = cards.find((card) => card.id === ask.open);
+      if (summary) void open(summary);
+    }
+  }, [cards]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // mana symbols used on the card are loaded as they appear
   const codes = useMemo(() => [...new Set([draft.front, draft.back].flatMap((item) => (item ? [...symbolsIn(item.manaCost), ...symbolsIn(item.rulesText)] : [])))], [draft]);
@@ -218,16 +229,18 @@ export function CardMaker() {
     return () => { active = false; };
   }, [codes, symbols]);
   const set = sets.find((item) => item.code === draft.setCode) ?? null;
+  // the symbol of the card's rarity, or the set's main symbol (0.20.0)
+  const symbol = symbolFor(set, draft.rarity);
   useEffect(() => {
     let active = true;
-    if (!set?.symbolUrl) { setSetSymbol(null); return; }
-    void setSymbolPicture(`${set.symbolUrl}?n=${set.hasSymbol ? 1 : 0}`).then((picture) => { if (active) setSetSymbol(picture); });
+    if (!symbol.url) { setSetSymbol(null); return; }
+    void setSymbolPicture(symbol.url).then((picture) => { if (active) setSetSymbol(picture); });
     return () => { active = false; };
-  }, [set?.symbolUrl, set?.hasSymbol]);
+  }, [symbol.url]);
 
   const info = (which: "front" | "back") => ({ rarity: draft.rarity, artist: draft.artist, setCode: draft.setCode || "XXX", collectorNumber: draft.collectorNumber, back: !!draft.back, face: which });
   const assets = (which: "front" | "back"): Assets => ({
-    art: arts[which].image, splitArt: arts.back.image, setSymbol, symbols, setSymbolTint: !!set?.rarityColors && set.symbolType === "image/svg+xml",
+    art: arts[which].image, splitArt: arts.back.image, setSymbol, symbols, setSymbolTint: symbol.tint,
   });
 
   // the preview is drawn again after every change
@@ -329,7 +342,7 @@ export function CardMaker() {
   };
 
   const save = async () => {
-    if (!draft.setCode) return store.flash("Create a custom set first (Custom sets...)", "err");
+    if (!draft.setCode) return store.flash("Create a custom set first (Custom sets tab)", "err");
     if (!draft.front.name.trim()) return store.flash("Give the card a name", "err");
     if (!draft.front.typeLine.trim()) return store.flash("Give the card a type line", "err");
     if (draft.back && !draft.back.name.trim()) return store.flash("Give the back face a name", "err");
@@ -477,9 +490,7 @@ export function CardMaker() {
     lastField.current = element;
     if (element.dataset.field === "manaCost" || element.dataset.field === "rulesText") setSymbolTarget(element.dataset.field);
   };
-  const openSets = () => customDialog("Custom sets", (close) => (
-    <SetManager store={store} onChange={() => void loadLists()} onNewCard={(code) => { close(); void newInSet(code); }} />
-  ), 760);
+  const openSets = (code = draft.setCode || "new") => openSetsTab(store, code);
   const toggle = (list: string[], value: string, on: boolean) => (on ? [...new Set([...list, value])] : list.filter((item) => item !== value));
 
   return (
@@ -530,7 +541,7 @@ export function CardMaker() {
             ? <Picker id="cm-set" label="Custom set" value={draft.setCode} disabled={!mine}
               options={sets.map((item) => ({ value: item.code, label: `${item.name} (${item.code.toUpperCase()})` }))}
               onChange={(value) => change({ setCode: value, collectorNumber: id ? draft.collectorNumber : nextNumber(value, id) })} />
-            : <button type="button" className="btn small" onClick={() => openSets()}>Create a custom set...</button>}
+            : <button type="button" className="btn small" onClick={() => openSets("new")}>Create a custom set...</button>}
         </div>
         <div className="prow"><label htmlFor="cm-number">Collector number</label>
           <input id="cm-number" value={draft.collectorNumber} maxLength={10} disabled={!mine} onChange={(event) => change({ collectorNumber: event.target.value })} /></div>
