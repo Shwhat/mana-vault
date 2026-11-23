@@ -1,4 +1,5 @@
 import { cleanSvg } from "./svg.js";
+import { type NotesBackup, notesBackup, restoreNotes } from "./notes.js";
 import { purchaseBackup, restorePurchases } from "./purchases.js";
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
@@ -77,6 +78,8 @@ export interface ManaVaultBackup {
   cardBack: { bytes: string; type: string } | null;
   /** Version 7: the purchase history, entry by entry as kept. */
   purchases: unknown[];
+  /** 0.22.0: notes pages, their versions and pictures, pins and templates. */
+  notes?: NotesBackup;
 }
 
 export type BackupArt = { name: string; type: string; bytes: string; created_at: string };
@@ -142,6 +145,7 @@ export function createBackup(database: DatabaseSync, userId: number): ManaVaultB
     format: "mana-vault-backup",
     version: APP_VERSION,
     purchases: purchaseBackup(database, userId),
+    notes: notesBackup(database, userId),
     customSets,
     customCards,
     artLibrary: database.prepare("SELECT name, type, bytes, created_at FROM art_library WHERE user_id = ? ORDER BY created_at, rowid").all(userId)
@@ -309,6 +313,8 @@ export function restoreBackup(database: DatabaseSync, source: string, userId: nu
     }
     // version 7: the purchase history is replaced by the backup's, tied to the restored collections
     if (layoutOf(backup) >= 7) restorePurchases(database, userId, backup.purchases, (id) => collectionIds.get(id) ?? null);
+    // 0.22.0: the notes pages, on the restored decks and collections and on their own
+    restoreNotes(database, userId, backup.notes, (kind, id) => (kind === "deck" ? deckIds : collectionIds).get(id) ?? null);
     database.exec("COMMIT");
   } catch (error) {
     database.exec("ROLLBACK");
@@ -523,6 +529,7 @@ function validateBackup(value: unknown): ManaVaultBackup {
     format: "mana-vault-backup",
     version: Number(value.version) === 7 ? 7 : Number(value.version) === 6 ? 6 : 5,
     purchases: Number(value.version) === 7 && Array.isArray(value.purchases) ? value.purchases : [],
+    notes: isRecord(value.notes) && Array.isArray(value.notes.pages) ? value.notes as unknown as NotesBackup : undefined,
     customSets,
     customCards,
     artLibrary,

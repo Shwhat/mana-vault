@@ -114,7 +114,7 @@ Press **2** (or the **Collection** tab) to open it. The header holds:
 | Item | Use |
 |---|---|
 | Collection switcher | The button with the collection's name. It opens a list of your collections with their card counts and values, with All collections first (see below) |
-| Cards, Completion, Missing, Statistics | The tabs; see [Set completion](/about/set-completion) for Completion and Missing (shown only with a completion rule), and [Prices and statistics](/about/prices-and-statistics) for Statistics |
+| Cards, Completion, Missing, Statistics, Notes | The tabs; see [Set completion](/about/set-completion) for Completion and Missing (shown only with a completion rule), [Prices and statistics](/about/prices-and-statistics) for Statistics, and [Notes and the Wiki](/about/notes-and-the-wiki) for Notes (not on All collections) |
 | Wishlist | Shown when the collection is a wishlist |
 | Shared by name, or Shared with names | Shown for shared collections |
 | Filter box | Keeps the rows whose card name, set name, set code or collection name contains the text (Cards tab). The Filters panel also filters the rows (Filtering: Collection) |

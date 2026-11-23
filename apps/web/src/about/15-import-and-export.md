@@ -88,7 +88,7 @@ Deckbox files carry no store id, so they are matched by name, set and number as 
 | Item | Choices |
 |---|---|
 | Export | Whole collection: name (the open collection); Filtered cards (the rows shown under the collection's search box and filter tags); Selected cards (the picked rows); Missing cards (a collection with a completion rule and linked sets); Deck: name (the open deck). Only the choices that apply are offered |
-| Format | Mana Vault CSV, Moxfield CSV, ManaBox CSV, Archidekt CSV, Deckbox CSV, TCGplayer CSV, Plain text list |
+| Format | Mana Vault CSV, Moxfield CSV, ManaBox CSV, Archidekt CSV, Deckbox CSV, TCGplayer CSV, Plain text list. A deck exported as a Plain text list ends with its description (its top notes page) as lines starting with `//` under `// Notes` |
 
 **Export** downloads name.csv (or name.txt for a plain text list); in the Android app the share sheet opens. Missing cards are named "collection-name-missing".
 
@@ -147,6 +147,10 @@ A CSV file is read as a decklist when its first line has a Name or Card Name col
 | The zone must be recognized | Zone must be Main, Sideboard, Commander or Maybeboard |
 
 Lines that name a set and collector number are linked to free copies of exactly that printing and finish in your collections, the deck's own collection first. Lines without a set and number stay missing until a copy is linked; see [Decks](/about/decks). A regular and a foil line of the same printing become two deck cards.
+
+## Notes
+
+Notes pages are imported from .md files or a zip of them with **Import markdown...**, and exported as a zip of .md files with pictures with **Export notes...** (File menu) or **Export...** in the Wiki; see [Notes and the Wiki](/about/notes-and-the-wiki).
 
 ## Import review panel
 

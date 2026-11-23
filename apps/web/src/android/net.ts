@@ -50,7 +50,7 @@ export async function appFetch(path: string, init: RequestInit = {}, timeoutMs =
 export async function readJson<T>(response: Response): Promise<T> {
   if (!response.ok) {
     const body = (await response.json().catch(() => ({}))) as { error?: string };
-    throw new Error(body.error ?? `The server answered with an error (${response.status}).`);
+    throw Object.assign(new Error(body.error ?? `The server answered with an error (${response.status}).`), { status: response.status, body });
   }
   return response.json() as Promise<T>;
 }

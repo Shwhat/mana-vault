@@ -66,8 +66,11 @@ The app goes **Offline** only when the server cannot be reached: when a request 
 | Renaming collections and decks, creating collections and decks (New collection... and New deck... in Add to, and the Import window's new collection) | Sending, accepting and declining offers |
 | Scanning cards and adding the scanned list | Updating the card database |
 | Undo and redo | Devices, Change password and statistics not opened before |
+| Reading, searching, changing, making, moving, pinning and deleting notes pages, and adding pictures to them | Notes templates, page history, and importing and exporting notes |
 
 A command that needs a connection while offline shows "You are offline. This needs a connection to the server."
+
+Saves of one notes page made offline are sent as one change. When the page was saved on the server meanwhile, the app asks which text to keep when it sends the change (Keep mine, Keep theirs, Keep both); see [Notes and the Wiki](/about/notes-and-the-wiki).
 
 The card list on the phone also carries each card's MTGJSON details and store prices (0.21.0), so `is:reprint`, `is:starter`, `can:`, `store:` and `buylist` work without a connection; `in:`, price history, Open virtual packs... and Found in need the server. New collection... and Change collection... made without a connection wait with the other changes and are sent when it comes back. Tabs keep their place as on the desktop, also after the app comes back from the background.
 

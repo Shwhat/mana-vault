@@ -44,7 +44,7 @@ A copied or transferred collection keeps its description, rules and linked sets.
 
 ## Shared collections and decks
 
-- Both people can add, change, move and remove cards, link sets and change the settings.
+- Both people can add, change, move and remove cards, link sets and change the settings, and read and change its notes pages (see [Notes and the Wiki](/about/notes-and-the-wiki)). Copies sent to another account do not take the notes along; a transfer keeps them with the item.
 - Only the owner can delete it, send it as a share or transfer, or stop sharing it.
 - Rows in the Collections and Decks panels show a **Shared** badge. The collection and deck views show "Shared by name" or "Shared with names".
 - **Collection sharing...** and **Deck sharing...** list the people an item you own is shared with, each with **Stop sharing**.

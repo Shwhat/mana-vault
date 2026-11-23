@@ -8,8 +8,8 @@ A deck has a name, a format, a description, a cover card and cards in up to four
 |---|---|---|---|---|
 | Deck name | Text, 1 to 100 characters | Yes | None | Shown in the title bar, the deck switcher, Deck list and Decks panel |
 | Format | Commander, Standard, Pioneer, Modern, Legacy, Pauper, Vintage, Brawl, Standard Brawl, Historic, Explorer, Timeless, Alchemy, Oathbreaker, Pauper Commander, Duel Commander, Premodern, Old School, Penny Dreadful, PreDH or Casual | Yes | Commander | The format the deck is checked against (see Format and legality). Casual decks are not checked |
-| Description | Text with headings, lists, bold and links, up to 20,000 characters | No | Empty | Shown on the Description tab |
-| Cover card | Any printing in the deck | No | The first commander | Shown in the deck switcher and on the Description tab |
+| Description | The text of the deck's top notes page, up to 20,000 characters | No | Empty | Edited on the Notes tab; see [Notes and the Wiki](/about/notes-and-the-wiki) |
+| Cover card | Any printing in the deck | No | The first commander | Shown in the deck switcher and on the Notes tab |
 | Collection for the deck | One of your collections | No | None | The collection that receives copies added straight to the deck, remembered per deck (see below) |
 
 Every deck keeps the printing of each card. Each printing in a zone is its own row with its set and collector number.
@@ -173,7 +173,7 @@ Press **3** (or **Deck**) to open it. The header holds:
 | Item | Use |
 |---|---|
 | Deck switcher | Opens another deck (see Opening decks) |
-| Cards, Add, Ownership, Statistics, Playtest, Description, History | The tabs. On a phone they scroll sideways |
+| Cards, Add, Ownership, Statistics, Playtest, Notes, History | The tabs. On a phone they scroll sideways |
 | Shared by name, or Shared with names | Shown for shared decks |
 | Filter box | Cards tab: **Filter deck cards** keeps the cards whose name, type or set contains the text. Add tab: **Search cards to add** |
 | Options | Cards tab: view, group, sort and Edit as text, with a count of active filters. Add tab: the search layout and card size |
@@ -290,9 +290,9 @@ The Playtest tab draws sample hands from the main deck. Nothing here changes the
 
 The commanders are shown in the command zone. The bar shows the turn, the cards left in the library and the number of mulligans.
 
-## Description
+## Notes
 
-The Description tab shows the **Cover card** (choose any card in the deck, or The commander), the format, and the description. **Edit description** opens a text box: lines starting with `#` are headings, `**text**` is bold, lines starting with `-` are lists, and `[text](https://...)` is a link (only web addresses become links). **Save** keeps it, **Cancel** leaves it unchanged.
+The Notes tab (Description before 0.22.0) shows the **Cover card** (choose any card in the deck, or The commander) and the format at the top, then the deck's notes: its top page, which is the deck's description, and any child pages, such as a primer, a sideboard guide or combo notes. See [Notes and the Wiki](/about/notes-and-the-wiki).
 
 ## History
 

@@ -11,7 +11,6 @@ Messages appear at the right end of the status bar (on the phone, in a banner ab
 | Card name tagged tags, or Tags removed from Card name | Tags... |
 | Deck name updated: N added, N changed, N removed | Edit as text |
 | Format set to format | Deck format... |
-| Description saved | Saving the deck description |
 | Card name is the cover card, Cover card changed, or Cover card removed | Choosing the cover card |
 | Grid layout, Binder layout | Switching the collection layout with B |
 | Card name linked to collection names, or Card name is now missing | Link copies |
@@ -107,6 +106,14 @@ Messages appear at the right end of the status bar (on the phone, in a banner ab
 | Card name removed from the pack and deleted | Remove from pack..., Remove from pack and delete the card |
 | N cards added to name, N linked to the deck | Add deck to collection |
 | The deck is not missing any cards | Add deck to collection with Missing cards only when nothing is missing |
+| Page title made | New page..., New child page..., or clicking a link to a missing page |
+| Renamed to title, or Renamed to title, N links changed | Rename... on a notes page |
+| title moved | Move to... or dragging a page |
+| title deleted | Delete... on a page |
+| Template name saved, Template renamed, Template name deleted | Save as template..., Rename and Delete in Templates... |
+| Your text was kept, Their text was kept, Your text was kept as title (my copy) | The answer to Page changed by someone else |
+| Version of time restored | Restore in History... |
+| Imported N pages, Exported N pages | Import markdown..., Export notes... |
 
 ## Questions
 
@@ -114,6 +121,8 @@ Messages appear at the right end of the status bar (on the phone, in a banner ab
 |---|---|---|
 | Remove Card name? N card came from pack name. It stays listed on that pack. | Removing one copy that came from a pack or purchase | Remove, Cancel |
 | Remove Card name from this pack? | Remove from pack... | Remove from pack, keep the card; Remove from pack and delete the card (while copies are held); Cancel |
+| Delete title? (with "It has N child pages" when it has some) | Delete... on a notes page | Delete with child pages, Move child pages up, Cancel (or Delete and Cancel for a page without child pages) |
+| Page changed by someone else: name saved this page at time while you were editing it. Choose which text to keep. | Saving a notes page someone else saved meanwhile | Keep mine, Keep theirs, Keep both, Decide later |
 
 ## Problems shown by Mana Vault
 
@@ -207,11 +216,35 @@ Messages appear at the right end of the status bar (on the phone, in a banner ab
 | Not found in Play booster, Foundations | A pulled card its pack cannot hold | Check the card, or Move to pack... / Remove from pack... |
 | This picture has no transparent background, so it keeps its own colors. | A JPEG or opaque main symbol with Rarity colors on | Use an SVG, or a PNG or WebP with a transparent background |
 
+### Notes and the Wiki (0.22.0)
+
+| Message | Cause | What to do |
+|---|---|---|
+| Type a title for the page | New page... with an empty title | Type a title |
+| Not saved (beside the page title), Could not save the page. | The save failed, for example without a connection | The next change tries again; check the connection |
+| Could not make the page. / Could not move the page. / Could not delete the page. / Could not rename the page. / Could not pin the page. | The change failed | Check the connection and try again |
+| Could not add the picture. | The picture could not be read or sent | Use a PNG, JPEG, GIF, WebP, AVIF or SVG file up to 20 MB |
+| Could not load the versions. / Could not restore the version. / Could not open the notes. | The server could not be reached | Try again with a connection |
+| Could not save the template. / Could not rename the template. / Could not delete the template. | The change failed | Try again |
+| There are no pages to export | Export... with no pages | None |
+| There are no .md files to import, Could not import the files. | The files chosen hold no .md, .markdown or .txt files, or could not be read | Choose markdown files or a zip of them |
+| Could not export the pages. | The export failed | Try again |
+| No card named name in the card database | Clicking a card link whose card is not in the card database | Change the link to a card name in the database |
+| Someone changed the page meanwhile. Try again. | Rename... while another save changed the page | Rename it again |
+
 ## Problems reported by the server
 
 | Message | Cause |
 |---|---|
 | CSV has no card rows | The collection file has only a header, or nothing |
+| A page title can be 1 to 200 characters, A page can be up to 500,000 characters | A notes page title or text is too long, or the title is empty |
+| Page not found, The parent page was not found | The page was deleted, moved out of reach, or the deck or collection it was on is no longer shared with you |
+| A page cannot go under itself or one of its child pages | Move to... or dragging a page onto its own child page |
+| The top page of a deck or collection stays with it, The top page of a deck or collection cannot be deleted. Clear its text instead. | Moving or deleting a top page |
+| The page can no longer be put back | Undo of a delete more than a day later, or after the page's deck or collection was deleted |
+| Add a PNG, JPEG, GIF, WebP, AVIF or SVG picture, A picture can be up to 20 MB, The picture is empty | Adding another kind of file, a larger picture or an empty file to a page |
+| A template name can be 1 to 100 characters, Template not found, Version not found | A template name is empty or too long; a template or version was deleted meanwhile |
+| Import up to 2,000 pages at a time | Import markdown... with more files |
 | CSV needs a "Name" or "Card Name" column | The first line has no name column |
 | CSV can contain at most 5,000 rows per import | The file is too long; split it |
 | Could not read CSV: reason | The file is not valid CSV |

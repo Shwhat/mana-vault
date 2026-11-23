@@ -18,6 +18,7 @@ import { AdminView } from "../views/AdminView";
 import CardScanner from "./CardScanner";
 import { ContextMenuHost } from "./ContextMenu";
 import { PurchasesView } from "../views/PurchasesView";
+import { WikiView } from "../views/WikiView";
 import { Dock } from "./Dock";
 import { ModeTabs, TitleBar, UndoButtons, useWorkspaceActions } from "./MenuBar";
 import { StatusBar } from "./StatusBar";
@@ -35,6 +36,7 @@ function CenterView({ actions, onFilters }: { actions: Record<string, Action>; o
   if (store.view === "trade") return <TradeView actions={actions} />;
   if (store.view === "proxies") return <ProxiesView actions={actions} />;
   if (store.view === "purchases") return <PurchasesView actions={actions} />;
+  if (store.view === "wiki") return <WikiView actions={actions} />;
   return <CardsView actions={actions} onFilters={onFilters} />;
 }
 

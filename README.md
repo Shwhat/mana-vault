@@ -74,6 +74,7 @@ The full user guide is built into the app: Help tab, **About Mana Vault**. The p
 - Add precon as deck... and Add precon to collection...; Scan barcode... for a product in Purchases; expected value of booster packs, Open virtual packs... and a warning on a pulled card its pack cannot hold; Change collection... on a pack; New collection... in every list where cards go.
 - Search syntax `is:reprint`, `is:starter`, `can:commander`, `can:oathbreaker`, `can:brawl`, `store:`, `buylist` and `in:`; imports matched by TCGplayer, Card Kingdom and CardSphere ids and TCGplayer SKUs.
 - Every tab opens where it was left (its card page, filters, entry and scroll position); pressing the tab already shown goes back to its first screen.
+- Notes and the Wiki (0.22.0): a Notes tab on every deck (its top page is the deck's description) and collection, with child pages to any depth; a rich text editor with a toolbar (headings, lists, checklists, tables, quotes, code, links, `[[Page]]` links, card links with the card's picture, and pictures) saved as markdown; a Wiki tab with search, Pinned, Recent, Decks, Collections and My pages for pages not attached to anything, and drag and drop; built-in and own templates; page history with Restore and a choice of text when two people save the same page; notes that follow sharing; markdown import (files or an Obsidian-style zip) and zip export with pictures; offline notes in the Android app.
 - Built-in About guide with release notes.
 
 ## Keyboard shortcuts
@@ -81,7 +82,7 @@ The full user guide is built into the app: Help tab, **About Mana Vault**. The p
 | Key | Action |
 |---|---|
 | / | Find card |
-| 1, 2, 3, 4, 5, 6 | Card search, collection, deck, trade, proxies, purchases view |
+| 1, 2, 3, 4, 5, 6, 7 | Card search, collection, deck, trade, proxies, purchases, wiki view |
 | Up, Down | Previous or next row |
 | Enter | Add the selected card to the collection or deck selected last |
 | Shift+Enter | Add the selected card to the open deck |
@@ -95,7 +96,8 @@ The full user guide is built into the app: Help tab, **About Mana Vault**. The p
 | Ctrl+A | Pick every card the collection filter shows |
 | Ctrl+click, Shift+click | Pick more rows, or a range |
 | Delete | Remove the picked collection rows |
-| Ctrl+Z, Ctrl+Y (or Ctrl+Shift+Z) | Undo, redo |
+| Ctrl+Z, Ctrl+Y (or Ctrl+Shift+Z) | Undo, redo (in a notes page: undo and redo typing) |
+| Ctrl+B, Ctrl+I, Ctrl+K | Bold, italic and link in a notes page |
 | Ctrl+O | Open deck |
 | Q | Go to Quick add in the open deck |
 | Esc | Close the window, menu, About guide or Administration, or clear the selection |
@@ -250,7 +252,7 @@ The browser suite uses Playwright's Chromium (`npx playwright install chromium` 
 
 | Path | Contents |
 |---|---|
-| `apps/server/src` | Fastify server: API, sign-in (`auth.ts`), collections, set completion and sending (`library.ts`), decks (`decks.ts`), deck card links (`links.ts`), set list (`sets.ts`), search, imports, backups, catalog updates |
+| `apps/server/src` | Fastify server: API, sign-in (`auth.ts`), collections, set completion and sending (`library.ts`), decks (`decks.ts`), notes pages (`notes.ts`), deck card links (`links.ts`), set list (`sets.ts`), search, imports, backups, catalog updates |
 | `apps/web/src` | React interface: `store.tsx` (state), `library-state.tsx` (collections, picking rows, decks admin, offers), `actions.tsx` (every command), `menus.ts` (the menu bar, mode tabs and account menu as data), `formats.ts` (export formats), `dock.ts` (panel layout model), `components/`, `panels/`, `views/`, `about/` (guide pages), `style.css` |
 | `apps/web/public` | Sign-in page, icons, manifest and service worker |
 | `apps/android` | Android app: Capacitor project (`android/`), native plugin, icons |

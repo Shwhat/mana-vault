@@ -1,4 +1,5 @@
 // ---------- collection view: cards, set completion and missing cards ----------
+import { NotesPane } from "../components/NotesPane";
 import { packNote } from "../purchase-state";
 import { newEntry } from "./PurchasesView";
 import { SetIcon } from "../components/CardMarks";
@@ -132,8 +133,8 @@ function CollectionHeader({ current, actions }: { current: Collection; actions: 
   const store = useApp();
   // a collection without a completion rule tracks no completion
   const tabs: Array<[CollectionTab, string]> = store.allCollections ? [["cards", "Cards"]] : current.completion === "none"
-    ? [["cards", "Cards"], ["stats", "Statistics"]]
-    : [["cards", "Cards"], ["completion", "Completion"], ["missing", "Missing"], ["stats", "Statistics"]];
+    ? [["cards", "Cards"], ["stats", "Statistics"], ["notes", "Notes"]]
+    : [["cards", "Cards"], ["completion", "Completion"], ["missing", "Missing"], ["stats", "Statistics"], ["notes", "Notes"]];
   const currency = store.prefs.currency;
   const isTarget = store.prefs.targetCollection === current.id;
   const rows = store.collection?.length ?? current.entryCount;
@@ -638,7 +639,8 @@ export function CollectionView({ actions }: { actions: Record<string, Action> })
   return (
     <div className="view" id="view-collection">
       <CollectionHeader current={current} actions={actions} />
-      {(store.collectionTab === "cards" || (current.completion === "none" && store.collectionTab !== "stats")) && <CardsTab actions={actions} />}
+      {(store.collectionTab === "cards" || (current.completion === "none" && store.collectionTab !== "stats" && store.collectionTab !== "notes") || (store.allCollections && store.collectionTab === "notes")) && <CardsTab actions={actions} />}
+      {store.collectionTab === "notes" && !store.allCollections && <NotesPane key={current.id} scope={{ kind: "collection", itemId: current.id, name: current.name }} view="collection" />}
       {store.collectionTab === "completion" && current.completion !== "none" && <CompletionTab current={current} />}
       {store.collectionTab === "missing" && current.completion !== "none" && <MissingTab current={current} actions={actions} />}
       {store.collectionTab === "stats" && (

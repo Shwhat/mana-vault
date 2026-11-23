@@ -36,6 +36,7 @@ import {
 import { enterSource, priceCols } from "./price-context.js";
 import { priceSourceOf } from "./mtgjson.js";
 import { registerMtgjsonRoutes, startMtgjsonRunner } from "./mtgjson-routes.js";
+import { NOTES_PUBLIC, registerNoteRoutes } from "./notes.js";
 
 declare module "fastify" {
   interface FastifyRequest {
@@ -184,7 +185,7 @@ export async function buildApp(
     enterSource(priceSourceOf(database, request.user?.id));
     // the shared trade binder is the one page that works without signing in
     if (PUBLIC_PATHS.has(path) || request.user || (path === "/api/devices" && request.method === "POST")
-      || ((request.method === "GET" || request.method === "HEAD") && (/^\/share\/[\w-]{10,64}$/.test(path) || CUSTOM_PUBLIC.test(path) || EXTRAS_PUBLIC.test(path) || PICTURE_PATH.test(path)))) return;
+      || ((request.method === "GET" || request.method === "HEAD") && (/^\/share\/[\w-]{10,64}$/.test(path) || CUSTOM_PUBLIC.test(path) || EXTRAS_PUBLIC.test(path) || NOTES_PUBLIC.test(path) || PICTURE_PATH.test(path)))) return;
     if (path.startsWith("/api/")) return reply.code(401).send({ error: "You are signed out. Sign in again to continue." });
     if (path === "/" || path.endsWith(".html") || !path.includes(".")) return reply.redirect("/login");
     return reply.code(401).send({ error: "Signed out" });
@@ -231,6 +232,7 @@ export async function buildApp(
   registerLibraryRoutes(app, database);
   registerDeckRoutes(app, database);
   registerDeckBuilderRoutes(app, database);
+  registerNoteRoutes(app, database);
   registerTradeRoutes(app, database);
   initializePurchases(database);
   registerPurchaseRoutes(app, database, join(webRoot, "ocr"), options.fetcher as ((url: string, init?: RequestInit) => Promise<Response>) | undefined);

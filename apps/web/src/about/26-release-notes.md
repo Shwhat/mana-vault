@@ -2,6 +2,21 @@
 
 The installed version is shown at the top of this guide.
 
+## 0.22.0 (2026-11-22): Notes and the Wiki
+
+- Notes: decks and collections have a Notes tab with a tree of pages. A deck's Description tab is now its Notes tab: the description is the text of the deck's top page, and the Cover card and Format are at the top of the tab.
+- Editor: pages are edited as formatted text with a toolbar (headings, bold, italic, strikethrough, code, lists, checklists, quotes, code blocks, dividers, tables, links, page links, card links and pictures) and typed shortcuts, saved by themselves 1 second after the last change, and stored as markdown.
+- Page links (`[[Page title]]`, or typing `[[`) open the page, or make it when it does not exist; renaming a page changes the links to it; each page lists the pages that link to it. Card links (`[[card:Card name]]`) show the card's picture when pointed at and open the card page.
+- Pictures are pasted, dropped or chosen and kept on the server; large pictures are made smaller first.
+- Wiki tab (key 7, the Wiki button on the phone's Home screen, Wiki view in the View menu): search every page, Pinned and Recent pages, the Decks and Collections with notes, and My pages for pages not attached to anything. Drag a page to reorder it or put it under another page; Move to... does the same from the right-click menu.
+- Templates: Deck primer, Combo, Sideboard guide and Collection plan are built in; Save as template... adds your own, and Templates... renames and deletes them.
+- History... lists each page's versions with Restore. When someone saved a page while you were editing it, you choose Keep mine, Keep theirs or Keep both.
+- Notes follow the sharing of their deck or collection. Deleting a deck or collection deletes its notes.
+- Import markdown... reads .md files or a zip (such as an Obsidian vault) with pictures; Export notes... saves a page with its child pages, a deck's or collection's tree, or the whole Wiki as a zip of .md files with pictures. A deck exported as a Plain text list ends with its notes as `//` lines.
+- Android app: notes are kept on the phone and can be read, searched and changed without a connection; pictures added offline are sent with the changes.
+- Backups include notes pages, their versions and pictures, pins and templates.
+- Each deck's existing description becomes its top notes page when the server starts with this version.
+
 ## 0.21.0 (2026-11-22): MTGJSON data, store prices, precons, booster values and tabs that keep their place
 
 - MTGJSON: each card database update also keeps MTGJSON's data on the server: every printing's record (matched by Scryfall id), booster contents, sealed product contents and barcodes, TCGplayer SKUs and the keyword and card type lists weekly, and every store's prices daily. Administration, Card database has an MTGJSON section with each part's count, size, date and last result, Update MTGJSON data now and Update prices now.

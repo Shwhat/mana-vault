@@ -92,14 +92,23 @@ test("tags, description, cover card, history and playtest", async ({ page }) => 
   await deckOptions(page, () => choose(page, page.locator("#deck-group"), "tag"));
   await expect(page.locator("#view-deck .grouphead")).toHaveText(["Artifacts 1", "Ramp 1", "No tag 8"]);
 
-  await page.getByRole("tab", { name: "Description" }).click();
-  await page.getByRole("button", { name: "Edit description" }).click();
-  await page.getByLabel("Deck description").fill("# Plan\nPlay **elves**. [Bad](javascript:alert(1))");
-  await page.getByRole("button", { name: "Save" }).click();
-  await expect(status(page)).toHaveText("Description saved");
-  await expect(page.locator(".abpage.desc h1")).toHaveText("Plan");
-  await expect(page.locator(".abpage.desc b")).toHaveText("elves");
-  await expect(page.locator(".abpage.desc a")).toHaveCount(0);
+  // 0.22.0: the description is the deck's top notes page on the Notes tab
+  await page.getByRole("tab", { name: "Notes" }).click();
+  await page.locator(".notebody").click();
+  await page.keyboard.type("# Plan");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("Play **elves**.");
+  await expect(page.locator(".nstatus")).toHaveText("Saved", { timeout: 6000 });
+  await expect(page.locator(".notebody h1")).toHaveText("Plan");
+  await expect(page.locator(".notebody strong")).toHaveText("elves");
+  // a link to a script address is never made a link
+  const decks = await (await page.request.get("/api/decks")).json() as Array<{ id: string }>;
+  await page.request.patch(`/api/decks/${decks[0]!.id}`, { headers: { "x-mana-vault": "1" }, data: { description: "# Plan\n\nPlay **elves**. [Bad](javascript:alert(1))\n" } });
+  await page.reload();
+  await page.locator("#modetabs .mtab", { hasText: "Decks" }).click();
+  await page.getByRole("tab", { name: "Notes" }).click();
+  await expect(page.locator(".notebody")).toContainText("Bad");
+  await expect(page.locator('.notebody a[href^="javascript"]')).toHaveCount(0);
   await choose(page, page.locator("#deck-cover"), { label: "Sol Ring" });
   await expect(status(page)).toHaveText("Cover card changed");
 

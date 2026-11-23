@@ -33,6 +33,7 @@ Card pictures downloaded to the server are kept in the picture folder: by defaul
 | Art library | Every picture you added to the art library, with its name (backups made with 0.15.0 and later). A restore keeps pictures other accounts added |
 | Card back | The card back you uploaded for printing, if any (backups made with 0.15.0 and later) |
 | Purchase history | Every entry with its lines, openings, tied cards, sales, sealed values, place, who paid shipping and receipt (backups made with 0.16.0 and later). On restore each place is matched to the server's places by name, and added when it is new |
+| Notes | The notes pages of your own decks and collections and your pages in My pages, with their versions and pictures, your pins and your templates (backups made with 0.22.0 and later). A restore replaces your pages in My pages and your templates, and puts the pages back on the restored decks and collections. Restoring an older backup makes each deck's top page from its description |
 
 A backup does not contain collections or decks shared with you by others, accounts, preferences, prices, deck history, trades, the trade binder link, the print list or the full card database. Prices return with the next card database update.
 

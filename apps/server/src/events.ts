@@ -3,7 +3,7 @@ import type { DatabaseSync } from "node:sqlite";
 import type { FastifyInstance, FastifyReply } from "fastify";
 
 /** What changed, so a page reloads only the parts it shows. */
-export type ChangeArea = "library" | "decks" | "purchases" | "trades" | "inbox" | "prints" | "prefs" | "opening" | "other";
+export type ChangeArea = "library" | "decks" | "purchases" | "trades" | "inbox" | "prints" | "prefs" | "opening" | "notes" | "other";
 
 export type ChangeEvent = { areas: ChangeArea[]; by: number; client: string | null; at: number; opening?: OpeningNote | null };
 /** The active opening of an account (item 7): sent when an opening starts or ends. */
@@ -28,7 +28,9 @@ export function areasOf(path: string): ChangeArea[] {
   if (/^\/api\/(shares|offers|inbox|send)/.test(path)) { areas.add("inbox"); areas.add("library"); areas.add("decks"); }
   if (/^\/api\/(print|proxies)/.test(path)) areas.add("prints");
   if (/^\/api\/prefs/.test(path)) areas.add("prefs");
-  if (/^\/api\/sync/.test(path)) { areas.add("library"); areas.add("decks"); areas.add("purchases"); areas.add("trades"); }
+  if (/^\/api\/notes/.test(path)) areas.add("notes");
+  if (/^\/api\/decks\/[^/]+$/.test(path)) areas.add("notes");
+  if (/^\/api\/sync/.test(path)) { areas.add("library"); areas.add("decks"); areas.add("purchases"); areas.add("trades"); areas.add("notes"); }
   if (!areas.size) areas.add("other");
   return [...areas];
 }

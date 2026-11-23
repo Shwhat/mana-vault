@@ -144,6 +144,66 @@ test.describe("Android app", () => {
     expect((await serverCards(page, baseURL!)).sort()).toEqual(["1 Counterspell", "1 Shivan Dragon"]);
   });
 
+  test("notes pages are read, changed and made offline, and sent when back online (0.22.0)", async ({ page, context, baseURL }) => {
+    await fakePhone(page);
+    await signUpOnPhone(page, baseURL!, "notes");
+    await page.getByRole("button", { name: "Wiki" }).click();
+    await page.locator("#view-wiki .wikihead").getByRole("button", { name: "New page..." }).click();
+    await page.locator("dialog#dlg[open]").getByRole("textbox", { name: "Title" }).fill("Phone page");
+    await page.locator("dialog#dlg[open]").getByRole("button", { name: "Make page" }).click();
+    // pages open to read on the phone; Edit starts editing
+    await page.getByRole("button", { name: "Edit", exact: true }).click();
+    await page.locator(".notebody").click();
+    await page.keyboard.type("Online text");
+    await expect(page.locator(".nstatus")).toHaveText("Saved", { timeout: 6000 });
+    await page.getByRole("button", { name: "Done", exact: true }).click();
+    await expect(chip(page)).toHaveText(/^Synced/);
+
+    await context.setOffline(true);
+    await page.getByRole("button", { name: "Edit", exact: true }).click();
+    await page.locator(".notebody").click();
+    await page.keyboard.press("Control+End");
+    await page.keyboard.type(" and offline text");
+    await expect(page.locator(".nstatus")).toHaveText("Saved", { timeout: 6000 });
+    await page.getByRole("button", { name: "Done", exact: true }).click();
+    await expect(chip(page)).toContainText("Offline");
+    // a new page offline, and search on the phone
+    await page.getByRole("button", { name: "Pages", exact: true }).click();
+    await page.locator("#view-wiki .wikihead").getByRole("button", { name: "New page..." }).click();
+    await page.locator("dialog#dlg[open]").getByRole("textbox", { name: "Title" }).fill("Made offline");
+    await page.locator("dialog#dlg[open]").getByRole("button", { name: "Make page" }).click();
+    await expect(page.locator("input.ntitle")).toHaveValue("Made offline");
+    await page.getByRole("button", { name: "Pages", exact: true }).click();
+    await page.getByRole("textbox", { name: "Search notes" }).fill("offline text");
+    await expect(page.getByRole("listbox", { name: "Pages found" }).getByRole("option")).toHaveCount(1);
+
+    await context.setOffline(false);
+    await expect(chip(page)).toHaveText(/^Synced/);
+    const token = await page.evaluate(() => (JSON.parse(localStorage.getItem("test.native") ?? "{}") as { token: string }).token);
+    const headers = { authorization: `Bearer ${token}`, "x-mana-vault": "1" };
+    const tree = await (await page.request.get(`${baseURL}/api/notes`, { headers })).json() as { pages: Array<{ id: string; title: string }> };
+    expect(tree.pages.map((item) => item.title).sort()).toEqual(["Made offline", "Phone page"]);
+    const phonePage = tree.pages.find((item) => item.title === "Phone page")!;
+    const saved = await (await page.request.get(`${baseURL}/api/notes/pages/${phonePage.id}`, { headers })).json() as { body: string; version: number };
+    expect(saved.body).toBe("Online text and offline text\n");
+
+    // an offline change that meets a newer save on the server asks which text to keep
+    await page.getByRole("textbox", { name: "Search notes" }).fill("");
+    await page.locator(".ntree [role=treeitem]", { hasText: "Phone page" }).click();
+    await context.setOffline(true);
+    await page.getByRole("button", { name: "Edit", exact: true }).click();
+    await page.locator(".notebody").click();
+    await page.keyboard.press("Control+End");
+    await page.keyboard.type(" again");
+    await expect(page.locator(".nstatus")).toHaveText("Saved", { timeout: 6000 });
+    await page.request.put(`${baseURL}/api/notes/pages/${phonePage.id}`, { headers, data: { body: "Changed on the computer\n", baseVersion: saved.version } });
+    await context.setOffline(false);
+    await expect(page.locator("dialog#dlg[open]")).toContainText("Choose which text to keep", { timeout: 15_000 });
+    await page.locator("dialog#dlg[open]").getByRole("button", { name: "Keep mine" }).click();
+    await expect.poll(async () => (await (await page.request.get(`${baseURL}/api/notes/pages/${phonePage.id}`, { headers })).json() as { body: string }).body)
+      .toBe("Online text and offline text again\n");
+  });
+
   test("Back button, devices, notifications and sign out", async ({ page, baseURL }) => {
     await fakePhone(page);
     await signUpOnPhone(page, baseURL!, "back");

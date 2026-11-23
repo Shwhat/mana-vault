@@ -260,9 +260,9 @@ export type BackupSummary = {
 
 export type User = { id: number; name: string; admin?: boolean; mustChange?: boolean };
 
-export type View = "home" | "cards" | "collection" | "deck" | "trade" | "proxies" | "purchases" | "about" | "admin";
-export type CollectionTab = "cards" | "completion" | "missing" | "stats";
-export type DeckTab = "cards" | "add" | "ownership" | "stats" | "playtest" | "description" | "history";
+export type View = "home" | "cards" | "collection" | "deck" | "trade" | "proxies" | "purchases" | "wiki" | "about" | "admin";
+export type CollectionTab = "cards" | "completion" | "missing" | "stats" | "notes";
+export type DeckTab = "cards" | "add" | "ownership" | "stats" | "playtest" | "notes" | "history";
 export type DeckView = "list" | "text" | "stacks" | "grid";
 export type DeckGroup = import("./list-groups").ListGroup;
 export type DeckSort = import("./list-groups").ListSort;

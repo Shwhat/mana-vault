@@ -62,6 +62,7 @@ System follows the device's light or dark setting and changes with it. A new ver
 ## Undo and redo
 
 - Undo (Ctrl+Z) reverses the last collection or deck edit: adding a card (and the wishlist wants it lowered), changing a count, removing an entry or deck card (one or many at once), moving cards between collections, Copy details, marking or unmarking for trade, adding to the wishlist, moving a deck card between zones, linking copies to a deck card, and adding a scanned list (one step for the whole list, including the deck links), tags on deck cards, Edit as text, and completing a trade. Redo (Ctrl+Y or Ctrl+Shift+Z) repeats it.
+- Notes: making a page, moving it, deleting it (with its child pages or not), importing markdown and deleting a template can be undone. Typing in a page has its own Undo and Redo in the page's toolbar (Ctrl+Z and Ctrl+Y while typing in the page), and each page keeps its versions in History...
 - Up to 150 edits are kept. The history lasts until the page is reloaded.
 - Imports, backup restores, creating, changing or deleting collections and decks, sending and accepting, card database updates, preference changes, changes to a trade's lines, and accepting a trade from another account cannot be undone. A backup restore, or deleting or leaving a collection or deck, clears the history.
 - An undo sets the counts back to what they were before the edit. If someone else changed the same card in the meantime, their change to that card is replaced.
@@ -82,6 +83,7 @@ Shortcuts work when no text box, menu or window has focus, except the Ctrl short
 | 4 | Trade view |
 | 5 | Proxies view |
 | 6 | Purchases view |
+| 7 | Wiki view |
 | Up, Down | Select the previous or next row (Down also leaves the search box) |
 
 ### Adding cards
@@ -120,6 +122,18 @@ Shortcuts work when no text box, menu or window has focus, except the Ctrl short
 |---|---|
 | Ctrl+O | Open deck... |
 | Q | Go to Quick add in the open deck |
+
+### Notes pages
+
+These work while typing in a notes page; see [Notes and the Wiki](/about/notes-and-the-wiki).
+
+| Key | Action |
+|---|---|
+| Ctrl+B, Ctrl+I | Bold, italic |
+| Ctrl+K | Link |
+| Ctrl+Z, Ctrl+Y | Undo and redo typing in the page |
+| `[[` | Page link |
+| `# `, `- `, `1. `, `[ ] `, `> ` at the start of a line | Heading, bullet list, numbered list, checklist, quote |
 
 In the collection and deck switchers, type to find, Up and Down move, Enter opens and Esc closes the list. A click on a collection or deck opens it. In the Collections and Decks panels Enter opens and Space picks it as where new cards go.
 

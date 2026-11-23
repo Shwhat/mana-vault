@@ -2,6 +2,15 @@
 
 | Term | Meaning in Mana Vault |
 |---|---|
+| Notes page | A page of formatted text, saved as markdown, attached to a deck, a collection or nothing |
+| Top page | The first notes page of a deck or collection, named after it. A deck's top page is its description |
+| Child page | A notes page under another page in the tree |
+| My pages | Notes pages not attached to a deck or collection, seen only by you |
+| Page link | A link to a notes page by its title, written `[[Page title]]` |
+| Card link | A link to a card by its name, written `[[card:Card name]]` |
+| Template | Text a new notes page can start from: built in, or saved from a page with Save as template... |
+| Version | A saved state of a notes page, listed in History... |
+| Wiki | The tab that shows every notes page you can read |
 | Pack | One pack of a product with packs in it, opened as its own opening and named with its number (Pack 3 of 36) |
 | Pack cost | A product's full cost divided by its packs |
 | Named product | A sealed product with a name of its own, such as a Commander deck or a bundle, listed for each set with the card database; picked or typed as a line's Product name |

@@ -14,9 +14,9 @@ Click a menu to open it. While a menu is open, pointing at another menu opens th
 
 | Menu | Commands |
 |---|---|
-| File | New collection..., New deck..., Add precon as deck... (Precon deck), Add precon to collection... (Precon to collection), Import..., Export..., Export purchase history... (Export purchases), New purchase..., New card sale... or Sell selected cards... when cards are picked in a collection (Sell), Scan barcode... (Scan barcode), Open virtual packs... (Virtual packs), Scan card..., Download backup, Restore backup..., Update card database (Update database, admins only), Sign out |
+| File | New collection..., New deck..., Add precon as deck... (Precon deck), Add precon to collection... (Precon to collection), Import..., Export..., Export purchase history... (Export purchases), New purchase..., New card sale... or Sell selected cards... when cards are picked in a collection (Sell), Scan barcode... (Scan barcode), Open virtual packs... (Virtual packs), New notes page... (New page), Import markdown..., Export notes..., Notes templates... (Templates), Scan card..., Download backup, Restore backup..., Update card database (Update database, admins only), Sign out |
 | Edit | Undo, Redo, Find, Select all cards, Clear filters |
-| View | Purchases view (Purchases); Light theme, Dark theme, System theme; Prices on pictures; Main price source... (Price source); Buylist prices in lists (Buylist); Card layout...; Filters panel, Collections panel, Decks panel, Card panel, Deck list panel, Import review panel |
+| View | Purchases view (Purchases), Wiki view (Wiki); Light theme, Dark theme, System theme; Prices on pictures; Main price source... (Price source); Buylist prices in lists (Buylist); Card layout...; Filters panel, Collections panel, Decks panel, Card panel, Deck list panel, Import review panel |
 | Help | Keyboard shortcuts, About Mana Vault |
 
 Undo and Redo show the change they will reverse or repeat, for example "Undo Add Sol Ring". The same two commands are arrow buttons in the title bar right after the Help menu (and in the phone's top bar): the tooltip names the change, such as "Undo Add Sol Ring (Ctrl+Z)", and a button is greyed out when there is nothing to undo or redo. **Import...** and **Export...** open the import and export windows; see [Import and export](/about/import-and-export).
@@ -34,8 +34,9 @@ Under the title bar, the mode tabs switch the program between its parts. The tab
 | Trade | Trades (Trade view), with a count when trades wait for your answer | 4 |
 | Proxies | The print list and the card maker (Proxies view) | 5 |
 | Purchases | Purchase history (Purchases view); see [Purchases](/about/purchases) | 6 |
+| Wiki | Notes of every deck and collection, and your own pages (Wiki view); see [Notes and the Wiki](/about/notes-and-the-wiki) | 7 |
 
-The views of a collection (Cards, Completion, Missing, Statistics) and of a deck (Cards, Ownership, Statistics, Playtest, Description, History) are the tabs in the header of that view.
+The views of a collection (Cards, Completion, Missing, Statistics, Notes) and of a deck (Cards, Add, Ownership, Statistics, Playtest, Notes, History) are the tabs in the header of that view.
 
 ## Where other commands are
 
@@ -82,22 +83,23 @@ Commands that can be used are shown in the normal text color.
 
 ## Work area
 
-The work area in the middle shows one of six views, chosen with the Views group on the Home tab or keys 1, 2, 3, 4 and 5. Each view has a header row with its name, a search or filter box where it applies, and a count on the right.
+The work area in the middle shows one of the views, chosen with the mode tabs or keys 1 to 7. Each view has a header row with its name, a search or filter box where it applies, and a count on the right.
 
 | View | Shows |
 |---|---|
-| Home | Totals for your collections (cards owned, value, collections, decks), Scan cards, Search and Import buttons, offers waiting in your Inbox, and your recent scans |
+| Home | Totals for your collections (cards owned, value, collections, decks), Scan cards, Search, Import, Purchases and Wiki buttons, offers waiting in your Inbox, and your recent scans |
 | Card search | Search results as a grid of card pictures, binder pages or a list, with prices and owned counts; see [Card search](/about/card-search) |
-| Collection | The open collection, in four tabs: Cards (a grid of card pictures, binder pages or a list), Completion, Missing and Statistics; see [Collections](/about/collections), [Set completion](/about/set-completion) and [Prices and statistics](/about/prices-and-statistics) |
-| Deck | The open deck, in seven tabs: Cards (the format check and the cards by zone and group as a list, text, stacks or grid), Add (Quick add and a card search), Ownership, Statistics, Playtest, Description and History; see [Decks](/about/decks) |
+| Collection | The open collection, in five tabs: Cards (a grid of card pictures, binder pages or a list), Completion, Missing, Statistics and Notes; see [Collections](/about/collections), [Set completion](/about/set-completion) and [Prices and statistics](/about/prices-and-statistics) |
+| Deck | The open deck, in seven tabs: Cards (the format check and the cards by zone and group as a list, text, stacks or grid), Add (Quick add and a card search), Ownership, Statistics, Playtest, Notes and History; see [Decks](/about/decks) |
 | Trade | Saved trades: You give and You get with their searches, the balance bar and wishlist matches; see [Wishlists and trading](/about/wishlists-and-trading) |
 | Proxies | The print list with sheet settings, preview and exports (Print tab), the card maker (Card maker tab) and custom sets with their symbols (Custom sets tab); see [Proxies and the card maker](/about/proxies) |
+| Wiki | The tree of notes pages (search, Pinned, Recent, Decks, Collections, My pages) and the open page; see [Notes and the Wiki](/about/notes-and-the-wiki) |
 
 Click a row to select it; its details appear in the Card panel. Up and Down select the previous or next row. The About guide and the card page also open in the work area and close with **Close**, **Back** or Esc. The About guide also closes when you open a collection, deck, card or view, or select a card in a panel.
 
 ## Tabs keep their place
 
-Each mode tab opens where it was left: Search keeps its search, filters, sort, view and scroll position; Collection its collection, view, filters, sort, picked cards and scroll position; Decks its deck, zone, view and scroll position; Trade the trade being built; Proxies Print, Card maker or Custom sets and the card or set chosen; Purchases the part shown (Summary, History or an entry), History's find box, filters, sort and picked rows, and the scroll position; Administration its section. A card page opened from a tab belongs to that tab, so another tab never shows it and Back returns to the tab's list where it was.
+Each mode tab opens where it was left: Search keeps its search, filters, sort, view and scroll position; Collection its collection, view, filters, sort, picked cards and scroll position; Decks its deck, zone, view and scroll position; Trade the trade being built; Proxies Print, Card maker or Custom sets and the card or set chosen; Purchases the part shown (Summary, History or an entry), History's find box, filters, sort and picked rows, and the scroll position; Wiki its open page, search and folded pages, and each Notes tab its open page; Administration its section. A card page opened from a tab belongs to that tab, so another tab never shows it and Back returns to the tab's list where it was.
 
 Pressing a tab's button while that tab is already shown goes back to its first screen: its card page closes and what it was showing is cleared. On a phone, the bottom bar, the Home buttons and the Menu work the same way. What each tab shows is kept while Mana Vault is open (and while the app is in the background on a phone); signing out clears it. A purchase entry deleted on another device while Purchases was closed opens History in its place.
 
@@ -180,7 +182,7 @@ Below 900 pixels wide, and always in the Android app, the title bar, menus, mode
 
 - A top bar with the deck name, "Card", "Scan" or "Mana Vault", in the Android app the sync button (see [Android app](/about/android-app)), **Filters** in the collection, deck and trade views, **Trades** with a count when trades wait for your answer, an **Inbox** button with a count when offers are waiting, and the **Menu** button at the top right.
 - The current view, filling the screen. Phones open on Home. The card search adds a **Filters** button under the search box.
-- A bottom tab bar: **Home**, **Search**, **Collection**, **Decks**, **Trade**, **Proxies** and **Scan**. Search is card search. Decks shows the open deck, with the deck switcher at the top. Scan opens the camera scanner in place of the view (see [Scanning cards](/about/scanning-cards)).
+- A bottom tab bar: **Home**, **Search**, **Collection**, **Decks**, **Trade**, **Proxies** and **Scan**. Search is card search. Decks shows the open deck, with the deck switcher at the top. Scan opens the camera scanner in place of the view (see [Scanning cards](/about/scanning-cards)). Purchases and Wiki open from their buttons on Home and from the View section of the Menu.
 - Tapping a card opens its card page (except while picking rows).
 - **Menu** opens a sheet with one section per menu (File, Edit, View, Help). Tapping a section opens it. The last section, **Account**, is open and holds Inbox, Change password, Devices and Sign out; the Android app adds Sync now, Notifications and Check for updates. Commands that do not apply are not shown.
 - Sheets that slide up from the bottom: **Filters**, **Menu** and the scanned list in the scanner. Close a sheet with **Close**, by tapping outside it, or with Esc.

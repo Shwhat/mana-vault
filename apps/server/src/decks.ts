@@ -5,6 +5,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { type CopyKey, readCopyKey } from "./copies.js";
 import { access, forgetItem, itemSharing, lowerWishlists } from "./library.js";
 import { addLink, capDeckCardLinks, deckLinks, type Link, touchDeckCollections } from "./links.js";
+import { setDeckTopBody } from "./notes.js";
 import { priceCols, usdEtchedSql, usdFoilSql, usdSql } from "./price-context.js";
 
 export const ZONES = ["main", "sideboard", "commander", "maybeboard"];
@@ -315,6 +316,8 @@ export function registerDeckRoutes(app: FastifyInstance, database: DatabaseSync)
     }
     if (typeof description === "string") {
       database.prepare("UPDATE decks SET description = ?, updated_at = strftime('%Y-%m-%d %H:%M:%f', 'now') WHERE id = ?").run(description, deckId);
+      // the description is the deck's top notes page (0.22.0)
+      setDeckTopBody(database, deckId, description, userOf(request));
       logDeck(database, deckId, nameOf(request), "Description changed");
     }
     if (coverCardId !== undefined) {
