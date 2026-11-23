@@ -41,6 +41,10 @@ export type PurchaseList = {
 };
 export type EntryLine = {
   id: string; product: string; productLabel: string; name: string; setCode: string | null; quantity: number; cost: number; full: number; packs: number;
+  /** The set's name (0.21.0). */
+  setName?: string | null;
+  /** Expected value from the booster contents (0.21.0): per pack, for the whole line, and the booster type it was worked out for. */
+  ev?: number | null; evLine?: number | null; evLabel?: string | null;
   opened: number; sold: number; sealed: number; sealedValue: number; valueDate: string | null; cardId: string | null; foil: number | null;
   condition: string | null; language: string | null; collectionId: string | null; values: Array<{ date: string; value: number }>;
   /** Packs opened and packs still sealed, for products with packs (0.19.0). */
@@ -59,6 +63,8 @@ export type EntryTie = {
   valueThen: number | null;
   /** The copies no longer held: sold, traded, or gone (removed from the collection). */
   sold: number; traded: number; gone: number;
+  /** A card a pack's booster contents cannot hold, such as "Not found in Play booster, Foundations" (0.21.0). */
+  warning?: string | null;
 };
 export type EntryOpening = {
   id: string; lineId: string; count: number; name: string; collectionId: string | null; active: boolean; createdAt: string; doneAt: string | null;
@@ -67,6 +73,8 @@ export type EntryOpening = {
   valueNow: number; valueWhenPulled: number; whenPulledUnpriced: number; gone: number;
   /** 0.19.0: the pack's number in its product, its group of packs opened together, whether it waits, its cost, what its cards sold for and its gain or loss. */
   packNumber: number | null; groupId: string | null; waiting: boolean; packCost: number; soldFor: number; gain: number;
+  /** The expected value of the opening's packs, stored the day it was opened (0.21.0). */
+  ev?: number | null;
 };
 export type Entry = Omit<EntrySummary, "sets" | "products"> & {
   tax: number; shipping: number; fees: number; cashOut: number; cashIn: number; tradeId: string | null; pulledIncome: number;

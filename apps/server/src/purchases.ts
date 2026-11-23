@@ -7,11 +7,14 @@ import type { DatabaseSync } from "node:sqlite";
 import { access } from "./library.js";
 import { type CopyKey, readCopyKey } from "./copies.js";
 import { type CopyChange, onCopiesAdded, onCopiesLowered, onCopiesMoved, onTradeDone, onTradeReopened, type TradeSide } from "./copy-events.js";
-import { relinkRemoved, trimLinks } from "./links.js";
+import { linkedCount, moveLinks, relinkRemoved, trimLinks } from "./links.js";
+import { BOOSTER_PRODUCTS, lineBooster, lineValue, pullsAllowed, boosterLabel } from "./boosters.js";
 import { mergeHooks } from "./scryfall-extras.js";
 import { isAdmin } from "./admin.js";
 import { CONDITION_NOTE, conditionOf, finishOf, parseReceipt, pdfText, pictureText, setOf } from "./receipts.js";
 import { initializeSealed, matchSealed, sealedChoices, sealedDeckCards } from "./sealed.js";
+import { activeSource, priceCols } from "./price-context.js";
+import { sourcePriceOn, storeOf } from "./mtgjson.js";
 
 export const ENTRY_KINDS = ["purchase", "card_sale", "product_sale", "trade"] as const;
 export type EntryKind = (typeof ENTRY_KINDS)[number];
@@ -145,6 +148,8 @@ export function initializePurchases(database: DatabaseSync): void {
   // 0.19.0: packs opened one at a time. An opening of a product with packs is one pack (count is in packs); the packs of
   // one Open... share a group and wait in order. Older openings of such products are counted in packs from now on.
   const openingColumns = new Set(database.prepare("PRAGMA table_info(purchase_openings)").all().map((row) => String(row.name)));
+  // the expected value of an opening's packs, stored the day it is opened (0.21.0)
+  if (!openingColumns.has("ev")) database.exec("ALTER TABLE purchase_openings ADD COLUMN ev REAL");
   if (!openingColumns.has("pack_number")) {
     database.exec("ALTER TABLE purchase_openings ADD COLUMN pack_number INTEGER");
     database.exec("ALTER TABLE purchase_openings ADD COLUMN group_id TEXT");
@@ -313,11 +318,13 @@ function ownCollection(database: DatabaseSync, id: unknown, userId: number): boo
 /** Today's price of a copy in USD, by its finish. */
 /** A card's price on a day from the price history (the last one on or before it), or today's price when there is none. */
 function priceOnDay(database: DatabaseSync, cardId: string, foil: number, day: string): number | null {
+  // the main price source of the account (0.21.0), along its fallback stores, then today's price
   try {
-    const row = database.prepare("SELECT usd, usd_foil, usd_etched FROM price_history WHERE card_id = ? AND day <= ? ORDER BY day DESC LIMIT 1").get(cardId, day);
-    if (row) {
-      const value = foil === 0 ? row.usd : foil === 1 ? row.usd_foil : row.usd_etched ?? row.usd_foil;
-      if (value !== null && value !== undefined) return Number(value);
+    const value = sourcePriceOn(database, cardId, foil, day, activeSource());
+    if (value !== null) return value;
+    if (foil === 2) {
+      const etched = sourcePriceOn(database, cardId, 1, day, activeSource());
+      if (etched !== null) return etched;
     }
   } catch {
     // no price history table yet
@@ -326,7 +333,7 @@ function priceOnDay(database: DatabaseSync, cardId: string, foil: number, day: s
 }
 
 function priceNow(database: DatabaseSync, cardId: string, foil: number, _currency = "usd"): number | null {
-  const row = database.prepare("SELECT price_usd, price_usd_foil, price_usd_etched FROM cards WHERE id = ?").get(cardId);
+  const row = database.prepare(`SELECT ${priceCols("cards")} FROM cards WHERE id = ?`).get(cardId);
   if (!row) return null;
   const value = foil === 0 ? row.price_usd : foil === 1 ? row.price_usd_foil : row.price_usd_etched ?? row.price_usd_foil;
   return value === null || value === undefined ? null : Number(value);
@@ -546,7 +553,13 @@ export function purchaseChart(database: DatabaseSync, userId: number, currency: 
   const history = new Map<string, Array<{ day: string; prices: number[] }>>();
   const historyOf = (cardId: string) => {
     if (!history.has(cardId)) {
-      history.set(cardId, database.prepare(`SELECT day, ${column.join(", ")} FROM price_history WHERE card_id = ? ORDER BY day`).all(cardId)
+      // the main price source's history when it has one for the card (0.21.0), otherwise Scryfall's
+      const store = storeOf(activeSource());
+      const fromStore = store && currency === "usd"
+        ? database.prepare("SELECT day, r, rf, re FROM store_price_history WHERE card_id = ? AND store = ? ORDER BY day").all(cardId, store.code)
+          .map((row) => ({ day: String(row.day), prices: ["r", "rf", "re"].map((name) => Number(row[name] ?? NaN)) }))
+        : [];
+      history.set(cardId, fromStore.length ? fromStore : database.prepare(`SELECT day, ${column.join(", ")} FROM price_history WHERE card_id = ? ORDER BY day`).all(cardId)
         .map((row) => ({ day: String(row.day), prices: column.map((name) => Number(row[name] ?? NaN)) })));
     }
     return history.get(cardId)!;
@@ -632,6 +645,45 @@ export function purchaseEntry(database: DatabaseSync, userId: number, id: string
     const out = outs.get(Number(tie.id)) ?? { sold: 0, traded: 0, gone: 0, soldFor: 0 };
     return { sold: out.sold, traded: out.traded, gone: out.gone };
   };
+  // booster contents (0.21.0): expected value per pack and the pull check of each line
+  const values = new Map<string, ReturnType<typeof lineValue>>();
+  const valueOf = (line: Record<string, unknown>) => {
+    const key = String(line.id);
+    if (!values.has(key)) values.set(key, lineValue(database, line, activeSource()));
+    return values.get(key)!;
+  };
+  const checks = new Map<string, { allowed: Map<string, Set<number>>; label: string } | null>();
+  const checkOf = (lineId: string | null) => {
+    if (!lineId) return null;
+    if (!checks.has(lineId)) {
+      const line = figures.lines.find((item) => item.id === lineId);
+      const booster = line && BOOSTER_PRODUCTS.has(String(line.product)) ? lineBooster(database, line) : null;
+      const allowed = booster ? pullsAllowed(database, booster.setCode, booster.name) : null;
+      if (allowed && line?.sealed_id) {
+        // cards a product holds besides its packs (a bundle's promo card)
+        try {
+          const contents = JSON.parse(String(database.prepare("SELECT contents FROM sealed_products WHERE id = ?").get(String(line.sealed_id))?.contents ?? "null")) as { card?: Array<{ uuid?: unknown; foil?: unknown }> } | null;
+          for (const card of contents?.card ?? []) {
+            const cardId = database.prepare("SELECT card_id FROM mtgjson_records WHERE uuid = ?").get(String(card.uuid ?? ""))?.card_id;
+            if (typeof cardId === "string") allowed.set(cardId, new Set([...(allowed.get(cardId) ?? []), card.foil ? 1 : 0, card.foil ? 2 : 0]));
+          }
+        } catch {
+          // no contents saved
+        }
+      }
+      const setName = String(database.prepare("SELECT name FROM sets WHERE code = ?").get(String(booster?.setCode ?? ""))?.name ?? booster?.setCode?.toUpperCase() ?? "");
+      checks.set(lineId, allowed && booster ? { allowed, label: `${boosterLabel(booster.name)}, ${setName}` } : null);
+    }
+    return checks.get(lineId)!;
+  };
+  const openingLine = new Map(database.prepare("SELECT id, line_id FROM purchase_openings WHERE entry_id = ?").all(id).map((row) => [String(row.id), String(row.line_id)]));
+  const warningOf = (tie: Record<string, unknown>): string | null => {
+    if (!tie.opening_id) return null;
+    const check = checkOf(openingLine.get(String(tie.opening_id)) ?? null);
+    if (!check) return null;
+    const finishes = check.allowed.get(String(tie.card_id));
+    return finishes && finishes.has(Number(tie.foil)) ? null : `Not found in ${check.label}`;
+  };
   const openings = database.prepare("SELECT * FROM purchase_openings WHERE entry_id = ? ORDER BY created_at, pack_number").all(id).map((opening) => {
     const ties = figures.ties.filter((tie) => tie.opening_id === opening.id);
     // Pulled value: every pull at today's price, owned or not; Value now: the pulls still held; Value when pulled: fixed
@@ -645,7 +697,17 @@ export function purchaseEntry(database: DatabaseSync, userId: number, id: string
     const linePacks = Number(line?.packs ?? 0);
     const packCost = line ? money(Number(line.full) / Math.max(1, Number(line.quantity) * (linePacks > 0 ? linePacks : 1)) * packs) : 0;
     const soldFor = money(ties.reduce((sum, tie) => sum + (outs.get(Number(tie.id))?.soldFor ?? 0), 0));
+    // expected value of the opening's packs (0.21.0), stored the first time it is worked out and kept after that
+    let ev = opening.ev === null || opening.ev === undefined ? null : Number(opening.ev);
+    if (ev === null && line) {
+      const value = valueOf(line);
+      if (value) {
+        ev = money(value.perPack * (linePacks > 0 ? packs : packs * 1));
+        database.prepare("UPDATE purchase_openings SET ev = ? WHERE id = ?").run(ev, String(opening.id));
+      }
+    }
     return {
+      ev,
       id: String(opening.id), lineId: String(opening.line_id), count: Number(opening.count), name: String(opening.name), collectionId: opening.collection_id ? String(opening.collection_id) : null,
       active: Number(opening.active) === 1, createdAt: String(opening.created_at), doneAt: opening.done_at ? String(opening.done_at) : null,
       cards: ties.reduce((sum, tie) => sum + Number(tie.quantity), 0), valuePulled: money(pulled), perPack: money(pulled / packs), packs,
@@ -665,8 +727,17 @@ export function purchaseEntry(database: DatabaseSync, userId: number, id: string
     out: figures.out, in: figures.in, value: figures.value, gain: figures.gain, unpriced: figures.unpriced, pulledIncome: figures.pulledIncome,
     lines: figures.lines.map((line) => ({
       id: String(line.id), product: String(line.product), productLabel: line.product === "other" ? String(line.name) : PRODUCTS[String(line.product)]?.label ?? String(line.product),
-      name: String(line.name), setCode: line.set_code ? String(line.set_code) : null, quantity: Number(line.quantity), cost: Number(line.cost), full: line.full,
+      name: String(line.name), setCode: line.set_code ? String(line.set_code) : null,
+      setName: line.set_code ? String(database.prepare("SELECT name FROM sets WHERE code = ?").get(String(line.set_code))?.name ?? String(line.set_code).toUpperCase()) : null,
+      quantity: Number(line.quantity), cost: Number(line.cost), full: line.full,
       sealedId: line.sealed_id ? String(line.sealed_id) : null,
+      // expected value (0.21.0): per pack, and for the whole line (packs of each unit, or one pack for a single booster)
+      ...(() => {
+        const value = valueOf(line);
+        if (!value) return { ev: null, evLine: null, evLabel: null };
+        const perUnit = Number(line.packs) > 0 ? Number(line.packs) : String(line.product).endsWith("_booster") ? 1 : 0;
+        return { ev: value.perPack, evLine: perUnit ? money(value.perPack * perUnit * Number(line.quantity)) : null, evLabel: value.label };
+      })(),
       hasDeck: !!line.sealed_id && !!database.prepare("SELECT 1 FROM sealed_products WHERE id = ? AND deck_name IS NOT NULL").get(String(line.sealed_id)),
       packs: Number(line.packs), opened: Number(line.opened), sold: Number(line.sold), sealed: line.sealed, sealedValue: line.sealedValue, valueDate: line.valueDate,
       packsOpened: Number(line.packs_opened ?? 0), packsLeft: Number(line.packs) > 0 ? packsLeft(line) : line.sealed,
@@ -686,6 +757,7 @@ export function purchaseEntry(database: DatabaseSync, userId: number, id: string
       collectionId: String(tie.collection_id), quantity: Number(tie.quantity), held: tie.held, price: tie.price, lineId: tie.line_id ? String(tie.line_id) : null,
       openingId: tie.opening_id ? String(tie.opening_id) : null, tradePrice: tie.trade_price === null || tie.trade_price === undefined ? null : Number(tie.trade_price),
       valueThen: tie.value_then === null || tie.value_then === undefined ? null : Number(tie.value_then),
+      warning: warningOf(tie),
       ...outOf(tie),
     })),
     openings,
@@ -722,7 +794,7 @@ const COLUMNS: Record<string, string[]> = {
   purchase_entries: ["id", "user_id", "kind", "date", "place", "place_id", "note", "currency", "tax", "shipping", "shipping_by", "fees", "cash_out", "cash_in", "trade_id", "source", "created_at"],
   purchase_lines: ["id", "entry_id", "position", "product", "name", "set_code", "quantity", "cost", "packs", "opened", "sold", "card_id", "foil", "condition", "language", "collection_id", "packs_opened"],
   purchase_sales: ["id", "entry_id", "position", "what", "card_id", "foil", "condition", "language", "proxy", "collection_id", "name", "quantity", "price", "source_entry_id", "source_line_id"],
-  purchase_openings: ["id", "user_id", "entry_id", "line_id", "count", "name", "collection_id", "active", "created_at", "done_at", "pack_number", "group_id", "waiting"],
+  purchase_openings: ["id", "user_id", "entry_id", "line_id", "count", "name", "collection_id", "active", "created_at", "done_at", "pack_number", "group_id", "waiting", "ev"],
   purchase_ties: ["user_id", "entry_id", "line_id", "opening_id", "collection_id", "card_id", "foil", "condition", "language", "proxy", "quantity", "price", "created_at", "value_then"],
   purchase_values: ["line_id", "date", "value"],
   purchase_receipts: ["entry_id", "name", "type", "data", "added_at"],
@@ -1174,6 +1246,78 @@ export function registerPurchaseRoutes(app: FastifyInstance, database: DatabaseS
 
   const ownOpening = (request: FastifyRequest<{ Params: { openingId: string } }>) =>
     database.prepare("SELECT * FROM purchase_openings WHERE id = ? AND user_id = ?").get(request.params.openingId, userOf(request));
+
+  // Change collection... on a pack (0.21.0): where its cards go from now on, and optionally the pulls already added
+  const movePulls = (userId: number, tieIds: number[] | null, openingIds: string[], to: string) => {
+    const held = heldByTie(database, userId);
+    const moved: Array<{ id: number; from: string; to: string; quantity: number }> = [];
+    const ties = tieIds
+      ? tieIds.flatMap((tieId) => database.prepare("SELECT * FROM purchase_ties WHERE id = ? AND user_id = ?").all(tieId, userId))
+      : openingIds.flatMap((openingId) => database.prepare("SELECT * FROM purchase_ties WHERE opening_id = ? AND user_id = ?").all(openingId, userId));
+    for (const tie of ties) {
+      const from = String(tie.collection_id);
+      const quantity = held.get(Number(tie.id)) ?? 0;
+      if (from === to || quantity <= 0) continue;
+      const key = keyOfRow(tie);
+      const have = heldQuantity(database, from, key);
+      const take = Math.min(quantity, have);
+      if (take <= 0) continue;
+      // deck links follow the copies, so pulls in a deck stay in it
+      moveLinks(database, { collectionId: from, key }, { collectionId: to, key }, take, have - linkedCount(database, from, key));
+      takeCopies(database, from, key, take);
+      putCopies(database, to, key, take);
+      database.prepare("UPDATE purchase_ties SET collection_id = ? WHERE id = ?").run(to, Number(tie.id));
+      moved.push({ id: Number(tie.id), from, to, quantity: take });
+    }
+    return moved;
+  };
+
+  app.post<{ Params: { openingId: string }; Body: { collectionId?: unknown; move?: unknown; rest?: unknown } }>("/api/purchases/openings/:openingId/collection", async (request, reply) => {
+    const opening = ownOpening(request);
+    if (!opening) return reply.code(404).send({ error: "That opening is not in your purchase history" });
+    const userId = userOf(request);
+    const collectionId = request.body?.collectionId;
+    if (!ownCollection(database, collectionId, userId)) return reply.code(404).send({ error: "Choose one of your collections" });
+    const targets = [opening, ...(request.body?.rest === true && opening.group_id
+      ? database.prepare("SELECT * FROM purchase_openings WHERE group_id = ? AND user_id = ? AND waiting = 1 AND id != ?").all(String(opening.group_id), userId, String(opening.id))
+      : [])];
+    let result: { openings: Array<{ id: string; collectionId: string | null }>; ties: Array<{ id: number; from: string; to: string; quantity: number }> } = { openings: [], ties: [] };
+    try {
+      transaction(database, () => {
+        result = {
+          openings: targets.map((item) => ({ id: String(item.id), collectionId: item.collection_id ? String(item.collection_id) : null })),
+          ties: request.body?.move === true ? movePulls(userId, null, targets.map((item) => String(item.id)), String(collectionId)) : [],
+        };
+        for (const item of targets) database.prepare("UPDATE purchase_openings SET collection_id = ? WHERE id = ?").run(String(collectionId), String(item.id));
+      });
+    } catch (error) {
+      return fail(reply, error, "Could not change the collection");
+    }
+    return { undo: result, entry: purchaseEntry(database, userId, String(opening.entry_id)) };
+  });
+
+  // undo of Change collection...: the packs' collections as they were, and the moved pulls back where they came from
+  app.post<{ Body: { openings?: unknown; ties?: unknown } }>("/api/purchases/openings/collection/restore", async (request, reply) => {
+    const userId = userOf(request);
+    const openings = Array.isArray(request.body?.openings) ? request.body.openings as Array<{ id?: unknown; collectionId?: unknown }> : [];
+    const ties = Array.isArray(request.body?.ties) ? request.body.ties as Array<{ id?: unknown; from?: unknown; to?: unknown }> : [];
+    try {
+      transaction(database, () => {
+        for (const tie of ties) {
+          const row = database.prepare("SELECT collection_id FROM purchase_ties WHERE id = ? AND user_id = ?").get(Number(tie.id), userId);
+          if (!row || !ownCollection(database, tie.from, userId)) continue;
+          movePulls(userId, [Number(tie.id)], [], String(tie.from));
+        }
+        for (const item of openings) {
+          if (item.collectionId !== null && !ownCollection(database, item.collectionId, userId)) continue;
+          database.prepare("UPDATE purchase_openings SET collection_id = ? WHERE id = ? AND user_id = ?").run(item.collectionId === null ? null : String(item.collectionId), String(item.id), userId);
+        }
+      });
+    } catch (error) {
+      return fail(reply, error, "Could not undo the change");
+    }
+    return { ok: true };
+  });
 
   // Done opening ends it; Continue opening makes it where pulled cards are tied again
   app.post<{ Params: { openingId: string }; Body: { active?: unknown } }>("/api/purchases/openings/:openingId/active", async (request, reply) => {

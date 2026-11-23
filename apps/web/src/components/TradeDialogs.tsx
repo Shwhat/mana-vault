@@ -2,6 +2,7 @@
 import { customDialog, dialog } from "./Dialog";
 import { type Store, useApp } from "../store";
 import type { Trade } from "../trade-state";
+import { chosenCollection, collectionFields } from "./CollectionPicker";
 
 /** The collections that can receive cards: owned or shared collections, not wishlists. */
 const receivers = (store: Store) => (store.collections ?? []).filter((item) => item.kind !== "wishlist");
@@ -44,15 +45,23 @@ export async function sendTradeDialog(store: Store, trade: Trade) {
   if (!list.length) return store.flash("Create a collection for the cards you get first", "err");
   dialog(`Send ${trade.name}`, [
     ["to", "Send to", String(trade.with?.id ?? people[0]!.id), "select", people.map((person) => [String(person.id), person.name])],
-    ["into", "Cards you get go to", trade.collectionId ?? defaultReceiver(store), "select", list.map((item) => [item.id, item.name])],
-  ], async (values) => { await store.sendTrade(trade, Number(values.to), String(values.into)); }, "Send", undefined, 480);
+    ["into", "Cards you get go to", trade.collectionId ?? defaultReceiver(store), "select", collectionFields(list)],
+  ], async (values) => {
+    const into = await chosenCollection(store, values, "into");
+    if (!into) return false;
+    await store.sendTrade(trade, Number(values.to), into);
+  }, "Send", undefined, 480);
 }
 
 export function acceptTradeDialog(store: Store, trade: Trade) {
   const list = receivers(store);
   if (!list.length) return store.flash("Create a collection for the cards you get first", "err");
-  dialog(`Accept ${trade.name}`, [["into", "Cards you get go to", trade.collectionId ?? defaultReceiver(store), "select", list.map((item) => [item.id, item.name])]],
-    async (values) => { await store.acceptTrade(trade, String(values.into)); }, "Accept trade", undefined, 480);
+  dialog(`Accept ${trade.name}`, [["into", "Cards you get go to", trade.collectionId ?? defaultReceiver(store), "select", collectionFields(list)]],
+    async (values) => {
+      const into = await chosenCollection(store, values, "into");
+      if (!into) return false;
+      await store.acceptTrade(trade, into);
+    }, "Accept trade", undefined, 480);
 }
 
 /** The public link to your trade binder: the cards you marked for trade, readable without signing in. */

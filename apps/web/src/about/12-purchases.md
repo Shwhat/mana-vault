@@ -72,6 +72,10 @@ A name picked from the list, or typed exactly as a listed product's name (case a
 
 The product name shows beside the product in the entry's product table, in the opening list, in the history description and in the names of the line's openings.
 
+### Scan barcode...
+
+**Scan barcode...** (in Purchases and the File menu) finds a product by the barcode on its box: type the code, scan it with a barcode reader (which types it and presses Enter), or on a phone or browser that can read barcodes, **Use the camera**. A product MTGJSON lists with that code starts a new purchase with a line for it: its product type, set, product name and named product filled in. A code with no match starts a purchase with an Other line and the code in the Note ("Barcode 012345678905"), with the message "No product has that barcode. Its code is kept in the note." Not every product has a barcode in MTGJSON's data.
+
 ### Single cards
 
 Single cards are chosen, never typed. The Single cards table has one row per card with its printing, finish, condition, language, collection, quantity, cost each and total. There are three ways to add them:
@@ -153,6 +157,32 @@ The decklist is downloaded the first time the deck is opened and kept. When it c
 A box counts as opened from its first pack: its State shows packs opened and packs left (such as "3 of 36 packs opened, 33 left"), and its packs not yet opened keep counting at the box's value divided by its packs. A waiting pack has **Start this pack**; an ended pack has **Continue opening**. Undo of Open... removes every pack opened at the same time, with their cards' ties.
 
 Only one opening is active at a time; opening another ends the one before. An opening started on one device is the opening on every device: the phone's scanner shows **Scanning into: name** and fills it in as where scanned cards go (see [Scanning cards](/about/scanning-cards)), and ending it on one device ends it on all of them.
+
+### Change collection...
+
+**Change collection...** changes where a pack's cards go, while it is open or after it is done. It is on each pack of the purchase entry (button and right-click menu), CHANGE COLLECTION... in the status bar and the scanner's "Scanning into" line (for the pack being opened).
+
+| Field | Choices | Notes |
+|---|---|---|
+| Collection | Your collections and New collection... | Starts on the pack's collection |
+| Cards already pulled | Move them to the new collection, Leave them where they are | Asked each time, when the pack has pulls still held |
+| Packs | This pack only, This pack and the packs not yet reached | When packs of the same product wait |
+
+**Change** applies it: cards added from then on go to the new collection. Move them moves every pull still held (not sold, traded or gone) with its tie, date and Value when pulled; pulls in a deck stay in the deck. The change is one undo step. Each pack shows where its cards go ("Goes to Bling Collection").
+
+### Expected value and the pull check
+
+Booster contents from MTGJSON list each booster type's pack layouts with their chances and the cards of each sheet with their weights. **Expected value** of a pack adds up each layout's chance times, for each sheet in it, its cards' chances times their price (the main price source; foil sheets use the foil price, or the etched price when there is no foil price).
+
+Example: a pack is 3 times out of 4 one common and one rare, and otherwise one common and one foil. The common is $0.20, the rares $4.00 and $14.00 (equal chances), the foil $8.00: 3/4 x (0.20 + 9.00) + 1/4 x (0.20 + 8.00) = $8.95.
+
+- The Products table has an **Expected value** column: the whole line (packs of each unit times its quantity; one pack for a single booster) and the value per pack. A booster box or bundle uses its product's packs, or the set's usual booster type (Play, Draft, Set or Collector) when the product names none.
+- Each opening shows its Expected value next to Value when pulled, worked out with that day's prices and stored; it does not change after that. The line adds up its packs.
+- **Pull check**: a card added to a pack that its booster contents cannot hold (wrong set, wrong finish, on no sheet) is still added and marked in the cards table, for example "Not found in Play booster, Foundations". Cards a product holds besides its packs (a bundle's promo card) count as allowed. Products with no booster contents, and Commander decks opened with their decklist, are not checked.
+
+### Open virtual packs...
+
+**Open virtual packs...** (in Purchases and the File menu) opens packs drawn from a set's booster contents and odds: choose the set and booster, then **Open a pack** (then **Open another**), **Open 10** or **Clear**. Each pack shows its cards with finish badges and prices and its total; above them are the packs opened, their total, the average per pack and the expected value. Virtual packs are not saved and never add cards. Clicking a card opens its card page. It needs a connection to the server.
 
 ### Removing a card from its pack
 
@@ -311,6 +341,10 @@ Saving, editing and deleting entries, **Open...**, **Set current value...**, **U
 ## Android app
 
 Purchases works online. Without a connection, the history and the summary show from the last copy kept on the phone, and changes need a connection, like trades.
+
+## Keeping its place
+
+Purchases opens where it was left: Summary, History, or the entry that was open, with History's find box, filters, sort and picked rows and the scroll position. See [Screen layout](/about/screen-layout#tabs-keep-their-place).
 
 ## Messages
 

@@ -105,6 +105,15 @@ export function checkDeck(format: string, cards: DeckCard[]): Legality {
       }
     }
     for (const card of commanders) {
+      // MTGJSON's leadership data says exactly which formats a card can lead (0.21.0); without it, the type line decides
+      const lead = card.leadership;
+      if (lead) {
+        const role = format === "oathbreaker" ? "oathbreaker" : format === "brawl" || format === "standardbrawl" ? "brawl" : "commander";
+        // an oathbreaker deck also holds its signature spell in the Commander zone
+        const spell = role === "oathbreaker" && /instant|sorcery/i.test(frontType(card.type_line));
+        if (!lead[role] && !spell) problems.push({ level: "warn", text: `${card.name} cannot lead a ${name} deck`, entries: [card.entry_id] });
+        continue;
+      }
       const type = frontType(card.type_line);
       const can = /can be your commander/i.test(card.oracle_text ?? "") || (type.includes("Legendary") && (type.includes("Creature") || type.includes("Planeswalker")));
       if (!can && format !== "oathbreaker") problems.push({ level: "warn", text: `${card.name} may not be able to be a commander`, entries: [card.entry_id] });

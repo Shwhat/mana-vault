@@ -26,6 +26,15 @@ type Spec = FormSpec | CustomSpec;
 
 let show: ((spec: Spec | null) => void) | null = null;
 
+/**
+ * The value of the New collection... choice in a select field (0.21.0). Choosing it shows a name field (its value is
+ * under the field's key followed by ":name") so the caller can make the collection with makeChosenCollection.
+ */
+export const NEW_COLLECTION = "__new_collection__";
+/** The suggested name of a new collection chosen in a field, by field key. */
+const suggested = new Map<string, string>();
+export const suggestCollectionName = (key: string, name: string) => suggested.set(key, name);
+
 /** Opens a form dialog. Values are trimmed strings (booleans for check fields). Returning false keeps it open. */
 export function dialog(title: string, fields: Field[], onOk: FormSpec["onOk"], okLabel = "OK", extra?: ReactNode, width?: number) {
   show?.({ kind: "form", title, fields, onOk, okLabel, extra, width });
@@ -123,6 +132,7 @@ export function DialogHost() {
     for (const [key, , , type] of spec.fields) {
       const value = values[key];
       result[key] = type === "check" ? value === true : String(value ?? "").trim();
+      if (value === NEW_COLLECTION) result[`${key}:name`] = String(values[`${key}:name`] ?? "").trim();
     }
     setBusy(true);
     try {
@@ -154,8 +164,14 @@ export function DialogHost() {
                   <div className="prow" key={key}>
                     <label htmlFor={`f-${key}`}>{label}</label>
                     {type === "select" ? (
-                      <Picker id={`f-${key}`} label={label} value={String(values[key] ?? "")}
-                        onChange={(value) => setValues({ ...values, [key]: value })} options={choices(options ?? [])} />
+                      <>
+                        <Picker id={`f-${key}`} label={label} value={String(values[key] ?? "")}
+                          onChange={(value) => setValues({ ...values, [key]: value, ...(value === NEW_COLLECTION && values[`${key}:name`] === undefined ? { [`${key}:name`]: suggested.get(key) ?? "" } : {}) })} options={choices(options ?? [])} />
+                        {values[key] === NEW_COLLECTION && (
+                          <input aria-label="Name of the new collection" className="newname" placeholder="Name of the new collection" autoFocus maxLength={100}
+                            value={String(values[`${key}:name`] ?? "")} onChange={(event) => setValues({ ...values, [`${key}:name`]: event.target.value })} />
+                        )}
+                      </>
                     ) : type === "check" ? (
                       <input
                         id={`f-${key}`}

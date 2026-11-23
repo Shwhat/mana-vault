@@ -91,6 +91,10 @@ Adding the same card in the same finish, condition and language again raises its
 
 The **balance bar** under the header shows You give against You get as one bar, and the difference: "Even trade", or the amount "in your favor" or "in their favor", with the number of lines without a price (they count as nothing).
 
+### Buylist in the trade view
+
+Each line shows its buylist (the highest price a store pays, for its finish and count) under its price, and each side's heading shows a buylist total beside its value. See [Prices and statistics](/about/prices-and-statistics).
+
 ## Completing a trade
 
 **Complete trade...** asks which collection the cards you get go to, then, in one step:

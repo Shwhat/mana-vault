@@ -1,7 +1,7 @@
 import { createReadStream, createWriteStream } from "node:fs";
 import { createInterface } from "node:readline";
 import { mkdir, rename, rm } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { createGunzip } from "node:zlib";
 import { pipeline } from "node:stream/promises";
@@ -11,7 +11,7 @@ import { initializeDatabase } from "./database.js";
 import { saveSets } from "./sets.js";
 import { importBulkFile, OFFICIAL_LANGUAGES } from "./import-bulk.js";
 import { importScryfallExtras } from "./scryfall-extras.js";
-import { importSealedData } from "./sealed.js";
+import { importMtgjson } from "./mtgjson.js";
 import { chain } from "stream-chain";
 import { parser } from "stream-json";
 import { streamArray } from "stream-json/streamers/stream-array.js";
@@ -280,8 +280,9 @@ export async function importCatalogExtras(database: DatabaseSync, dataPath: stri
     console.warn(`Could not save the price history: ${error instanceof Error ? error.message : String(error)}`);
   }
   await importScryfallExtras(database, (options.fetcher ?? fetch) as unknown as Parameters<typeof importScryfallExtras>[1]);
-  // MTGJSON's named sealed products and preconstructed decks (0.20.0)
-  await importSealedData(database, options.fetcher ?? fetch);
+  // MTGJSON (0.21.0): sealed products and decklists, every printing's record, booster contents, SKUs and catalogs
+  // weekly, and today's prices from every store
+  await importMtgjson(database, { fetcher: options.fetcher ?? fetch, folder: join(dirname(dataPath), "mtgjson") });
 }
 
 const savedSetting = (database: DatabaseSync, key: string): unknown => {

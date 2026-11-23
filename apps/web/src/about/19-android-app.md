@@ -69,6 +69,8 @@ The app goes **Offline** only when the server cannot be reached: when a request 
 
 A command that needs a connection while offline shows "You are offline. This needs a connection to the server."
 
+The card list on the phone also carries each card's MTGJSON details and store prices (0.21.0), so `is:reprint`, `is:starter`, `can:`, `store:` and `buylist` work without a connection; `in:`, price history, Open virtual packs... and Found in need the server. New collection... and Change collection... made without a connection wait with the other changes and are sent when it comes back. Tabs keep their place as on the desktop, also after the app comes back from the background.
+
 ### Sync
 
 The top bar always shows the sync button:

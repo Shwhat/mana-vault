@@ -31,7 +31,11 @@ export type Card = {
 
 /** Prices are in US dollars only (0.17.0). */
 export type Prices = { usd: number | null; usd_foil: number | null; usd_etched: number | null };
-export type PriceFields = { price_usd: number | null; price_usd_foil: number | null; price_usd_etched: number | null };
+export type PriceFields = {
+  price_usd: number | null; price_usd_foil: number | null; price_usd_etched: number | null;
+  /** The highest buylist price of any store for each finish (0.21.0). */
+  buy_usd?: number | null; buy_usd_foil?: number | null; buy_usd_etched?: number | null;
+};
 export type Currency = "usd";
 /** 0 regular, 1 foil, 2 etched. */
 export type FinishCode = 0 | 1 | 2;
@@ -182,6 +186,8 @@ export type DeckCard = Pick<Card, "name" | "mana_cost" | "type_line" | "set_code
   power?: string | null;
   toughness?: string | null;
   tags?: string[];
+  /** Which formats the card can lead, from MTGJSON (0.21.0); null or missing when MTGJSON has no record of it. */
+  leadership?: { commander: boolean; oathbreaker: boolean; brawl: boolean } | null;
   /** The finish the deck card is played in: 0 regular, 1 foil, 2 etched (0.10.0). */
   finish?: FinishCode;
   /** The finishes the printing is made in, such as "nonfoil,foil". */
@@ -336,6 +342,10 @@ export const curveKey = (manaValue: number | null, typeLine: string) => {
 /** The price of one copy in US dollars: etched uses the etched price or else the foil price. */
 export function priceOf(prices: PriceFields, foil: FinishCode, _currency: Currency = "usd"): number | null {
   return foil === 0 ? prices.price_usd : foil === 1 ? prices.price_usd_foil : prices.price_usd_etched ?? prices.price_usd_foil;
+}
+/** The highest buylist price of a finish (0.21.0), or null. */
+export function buylistOf(prices: PriceFields, foil: FinishCode): number | null {
+  return (foil === 0 ? prices.buy_usd : foil === 1 ? prices.buy_usd_foil : prices.buy_usd_etched ?? prices.buy_usd_foil) ?? null;
 }
 export const pricesOf = (card: { prices?: Prices }): PriceFields => ({
   price_usd: card.prices?.usd ?? null, price_usd_foil: card.prices?.usd_foil ?? null, price_usd_etched: card.prices?.usd_etched ?? null,

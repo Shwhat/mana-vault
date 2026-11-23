@@ -20,6 +20,7 @@ import {
 import { candidateLabel } from "./components/LibraryDialogs";
 import { type Finish, parseQuickAdd } from "./deck-rules";
 import { usePhone } from "./narrow";
+import { resetTab } from "./kept";
 import { useCardSearch } from "./card-search";
 import { emptyScopes, type FilterScope, filtersOn, matchesFilters, useServerMatch } from "./filters";
 
@@ -86,8 +87,12 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
   const bumpStacks = useCallback(() => setStackVersion((value) => value + 1), []);
   const undoQueue = useRef<Promise<void>>(Promise.resolve());
   const [scannerOpen, setScannerOpen] = useState(false);
-  // the card page shows over the current view; the printing id of the card shown
-  const [cardPage, setCardPage] = useState<string | null>(null);
+  // the card page shows over the view it was opened from (0.21.0: each tab keeps its own card page)
+  const [cardPages, setCardPages] = useState<Record<string, string | null>>({});
+  const shownView = useRef(view);
+  shownView.current = view;
+  const cardPage = cardPages[view] ?? null;
+  const setCardPage = useCallback((id: string | null) => setCardPages((pages) => (pages[shownView.current] === id ? pages : { ...pages, [shownView.current]: id })), []);
   const [contextMenu, setContextMenu] = useState<ContextMenu>(null);
   const searchInput = useRef<HTMLInputElement | null>(null);
   const flashTimer = useRef<number | undefined>(undefined);
@@ -158,7 +163,7 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
   // ---------- views ----------
   const setView = useCallback((next: View) => {
     if (next === "about") return;
-    setCardPage(null);
+    // each tab keeps its card page and what it was showing (0.21.0)
     setViewState(next);
     setLastView(next);
     if (window.location.pathname.startsWith("/about")) window.history.pushState(null, "", "/");
@@ -179,9 +184,21 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
     window.history.pushState(null, "", "/");
   }, [lastView]);
 
+  /**
+   * A tab's button (0.21.0): another tab opens where it was left; the tab already shown goes back to its first screen
+   * (its card page closes and what it was showing is cleared).
+   */
+  const pressTab = useCallback((next: View) => {
+    if (next === shownView.current) {
+      setCardPages((pages) => ({ ...pages, [next]: null }));
+      resetTab(next);
+      return;
+    }
+    setView(next);
+  }, [setView]);
+
   /** Administration replaces the work area; closing it goes back to where it was opened from. */
   const openAdmin = useCallback((tab = "accounts") => {
-    setCardPage(null);
     setViewState((current) => {
       if (current !== "admin" && current !== "about") setAdminReturn(current);
       return "admin";
@@ -1262,7 +1279,7 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
     addToCollection, setCollectionQuantity, addToDeck, setDeckQuantity, moveDeckCard, linkOwnedCopies, markUpgrade,
     showReview, downloadBackup, restoreBackup, loadCandidates, setDeckLinks, restoreDeck, loadDeck, restoreWishes,
     applyWorkspace, saveWorkspace, deleteWorkspace,
-    scannerOpen, setScannerOpen, ...scan, cardPage, setCardPage: showCardPage, contextMenu, setContextMenu, openCollection, targetCollection, targetDeck,
+    scannerOpen, setScannerOpen, ...scan, cardPage, setCardPage: showCardPage, pressTab, contextMenu, setContextMenu, openCollection, targetCollection, targetDeck,
     refreshAfterChange,
   };
 }

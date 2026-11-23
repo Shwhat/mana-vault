@@ -37,6 +37,10 @@ The **All**, **Commander**, **Main**, **Sideboard** and **Maybe** buttons above 
 
 Opening a deck closes the About guide. The last deck you opened opens again the next time you sign in.
 
+### Add precon as deck...
+
+**Add precon as deck...** in the File menu lists every preconstructed deck MTGJSON knows, with a find box. Choosing one makes a new deck named after it, with its commander, main board and side board in the printings and finishes the decklist names. A deck with a commander gets the Commander format; others are Casual. Undo deletes the new deck. The same happens from a precon in a card page's **Found in**.
+
 ## Renaming and deleting decks
 
 - **Rename...** in a deck's right-click menu (Decks panel or deck switcher) changes the deck's name, 1 to 100 characters. Renaming a shared deck changes it for both people.
@@ -233,6 +237,10 @@ Maybeboard cards are never checked. The card database must hold legality data; i
 | Card is banned in format, Card is not legal in format | The card cannot be played in the format |
 | Card is outside the commander's colors (colors) | The card has a color the commanders do not have |
 | Card may not be able to be a commander | The commander is not a legendary creature or planeswalker |
+
+### Who can lead a deck
+
+With MTGJSON data, the commander check uses MTGJSON's list of which formats each card can lead: Commander and other commander formats, Oathbreaker (where the Commander zone also holds the signature spell, an instant or sorcery) and Brawl and Standard Brawl. A card that cannot lead the format gets the warning "name cannot lead a Format deck". A card MTGJSON has no record of is checked by its type line and rules text as before ("name may not be able to be a commander").
 
 ## Ownership
 

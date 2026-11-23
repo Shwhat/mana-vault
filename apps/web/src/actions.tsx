@@ -13,6 +13,10 @@ import { completeTradeDialog, newTradeDialog, renameTradeDialog, sendTradeDialog
 import { collectionDialog, copyDialog, inboxDialog, linkDialog, moveDialog, newDeckDialog, renameDeckDialog, sendDialog, sharingDialog } from "./components/LibraryDialogs";
 import { exportWindow, importWindow } from "./components/FileWindows";
 import { addDeckToCollectionDialog } from "./components/ItemMenus";
+import { preconCollectionDialog, preconDeckDialog } from "./components/Precons";
+import { barcodeDialog, virtualPacksDialog } from "./components/PurchaseDialogs";
+import { refreshCardSearches } from "./card-search";
+import type { Prefs } from "./prefs";
 import { editTextDialog, formatDialog, tagsDialog } from "./components/DeckDialogs";
 import { entryKey } from "./library-state";
 import { isOpen, type PanelId, PANELS, PRESET_NAMES, removePanel } from "./dock";
@@ -31,6 +35,9 @@ export type Action = {
 };
 
 /** Every keyboard shortcut, in the order the shortcut list shows them. */
+/** The stores an account can choose as its main price source (0.21.0); only stores priced in US dollars, so totals stay in one currency. */
+export const PRICE_SOURCES: Array<[Prefs["mainPriceSource"], string]> = [["tcgplayer", "TCGplayer"], ["cardkingdom", "Card Kingdom"], ["cardsphere", "CardSphere"], ["scryfall", "Scryfall"]];
+
 export const SHORTCUTS: Array<[group: string, key: string, action: string]> = [
   ["Search", "/", "find"],
   ["Search", "1", "view.cards"],
@@ -128,6 +135,29 @@ export function useActions(store: Store): Record<string, Action> {
         run: () => { store.setPrefs({ pricesOnPictures: !prefs.pricesOnPictures }); store.flash(prefs.pricesOnPictures ? "Prices on pictures off" : "Prices on pictures on"); },
       },
       cardLayout: { label: "Card layout...", short: "Card layout", icon: "panels", run: cardLayoutDialog },
+      // 0.21.0: the store whose prices every figure uses, chosen per account
+      "prices.source": {
+        label: "Main price source...", short: "Price source", icon: prefs.currency,
+        run: () => dialog("Main price source", [["source", "Main price source", prefs.mainPriceSource, "select", PRICE_SOURCES]], async (values) => {
+          const source = String(values.source) as Prefs["mainPriceSource"];
+          // saved at once, so the prices loaded next come from the new source
+          await request("/api/prefs", { method: "PUT", body: JSON.stringify({ ...prefs, mainPriceSource: source }) });
+          store.setPrefs({ mainPriceSource: source });
+          await store.refreshAfterChange();
+          refreshCardSearches();
+          store.flash(`Prices now come from ${PRICE_SOURCES.find(([id]) => id === source)?.[1] ?? source}`);
+        }, "Save", <p className="note">Collection value, statistics, deck value, Purchases, trades, the print list and sorting by price use this store. When it has no price for a printing and finish, TCGplayer, Scryfall, Card Kingdom and CardSphere are tried in that order. Value when pulled and Value when added keep the price they were saved with.</p>, 480),
+      },
+      "prices.buylist": {
+        label: "Buylist prices in lists", short: "Buylist", icon: prefs.currency, on: prefs.showBuylist,
+        run: () => { store.setPrefs({ showBuylist: !prefs.showBuylist }); store.flash(prefs.showBuylist ? "Buylist prices hidden" : "Buylist prices shown in collection and deck lists"); },
+      },
+      // 0.21.0: precons from MTGJSON's deck list
+      "precon.deck": { label: "Add precon as deck...", short: "Precon deck", icon: "deck", run: () => preconDeckDialog(store) },
+      "precon.collection": { label: "Add precon to collection...", short: "Precon to collection", icon: "addcol", run: () => preconCollectionDialog(store) },
+      // 0.21.0: a product found by its barcode, and virtual packs from booster contents
+      "purchases.barcode": { label: "Scan barcode...", short: "Scan barcode", icon: "scan", run: () => barcodeDialog(store, () => store.setView("purchases")) },
+      "boosters.open": { label: "Open virtual packs...", short: "Virtual packs", icon: "cards", run: () => virtualPacksDialog(store) },
       "view.collection": { label: "Collection view", short: "Collection", icon: "collection", key: "2", on: store.view === "collection", run: () => store.setView("collection") },
       "collection.new": { label: "New collection...", short: "New collection", icon: "newcol", run: () => collectionDialog(store) },
       "collection.settings": {

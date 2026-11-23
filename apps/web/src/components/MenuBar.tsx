@@ -109,7 +109,8 @@ export function TitleBar({ actions }: { actions: Record<string, Action> }) {
 /** The mode tabs: Home, Search, Collection, Decks, Trade and Proxies. A tab switches the program to that part. */
 export function ModeTabs({ actions }: { actions: Record<string, Action> }) {
   const store = useApp();
-  const current = store.cardPage ? null : store.view;
+  // a card page belongs to the tab it was opened from (0.21.0), so the tab stays marked
+  const current = store.view;
   return (
     <div id="modetabs" role="tablist" aria-label="Mode">
       {MODE_TABS.map((tab) => {
@@ -117,7 +118,7 @@ export function ModeTabs({ actions }: { actions: Record<string, Action> }) {
         const on = current === tab.view;
         return (
           <div key={tab.action} role="tab" aria-selected={on} className={on ? "mtab active" : "mtab"} title={action?.key ? `${tab.name} (${action.key})` : tab.name}
-            onClick={() => { store.setCardPage(null); action?.run(); }}>
+            onClick={() => { if (action) store.pressTab(tab.view as Parameters<typeof store.pressTab>[0]); }}>
             {tab.name}
             {tab.view === "trade" && store.waitingTrades > 0 && <span className="cbadge">{store.waitingTrades}</span>}
           </div>

@@ -4,11 +4,41 @@ Mana Vault shows a price for each printing, the value of every collection and de
 
 ## Where prices come from
 
-Prices are part of the card database. Each update stores Scryfall's prices for every printing: a regular, foil and etched price in US dollars. Prices are in US dollars only. Prices change only when the card database is updated, so they are as old as the last update shown in the status bar. A printing without a price shows "No price".
+Prices are part of the card database. Each card database update stores Scryfall's prices for every printing (a regular, foil and etched price in US dollars), and MTGJSON's prices are saved once a day from five stores:
+
+| Store | Prices kept | Currency |
+|---|---|---|
+| TCGplayer | Retail and buylist | US dollars |
+| Card Kingdom | Retail and buylist | US dollars |
+| CardSphere | Retail | US dollars |
+| Cardmarket | Retail | Euros |
+| Cardhoarder | Retail (MTGO) | MTGO tix |
+
+Each is kept for regular, foil and etched where the store lists it. A store's current prices are its newest saved day. A printing without a price shows "No price".
+
+## Main price source
+
+**Main price source...** in the View menu chooses, for your account, the store every price and value uses: TCGplayer (the default), Card Kingdom, CardSphere or Scryfall. It drives collection values, statistics, deck values, Purchases (Value now, Pulled value, Expected value), trades, the print list and sorting and searching by price. Cardmarket and Cardhoarder are shown in the card page's Prices table and chart only, since their prices are not in US dollars.
+
+When the main source has no price for a printing and finish, the next of TCGplayer, Scryfall, Card Kingdom and CardSphere with a price is used. The card page's Prices table shows which store each price comes from. Value when pulled and Value when added keep the price they were saved with; changing the main source does not change them.
+
+| Main source | Card Kingdom price | TCGplayer price | Scryfall price | Price used |
+|---|---|---|---|---|
+| Card Kingdom | $3.00 | $14.00 | $9.50 | $3.00 |
+| Card Kingdom | none | $4.00 | none | $4.00 (TCGplayer) |
+| Card Kingdom | none | none | $1.00 | $1.00 (Scryfall) |
+
+## Buylist prices
+
+A buylist price is what a store pays for a card. The buylist of a card is the highest buylist price of any store (TCGplayer, Card Kingdom) for its finish. **Buylist prices in lists** in the View menu shows each row's buylist price beside its price in collection and deck lists. The trade view always shows each line's buylist and a buylist total for each side.
 
 ## Price history
 
-Each card database update also saves the day's prices of every printing whose price changed since the last saved day, so the history grows only with changes. The **Price history** tab of the card page shows a line chart of the price over time for the printing shown, one line per finish (Regular, Foil, Etched) Moving over the chart shows the day and price under the pointer. **Show table** lists every saved day with each finish's price. A printing with no saved history shows "No price history yet. Prices are saved with each card database update."
+Each card database update saves the day's Scryfall prices of every printing whose price changed since the last saved day. Each day's MTGJSON prices are saved the same way for every store: a day is kept only when it differs from the day before, and a day already saved is never changed. Mana Vault's own history older than 90 days is kept.
+
+The first time, an admin can download MTGJSON's last 90 days of every store's prices (Administration, Card database, MTGJSON), so the charts start with history; see [Administration](/about/administration).
+
+The **Price history** tab of the card page shows one line per store for the finish chosen (Regular, Foil, Etched). The store buttons choose **US dollar stores** (every store priced in US dollars on one chart, the main source first) or one store; Cardmarket and Cardhoarder are shown on their own. Each store keeps its color; a legend names them and each line is labeled at its end. Moving over the chart shows the day and every store's price under the pointer. **Show table** lists every day with each store's price. A printing with no saved history shows "No price history yet. Prices are saved with each card database update and each day's MTGJSON prices."
 
 ## Currency
 

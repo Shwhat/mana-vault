@@ -3,9 +3,10 @@ import { tradeDone, tradeReopened, type TradeSide } from "./copy-events.js";
 import { randomBytes, randomUUID } from "node:crypto";
 import type { FastifyInstance, FastifyReply } from "fastify";
 import type { DatabaseSync } from "node:sqlite";
-import { type CopyKey, PRICE_COLUMNS, readCondition, readFinish, readLanguage } from "./copies.js";
+import { type CopyKey, priceColumnList, readCondition, readFinish, readLanguage } from "./copies.js";
 import { access, lowerWishlists } from "./library.js";
 import { trimLinks } from "./links.js";
+import { priceColumns, priceSourceOf } from "./mtgjson.js";
 
 export type Side = "give" | "get";
 export type TradeLineInput = CopyKey & { side: Side; quantity: number; price: number | null; collectionId: string | null };
@@ -144,7 +145,7 @@ export function registerTradeRoutes(app: FastifyInstance, database: DatabaseSync
     const mine = Number(row.owner_id) === userId;
     const lines = database.prepare(
       `SELECT l.id, l.side, l.card_id, l.foil, l.condition, l.language, l.quantity, l.price, l.collection_id, c.name, c.set_code, c.set_name,
-              c.collector_number, c.image_url, c.rarity, ${PRICE_COLUMNS}, col.name AS collection_name
+              c.collector_number, c.image_url, c.rarity, ${priceColumnList()}, col.name AS collection_name
        FROM trade_lines l JOIN cards c ON c.id = l.card_id LEFT JOIN collections col ON col.id = l.collection_id
        WHERE l.trade_id = ? ORDER BY l.id`,
     ).all(String(row.id)).map((line) => ({
@@ -153,7 +154,7 @@ export function registerTradeRoutes(app: FastifyInstance, database: DatabaseSync
       price: line.price === null ? null : Number(line.price), collectionId: line.collection_id === null ? null : String(line.collection_id),
       collectionName: line.collection_name === null ? null : String(line.collection_name), name: String(line.name), set_code: String(line.set_code),
       set_name: String(line.set_name), collector_number: String(line.collector_number), image_url: line.image_url, rarity: String(line.rarity),
-      price_usd: line.price_usd, price_usd_foil: line.price_usd_foil, price_usd_etched: line.price_usd_etched, price_eur: line.price_eur, price_eur_foil: line.price_eur_foil,
+      price_usd: line.price_usd, price_usd_foil: line.price_usd_foil, price_usd_etched: line.price_usd_etched, price_eur: line.price_eur, price_eur_foil: line.price_eur_foil, buy_usd: line.buy_usd ?? null, buy_usd_foil: line.buy_usd_foil ?? null, buy_usd_etched: line.buy_usd_etched ?? null,
     }));
     const partnerId = row.partner_id === null ? null : Number(row.partner_id);
     const other = mine ? partnerId : Number(row.owner_id);
@@ -385,7 +386,7 @@ export function registerTradeRoutes(app: FastifyInstance, database: DatabaseSync
   app.get("/api/trades/matches", async (request) => {
     const userId = userOf(request);
     const rows = (wantFrom: "me" | "them") => database.prepare(
-      `SELECT owner.id AS user_id, owner.name AS user_name, c.id AS card_id, c.name, c.set_code, c.set_name, c.collector_number, c.image_url, ${PRICE_COLUMNS},
+      `SELECT owner.id AS user_id, owner.name AS user_name, c.id AS card_id, c.name, c.set_code, c.set_name, c.collector_number, c.image_url, ${priceColumnList()},
               i.foil, i.condition, i.language, i.trade, i.collection_id, MIN(i.trade, wanted.quantity) AS quantity, wanter.id AS wanter_id, wanter.name AS wanter_name
        FROM collection_cards i JOIN collections col ON col.id = i.collection_id AND col.kind = 'collection'
        JOIN users owner ON owner.id = col.owner_id JOIN cards c ON c.id = i.card_id
@@ -401,7 +402,7 @@ export function registerTradeRoutes(app: FastifyInstance, database: DatabaseSync
       cardId: String(row.card_id), name: String(row.name), set_code: String(row.set_code), set_name: String(row.set_name), collector_number: String(row.collector_number),
       image_url: row.image_url, foil: Number(row.foil), condition: String(row.condition), language: String(row.language), quantity: Number(row.quantity),
       collectionId: wantFrom === "them" ? String(row.collection_id) : null,
-      price_usd: row.price_usd, price_usd_foil: row.price_usd_foil, price_usd_etched: row.price_usd_etched, price_eur: row.price_eur, price_eur_foil: row.price_eur_foil,
+      price_usd: row.price_usd, price_usd_foil: row.price_usd_foil, price_usd_etched: row.price_usd_etched, price_eur: row.price_eur, price_eur_foil: row.price_eur_foil, buy_usd: row.buy_usd ?? null, buy_usd_foil: row.buy_usd_foil ?? null, buy_usd_etched: row.buy_usd_etched ?? null,
     }));
     return { theyHave: rows("me"), theyWant: rows("them") };
   });
@@ -425,7 +426,7 @@ export function registerTradeRoutes(app: FastifyInstance, database: DatabaseSync
     reply.header("cache-control", "no-store").header("x-robots-tag", "noindex");
     if (!owner) return reply.code(404).type("text/html; charset=utf-8").send(sharePage("Trade binder", "<p>This link is turned off or was replaced.</p>"));
     const rows = database.prepare(
-      `SELECT c.name, c.set_code, c.set_name, c.collector_number, c.image_url, i.foil, i.condition, i.language, SUM(i.trade) AS count, c.price_usd, c.price_usd_foil, c.price_usd_etched
+      `SELECT c.name, c.set_code, c.set_name, c.collector_number, c.image_url, i.foil, i.condition, i.language, SUM(i.trade) AS count, ${priceColumns(priceSourceOf(database, Number(owner.id)))}
        FROM collection_cards i JOIN collections col ON col.id = i.collection_id JOIN cards c ON c.id = i.card_id
        WHERE col.owner_id = ? AND col.kind = 'collection' AND i.trade > 0 AND i.proxy = 0
        GROUP BY i.card_id, i.foil, i.condition, i.language ORDER BY c.name, c.set_code`,

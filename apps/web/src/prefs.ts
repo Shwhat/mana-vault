@@ -11,6 +11,10 @@ export type Theme = "light" | "dark" | "system";
 
 export type Prefs = {
   theme: Theme;
+  /** The store every price comes from (0.21.0); a store with no price falls back to TCGplayer, Scryfall, Card Kingdom and CardSphere. */
+  mainPriceSource: "tcgplayer" | "cardkingdom" | "cardsphere" | "scryfall";
+  /** Collection and deck lists show each row's buylist price beside its price (0.21.0). */
+  showBuylist: boolean;
   foil: boolean;
   zone: Zone;
   /** The zone the deck list shows (0.13.0): all zones, or one zone, which is then also where Add puts cards. */
@@ -102,7 +106,7 @@ export type Prefs = {
 export function defaultPrefs(): Prefs {
   const preset = PRESETS[DEFAULT_WORKSPACE]!();
   return {
-    theme: "light", foil: false, zone: "main", deckZoneView: "all", layout: preset.layout,
+    theme: "light", mainPriceSource: "tcgplayer", showBuylist: false, foil: false, zone: "main", deckZoneView: "all", layout: preset.layout,
     workspace: DEFAULT_WORKSPACE, workspaces: {}, lastDeckId: null, targetCollection: null, addTo: "collection", openCollection: null,
     currency: "usd", collectionSort: "name", collectionLayout: "grid", collectionLayoutPhone: "grid", gridSize: "m",
     searchLayout: "grid", searchLayoutPhone: "grid", searchSize: "m", allWishlists: false, tradeAllCards: false, searchAllPrintings: false,
@@ -123,6 +127,8 @@ export function mergePrefs(saved: unknown): Prefs {
   const sameVersion = value.appVersion === APP_VERSION;
   return {
     theme: value.theme === "dark" || value.theme === "system" ? value.theme : "light",
+    mainPriceSource: (["tcgplayer", "cardkingdom", "cardsphere", "scryfall"] as const).find((item) => item === value.mainPriceSource) ?? "tcgplayer",
+    showBuylist: value.showBuylist === true,
     foil: value.foil === true,
     zone: value.zone === "sideboard" || value.zone === "commander" || value.zone === "maybeboard" ? value.zone : "main",
     deckZoneView: (["all", "main", "sideboard", "commander", "maybeboard"] as const).find((item) => item === value.deckZoneView) ?? "all",

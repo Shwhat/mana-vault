@@ -33,6 +33,9 @@ import {
   AuthStore, COOKIE_NAME, DEFAULT_ITERATIONS, GUARD_HEADER, Limiter, readCookie, sessionCookie,
   type User, validName, validPassword,
 } from "./auth.js";
+import { enterSource, priceCols } from "./price-context.js";
+import { priceSourceOf } from "./mtgjson.js";
+import { registerMtgjsonRoutes, startMtgjsonRunner } from "./mtgjson-routes.js";
 
 declare module "fastify" {
   interface FastifyRequest {
@@ -67,6 +70,8 @@ export interface AppOptions {
   setUpdateInterval?: (hours: number) => void;
   /** Turns off the background picture downloads (tests). */
   pictureDownloads?: boolean;
+  /** Checks once an hour whether today's MTGJSON prices are saved (off in tests). */
+  mtgjsonSchedule?: boolean;
 }
 
 declare module "fastify" {
@@ -155,6 +160,7 @@ export async function buildApp(
     reply.header("referrer-policy", "same-origin");
     if (!requireSignIn) {
       request.user = localUser;
+      enterSource(priceSourceOf(database, localUser?.id));
       return;
     }
     const path = request.url.split("?")[0] ?? "/";
@@ -174,6 +180,8 @@ export async function buildApp(
         request.deviceId = device.deviceId;
       }
     }
+    // prices for the rest of the request come from the account's main price source (0.21.0)
+    enterSource(priceSourceOf(database, request.user?.id));
     // the shared trade binder is the one page that works without signing in
     if (PUBLIC_PATHS.has(path) || request.user || (path === "/api/devices" && request.method === "POST")
       || ((request.method === "GET" || request.method === "HEAD") && (/^\/share\/[\w-]{10,64}$/.test(path) || CUSTOM_PUBLIC.test(path) || EXTRAS_PUBLIC.test(path) || PICTURE_PATH.test(path)))) return;
@@ -246,12 +254,17 @@ export async function buildApp(
   };
   registerAdminRoutes(app, adminContext);
   registerExtrasRoutes(app, database, settings, options.fetcher as typeof fetch | undefined);
+  // MTGJSON data (0.21.0): Administration's parts, store prices, precons, barcodes, boosters; today's prices once a day
+  const mtgjsonFetcher = (options.fetcher ?? fetch) as unknown as (url: string, init?: RequestInit) => Promise<Response>;
+  const mtgjson = startMtgjsonRunner(database, { fetcher: mtgjsonFetcher, databasePath, schedule: options.mtgjsonSchedule ?? process.env.NODE_ENV !== "test" });
+  registerMtgjsonRoutes(app, database, mtgjson, mtgjsonFetcher);
   const stopBackups = startBackupSchedule(adminContext);
   registerEventRoutes(app, events, activeOpening);
   app.addHook("onClose", async () => {
     events.close();
     stopBackups();
     pictures.stop();
+    mtgjson.stop();
   });
   applySettings();
 
@@ -566,7 +579,7 @@ export async function buildApp(
 
       const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
       const columns = `id, oracle_id, name, mana_cost, mana_value, type_line, oracle_text, colors, color_identity, legalities,
-                set_code, set_name, collector_number, rarity, image_url, released_at, artist, ${CARD_PRICE_COLUMNS}`;
+                set_code, set_name, collector_number, rarity, image_url, released_at, artist, ${cardPriceColumns("x")}`;
       // grouped: one result per card, showing its newest regular English printing, with how many printings matched
       const grouped = group === "1";
       // Grouped search picks one printing per card. Only the few columns the pick needs go through the window step,
@@ -640,7 +653,7 @@ export async function buildApp(
   app.get<{ Params: { cardId: string } }>("/api/cards/:cardId", async (request, reply) => {
     const row = database.prepare(
       `SELECT id, oracle_id, name, mana_cost, mana_value, type_line, oracle_text, colors, color_identity, legalities,
-              set_code, set_name, collector_number, rarity, image_url, released_at, artist, ${CARD_PRICE_COLUMNS}
+              set_code, set_name, collector_number, rarity, image_url, released_at, artist, ${cardPriceColumns("cards")}
        FROM cards WHERE id = ?`,
     ).get(request.params.cardId);
     if (!row) return reply.code(404).send({ error: "Card printing not found" });
@@ -765,4 +778,5 @@ function toCardRow(row: Record<string, unknown>): CardRow & {
 }
 
 const price = (value: unknown) => (typeof value === "number" ? value : null);
-const CARD_PRICE_COLUMNS = "flavor_name, power, toughness, price_usd, price_usd_foil, price_usd_etched, price_eur, price_eur_foil, custom, finishes, promo_types, lang";
+/** The card columns with prices from the main price source of the request (0.21.0). */
+const cardPriceColumns = (card: string) => `flavor_name, power, toughness, ${priceCols(card)}, custom, finishes, promo_types, lang`;

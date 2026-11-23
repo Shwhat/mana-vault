@@ -125,8 +125,8 @@ export function PhoneShell({ actions }: { actions: Record<string, Action> }) {
 
   const leave = () => { setSheet(null); store.setScannerOpen(false); store.setCardPage(null); };
   const tab = (id: "home" | "cards" | "collection" | "deck" | "trade" | "proxies", label: string, icon: string) => (
-    <button type="button" className={store.view === id && !sheet && !store.scannerOpen && !store.cardPage ? "ptab on" : "ptab"}
-      onClick={() => { leave(); store.setView(id); }}>
+    <button type="button" className={store.view === id && !sheet && !store.scannerOpen ? "ptab on" : "ptab"}
+      onClick={() => { setSheet(null); store.setScannerOpen(false); store.pressTab(id); }}>
       <Icon name={icon} /><span>{label}</span>
     </button>
   );

@@ -177,6 +177,20 @@ This page lists what Mana Vault does in the current version, followed by what is
 - Notifications for new offers in the Inbox, checked in the background about every 15 minutes, optionally only on Wi-Fi.
 - The Back button, the Android share sheet for exports and backups, sharing lists into the app to import them and pictures or PDFs to read as receipts, background sync as soon as the phone is online, https only, and a daily check of your server for a newer app.
 
+### 0.21.0 additions
+
+- MTGJSON data kept on the server: every printing's MTGJSON record, prices from TCGplayer, Card Kingdom, CardSphere, Cardmarket and Cardhoarder (retail and buylist, for each finish), booster contents, sealed product contents, TCGplayer SKUs and the keyword and card type lists, with their own part list and buttons in Administration.
+- A main price source chosen for each account (Main price source... in the View menu), used by every price and value, with fallback stores.
+- 90 days of price history from every store, filled in once when an admin chooses, then one day at a time; the card page's Price history has one line per store.
+- The card page's Prices table (every store, retail and buylist), Oracle and Printed text, the formats a card can lead, and Found in.
+- Add precon as deck... and Add precon to collection...; Scan barcode... for a product's barcode in Purchases.
+- Expected value of booster packs on purchase lines and openings, Open virtual packs..., and a warning on a pulled card its pack cannot hold.
+- Search syntax `is:reprint`, `is:starter`, `can:commander`, `can:oathbreaker`, `can:brawl`, `store:`, `buylist` and `in:`.
+- Imports match the exact printing by a TCGplayer, Card Kingdom or CardSphere id, or a TCGplayer SKU.
+- Each tab opens where it was left; pressing the tab's button again goes back to its first screen.
+- New collection... in every list where cards go to a collection, and Change collection... on a pack.
+- Custom set symbols in PNG or WebP get rarity colors too, and a set's common symbol can be white.
+
 ### 0.20.0 additions
 
 - Purchases: a Product name on every line, with the named products of the line's set (Commander decks, bundles and others from MTGJSON) to pick from; receipts fill it ("Landing Party", "Beam Me Up Bundle").

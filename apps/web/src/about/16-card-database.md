@@ -23,6 +23,22 @@ Each update also keeps, for use without the internet:
 | Card back | Scryfall's card back picture | The standard Magic card back, downloaded once in full size, for printing proxies |
 | Named products | MTGJSON's set list and deck list | The sealed products of every set (Commander decks, bundles, boxes, packs and kits) with their names, and the names of preconstructed decks, for the Product name of purchase lines and reading receipts. A deck's decklist is downloaded the first time the deck is opened from a purchase, and kept; see [Purchases](/about/purchases) |
 
+## MTGJSON data (0.21.0)
+
+Each card database update also brings MTGJSON's data, after Scryfall's. The weekly parts are downloaded again when they are more than six days old (MTGJSON rebuilds them weekly); today's prices once a day.
+
+| Part | MTGJSON file | Refreshed | Used for |
+|---|---|---|---|
+| Card data | AllPrintings | Weekly | Every printing's full MTGJSON record (kept compressed), matched to the card database by Scryfall id: original printed text and type line, reprint and starter marks, the formats a card can lead, store ids for imports, the products each printing comes from, booster contents and sealed product contents |
+| Sealed products | SetList, with contents from AllPrintings | Weekly | Named products, product barcodes, Found in |
+| Decklists | DeckList | Weekly | Precons; a decklist is downloaded the first time it is used and kept |
+| Price history | AllPrices (90 days) | When an admin chooses | Every store's last 90 days |
+| Prices today | AllPricesToday | Daily | Every store's prices for the day |
+| TCGplayer SKUs | TcgplayerSkus | Weekly | Matching TCGplayer SKUs in imports |
+| Catalogs | Keywords, CardTypes | Weekly | The keyword and card type lists |
+
+Printings MTGJSON lists that match no card are kept in the records and counted in Administration. Custom cards and custom sets are never changed. When a part fails, what was stored before is kept ("Kept previous copy"); with nothing stored before it is "Failed". The server also checks once an hour whether today's prices are saved. See [Administration](/about/administration#card-database).
+
 When one of these parts fails to download, what was stored before is kept and the rest of the update goes on. Tags, special foils, unofficial languages and price history appear after the first card database update with version 0.12.0; set symbols, symbols, printing changes, name and keyword lists, the card back and the other card languages after the first update with version 0.15.0; named products after the first update with version 0.20.0.
 
 ## Card languages

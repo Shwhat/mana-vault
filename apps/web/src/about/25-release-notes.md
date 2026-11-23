@@ -2,6 +2,25 @@
 
 The installed version is shown at the top of this guide.
 
+## 0.21.0 (2026-11-22): MTGJSON data, store prices, precons, booster values and tabs that keep their place
+
+- MTGJSON: each card database update also keeps MTGJSON's data on the server: every printing's record (matched by Scryfall id), booster contents, sealed product contents and barcodes, TCGplayer SKUs and the keyword and card type lists weekly, and every store's prices daily. Administration, Card database has an MTGJSON section with each part's count, size, date and last result, Update MTGJSON data now and Update prices now.
+- Prices from TCGplayer, Card Kingdom, CardSphere, Cardmarket and Cardhoarder, retail and buylist, for each finish. Main price source... in the View menu chooses, for your account, the store every price and value uses (TCGplayer by default), falling back to TCGplayer, Scryfall, Card Kingdom and CardSphere.
+- Price history: 90 days of every store's prices can be downloaded once (Administration shows its size first, or Skip); each day's prices are added from then on. The card page's Price history has one line per store, with a store picker, a legend and a table.
+- Card page: a Prices table with every store's retail and buylist prices, an Oracle and Printed switch for text changed since printing, the formats a card can lead, and Found in (the products and precons a printing comes from).
+- Buylist: the trade view shows each line's buylist and each side's buylist total; Buylist prices in lists (View menu) adds it to collection and deck lists.
+- Precons: Add precon as deck... and Add precon to collection... in the File menu.
+- Purchases: Scan barcode... starts a purchase with the product found by its barcode; Expected value of booster packs on product lines and openings; Open virtual packs...; a card a pack cannot hold is marked ("Not found in Play booster, Foundations").
+- Purchases: Change collection... on a pack (entry page, right-click, status bar and scanner), moving the cards already pulled or leaving them, for this pack or the packs not yet reached, as one undo step.
+- New collection... at the end of every list that chooses where cards go.
+- Search: `is:reprint`, `is:starter`, `can:commander`, `can:oathbreaker`, `can:brawl`, `store:`, `buylist` and `in:`; all but `in:` also work offline on the phone.
+- Decks: the commander check uses MTGJSON's list of which formats a card can lead.
+- Imports match the exact printing by a TCGplayer, Card Kingdom or CardSphere id, or a TCGplayer SKU (with its condition and language).
+- Every tab opens where it was left, with its card page, filters and scroll position; pressing the tab already shown goes back to its first screen. A deleted purchase entry opens History.
+- Custom sets: a PNG or WebP main symbol with a transparent background gets rarity colors too; Common symbol can be White. Changing them draws the set's card pictures again.
+- Card maker: the Custom sets... button under the find box is gone; custom sets are in the Custom sets tab.
+- MTGJSON's data appears after the first card database update with this version (or Update MTGJSON data now in Administration).
+
 ## 0.20.0 (2026-11-22): Named products and the Custom sets tab
 
 - Purchases: every product line has a Product name, such as "Landing Party" for a Commander deck or "Beam Me Up Bundle". The list under the field holds the named products of the line's set and product, downloaded from MTGJSON with each card database update; any other name can be typed. The separate name of Other lines is now this field.

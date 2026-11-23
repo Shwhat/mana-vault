@@ -1,5 +1,5 @@
 // ---------- purchase history windows: new and edited entries, Open..., Set current value..., and imported prices ----------
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { pickFile, request, sendFile } from "../api";
 import { isApp, native } from "../android/platform";
 import type { FoundCard } from "../card-search";
@@ -15,6 +15,7 @@ import { customDialog } from "./Dialog";
 import { type Choice, choices, Picker } from "./Picker";
 import { finishesOf, type Printing, PrintingList } from "./PrintingDialog";
 import { Suggest } from "./Suggest";
+import { CollectionPicker } from "./CollectionPicker";
 
 const today = () => new Date().toISOString().slice(0, 10);
 const num = (text: string) => {
@@ -658,7 +659,7 @@ function PurchaseEditor({ store, list, start, close, onSaved, reopen }: {
                   options={finishes.map((code) => ({ value: String(code), label: finishLabel(code, line.promoTypes) }))} onChange={(foil) => setSingle(line.key, { foil: Number(foil) as FinishCode })} /></td>
                 <td><Picker label={`Condition of ${line.name}`} value={line.condition} disabled={locked} options={choices(CONDITIONS)} onChange={(condition) => setSingle(line.key, { condition })} /></td>
                 <td><Picker label={`Language of ${line.name}`} value={line.language} disabled={locked} options={choices(LANGUAGES)} onChange={(language) => setSingle(line.key, { language })} /></td>
-                <td><Picker label={`Collection of ${line.name}`} value={line.collectionId} disabled={locked} options={owned.map((item) => ({ value: item.id, label: item.name }))} onChange={(collectionId) => setSingle(line.key, { collectionId })} /></td>
+                <td><CollectionPicker store={store} label={`Collection of ${line.name}`} value={line.collectionId} disabled={locked} list={owned} onChange={(collectionId) => setSingle(line.key, { collectionId })} /></td>
                 <td><input aria-label={`Quantity of ${line.name}`} type="number" min={locked ? line.locked : 1} disabled={locked} value={line.quantity} className="num" onChange={(event) => setSingle(line.key, quantityOf(line, event.target.value))} /></td>
                 <td><input aria-label={`Cost each of ${line.name}`} inputMode="decimal" value={line.each} className="num" onChange={(event) => setSingle(line.key, costOf(line, "each", event.target.value))} /></td>
                 <td><input aria-label={`Total of ${line.name}`} inputMode="decimal" value={line.total} className="num" onChange={(event) => setSingle(line.key, costOf(line, "total", event.target.value))} /></td>
@@ -926,6 +927,14 @@ function purchaseWindow(store: Store, list: PurchaseList, draft: PurchaseDraft, 
 }
 
 /** Open...: how many of a product line to open, and where the pulled cards go. */
+/** The name a new collection for a product's pulls is given (0.21.0): "Landing Party, Star Trek Commander", or "Foundations Play boosters". */
+function newCollectionName(line: EntryLine): string {
+  const set = line.setName ?? line.setCode?.toUpperCase() ?? "";
+  if (line.product !== "other" && line.name) return set ? `${line.name}, ${set}` : line.name;
+  const plural = /(x|s)$/i.test(line.productLabel) ? `${line.productLabel}es` : `${line.productLabel}s`;
+  return [set, set ? plural : line.productLabel].filter(Boolean).join(" ");
+}
+
 function OpenEditor({ store, entry, line, close, onDone }: { store: Store; entry: Entry; line: EntryLine; close: () => void; onDone: () => void }) {
   const owned = (store.collections ?? []).filter((item) => item.kind === "collection" && item.role === "owner");
   // products with packs open a number of packs, one at a time (0.19.0); others open a number of the product
@@ -946,7 +955,9 @@ function OpenEditor({ store, entry, line, close, onDone }: { store: Store; entry
       }>(`/api/purchases/${entry.id}/lines/${line.id}/open`, {
         method: "POST", body: JSON.stringify({ count: Number(count), collectionId, decklist: deckList && useDeck }),
       });
-      const where = owned.find((item) => item.id === collectionId)?.name ?? "the collection";
+      // a collection made with New collection... is not yet in the list the window was opened with
+      const where = owned.find((item) => item.id === collectionId)?.name
+        ?? (await request<Array<{ id: string; name: string }>>("/api/collections").catch(() => [])).find((item) => item.id === collectionId)?.name ?? "the collection";
       if (!opening.deck) setActiveOpening({ ...opening, groupIndex: 1, groupSize: opening.packs.length, hasNext: opening.packs.length > 1 });
       store.setTargetCollection(collectionId);
       store.pushUndo({
@@ -982,7 +993,7 @@ function OpenEditor({ store, entry, line, close, onDone }: { store: Store; entry
       {deckList && <label className="ck"><input type="checkbox" checked={useDeck} onChange={(event) => setUseDeck(event.target.checked)} /> Add the decklist of {line.name}</label>}
       {deckList && useDeck && <p className="note">The deck's cards are added to the collection and tied to the opening. Printings and finishes can be changed afterward.</p>}
       <div className="prow"><label htmlFor="op-coll">Pulled cards go to</label>
-        <Picker id="op-coll" label="Collection" value={collectionId} options={owned.map((item) => ({ value: item.id, label: item.name }))} onChange={setCollectionId} /></div>
+        <CollectionPicker store={store} id="op-coll" label="Collection" value={collectionId} list={owned} onChange={setCollectionId} suggest={newCollectionName(line)} /></div>
       <div className="btnrow end">
         <button type="button" className="btn primary" disabled={!collectionId} onClick={() => void open()}>Open</button>
       </div>
@@ -1346,3 +1357,252 @@ function TieCopies({ store, openingId, collectionId, close, onDone }: { store: S
 
 export const tieCopiesDialog = (store: Store, openingId: string, onDone: () => void, collectionId: string | null = null) =>
   customDialog("Add existing copies", (close) => <TieCopies store={store} openingId={openingId} collectionId={collectionId} close={close} onDone={onDone} />, 980, "Cancel");
+
+// ---------- Change collection... on a pack (0.21.0) ----------
+
+function ChangeCollection({ store, openingId, entryId, close, onDone }: { store: Store; openingId: string; entryId: string; close: () => void; onDone: () => void }) {
+  const [entry, setEntry] = useState<Entry | null>(null);
+  const [error, setError] = useState("");
+  const [collectionId, setCollectionId] = useState("");
+  const [move, setMove] = useState<"move" | "leave" | "">("");
+  const [rest, setRest] = useState(false);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    request<Entry>(`/api/purchases/${encodeURIComponent(entryId)}`).then((loaded) => {
+      setEntry(loaded);
+      setCollectionId(loaded.openings.find((item) => item.id === openingId)?.collectionId ?? "");
+    }).catch((reason: unknown) => setError(reason instanceof Error ? reason.message : "Could not load the purchase."));
+  }, [entryId, openingId]);
+  if (error) return <p className="note err">{error}</p>;
+  if (!entry) return <p className="note">Loading the purchase</p>;
+  const opening = entry.openings.find((item) => item.id === openingId);
+  if (!opening) return <p className="note err">That pack is not in the purchase.</p>;
+  const owned = (store.collections ?? []).filter((item) => item.kind === "collection" && item.role === "owner");
+  const held = entry.ties.filter((tie) => tie.openingId === openingId).reduce((sum, tie) => sum + tie.held, 0);
+  const waiting = entry.openings.filter((item) => item.groupId && item.groupId === opening.groupId && item.waiting && item.id !== opening.id).length;
+  const line = entry.lines.find((item) => item.id === opening.lineId);
+  const change = async () => {
+    if (busy || !collectionId) return;
+    if (held && !move) return setError("Choose what happens to the cards already pulled");
+    setBusy(true);
+    setError("");
+    try {
+      const result = await request<{ undo: { openings: unknown[]; ties: Array<{ quantity: number }> } }>(`/api/purchases/openings/${encodeURIComponent(openingId)}/collection`, {
+        method: "POST", body: JSON.stringify({ collectionId, move: move === "move", rest }),
+      });
+      const name = store.collectionName(collectionId);
+      store.pushUndo({
+        label: `Change the collection of ${opening.name}`,
+        undo: async () => {
+          await request("/api/purchases/openings/collection/restore", { method: "POST", body: JSON.stringify(result.undo) });
+          await reloadOpening();
+          await store.refreshAfterChange();
+          onDone();
+        },
+        redo: async () => {
+          await request(`/api/purchases/openings/${encodeURIComponent(openingId)}/collection`, { method: "POST", body: JSON.stringify({ collectionId, move: move === "move", rest }) });
+          await reloadOpening();
+          await store.refreshAfterChange();
+          onDone();
+        },
+      });
+      if (opening.active) store.setTargetCollection(collectionId);
+      await reloadOpening();
+      await store.refreshAfterChange();
+      close();
+      onDone();
+      const moved = result.undo.ties.reduce((sum, tie) => sum + tie.quantity, 0);
+      store.flash(`${opening.name} now goes to ${name}${moved ? `; ${moved} ${moved === 1 ? "card" : "cards"} moved there` : ""}`);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Could not change the collection.");
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="purchaseedit">
+      {error && <p className="note err">{error}</p>}
+      <div className="prow"><label htmlFor="cc-coll">Collection</label>
+        <CollectionPicker store={store} id="cc-coll" label="Collection" value={collectionId} list={owned} onChange={setCollectionId} suggest={line ? newCollectionName(line) : ""} /></div>
+      {held > 0 && (
+        <fieldset className="radiorow">
+          <legend>Cards already pulled ({held} still held)</legend>
+          <label className="ck"><input type="radio" name="cc-move" checked={move === "move"} onChange={() => setMove("move")} /> Move them to the new collection</label>
+          <label className="ck"><input type="radio" name="cc-move" checked={move === "leave"} onChange={() => setMove("leave")} /> Leave them where they are</label>
+        </fieldset>
+      )}
+      {waiting > 0 && (
+        <fieldset className="radiorow">
+          <legend>Packs</legend>
+          <label className="ck"><input type="radio" name="cc-rest" checked={!rest} onChange={() => setRest(false)} /> This pack only</label>
+          <label className="ck"><input type="radio" name="cc-rest" checked={rest} onChange={() => setRest(true)} /> This pack and the {waiting} {waiting === 1 ? "pack" : "packs"} not yet reached</label>
+        </fieldset>
+      )}
+      <div className="btnrow end">
+        <button type="button" className="btn primary" disabled={busy || !collectionId || (held > 0 && !move)} onClick={() => void change()}>Change</button>
+      </div>
+    </div>
+  );
+}
+
+/** Change collection...: where a pack's cards go from now on, and optionally the cards already pulled (0.21.0). */
+export const changeCollectionDialog = (store: Store, opening: { id: string; entryId: string; name: string }, onDone: () => void = () => undefined) =>
+  customDialog(`Change collection of ${opening.name}`, (close) => <ChangeCollection store={store} openingId={opening.id} entryId={opening.entryId} close={close} onDone={onDone} />, 520, "Cancel");
+
+// ---------- Scan barcode (0.21.0): a product found by its UPC ----------
+
+export type BarcodeProduct = { sealedId: string; setCode: string; name: string; fullName: string; product: string };
+
+/** Looks up a product by the barcode on its box. Null when no product has it. */
+export async function productOfBarcode(code: string): Promise<BarcodeProduct | null> {
+  try {
+    return await request<BarcodeProduct>(`/api/sealed/barcode/${encodeURIComponent(code.replace(/\D/g, ""))}`);
+  } catch {
+    return null;
+  }
+}
+
+// ---------- Open virtual packs (0.21.0) ----------
+
+type BoosterSet = { code: string; name: string; releasedAt: string | null; boosters: Array<{ name: string; label: string }> };
+type VirtualCard = { id: string; name: string; set_code: string; collector_number: string; rarity: string; image_url: string | null };
+type Opened = { packs: Array<{ cards: Array<{ cardId: string; foil: boolean; price: number | null }>; total: number }>; cards: Record<string, VirtualCard>; expected: number | null };
+
+function VirtualPacks({ store, initialSet }: { store: Store; initialSet?: string }) {
+  const [sets, setSets] = useState<BoosterSet[] | null>(null);
+  const [setCode, setSetCode] = useState(initialSet ?? "");
+  const [booster, setBooster] = useState("");
+  const [packs, setPacks] = useState<Opened["packs"]>([]);
+  const [cards, setCards] = useState<Record<string, VirtualCard>>({});
+  const [expected, setExpected] = useState<number | null>(null);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    request<BoosterSet[]>("/api/boosters/sets").then((list) => {
+      setSets(list);
+      const first = list.find((item) => item.code === initialSet) ?? list[0];
+      if (first) { setSetCode(first.code); setBooster(first.boosters[0]?.name ?? ""); }
+    }).catch((reason: unknown) => setError(reason instanceof Error ? reason.message : "Could not load the sets with booster contents."));
+  }, [initialSet]);
+  const set = sets?.find((item) => item.code === setCode);
+  const open = async (count: number) => {
+    setError("");
+    try {
+      const result = await request<Opened>("/api/boosters/open", { method: "POST", body: JSON.stringify({ set: setCode, booster, count }) });
+      setPacks((value) => [...result.packs.reverse(), ...value]);
+      setCards((value) => ({ ...value, ...result.cards }));
+      setExpected(result.expected);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Could not open the packs. Opening virtual packs needs a connection to the server.");
+    }
+  };
+  const total = packs.reduce((sum, pack) => sum + pack.total, 0);
+  if (!sets) return error ? <p className="note err">{error}</p> : <p className="note">Loading the sets</p>;
+  if (!sets.length) return <p className="note">No set has booster contents yet. They arrive with the next MTGJSON update.</p>;
+  return (
+    <div className="virtualpacks">
+      {error && <p className="note err">{error}</p>}
+      <div className="btnrow">
+        <Picker label="Set" prefix="Set: " value={setCode} options={sets.map((item) => ({ value: item.code, label: `${item.name} (${item.code.toUpperCase()})` }))}
+          onChange={(code) => { setSetCode(code); setBooster(sets.find((item) => item.code === code)?.boosters[0]?.name ?? ""); setPacks([]); setExpected(null); }} />
+        <Picker label="Booster" prefix="Booster: " value={booster} options={(set?.boosters ?? []).map((item) => ({ value: item.name, label: item.label }))}
+          onChange={(name) => { setBooster(name); setPacks([]); setExpected(null); }} />
+        <button type="button" className="btn small primary" disabled={!booster} onClick={() => void open(1)}>{packs.length ? "Open another" : "Open a pack"}</button>
+        <button type="button" className="btn small" disabled={!booster} onClick={() => void open(10)}>Open 10</button>
+        <button type="button" className="btn small" disabled={!packs.length} onClick={() => setPacks([])}>Clear</button>
+      </div>
+      <p className="sub">{packs.length} {packs.length === 1 ? "pack" : "packs"} opened, {money(total, "usd")} in all
+        {packs.length ? `, ${money(total / packs.length, "usd")} per pack` : ""}{expected !== null ? `. Expected value ${money(expected, "usd")} per pack` : ""}</p>
+      <div className="vpacks">
+        {packs.map((pack, index) => (
+          <section key={packs.length - index} className="vpack">
+            <h4>Pack {packs.length - index} <span className="sub">{money(pack.total, "usd")}</span></h4>
+            <div className="vpackcards">
+              {pack.cards.map((item, position) => {
+                const card = cards[item.cardId];
+                return (
+                  <button key={`${item.cardId}-${position}`} type="button" className="vcard" title={card ? `${card.name} (${card.set_code.toUpperCase()}) ${card.collector_number}` : ""}
+                    onClick={() => store.setCardPage(item.cardId)}>
+                    {card?.image_url ? <img src={card.image_url} alt={card.name} loading="lazy" /> : <span className="vname">{card?.name ?? "Card"}</span>}
+                    <span className="vfoot">{item.foil && <span className="badge foil">FOIL</span>}<b>{money(item.price, "usd")}</b></span>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** Open virtual packs...: packs drawn from a set's booster contents and odds, with prices. Nothing is saved. */
+export const virtualPacksDialog = (store: Store, setCode?: string) =>
+  customDialog("Open virtual packs", () => <VirtualPacks store={store} initialSet={setCode} />, 1000);
+
+/** A new purchase with one line for the product a barcode names; with no match, a blank line and the code in the note (0.21.0). */
+export async function purchaseFromBarcode(store: Store, code: string, onSaved: Saved = () => undefined) {
+  try {
+    const [list, found] = await Promise.all([request<PurchaseList>("/api/purchases"), productOfBarcode(code)]);
+    const product = found?.product ?? "play_booster";
+    const line: LineDraft = {
+      product, name: found?.name ?? "", setCode: found?.setCode ?? "", quantity: "1", each: "", total: "",
+      packs: String(list.products.find((item) => item.id === product)?.packs ?? 0), locked: 0,
+    };
+    purchaseWindow(store, list, {
+      entry: null, head: { date: today(), place: "", note: found ? "" : `Barcode ${code}` }, tax: "", shipping: "", lines: found ? [line] : [{ ...line, product: "other" }],
+      singles: [], receipt: null,
+    }, onSaved);
+    store.flash(found ? `Found ${found.fullName}` : "No product has that barcode. Its code is kept in the note.", found ? "ok" : "err");
+  } catch (reason) {
+    store.fail(reason, "Could not open purchase history.");
+  }
+}
+
+type Detector = { detect: (source: CanvasImageSource) => Promise<Array<{ rawValue: string }>> };
+
+function BarcodeScan({ store, close, onSaved }: { store: Store; close: () => void; onSaved: Saved }) {
+  const [code, setCode] = useState("");
+  const [camera, setCamera] = useState(false);
+  const [note, setNote] = useState("");
+  const video = useRef<HTMLVideoElement>(null);
+  const canDetect = typeof window !== "undefined" && "BarcodeDetector" in window;
+  const use = (value: string) => {
+    const digits = value.replace(/\D/g, "");
+    if (digits.length < 8) return setNote("A barcode has 8 to 14 digits");
+    close();
+    void purchaseFromBarcode(store, digits, onSaved);
+  };
+  useEffect(() => {
+    if (!camera || !video.current) return;
+    let stream: MediaStream | null = null;
+    let active = true;
+    const Detector = (window as unknown as { BarcodeDetector: new (options: { formats: string[] }) => Detector }).BarcodeDetector;
+    const detector = new Detector({ formats: ["upc_a", "upc_e", "ean_13", "ean_8"] });
+    void navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } }).then(async (media) => {
+      stream = media;
+      if (!video.current) return;
+      video.current.srcObject = media;
+      await video.current.play();
+      while (active && video.current) {
+        const found = await detector.detect(video.current).catch(() => []);
+        if (found[0]?.rawValue) { active = false; use(found[0].rawValue); return; }
+        await new Promise((resolve) => window.setTimeout(resolve, 250));
+      }
+    }).catch(() => setNote("The camera could not be opened. Type the code instead."));
+    return () => { active = false; stream?.getTracks().forEach((track) => track.stop()); };
+  }, [camera]); // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <div className="purchaseedit">
+      <div className="prow"><label htmlFor="bc-code">Barcode</label>
+        <input id="bc-code" inputMode="numeric" autoFocus value={code} placeholder="Type the code or scan it with a barcode reader" onChange={(event) => setCode(event.target.value)}
+          onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); event.stopPropagation(); use(code); } }} /></div>
+      {note && <p className="note err">{note}</p>}
+      {canDetect && !camera && <button type="button" className="btn small" onClick={() => setCamera(true)}>Use the camera</button>}
+      {camera && <video ref={video} className="barcodevideo" muted playsInline />}
+      <div className="btnrow end"><button type="button" className="btn primary" disabled={code.replace(/\D/g, "").length < 8} onClick={() => use(code)}>Find product</button></div>
+    </div>
+  );
+}
+
+/** Scan barcode: finds a product by the barcode on its box and starts a purchase with it (0.21.0). */
+export const barcodeDialog = (store: Store, onSaved: Saved = () => undefined) =>
+  customDialog("Scan barcode", (close) => <BarcodeScan store={store} close={close} onSaved={onSaved} />, 460, "Cancel");

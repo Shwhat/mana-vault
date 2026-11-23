@@ -120,3 +120,11 @@
 | Import preview | The check of an import file that shows what would be added before anything changes |
 | Backup | A JSON file with one account's own collections, decks and the card records they use |
 | Session | A signed-in browser, kept for 30 days |
+| Buylist | What a store pays for a card. The buylist of a card is the highest of any store's for its finish |
+| Expected value | What a pack is worth on average: each card's chance in the pack times its price, added up |
+| Main price source | The store whose prices every price and value of your account uses |
+| MTGJSON | An open catalog of Magic data: card records, store prices, booster contents, sealed products and decklists |
+| Precon | A preconstructed deck sold as a product, such as a Commander deck |
+| Pull check | The check that a card added to a pack could come from that pack |
+| SKU | TCGplayer's id for one printing in one condition, language and finish |
+| Virtual pack | A pack drawn from a set's booster contents and odds, not saved |

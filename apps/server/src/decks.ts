@@ -5,6 +5,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { type CopyKey, readCopyKey } from "./copies.js";
 import { access, forgetItem, itemSharing, lowerWishlists } from "./library.js";
 import { addLink, capDeckCardLinks, deckLinks, type Link, touchDeckCollections } from "./links.js";
+import { priceCols, usdEtchedSql, usdFoilSql, usdSql } from "./price-context.js";
 
 export const ZONES = ["main", "sideboard", "commander", "maybeboard"];
 /** Deck formats; each name except casual is a Scryfall legality key. */
@@ -249,7 +250,7 @@ export function registerDeckRoutes(app: FastifyInstance, database: DatabaseSync)
     const deck = database.prepare(
       `SELECT d.id, d.name, d.format, d.mode, d.collection_id, d.created_at, d.updated_at, d.description, d.cover_card_id,
               COALESCE((SELECT SUM(quantity) FROM deck_cards WHERE deck_id = d.id AND zone != 'maybeboard'), 0) AS card_count,
-              (SELECT SUM(dc.quantity * (CASE dc.finish WHEN 1 THEN COALESCE(c.price_usd_foil, c.price_usd, c.price_usd_etched) WHEN 2 THEN COALESCE(c.price_usd_etched, c.price_usd_foil, c.price_usd) ELSE COALESCE(c.price_usd, c.price_usd_foil, c.price_usd_etched) END)) FROM deck_cards dc JOIN cards c ON c.id = dc.printing_id
+              (SELECT SUM(dc.quantity * (CASE dc.finish WHEN 1 THEN COALESCE(${usdFoilSql()}, ${usdSql()}, ${usdEtchedSql()}) WHEN 2 THEN COALESCE(${usdEtchedSql()}, ${usdFoilSql()}, ${usdSql()}) ELSE COALESCE(${usdSql()}, ${usdFoilSql()}, ${usdEtchedSql()}) END)) FROM deck_cards dc JOIN cards c ON c.id = dc.printing_id
                  WHERE dc.deck_id = d.id AND dc.zone != 'maybeboard') AS value_usd,
               (SELECT SUM(dc.quantity * (CASE dc.finish WHEN 0 THEN COALESCE(c.price_eur, c.price_eur_foil) ELSE COALESCE(c.price_eur_foil, c.price_eur) END)) FROM deck_cards dc JOIN cards c ON c.id = dc.printing_id
                  WHERE dc.deck_id = d.id AND dc.zone != 'maybeboard') AS value_eur,
@@ -353,7 +354,7 @@ export function registerDeckRoutes(app: FastifyInstance, database: DatabaseSync)
       `SELECT dc.id AS entry_id, c.id AS card_id, dc.oracle_id, dc.printing_id, dc.quantity, dc.zone, dc.finish, dc.tags, c.name, c.mana_cost,
               c.type_line, c.set_code, c.set_name, c.collector_number, c.image_url, c.mana_value, c.rarity, c.colors, c.color_identity, c.artist,
               c.oracle_text, c.legalities, c.produced_mana, c.tokens, c.power, c.toughness,
-              c.price_usd, c.price_usd_foil, c.price_usd_etched, c.price_eur, c.price_eur_foil, c.custom, c.finishes, c.promo_types, c.removed,
+              ${priceCols()}, c.custom, c.finishes, c.promo_types, c.removed, c.lead_commander, c.lead_oathbreaker, c.lead_brawl,
               dc.want_card_id, dc.want_finish, w.set_code AS want_set_code, w.collector_number AS want_collector_number
        FROM deck_cards dc LEFT JOIN cards w ON w.id = dc.want_card_id JOIN cards c ON c.id = COALESCE(
          dc.printing_id, (SELECT p.id FROM cards p WHERE p.oracle_id = dc.oracle_id ORDER BY p.removed, p.lang != 'en', p.released_at DESC LIMIT 1))
@@ -369,6 +370,9 @@ export function registerDeckRoutes(app: FastifyInstance, database: DatabaseSync)
       return {
         ...card, custom: Number(card.custom ?? 0) === 1, removed: Number(card.removed ?? 0) === 1, tags: String(card.tags ?? "").split("\n").filter(Boolean), legalities: parse(card.legalities, {}), tokens: parse(card.tokens, []),
         want_card_id: card.want_card_id ?? null, want_finish: Number(card.want_finish ?? 0), links: list, missing, owned, inDecks,
+        // which formats the card can lead, from MTGJSON (0.21.0); null when MTGJSON has no record of it
+        leadership: card.lead_commander === null || card.lead_commander === undefined ? null
+          : { commander: Number(card.lead_commander) === 1, oathbreaker: Number(card.lead_oathbreaker) === 1, brawl: Number(card.lead_brawl) === 1 },
       };
     });
     return { ...deck, cards };

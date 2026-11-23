@@ -5,13 +5,13 @@ export type Menu = { id: string; name: string; items: string[] };
 export const MENUS: Menu[] = [
   {
     id: "file", name: "File", items: [
-      "collection.new", "newDeck", "-", "io.import", "io.export", "purchases.export", "-", "purchases.new", "purchases.sale", "-", "scan", "-", "backup", "restore", "-", "updateCatalog", "-", "signout",
+      "collection.new", "newDeck", "-", "precon.deck", "precon.collection", "-", "io.import", "io.export", "purchases.export", "-", "purchases.new", "purchases.sale", "purchases.barcode", "boosters.open", "-", "scan", "-", "backup", "restore", "-", "updateCatalog", "-", "signout",
     ],
   },
   { id: "edit", name: "Edit", items: ["undo", "redo", "-", "find", "pickAll", "clearFilters"] },
   {
     id: "view", name: "View", items: [
-      "view.purchases", "-", "theme.light", "theme.dark", "theme.system", "-", "prices.pictures", "cardLayout", "-",
+      "view.purchases", "-", "theme.light", "theme.dark", "theme.system", "-", "prices.pictures", "prices.source", "prices.buylist", "cardLayout", "-",
       "panel.filters", "panel.collections", "panel.decks", "panel.card", "panel.decklist", "panel.review",
     ],
   },

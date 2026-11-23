@@ -14,9 +14,9 @@ Click a menu to open it. While a menu is open, pointing at another menu opens th
 
 | Menu | Commands |
 |---|---|
-| File | New collection..., New deck..., Import..., Export..., Export purchase history... (Export purchases), New purchase..., New card sale... or Sell selected cards... when cards are picked in a collection (Sell), Scan card..., Download backup, Restore backup..., Update card database (Update database, admins only), Sign out |
+| File | New collection..., New deck..., Add precon as deck... (Precon deck), Add precon to collection... (Precon to collection), Import..., Export..., Export purchase history... (Export purchases), New purchase..., New card sale... or Sell selected cards... when cards are picked in a collection (Sell), Scan barcode... (Scan barcode), Open virtual packs... (Virtual packs), Scan card..., Download backup, Restore backup..., Update card database (Update database, admins only), Sign out |
 | Edit | Undo, Redo, Find, Select all cards, Clear filters |
-| View | Purchases view (Purchases); Light theme, Dark theme, System theme; Prices on pictures; Card layout...; Filters panel, Collections panel, Decks panel, Card panel, Deck list panel, Import review panel |
+| View | Purchases view (Purchases); Light theme, Dark theme, System theme; Prices on pictures; Main price source... (Price source); Buylist prices in lists (Buylist); Card layout...; Filters panel, Collections panel, Decks panel, Card panel, Deck list panel, Import review panel |
 | Help | Keyboard shortcuts, About Mana Vault |
 
 Undo and Redo show the change they will reverse or repeat, for example "Undo Add Sol Ring". The same two commands are arrow buttons in the title bar right after the Help menu (and in the phone's top bar): the tooltip names the change, such as "Undo Add Sol Ring (Ctrl+Z)", and a button is greyed out when there is nothing to undo or redo. **Import...** and **Export...** open the import and export windows; see [Import and export](/about/import-and-export).
@@ -95,6 +95,12 @@ The work area in the middle shows one of six views, chosen with the Views group 
 
 Click a row to select it; its details appear in the Card panel. Up and Down select the previous or next row. The About guide and the card page also open in the work area and close with **Close**, **Back** or Esc. The About guide also closes when you open a collection, deck, card or view, or select a card in a panel.
 
+## Tabs keep their place
+
+Each mode tab opens where it was left: Search keeps its search, filters, sort, view and scroll position; Collection its collection, view, filters, sort, picked cards and scroll position; Decks its deck, zone, view and scroll position; Trade the trade being built; Proxies Print, Card maker or Custom sets and the card or set chosen; Purchases the part shown (Summary, History or an entry), History's find box, filters, sort and picked rows, and the scroll position; Administration its section. A card page opened from a tab belongs to that tab, so another tab never shows it and Back returns to the tab's list where it was.
+
+Pressing a tab's button while that tab is already shown goes back to its first screen: its card page closes and what it was showing is cleared. On a phone, the bottom bar, the Home buttons and the Menu work the same way. What each tab shows is kept while Mana Vault is open (and while the app is in the background on a phone); signing out clears it. A purchase entry deleted on another device while Purchases was closed opens History in its place.
+
 ## Card page
 
 The card page shows one card in full. It opens from **Card page** in a right-click menu, by tapping a card on a phone, and by tapping a card in the scanner.
@@ -104,7 +110,11 @@ The card page shows one card in full. It opens from **Card page** in a right-cli
 - Where you have it: each collection with its copies (and proxies), and each wishlist that wants it.
 - **Versions**: every printing of the card with set, number, rarity and year, and the market price for Normal, Foil and Etched where the printing exists in that finish. The card shown is first and highlighted; tapping another printing shows it.
 - **Rulings**: the official rulings for the card with their dates, or "No rulings".
-- **Price history**: the printing's saved prices as a line chart per finish, with **Show table** (see [Prices and statistics](/about/prices-and-statistics)).
+- **Oracle** and **Printed**: for an English card whose text or type line was changed by Oracle updates, a switch shows the text as first printed.
+- The formats the card can lead (Can lead Commander, Oathbreaker, Brawl) and a Reprint mark, from MTGJSON.
+- **Prices**: one row per store (TCGplayer, Card Kingdom, CardSphere, Cardmarket, Cardhoarder and Scryfall) with Regular, Foil and Etched prices and their buylist prices. The main price source is first and marked (main). A store with no price shows a blank cell.
+- **Price history**: the printing's saved prices as a line chart, one line per store, for the finish chosen, with **Show table** (see [Prices and statistics](/about/prices-and-statistics)).
+- **Found in**: every sealed product and precon the printing can come from, grouped by product type, with the finishes it comes in. A precon makes a new deck from its decklist; another product searches for the cards it holds (`in:`).
 - A round actions button at the bottom right: **Add to name...** (where cards go, opening the printing chooser), Add as proxy, Add to wishlist and Scan cards.
 
 ## Panels

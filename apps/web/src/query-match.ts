@@ -10,6 +10,16 @@ export type QueryCard = {
   keywords?: string | null; promo_types?: string | null; frame?: string | null; frame_effects?: string | null; border_color?: string | null;
   full_art?: number | null; lang?: string | null; custom?: number | boolean | null; legal?: number | null; usd?: number | null;
   power?: string | null; toughness?: string | null;
+  // from MTGJSON (0.21.0)
+  is_reprint?: number | null; is_starter?: number | null; lead_commander?: number | null; lead_oathbreaker?: number | null; lead_brawl?: number | null;
+  tcg_r?: number | null; tcg_rf?: number | null; tcg_re?: number | null; ck_r?: number | null; ck_rf?: number | null; ck_re?: number | null;
+  cs_r?: number | null; cs_rf?: number | null; cs_re?: number | null; cm_r?: number | null; cm_rf?: number | null; cm_re?: number | null;
+  ch_r?: number | null; ch_rf?: number | null; buy?: number | null;
+};
+
+/** Store names the store: filter takes, with their price fields (0.21.0), the same as on the server. */
+const STORE_KEYS: Record<string, "tcg" | "ck" | "cs" | "cm" | "ch"> = {
+  tcgplayer: "tcg", tcg: "tcg", cardkingdom: "ck", ck: "ck", cardsphere: "cs", cs: "cs", cardmarket: "cm", mcm: "cm", cardhoarder: "ch",
 };
 
 export type QueryContext = {
@@ -48,6 +58,8 @@ const IS_WORDS: Record<string, Test> = {
   extendedart: (card) => has(card.frame_effects, "extendedart"),
   promo: (card) => Number(card.promo ?? 0) === 1,
   variation: (card) => Number(card.variation ?? 0) === 1,
+  reprint: (card) => Number(card.is_reprint ?? 0) === 1,
+  starter: (card) => Number(card.is_starter ?? 0) === 1,
 };
 
 function normalizeColors(value: string): string {
@@ -111,6 +123,33 @@ export function compileQuery(query: string, context: QueryContext = {}): Test {
       add((card) => card.usd !== null && card.usd !== undefined && compare(card.usd, operator, amount));
       continue;
     }
+    if (key === "can") {
+      colonOnly();
+      const format = value.toLowerCase();
+      if (format !== "commander" && format !== "oathbreaker" && format !== "brawl") throw new Error("can: takes commander, oathbreaker or brawl");
+      add((card) => Number(card[`lead_${format}`] ?? 0) === 1);
+      continue;
+    }
+    if (key === "store") {
+      const found = /^([a-z]+)(>=|<=|>|<|=)(\d+(?:\.\d+)?)$/i.exec(value);
+      const prefix = found ? STORE_KEYS[found[1]!.toLowerCase()] : undefined;
+      if (!found || !prefix) throw new Error("Write store: as a store and a price, such as store:cardkingdom<5");
+      const foilOnly = /(^|\s)is:foil(\s|$)/i.test(query);
+      const field = (card: QueryCard) => {
+        const read = (suffix: string) => (card as Record<string, unknown>)[`${prefix}_${suffix}`] as number | null | undefined;
+        return (foilOnly ? read("rf") ?? read("re") : read("r") ?? read("rf") ?? read("re")) ?? null;
+      };
+      add((card) => { const price = field(card); return price !== null && compare(price, found[2]!, Number(found[3])); });
+      continue;
+    }
+    if (key === "buylist") {
+      if (!COMPARE.includes(operator)) throw new Error(`${rawKey} needs a comparison operator`);
+      const amount = Number(value);
+      if (!Number.isFinite(amount) || amount < 0) throw new Error("Prices must be a number of 0 or more");
+      add((card) => card.buy !== null && card.buy !== undefined && compare(card.buy, operator, amount));
+      continue;
+    }
+    if (key === "in") throw new Error("in: needs a connection to the server");
     if (key === "is" || key === "not") {
       colonOnly();
       const word = value.toLowerCase();

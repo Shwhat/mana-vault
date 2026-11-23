@@ -1,3 +1,4 @@
+import { usdEtchedSql, usdFoilSql, usdSql } from "./price-context.js";
 export interface SearchClause {
   sql: string;
   values: string[];
@@ -29,6 +30,14 @@ const IS_WORDS: Record<string, string> = {
   extendedart: "(',' || frame_effects || ',') LIKE '%,extendedart,%'",
   promo: "promo = 1",
   variation: "variation = 1",
+  // from MTGJSON (0.21.0)
+  reprint: "is_reprint = 1",
+  starter: "is_starter = 1",
+};
+
+/** Store names the store: filter takes, with their price columns (0.21.0). */
+const STORE_KEYS: Record<string, string> = {
+  tcgplayer: "tcg", tcg: "tcg", cardkingdom: "ck", ck: "ck", cardsphere: "cs", cs: "cs", cardmarket: "cm", mcm: "cm", cardhoarder: "ch",
 };
 
 export type SearchContext = { userId?: number };
@@ -113,8 +122,50 @@ export function parseCardQuery(query: string, context: SearchContext = {}): Sear
       const amount = Number(value);
       if (!Number.isFinite(amount) || amount < 0 || amount > 1_000_000) throw new Error("Prices must be a number of 0 or more");
       // the regular price, or the foil price for printings that only come in foil
-      const field = "COALESCE(price_usd, price_usd_foil, price_usd_etched)";
+      const field = `COALESCE(${usdSql("")}, ${usdFoilSql("")}, ${usdEtchedSql("")})`;
       clauses.push({ sql: `${negate}(${field} ${operator === ":" ? "=" : operator} CAST(? AS REAL))`, values: [String(amount)] });
+      continue;
+    }
+
+    // can:commander, can:oathbreaker, can:brawl (0.21.0): cards that can lead a deck of that format
+    if (key === "can") {
+      if (operator !== ":") throw new Error(`${rawKey} only supports the ":" operator`);
+      const format = value.toLowerCase();
+      if (!["commander", "oathbreaker", "brawl"].includes(format)) throw new Error("can: takes commander, oathbreaker or brawl");
+      clauses.push({ sql: `${negate}(lead_${format} = 1)`, values: [] });
+      continue;
+    }
+
+    // store:cardkingdom<5 (0.21.0): one store's retail price for the finish searched (regular, or foil with is:foil)
+    if (key === "store") {
+      const found = /^([a-z]+)(>=|<=|>|<|=)(\d+(?:\.\d+)?)$/i.exec(value);
+      if (!found || !STORE_KEYS[found[1]!.toLowerCase()]) throw new Error("Write store: as a store and a price, such as store:cardkingdom<5");
+      const prefix = STORE_KEYS[found[1]!.toLowerCase()]!;
+      const finish = /(^|\s)is:foil(\s|$)/i.test(query) ? `COALESCE(${prefix}_rf, ${prefix}_re)` : `COALESCE(${prefix}_r, ${prefix}_rf, ${prefix}_re)`;
+      clauses.push({ sql: `${negate}(${finish} ${found[2]} CAST(? AS REAL))`, values: [found[3]!] });
+      continue;
+    }
+
+    // buylist>2 (0.21.0): the highest buylist price of any store, any finish
+    if (key === "buylist") {
+      if (!COMPARE.includes(operator)) throw new Error(`${rawKey} needs a comparison operator`);
+      const amount = Number(value);
+      if (!Number.isFinite(amount) || amount < 0) throw new Error("Prices must be a number of 0 or more");
+      const best = "MAX(COALESCE(tcg_b, 0), COALESCE(tcg_bf, 0), COALESCE(tcg_be, 0), COALESCE(ck_b, 0), COALESCE(ck_bf, 0), COALESCE(ck_be, 0))";
+      clauses.push({ sql: `${negate}(NULLIF(${best}, 0) ${compare(operator)} CAST(? AS REAL))`, values: [String(amount)] });
+      continue;
+    }
+
+    // in:"collector booster", in:"Landing Party" (0.21.0): printings found in a product type or a named product
+    if (key === "in") {
+      if (operator !== ":") throw new Error(`${rawKey} only supports the ":" operator`);
+      const words = value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+      const product = words.replace(/ /g, "_");
+      clauses.push({
+        sql: `${negate}(id IN (SELECT s.card_id FROM mtgjson_sources s JOIN sealed_products p ON p.id = s.product_id
+          WHERE p.product = ? OR p.product = ? OR lower(p.name) LIKE ? OR lower(p.short_name) = ?))`,
+        values: [product, `${product}_booster`, `%${words.replace(/ /g, "%")}%`, words],
+      });
       continue;
     }
 
@@ -227,7 +278,7 @@ export type SearchOrder = { sql: string; values: (string | number)[]; with?: str
 export function searchOrder(sort: SearchSort, query: string, options: { currency?: string; userId?: number } = {}): SearchOrder {
   const words = plainWords(query).toLowerCase();
   const byName = "x.name, x.lang != 'en', x.released_at DESC";
-  const usd = options.currency === "eur" ? "COALESCE(x.price_eur, x.price_eur_foil)" : "COALESCE(x.price_usd, x.price_usd_foil, x.price_usd_etched)";
+  const usd = options.currency === "eur" ? "COALESCE(x.price_eur, x.price_eur_foil)" : `COALESCE(${usdSql("x")}, ${usdFoilSql("x")}, ${usdEtchedSql("x")})`;
   switch (sort) {
     case "name": return { sql: byName, values: [] };
     case "newest": return { sql: `x.released_at IS NULL, x.released_at DESC, ${byName}`, values: [] };

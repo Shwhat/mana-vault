@@ -4,6 +4,7 @@ import { newEntry } from "./PurchasesView";
 import { SetIcon } from "../components/CardMarks";
 import type { SetProgress } from "../types";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useKeptScroll } from "../kept";
 import type { Action } from "../actions";
 import { rowMenu } from "../components/ContextMenu";
 import { collectionDialog, copyDialog, moveDialog } from "../components/LibraryDialogs";
@@ -26,6 +27,7 @@ import { groupList } from "../list-groups";
 import { Switcher } from "../components/Switcher";
 import { StatsPanel } from "./StatsView";
 import { Quantity, Thumb } from "./Views";
+import { buylistOf } from "../types";
 
 const ALL_FACETS: Facets = { rarity: undefined, color: undefined, type: undefined, set: undefined, curve: undefined, finish: undefined, trade: undefined, inDeck: undefined, proxy: undefined };
 const SORTS: Array<[CollectionSort, string]> = [
@@ -390,6 +392,9 @@ function CardsTab({ actions }: { actions: Record<string, Action> }) {
   const currency = store.prefs.currency;
   const pictures = store.layout !== "list" && (collection?.length ?? 0) > 0 && visibleCollection.length > 0;
   const group = store.prefs.listGroups.collection;
+  // the list keeps its scroll position while the tab is closed (0.21.0)
+  const listRef = useRef<HTMLDivElement>(null);
+  useKeptScroll(`collection:${store.prefs.openCollection ?? ""}:list`, listRef, !pictures && collection !== null);
   return (
     <>
       {collection !== null && collection.length > 0 && <ChipBar />}
@@ -407,7 +412,7 @@ function CardsTab({ actions }: { actions: Record<string, Action> }) {
       )}
       {pictures && store.layout === "binder" && <Binder />}
       {pictures && store.layout === "grid" && <Grid />}
-      {!pictures && <div className="list" role="listbox" aria-label="Collection" aria-multiselectable="true">
+      {!pictures && <div className="list" role="listbox" aria-label="Collection" aria-multiselectable="true" ref={listRef}>
         {collection === null && <div className="emptynote">Loading the collection</div>}
         {collection !== null && collection.length === 0 && (
           <div className="empty">
@@ -439,6 +444,7 @@ function CardsTab({ actions }: { actions: Record<string, Action> }) {
               </div>
               <span className="price" title={entry.proxy ? "Proxies have no value" : price === null ? "No price in the card database" : `${money(price, currency)} each`}>
                 {entry.proxy ? "Proxy" : money(price === null ? null : price * entry.quantity, currency)}</span>
+              {store.prefs.showBuylist && <span className="price buylist" title="The highest buylist price of any store, for every copy">{entry.proxy ? "" : (() => { const buy = buylistOf(entry, entry.foil); return buy === null ? "" : `Buylist ${money(buy * entry.quantity, currency)}`; })()}</span>}
               <Quantity value={entry.quantity} name={entry.name} onChange={(quantity) => void store.setCollectionQuantity(entry, quantity)} />
               <button type="button" className="btn small icon-only" title={`Copy details of ${entry.name}`} aria-label={`Copy details of ${entry.name}`}
                 onClick={(event) => { event.stopPropagation(); copyDialog(store, entry); }}><Icon name="edit" /></button>

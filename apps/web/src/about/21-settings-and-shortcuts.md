@@ -7,6 +7,8 @@ Preferences are saved for your account on the server and follow you to every bro
 | Setting | Choices | Default | Where to change it |
 |---|---|---|---|
 | Theme | Light, Dark, System | Light | View menu, phone Menu |
+| Main price source | TCGplayer, Card Kingdom, CardSphere, Scryfall | TCGplayer | Main price source... in the View menu (short name Price source) |
+| Buylist prices in lists | On, Off | Off | View menu (short name Buylist) |
 | Add as foil (the finish the printing chooser starts on) | On, Off | Off | FOIL in the status bar, F |
 | Target zone | Main deck, Sideboard, Commander, Maybeboard | Main deck | Zone list beside Quick add on the deck's Add tab, the zone buttons, ZONE in the status bar, Z |
 | Zone shown | All, Commander, Main, Sideboard, Maybe | All | The zone buttons above the deck's cards and in the Deck list panel, Z. A zone also becomes the target zone; All makes it Main deck |

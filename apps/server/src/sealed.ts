@@ -8,7 +8,7 @@ import { productNameOf } from "./receipts.js";
 export const SET_LIST_URL = "https://mtgjson.com/api/v5/SetList.json";
 export const DECK_LIST_URL = "https://mtgjson.com/api/v5/DeckList.json";
 export const deckFileUrl = (fileName: string) => `https://mtgjson.com/api/v5/decks/${encodeURIComponent(fileName)}.json`;
-const userAgent = "ManaVault/0.20 (self-hosted)";
+const userAgent = "ManaVault/0.21 (self-hosted)";
 
 type Fetcher = (url: string, init?: RequestInit) => Promise<Response>;
 
@@ -202,35 +202,40 @@ export function matchSealed(database: DatabaseSync, line: { setCode: string | nu
 
 type DeckCard = { key: CopyKey; quantity: number };
 
-/**
- * The cards of the deck in a sealed product (commander and main board), as copies to add: each printing the decklist
- * names, foil when the decklist says so. Downloaded once from MTGJSON and kept. Null when the product has no decklist.
- */
-export async function sealedDeckCards(database: DatabaseSync, sealedId: string, fetcher: Fetcher = fetch): Promise<{ name: string; cards: DeckCard[]; missing: number } | null> {
-  const product = database.prepare("SELECT deck_name, deck_code FROM sealed_products WHERE id = ?").get(sealedId);
-  if (!product?.deck_name) return null;
-  const deck = database.prepare("SELECT * FROM sealed_decks WHERE name = ? AND code = ?").get(String(product.deck_name), String(product.deck_code ?? ""))
-    ?? database.prepare("SELECT * FROM sealed_decks WHERE name = ? ORDER BY code = ? DESC LIMIT 1").get(String(product.deck_name), String(product.deck_code ?? ""));
+type ListedCard = { scryfallId: string; setCode: string; number: string; count: number; foil: boolean; zone?: "commander" | "main" | "sideboard" };
+
+/** A preconstructed deck's list (commander, main board and side board), downloaded once from MTGJSON and kept. */
+export async function deckList(database: DatabaseSync, code: string, name: string, fetcher: Fetcher = fetch): Promise<{ code: string; name: string; type: string; list: ListedCard[] } | null> {
+  const deck = database.prepare("SELECT * FROM sealed_decks WHERE name = ? AND code = ?").get(name, code)
+    ?? database.prepare("SELECT * FROM sealed_decks WHERE name = ? ORDER BY code = ? DESC LIMIT 1").get(name, code);
   if (!deck) return null;
-  let list = deck.cards ? JSON.parse(String(deck.cards)) as Array<{ scryfallId: string; setCode: string; number: string; count: number; foil: boolean }> : null;
+  let list = deck.cards ? JSON.parse(String(deck.cards)) as ListedCard[] : null;
+  // lists kept before 0.21.0 have no zones: their cards count as main board
   if (!list) {
     const response = await fetcher(deckFileUrl(String(deck.file_name)), { headers: { "User-Agent": userAgent } });
     if (!response.ok) throw new Error(`The decklist could not be downloaded (${response.status})`);
-    const body = await response.json() as { data?: { commander?: unknown[]; mainBoard?: unknown[] } };
-    list = [...(body.data?.commander ?? []), ...(body.data?.mainBoard ?? [])].flatMap((raw) => {
+    const body = await response.json() as { data?: { commander?: unknown[]; mainBoard?: unknown[]; sideBoard?: unknown[] } };
+    const read = (zone: "commander" | "main" | "sideboard") => (raw: unknown): ListedCard[] => {
       const card = raw as { identifiers?: { scryfallId?: unknown }; setCode?: unknown; number?: unknown; count?: unknown; isFoil?: unknown };
       const count = Number(card?.count);
       if (!Number.isInteger(count) || count < 1) return [];
-      return [{ scryfallId: String(card.identifiers?.scryfallId ?? ""), setCode: String(card.setCode ?? "").toLowerCase(), number: String(card.number ?? ""), count, foil: card.isFoil === true }];
-    });
+      return [{ scryfallId: String(card.identifiers?.scryfallId ?? ""), setCode: String(card.setCode ?? "").toLowerCase(), number: String(card.number ?? ""), count, foil: card.isFoil === true, zone }];
+    };
+    list = [...(body.data?.commander ?? []).flatMap(read("commander")), ...(body.data?.mainBoard ?? []).flatMap(read("main")), ...(body.data?.sideBoard ?? []).flatMap(read("sideboard"))];
     if (!list.length) throw new Error("The decklist has no cards");
     database.prepare("UPDATE sealed_decks SET cards = ? WHERE code = ? AND name = ?").run(JSON.stringify(list), String(deck.code), String(deck.name));
   }
-  const cards = new Map<string, DeckCard>();
+  return { code: String(deck.code), name: String(deck.name), type: String(deck.type ?? ""), list };
+}
+
+/** The printing and finish of each card in a decklist, as copies to add, with the zone each is in. */
+export function listedCopies(database: DatabaseSync, list: ListedCard[], zones: Array<"commander" | "main" | "sideboard">): { cards: Array<DeckCard & { zone: string; oracleId: string }>; missing: number } {
+  const cards = new Map<string, DeckCard & { zone: string; oracleId: string }>();
   let missing = 0;
   for (const item of list) {
-    const row = (item.scryfallId ? database.prepare("SELECT id, finishes FROM cards WHERE id = ?").get(item.scryfallId) : undefined)
-      ?? database.prepare("SELECT id, finishes FROM cards WHERE set_code = ? AND collector_number = ? AND lang = 'en' LIMIT 1").get(item.setCode, item.number);
+    if (!zones.includes(item.zone ?? "main")) continue;
+    const row = (item.scryfallId ? database.prepare("SELECT id, oracle_id, finishes FROM cards WHERE id = ?").get(item.scryfallId) : undefined)
+      ?? database.prepare("SELECT id, oracle_id, finishes FROM cards WHERE set_code = ? AND collector_number = ? AND lang = 'en' LIMIT 1").get(item.setCode, item.number);
     if (!row) {
       missing += item.count;
       continue;
@@ -240,10 +245,31 @@ export async function sealedDeckCards(database: DatabaseSync, sealedId: string, 
       ? (finishes.includes("foil") || !finishes.includes("etched") ? 1 : 2)
       : finishes.includes("nonfoil") || finishes[0] === "" ? 0 : finishes.includes("foil") ? 1 : 2;
     const key: CopyKey = { cardId: String(row.id), foil, condition: "NM", language: "en", proxy: false };
-    const id = `${key.cardId}:${key.foil}`;
+    const id = `${key.cardId}:${key.foil}:${item.zone ?? "main"}`;
     const have = cards.get(id);
     if (have) have.quantity += item.count;
-    else cards.set(id, { key, quantity: item.count });
+    else cards.set(id, { key, quantity: item.count, zone: item.zone ?? "main", oracleId: String(row.oracle_id) });
   }
-  return { name: String(deck.name), cards: [...cards.values()], missing };
+  return { cards: [...cards.values()], missing };
+}
+
+/**
+ * The cards of the deck in a sealed product (commander and main board), as copies to add: each printing the decklist
+ * names, foil when the decklist says so. Downloaded once from MTGJSON and kept. Null when the product has no decklist.
+ */
+export async function sealedDeckCards(database: DatabaseSync, sealedId: string, fetcher: Fetcher = fetch): Promise<{ name: string; cards: DeckCard[]; missing: number } | null> {
+  const product = database.prepare("SELECT deck_name, deck_code FROM sealed_products WHERE id = ?").get(sealedId);
+  if (!product?.deck_name) return null;
+  const deck = await deckList(database, String(product.deck_code ?? ""), String(product.deck_name), fetcher);
+  if (!deck) return null;
+  const { cards, missing } = listedCopies(database, deck.list, ["commander", "main"]);
+  // the same printing and finish in two zones is one copy line
+  const merged = new Map<string, DeckCard>();
+  for (const card of cards) {
+    const id = `${card.key.cardId}:${card.key.foil}`;
+    const have = merged.get(id);
+    if (have) have.quantity += card.quantity;
+    else merged.set(id, { key: card.key, quantity: card.quantity });
+  }
+  return { name: deck.name, cards: [...merged.values()], missing };
 }

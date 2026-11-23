@@ -6,6 +6,8 @@ import { rowMenu } from "./ContextMenu";
 import { dialog } from "./Dialog";
 import { exportWindow } from "./FileWindows";
 import { collectionDialog, sendDialog, sharingDialog } from "./LibraryDialogs";
+import { chosenCollection, collectionFields } from "./CollectionPicker";
+import { suggestCollectionName } from "./Dialog";
 
 /** Renames a collection, keeping its other settings. */
 export function renameCollectionDialog(store: Store, item: Collection) {
@@ -66,11 +68,14 @@ export function addDeckToCollectionDialog(store: Store, deck: { id: string; name
   const list = (store.collections ?? []).filter((item) => item.kind !== "wishlist");
   if (!list.length) return store.flash("Create a collection first", "err");
   const preferred = [deck.collection_id, store.prefs.targetCollection].find((id) => id && list.some((item) => item.id === id)) ?? list[0]!.id;
+  suggestCollectionName("collection", deck.name);
   dialog(`Add ${deck.name} to a collection`, [
-    ["collection", "Collection", preferred, "select", list.map((item) => [item.id, item.name])],
+    ["collection", "Collection", preferred, "select", collectionFields(list)],
     ["mode", "Cards to add", "missing", "select", [["missing", "Missing cards only, linked to the deck"], ["all", "Every card as new copies"]]],
   ], async (values) => {
-    await store.addDeckToCollection(deck.id, String(values.collection), values.mode === "all" ? "all" : "missing");
+    const collection = await chosenCollection(store, values, "collection");
+    if (!collection) return false;
+    await store.addDeckToCollection(deck.id, collection, values.mode === "all" ? "all" : "missing");
   }, "Add cards");
 }
 
