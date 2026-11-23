@@ -14,6 +14,8 @@ import { closeDialog, confirmDialog, customDialog, dialog, isDialogOpen } from "
 import { Suggest } from "./Suggest";
 import { SetIcon } from "./CardMarks";
 import { deliverPurchaseScan, finishPurchaseScan, scanningForPurchase } from "./PurchaseDialogs";
+import { changeCollectionDialog } from "./PurchaseDialogs";
+import { PURCHASES_CHANGED } from "../live";
 
 type Capabilities = MediaTrackCapabilities & { torch?: boolean; focusMode?: string[]; pointsOfInterest?: unknown };
 const advanced = (value: Record<string, unknown>) => ({ advanced: [value] }) as unknown as MediaTrackConstraints;
@@ -401,7 +403,8 @@ export default function CardScanner({ phone = false, onClose }: { phone?: boolea
       {prefs.scanShowTotal && <p className="scantotal">{money(total, prefs.currency)}</p>}
       {opening && (
         <p className="scanopening" role="note">Scanning into: {opening.name}{packLabel(opening) ? ` (${packLabel(opening)})` : ""}
-          {opening.hasNext && <button type="button" className="btn small" onClick={(event) => { event.stopPropagation(); void goNextPack(store); }}>Next pack</button>}</p>
+          {opening.hasNext && <button type="button" className="btn small" onClick={(event) => { event.stopPropagation(); void goNextPack(store); }}>Next pack</button>}
+          <button type="button" className="btn small" onClick={(event) => { event.stopPropagation(); changeCollectionDialog(store, opening, () => window.dispatchEvent(new Event(PURCHASES_CHANGED))); }}>Change collection...</button></p>
       )}
       <div className="scanrail">
         <div className="scantools">

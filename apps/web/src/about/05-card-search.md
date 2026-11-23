@@ -47,6 +47,19 @@ A filter is a key, an operator and a value with no spaces, such as `t:dragon`. P
 
 Colors are W (white), U (blue), B (black), R (red) and G (green), or a color name. Mana values run from 0 to 100.
 
+### Filters from MTGJSON (0.21.0)
+
+| Filter | Finds | Example |
+|---|---|---|
+| `is:reprint` | Printings that are reprints | `is:reprint t:dragon` |
+| `is:starter` | Cards printed only in starter products | `is:starter` |
+| `can:commander`, `can:oathbreaker`, `can:brawl` | Cards that can lead a deck of that format | `can:commander c:g` |
+| `store:` | One store's price (regular, or foil and etched with `is:foil`). Stores: tcgplayer, cardkingdom, cardsphere, cardmarket (euros), cardhoarder (MTGO tix) | `store:cardkingdom<5` |
+| `buylist` | The highest buylist price of any store, any finish | `buylist>2` |
+| `in:` | Printings found in a product type, or in a named product | `in:"collector booster"`, `in:"Landing Party"` |
+
+These filters work after the first MTGJSON update. On a phone without a connection, every one of them works except `in:`, which says "in: needs a connection to the server".
+
 ### Search messages
 
 | Message | Cause |

@@ -11,6 +11,7 @@ import {
   FORMATS, formatName, LANGUAGES, type Offer, SEND_MODES, type SetInfo,
 } from "../types";
 import { closeDialog, customDialog, dialog } from "./Dialog";
+import { chosenCollection, collectionFields } from "./CollectionPicker";
 
 /** Search box plus a checkable set list. The chosen codes are kept in `holder.sets` for the dialog's OK handler. */
 function SetPicker({ holder, initial }: { holder: { sets: string[] }; initial: Array<{ code: string; name: string }> }) {
@@ -195,7 +196,7 @@ export function moveDialog(store: Store, entries: CollectionEntry[]) {
   if (!others.length) return store.flash("Create another collection to move cards into", "err");
   const single = entries.length === 1 ? entries[0]! : null;
   dialog(single ? `Move ${single.name}` : `Move ${entries.length} entries`, [
-    ["to", "Move to", others[0]!.id, "select", others.map((item) => [item.id, item.name])],
+    ["to", "Move to", others[0]!.id, "select", collectionFields(others)],
     ...(single && single.quantity > 1 ? [["count", "Copies to move", String(single.quantity), "number"] as [string, string, string, "number"]] : []),
   ], async (values) => {
     const counts = new Map<string, number>();
@@ -207,7 +208,9 @@ export function moveDialog(store: Store, entries: CollectionEntry[]) {
       }
       counts.set(entryKey(single), count);
     }
-    await store.moveEntries(entries, String(values.to), counts);
+    const to = await chosenCollection(store, values, "to");
+    if (!to) return false;
+    await store.moveEntries(entries, to, counts);
   }, "Move", undefined, 440);
 }
 

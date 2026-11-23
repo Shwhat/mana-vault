@@ -1,5 +1,6 @@
 // ---------- deck view: the deck builder (cards, ownership, statistics, playtest, description and history) ----------
-import { useEffect, useMemo, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
+import { useKeptScroll } from "../kept";
 import type { Action } from "../actions";
 import { request } from "../api";
 import { renderMarkdown } from "../components/About";
@@ -30,6 +31,7 @@ import { OptionsButton, Segments } from "../components/Options";
 import { choices, type Choice, Picker } from "../components/Picker";
 import { filterCount, matchesFilters, useServerMatch } from "../filters";
 import { EntryMenuButton, GroupedList, ListOptionRows, ManaCost } from "../components/GroupedList";
+import { buylistOf, type FinishCode, type PriceFields } from "../types";
 
 type Hover = { url: string; x: number; y: number } | null;
 type HoverProps = { onHover?: (url: string | null, event?: ReactMouseEvent) => void };
@@ -128,6 +130,7 @@ function ListRow({ card, flag, onHover }: { card: DeckCard; flag?: string } & Ho
         </div>
       </div>
       <span className="price">{money(price === null ? null : price * card.quantity, currency)}</span>
+      {store.prefs.showBuylist && <span className="price buylist" title="The highest buylist price of any store, for every copy">{(() => { const buy = buylistOf(card as PriceFields, (card.finish ?? 0) as FinishCode); return buy === null ? "" : `Buylist ${money(buy * card.quantity, currency)}`; })()}</span>}
       {card.zone !== "maybeboard" && (
         <button type="button" className="btn small icon-only" title={`Link copies of ${card.name}`} aria-label={`Link copies of ${card.name}`}
           onClick={(event) => { event.stopPropagation(); void linkDialog(store, card); }}><Icon name="link" /></button>
@@ -375,11 +378,14 @@ function CardsTab({ actions, legality, cards }: { actions: Record<string, Action
   const [hover, setHover] = useState<Hover>(null);
   const onHover = store.phone ? undefined : (url: string | null, event?: ReactMouseEvent) => setHover(url && event ? { url, x: event.clientX, y: event.clientY } : null);
   const view = store.prefs.deckZoneView;
+  // the deck list keeps its scroll position while the tab is closed (0.21.0)
+  const bodyRef = useRef<HTMLDivElement>(null);
+  useKeptScroll(`deck:${deck.id}:list`, bodyRef);
   return (
     <>
       <LegalityBar legality={legality} format={deck.format} />
       <ZoneButtons actions={actions} className="deckzones" />
-      <div className="list deckbody" role="listbox" aria-label="Deck cards" onScroll={() => setHover(null)}>
+      <div className="list deckbody" role="listbox" aria-label="Deck cards" ref={bodyRef} onScroll={() => setHover(null)}>
         {deck.cards.length === 0 && (
           <div className="empty">
             <Icon name="deck" />

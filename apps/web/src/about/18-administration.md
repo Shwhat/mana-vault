@@ -57,6 +57,9 @@ Shows the number of printings, the last update and its error, skipped cards, the
 - **Card languages**: English and unofficial languages (the default), All languages, or Chosen languages with a checkbox for each, with the number of printings, the download and the database growth shown before **Save languages**. **Pictures of other languages** (off by default) also downloads their pictures. See [Card languages](/about/card-database#card-languages).
 - **Parts** lists each part of the card database with its count and when it was last updated: card printings, sets, set symbols, symbols, rulings, art tags, oracle tags, printing changes, name and keyword lists, the card back and the price history, then the printing changes of the last update and how many removed printings are still held.
 
+- **MTGJSON** lists each MTGJSON part with its count, size on disk, the date it was last updated and the result of its last run (Updated, Kept previous copy, Failed, Skipped, or Not run yet), and how many MTGJSON printings match no card. **Update MTGJSON data now** downloads the weekly parts and today's prices; **Update prices now** downloads today's prices. While one runs the buttons wait and the list refreshes.
+- **90-day price history**: until it is downloaded or skipped, the section shows the download size of MTGJSON's last 90 days of prices, with **Download price history** and **Skip**. Skipping keeps each day's prices from then on. After the choice, **Download it now** is still offered.
+
 See [Card database](/about/card-database) for what an update downloads.
 
 ## Pictures

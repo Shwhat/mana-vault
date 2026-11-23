@@ -68,6 +68,19 @@ One card per line: a count, an optional "x", then the card name, for example `4 
 - Rows that list the same printing, finish, condition, language and proxy are added together. Details a row already has (purchase price, currency, date added) are kept.
 - A file can hold up to 5,000 card rows.
 
+### Store ids and SKUs (0.21.0)
+
+A row with a store's own id is matched to the exact printing by it before names and set codes, through MTGJSON's data:
+
+| Column | Store | Gives |
+|---|---|---|
+| SKU, SKU ID, TCGplayer SKU | TCGplayer | The printing, finish, condition and language (a Condition or Language column wins) |
+| TCGplayer Product ID, TCGplayer ID, Product ID | TCGplayer | The printing (the finish from the Finish or Printing column) |
+| Card Kingdom ID, CK ID | Card Kingdom | The printing and finish |
+| CardSphere ID | CardSphere | The printing and finish |
+
+Deckbox files carry no store id, so they are matched by name, set and number as before.
+
 ## The Export window
 
 **Export...** (File menu) opens one window for every export. **Export collection...**, **Export deck...** and **Export missing cards...** open it with that choice made.

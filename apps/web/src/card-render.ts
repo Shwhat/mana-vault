@@ -56,8 +56,10 @@ export type Assets = {
   /** The second half's art of a split card. */
   splitArt?: CanvasImageSource | null;
   setSymbol: CanvasImageSource | null;
-  /** Colors a one-color set symbol (an SVG) by the card's rarity, with a light outline (0.15.0). */
+  /** Colors a one-color set symbol (an SVG, or a PNG or WebP with a transparent background since 0.21.0) by the card's rarity, with a light outline (0.15.0). */
   setSymbolTint?: boolean;
+  /** Draws a tinted common symbol in white with a dark outline (0.21.0). */
+  commonWhite?: boolean;
   /** Mana symbol pictures by code without slashes (W, 2, WU, WP, T). A missing symbol is drawn as a colored circle. */
   symbols: Map<string, CanvasImageSource | null>;
 };
@@ -529,7 +531,7 @@ export function renderCard(canvas: HTMLCanvasElement, face: FaceDesign, info: Ca
   fitText(ctx, face.typeLine || "Type", typeBar.x + 20, typeBar.y + typeBar.h / 2 + 1, typeBar.w - 90, 30, 700, palette.text);
   const symbolBox = { x: typeBar.x + typeBar.w - 58, y: typeBar.y + 8, s: 40 };
   if (assets.setSymbol) {
-    const picture = assets.setSymbolTint ? tintedSymbol(assets.setSymbol, info.rarity, symbolBox.s) : assets.setSymbol;
+    const picture = assets.setSymbolTint && hasTransparency(assets.setSymbol) ? tintedSymbol(assets.setSymbol, info.rarity, symbolBox.s, !!assets.commonWhite) : assets.setSymbol;
     ctx.drawImage(picture, symbolBox.x, symbolBox.y, symbolBox.s, symbolBox.s);
   } else {
     ctx.save();
@@ -740,8 +742,39 @@ const RARITY_TINT: Record<string, string[]> = {
   mythic: ["#b4361b", "#f6a03a", "#b4361b"], special: ["#5b2a86", "#c59be6", "#5b2a86"], bonus: ["#5b2a86", "#c59be6", "#5b2a86"],
 };
 
-/** A set symbol filled with its rarity's colors and outlined in white, the way printed cards show it. */
-export function tintedSymbol(symbol: CanvasImageSource, rarity: string, size: number): HTMLCanvasElement {
+const transparent = new WeakMap<object, boolean>();
+/**
+ * Whether a picture has transparent pixels, so its shape can be filled with a rarity's colors (0.21.0). An SVG always
+ * can; a JPEG, or a PNG or WebP with no transparent pixels, keeps its own colors.
+ */
+export function hasTransparency(picture: CanvasImageSource): boolean {
+  const known = transparent.get(picture as object);
+  if (known !== undefined) return known;
+  let result = true;
+  try {
+    const source = picture as HTMLImageElement;
+    if (!(typeof HTMLImageElement !== "undefined" && source instanceof HTMLImageElement && /\.svg|svg\+xml/i.test(source.src))) {
+      const canvas = document.createElement("canvas");
+      canvas.width = 48;
+      canvas.height = 48;
+      const context = canvas.getContext("2d", { willReadFrequently: true })!;
+      context.clearRect(0, 0, 48, 48);
+      context.drawImage(picture, 0, 0, 48, 48);
+      const pixels = context.getImageData(0, 0, 48, 48).data;
+      result = false;
+      for (let index = 3; index < pixels.length; index += 4) {
+        if (pixels[index]! < 250) { result = true; break; }
+      }
+    }
+  } catch {
+    result = true;
+  }
+  transparent.set(picture as object, result);
+  return result;
+}
+
+/** A set symbol filled with its rarity's colors and outlined in white, the way printed cards show it. A white common symbol gets a dark outline (0.21.0). */
+export function tintedSymbol(symbol: CanvasImageSource, rarity: string, size: number, commonWhite = false): HTMLCanvasElement {
   const scale = 4;
   const s = size * scale;
   const pad = 2 * scale;
@@ -756,12 +789,13 @@ export function tintedSymbol(symbol: CanvasImageSource, rarity: string, size: nu
   outline.height = s;
   const octx = outline.getContext("2d")!;
   for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 8) octx.drawImage(shape, Math.cos(angle) * pad * 0.7, Math.sin(angle) * pad * 0.7);
+  const white = commonWhite && (rarity === "common" || !RARITY_TINT[rarity]);
   octx.globalCompositeOperation = "source-in";
-  octx.fillStyle = "#ffffff";
+  octx.fillStyle = white ? "#111111" : "#ffffff";
   octx.fillRect(0, 0, s, s);
   // the shape filled with the rarity's colors
   sctx.globalCompositeOperation = "source-in";
-  const stops = RARITY_TINT[rarity] ?? RARITY_TINT.common!;
+  const stops = white ? ["#ffffff", "#ffffff"] : RARITY_TINT[rarity] ?? RARITY_TINT.common!;
   const gradient = sctx.createLinearGradient(0, s, s, 0);
   stops.forEach((color, index) => gradient.addColorStop(stops.length === 1 ? 0 : index / (stops.length - 1), color));
   sctx.fillStyle = gradient;

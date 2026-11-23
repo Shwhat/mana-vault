@@ -2,6 +2,7 @@
 import { PickBar, usePicks } from "../components/Picks";
 import { goNextPack, PURCHASES_CHANGED } from "../live";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useKept, useKeptScroll } from "../kept";
 import { downloadBlob, fetchFile, request } from "../api";
 import { isApp } from "../android/platform";
 import type { Action } from "../actions";
@@ -11,6 +12,7 @@ import { choiceDialog, confirmDialog } from "../components/Dialog";
 import { choices, Picker } from "../components/Picker";
 import {
   entryDialog, fromPricesDialog, keepReceipt, openDialog, pickReceipt, placesDialog, purchaseFromReceipt, removeReceipt, type SaleCopy, tieCopiesDialog, useProductOptions, valueDialog,
+  barcodeDialog, changeCollectionDialog, virtualPacksDialog,
 } from "../components/PurchaseDialogs";
 import {
   type ChartPoint, type Entry, type EntryKind, type EntryOpening, type EntryTie, type EntrySummary, KIND_LABELS, type PurchaseList, packLabel, reloadOpening, setActiveOpening, useActiveOpening,
@@ -155,13 +157,14 @@ function Tiles({ list, currency }: { list: PurchaseList; currency: Currency }) {
 
 function History({ list, currency, onOpen, onChanged }: { list: PurchaseList; currency: Currency; onOpen: (id: string) => void; onChanged: () => void }) {
   const store = useApp();
-  const [term, setTerm] = useState("");
-  const [kind, setKind] = useState("");
-  const [product, setProduct] = useState("");
-  const [setCode, setSetCode] = useState("");
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
-  const [sort, setSort] = useState("new");
+  // kept while the tab is closed (0.21.0)
+  const [term, setTerm] = useKept("purchases:term", "");
+  const [kind, setKind] = useKept("purchases:kind", "");
+  const [product, setProduct] = useKept("purchases:product", "");
+  const [setCode, setSetCode] = useKept("purchases:set", "");
+  const [from, setFrom] = useKept("purchases:from", "");
+  const [to, setTo] = useKept("purchases:to", "");
+  const [sort, setSort] = useKept("purchases:sort", "new");
   const products = useProductOptions(list);
   const shown = useMemo(() => {
     const words = term.trim().toLowerCase();
@@ -244,7 +247,7 @@ function History({ list, currency, onOpen, onChanged }: { list: PurchaseList; cu
   );
 }
 
-function EntryPage({ id, list, onClose, onChanged }: { id: string; list: PurchaseList; onClose: () => void; onChanged: () => void }) {
+function EntryPage({ id, list, onClose, onChanged, onMissing }: { id: string; list: PurchaseList; onClose: () => void; onChanged: () => void; onMissing?: () => void }) {
   const store = useApp();
   const [entry, setEntry] = useState<Entry | null>(null);
   const [error, setError] = useState("");
@@ -252,9 +255,14 @@ function EntryPage({ id, list, onClose, onChanged }: { id: string; list: Purchas
     try {
       setEntry(await request<Entry>(`/api/purchases/${id}`));
     } catch (reason) {
+      // an entry deleted while the tab was closed (from another device, for example) opens History in its place (0.21.0)
+      if (reason instanceof Error && /not in your purchase history/i.test(reason.message) && onMissing) {
+        onMissing();
+        return;
+      }
       setError(reason instanceof Error ? reason.message : "Could not load the entry.");
     }
-  }, [id]);
+  }, [id, onMissing]);
   useEffect(() => { void load(); }, [load]);
   const tiePicks = usePicks((entry?.ties ?? []).map((tie) => String(tie.id)));
   // a change made on another device (0.18.0) loads the entry again
@@ -460,7 +468,8 @@ function EntryPage({ id, list, onClose, onChanged }: { id: string; list: Purchas
         <section>
           <h4>Products</h4>
           <div className="gridwrapper"><table className="dtable grid">
-            <thead><tr><th>Product</th><th>Set</th><th className="numcell">Quantity</th><th className="numcell">Full cost</th><th>State</th><th className="numcell">Value each</th><th /></tr></thead>
+            <thead><tr><th>Product</th><th>Set</th><th className="numcell">Quantity</th><th className="numcell">Full cost</th><th>State</th><th className="numcell">Value each</th>
+              {entry.lines.some((line) => line.ev !== null && line.ev !== undefined) && <th className="numcell" title="Each pack's chance of each card times its price, added up">Expected value</th>}<th /></tr></thead>
             <tbody>
               {entry.lines.map((line) => (
                 <tr key={line.id}>
@@ -473,6 +482,8 @@ function EntryPage({ id, list, onClose, onChanged }: { id: string; list: Purchas
                       ? [`${line.packsOpened} of ${line.quantity * line.packs} packs opened`, line.packsLeft ? `${line.packsLeft} left` : "", line.sold ? `${line.sold} sold` : ""].filter(Boolean).join(", ")
                       : [line.sealed ? `${line.sealed} sealed` : "", line.opened ? `${line.opened} opened` : "", line.sold ? `${line.sold} sold` : ""].filter(Boolean).join(", ")}</td>
                   <td className="numcell">{line.product === "single" ? valueThenOf(entry.ties.filter((tie) => tie.lineId === line.id), currency) : <>{money(line.sealedValue, currency)}{line.valueDate ? <span className="sub"> ({line.valueDate})</span> : <span className="sub"> (cost)</span>}</>}</td>
+                  {entry.lines.some((item) => item.ev !== null && item.ev !== undefined) && <td className="numcell">{line.ev !== null && line.ev !== undefined
+                    ? <>{line.evLine !== null && line.evLine !== undefined ? money(line.evLine, currency) : ""}<span className="sub"> ({money(line.ev, currency)} per {line.evLabel?.toLowerCase() ?? "pack"})</span></> : ""}</td>}
                   <td>{line.product !== "single" && (line.packs > 0 ? line.packsLeft > 0 : line.sealed > 0) && <span className="btnrow">
                     <button type="button" className="btn small" onClick={() => openDialog(store, entry, line, changed)}>{line.packs > 0 && line.packsOpened > 0 ? "Open more packs..." : "Open..."}</button>
                     <button type="button" className="btn small" onClick={() => valueDialog(store, entry, line, changed)}>Set current value...</button>
@@ -498,6 +509,7 @@ function EntryPage({ id, list, onClose, onChanged }: { id: string; list: Purchas
                   <span className="sub">{sum((opening) => opening.cards)} cards from {opened} {line.packs > 0 ? (opened === 1 ? "pack" : "packs") : "opened"}, {money(opened ? sum((opening) => opening.valuePulled) / opened : 0, currency)} per pack</span>
                   <span className="openfigs">
                     <span>Cost <b>{money(sum((opening) => opening.packCost), currency)}</b></span>
+                    {packs.some((opening) => opening.ev !== null && opening.ev !== undefined) && <span title="Each pack's chance of each card times its price on the day it was opened">Expected value <b>{money(sum((opening) => opening.ev ?? 0), currency)}</b></span>}
                     <span>Value when pulled <b>{money(sum((opening) => opening.valueWhenPulled), currency)}</b></span>
                     <span>Pulled value <b>{money(sum((opening) => opening.valuePulled), currency)}</b></span>
                     <span>Value now <b>{money(sum((opening) => opening.valueNow), currency)}</b></span>
@@ -505,12 +517,18 @@ function EntryPage({ id, list, onClose, onChanged }: { id: string; list: Purchas
                   </span>
                 </div>
                 {packs.map((opening) => (
-                  <div key={opening.id} className={`wsrow packrow${opening.active ? " active" : ""}${opening.waiting ? " waiting" : ""}`}>
+                  <div key={opening.id} className={`wsrow packrow${opening.active ? " active" : ""}${opening.waiting ? " waiting" : ""}`}
+                    {...rowMenu(store, opening.name, () => [
+                      { label: "Change collection...", run: () => changeCollectionDialog(store, { id: opening.id, entryId: entry.id, name: opening.name }, changed) },
+                      !opening.waiting && { label: "Add existing copies...", run: () => tieCopiesDialog(store, opening.id, changed, opening.collectionId) },
+                    ])}>
                     <span className="openinghead"><b>{opening.name}</b>
+                      <span className="sub packcoll">Goes to {opening.collectionId ? store.collectionName(opening.collectionId) : "no collection"}</span>
                       <span className="sub">{opening.waiting ? "Waiting" : `${opening.cards} cards${opening.gone ? `, ${opening.gone} gone` : ""}`}{opening.packNumber === null ? `, ${money(opening.perPack, currency)} per pack` : ""}</span>
                       {!opening.waiting && (
                         <span className="openfigs">
                           <span title={line.packs > 0 ? "The product's full cost divided by its packs" : "The product's full cost for what was opened"}>{line.packs > 0 ? "Pack cost" : "Cost"} <b>{money(opening.packCost, currency)}</b></span>
+                          {opening.ev !== null && opening.ev !== undefined && <span title="Each pack's chance of each card times its price on the day it was opened. This figure does not change.">Expected value <b>{money(opening.ev, currency)}</b></span>}
                           <span title="Every pull at its price on the day it was added. This figure does not change.">Value when pulled <b>{money(opening.valueWhenPulled, currency)}</b></span>
                           <span title="Every pull at today's price, owned or not">Pulled value <b>{money(opening.valuePulled, currency)}</b></span>
                           <span title="The pulls you still have, at today's price">Value now <b>{money(opening.valueNow, currency)}</b></span>
@@ -524,6 +542,7 @@ function EntryPage({ id, list, onClose, onChanged }: { id: string; list: Purchas
                         <button type="button" className="btn small" onClick={() => goAdd(opening, false)}>Add cards</button>
                         <button type="button" className="btn small" onClick={() => goAdd(opening, true)}>Scan</button>
                         <button type="button" className="btn small" onClick={() => tieCopiesDialog(store, opening.id, changed, opening.collectionId)}>Add existing copies...</button>
+                        <button type="button" className="btn small" onClick={() => changeCollectionDialog(store, { id: opening.id, entryId: entry.id, name: opening.name }, changed)}>Change collection...</button>
                         {packs.some((other) => other.groupId && other.groupId === opening.groupId && other.waiting)
                           ? <button type="button" className="btn small primary" onClick={() => void goNextPack(store).then(changed)}>Next pack</button>
                           : <button type="button" className="btn small primary" onClick={() => void setOpening(opening.id, false)}>Done opening</button>}
@@ -531,6 +550,7 @@ function EntryPage({ id, list, onClose, onChanged }: { id: string; list: Purchas
                     ) : (
                       <span className="btnrow">
                         {!opening.waiting && <button type="button" className="btn small" onClick={() => tieCopiesDialog(store, opening.id, changed, opening.collectionId)}>Add existing copies...</button>}
+                        <button type="button" className="btn small" onClick={() => changeCollectionDialog(store, { id: opening.id, entryId: entry.id, name: opening.name }, changed)}>Change collection...</button>
                         <button type="button" className="btn small" onClick={() => void setOpening(opening.id, true)}>{opening.waiting ? "Start this pack" : "Continue opening"}</button>
                       </span>
                     )}
@@ -559,7 +579,7 @@ function EntryPage({ id, list, onClose, onChanged }: { id: string; list: Purchas
                 <tr key={tie.id} className={`${tie.held === 0 ? "gonerow" : ""}${tiePicks.picked.has(String(tie.id)) ? " picked" : ""}`}
                   onClick={(event) => { tiePicks.clickPicks(String(tie.id), event); }}>
                   <td className="pickcell">{tiePicks.box(String(tie.id), tie.name)}</td>
-                  <td><button type="button" className="lnk" onClick={() => store.setCardPage(tie.cardId)}>{tie.name}</button></td>
+                  <td><button type="button" className="lnk" onClick={() => store.setCardPage(tie.cardId)}>{tie.name}</button>{tie.warning && <span className="badge pullwarn" title={tie.warning}>{tie.warning}</span>}</td>
                   {entry.openings.length > 0 && <td>{packName(entry.openings.find((opening) => opening.id === tie.openingId))}</td>}
                   <td>{tie.foil ? <span className="badge foil">{tie.foil === 1 ? "FOIL" : "ETCHED"}</span> : <span className="sub">Regular</span>}</td>
                   <td className="nowrap"><SetIcon code={tie.setCode} />{tie.setCode.toUpperCase()} #{tie.collectorNumber}</td>
@@ -643,10 +663,11 @@ async function viewReceipt(store: Store, entryId: string, name: string) {
 export function PurchasesView({ actions: _actions }: { actions: Record<string, Action> }) {
   const store = useApp();
   const currency: Currency = "usd";
-  const [tab, setTab] = useState<"summary" | "history">("summary");
-  const [period, setPeriod] = useState<Period>("all");
+  // the part shown, the period and the open entry are kept while the tab is closed (0.21.0)
+  const [tab, setTab] = useKept<"summary" | "history">("purchases:tab", "summary");
+  const [period, setPeriod] = useKept<Period>("purchases:period", "all");
   const [list, setList] = useState<PurchaseList | null>(null);
-  const [open, setOpen] = useState<string | null>(null);
+  const [open, setOpen] = useKept<string | null>("purchases:open", null);
   const [error, setError] = useState("");
   const opening = useActiveOpening();
   const load = useCallback(async () => {
@@ -675,6 +696,10 @@ export function PurchasesView({ actions: _actions }: { actions: Record<string, A
   const undoCount = store.undoStack.length + store.redoStack.length;
   useEffect(() => { if (list) void load(); }, [undoCount]); // eslint-disable-line react-hooks/exhaustive-deps
   const saved = (entry: Entry) => { void load(); setOpen(entry.id); };
+  const missingEntry = useCallback(() => { setOpen(null); setTab("history"); }, [setOpen, setTab]);
+  // each part keeps its scroll position while the tab is closed (0.21.0)
+  const wrap = useRef<HTMLDivElement>(null);
+  useKeptScroll(`purchases:${open ?? tab}`, wrap, !!list);
   const kinds: Array<[EntryKind, string]> = [["purchase", "Purchase"], ["card_sale", "Card sale"], ["product_sale", "Product sale"], ["trade", "Trade"]];
   return (
     <div className="view" id="view-purchases">
@@ -689,15 +714,17 @@ export function PurchasesView({ actions: _actions }: { actions: Record<string, A
           onClick={() => void choiceDialog("New entry", "What do you want to record?", kinds).then((kind) => { if (list && kind) entryDialog(store, list, kind, null, saved); })}>New entry...</button>
         <button type="button" className="btn small" onClick={() => fromPricesDialog(store, () => void load())}>Make purchases from imported prices...</button>
         <button type="button" className="btn small" onClick={() => void pickReceipt().then((file) => { if (file) void purchaseFromReceipt(store, file, saved); })}>Read receipt...</button>
+        <button type="button" className="btn small" onClick={() => barcodeDialog(store, saved)}>Scan barcode...</button>
+        <button type="button" className="btn small" onClick={() => virtualPacksDialog(store)}>Open virtual packs...</button>
         <button type="button" className="btn small" onClick={() => placesDialog(store)}>Places...</button>
         <button type="button" className="btn small" onClick={() => void exportPurchases(store, "entries")}>Export...</button>
         {opening && <button type="button" className="badge opening openingchip" title="Cards added to its collection are tied to this opening. Click to open its purchase" onClick={() => setOpen(opening.entryId)}>Opening: {opening.name}{packLabel(opening) ? ` (${packLabel(opening)})` : ""}</button>}
         {opening?.hasNext && <button type="button" className="btn small" onClick={() => void goNextPack(store)}>Next pack</button>}
       </div>
-      <div className="list purchasewrap">
+      <div className="list purchasewrap" ref={wrap}>
         {error && <p className="note err">{error}</p>}
         {!list && !error && <p className="note">Loading the purchase history</p>}
-        {list && open && <EntryPage key={open} id={open} list={list} onClose={() => setOpen(null)} onChanged={() => void load()} />}
+        {list && open && <EntryPage key={open} id={open} list={list} onClose={() => setOpen(null)} onChanged={() => void load()} onMissing={missingEntry} />}
         {list && !open && tab === "summary" && (
           <>
             <div className="btnrow">

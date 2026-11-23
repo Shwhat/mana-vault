@@ -2,6 +2,7 @@
 import { localPicture } from "./pictures.js";
 import type { FastifyInstance } from "fastify";
 import type { DatabaseSync } from "node:sqlite";
+import { priceCols } from "./price-context.js";
 
 export type Fetcher = (url: string, init?: { signal?: AbortSignal }) => Promise<{ ok: boolean; status: number; headers: { get(name: string): string | null }; arrayBuffer(): Promise<ArrayBuffer> }>;
 
@@ -109,7 +110,7 @@ export function registerProxyRoutes(app: FastifyInstance, database: DatabaseSync
     // lines of cards no longer in the card database (a deleted custom card) are left out; each line carries its card's details
     const card = database.prepare(
       `SELECT id, oracle_id, name, mana_cost, type_line, set_code, set_name, collector_number, image_url, back_image_url, custom, tokens, color_identity, artist,
-              mana_value, rarity, colors, price_usd, price_usd_foil, price_usd_etched, price_eur, price_eur_foil, finishes,
+              mana_value, rarity, colors, ${priceCols("cards")}, finishes,
               (SELECT back_picture IS NOT NULL FROM custom_cards WHERE custom_cards.id = cards.id) AS custom_back
        FROM cards WHERE id = ?`,
     );

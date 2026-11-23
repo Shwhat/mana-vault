@@ -14,6 +14,7 @@ import { FinishBadge } from "../components/CardMarks";
 import { lineEach, sideTotal, type Trade, type TradeLine, type TradeMatch, type TradeSide } from "../trade-state";
 import { CONDITIONS, type CollectionEntry, FINISHES, money, priceOf } from "../types";
 import { Quantity, SearchOptions, Thumb } from "./Views";
+import { buylistOf } from "../types";
 
 const STATUS: Record<Trade["status"], string> = { open: "Open", done: "Done", cancelled: "Cancelled" };
 const FINISH_CHOICES: Choice[] = FINISHES.map(([value, label]) => ({ value: String(value), label }));
@@ -87,7 +88,8 @@ function LineRow({ trade, line, editable }: { trade: Trade; line: TradeLine; edi
           {editable && line.price !== null && <button type="button" className="lnk" onClick={() => change({ price: null })}>Use card price</button>}
         </div>
       </div>
-      <span className="price">{money((lineEach(line, currency) ?? 0) * line.quantity, currency)}</span>
+      <span className="price">{money((lineEach(line, currency) ?? 0) * line.quantity, currency)}
+        {(() => { const buy = buylistOf(line, line.foil); return buy === null ? null : <span className="sub buyline" title="The highest buylist price of any store">Buylist {money(buy * line.quantity, currency)}</span>; })()}</span>
       {editable && <button type="button" className="btn small icon-only" title={`Remove ${line.name}`} aria-label={`Remove ${line.name} from the trade`}
         onClick={() => change({ quantity: 0 })}><Icon name="del" /></button>}
     </div>
@@ -189,7 +191,8 @@ function Column({ side, trade, editable }: { side: TradeSide; trade: Trade | nul
   return (
     <section className="tradecol" aria-label={title}>
       <div className="tradehead"><b>{title}</b><span className="cnt">{lines.reduce((sum, line) => sum + line.quantity, 0)}</span>
-        <span className="tradesum">{money(sideTotal(trade, side, currency), currency)}</span></div>
+        <span className="tradesum">{money(sideTotal(trade, side, currency), currency)}</span>
+        <span className="sub buytotal" title="What stores pay for these cards: the highest buylist price of any store">Buylist {money(lines.reduce((sum, line) => sum + (buylistOf(line, line.foil) ?? 0) * line.quantity, 0), currency)}</span></div>
       <div className="tlines">
         {lines.length === 0 && <p className="note pad">No cards yet</p>}
         {trade && lines.map((line) => <LineRow key={`${line.side}:${line.cardId}:${line.foil}:${line.condition}:${line.language}:${line.collectionId ?? ""}`} trade={trade} line={line} editable={editable} />)}

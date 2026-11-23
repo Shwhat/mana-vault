@@ -83,11 +83,12 @@ test("the Custom sets tab makes a set with a main and a rare symbol, and the car
   await choose(page, page.locator("#sm-rarity"), "mythic");
   await expect(page.locator(".setmaker canvas.cardcanvas")).toHaveAttribute("aria-label", "Sample mythic rare card");
 
-  // the card maker's Custom sets... opens this tab on the card's set
+  // New card in this set opens the card maker; the Custom sets tab (0.21.0: no Custom sets... button there) keeps the set
   await page.locator(".setmaker .makerform").getByRole("button", { name: "New card in this set" }).click();
   await expect(page.getByRole("tab", { name: "Card maker" })).toHaveAttribute("aria-selected", "true");
   await expect(page.locator("#cm-set")).toContainText(`Rare Woods (${code})`);
-  await page.getByRole("button", { name: "Custom sets..." }).click();
+  await expect(page.getByRole("button", { name: "Custom sets...", exact: true })).toHaveCount(0);
+  await page.getByRole("tab", { name: "Custom sets" }).click();
   await expect(page.getByRole("tab", { name: "Custom sets" })).toHaveAttribute("aria-selected", "true");
   await expect(page.locator("#sm-name")).toHaveValue("Rare Woods");
 

@@ -53,6 +53,14 @@ Only a true double click opens (at the computer's double-click speed); a slow se
 
 **Add as foil** decides the finish the printing chooser starts on: foil when it is on and the printing is made in foil. It is off by default and kept for your account. Switch it with **F** or FOIL in the status bar.
 
+### Add precon to collection...
+
+**Add precon to collection...** in the File menu lists every preconstructed deck MTGJSON knows (name, set, release date, deck type) with a find box. After a precon is chosen, **Add to** picks the collection (or New collection..., named after the precon), and **Add cards** adds every card of its commander, main board and side board as Near Mint English copies in the printing and finish the decklist names, as one undo step. A decklist is downloaded the first time it is used and kept. When it cannot be downloaded, nothing is added and the message says so.
+
+### New collection...
+
+Every list that chooses where cards go to (Add deck to collection, Move, imports, the scanner, single cards in a purchase, Open..., Change collection..., cards you get in a trade, proxy copies and Add precon to collection...) ends with **New collection...**. Choosing it asks for a name, filled in where there is one to suggest (the product, precon or deck); **Create** makes an ordinary collection of yours and picks it, with every other choice kept, and **Cancel** keeps the collection chosen before.
+
 ## Collection entries
 
 Each entry (row) is one printing in one finish, condition and language, real or a proxy. A printing can have several rows in the same collection, for example a regular near mint English row, a foil played Japanese row and a proxy row.

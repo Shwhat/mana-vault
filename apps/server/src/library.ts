@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import type { FastifyInstance, FastifyReply } from "fastify";
 import type { DatabaseSync } from "node:sqlite";
 import { listSets, type SetDetails, setDetails } from "./sets.js";
-import { type CopyExtras, type CopyKey, type Currency, NO_EXTRAS, PRICE_COLUMNS, priceSql, readCopyExtras, readCopyKey } from "./copies.js";
+import { type CopyExtras, type CopyKey, type Currency, NO_EXTRAS, priceColumnList, priceSql, readCopyExtras, readCopyKey } from "./copies.js";
 import { alignDeckCard, collectionLinks, dropLinks, linkedCount, moveLinks, relinkRemoved, rowKey, trimLinks } from "./links.js";
 import { finishOffered, readDeckFinish } from "./decks.js";
 
@@ -266,8 +266,9 @@ export function createCollection(database: DatabaseSync, ownerId: number, input:
   return id;
 }
 
-export const ENTRY_COLUMNS = `c.id, c.oracle_id, c.name, c.mana_cost, c.mana_value, c.type_line, c.set_code, c.set_name, c.collector_number, c.rarity,
-  c.image_url, c.colors, c.color_identity, c.artist, c.legalities, c.custom, c.promo_types, c.removed, ${PRICE_COLUMNS}, i.quantity, i.foil, i.condition, i.language, i.proxy, i.trade,
+/** The columns of a collection entry; prices from the main price source of the request (0.21.0). */
+export const entryColumns = () => `c.id, c.oracle_id, c.name, c.mana_cost, c.mana_value, c.type_line, c.set_code, c.set_name, c.collector_number, c.rarity,
+  c.image_url, c.colors, c.color_identity, c.artist, c.legalities, c.custom, c.promo_types, c.removed, ${priceColumnList()}, i.quantity, i.foil, i.condition, i.language, i.proxy, i.trade,
   i.purchase_price, i.price_currency, i.added_at, i.misprint, i.altered, i.signed`;
 const KEY_WHERE = "card_id = ? AND foil = ? AND condition = ? AND language = ? AND proxy = ?";
 const KEY_CONFLICT = "ON CONFLICT(collection_id, card_id, foil, condition, language, proxy)";
@@ -484,7 +485,7 @@ export function registerLibraryRoutes(app: FastifyInstance, database: DatabaseSy
   const entriesOf = (collectionId: string, where = "", values: unknown[] = []) => {
     const links = collectionLinks(database, collectionId);
     return database.prepare(
-      `SELECT ${ENTRY_COLUMNS} FROM collection_cards i JOIN cards c ON c.id = i.card_id
+      `SELECT ${entryColumns()} FROM collection_cards i JOIN cards c ON c.id = i.card_id
        WHERE i.collection_id = ? ${where} ORDER BY c.name, c.set_code, c.collector_number, i.proxy`,
     ).all(collectionId, ...(values as Array<string | number>)).map((row) => {
       const entry = toEntry(row);

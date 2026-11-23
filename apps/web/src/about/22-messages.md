@@ -186,6 +186,27 @@ Messages appear at the right end of the status bar (on the phone, in a banner ab
 | Could not copy to the clipboard | The browser refused clipboard access | Allow clipboard access for the site, or use a secure (HTTPS) address |
 | Could not action. | The action failed and the server gave no reason, often because the server could not be reached | Check the connection and try again |
 
+### MTGJSON, precons, barcodes and packs (0.21.0)
+
+| Message | Cause | What to do |
+|---|---|---|
+| An MTGJSON update is already running | Update MTGJSON data now, Update prices now or Download price history while another runs | Wait for it to finish |
+| The decklist could not be downloaded | Add precon as deck..., Add precon to collection... or Found in without a connection to MTGJSON | Try again when the server can reach MTGJSON |
+| That precon is not in the deck list | The precon was removed from MTGJSON's deck list | Choose another |
+| No product has that barcode. Its code is kept in the note. | Scan barcode... with a code MTGJSON does not list | Fill in the line by hand |
+| A barcode has 8 to 14 digits | Scan barcode... with too few digits | Type the whole code |
+| That set has no contents for this booster | Open virtual packs... for a booster without contents | Choose another booster |
+| Open 1 to 36 packs at a time | A request for more packs | Open fewer |
+| Choose one of your collections | Change collection... with a collection that is not yours | Choose another |
+| Choose what happens to the cards already pulled | Change without choosing Move them or Leave them | Choose one |
+| Enter a name for the new collection | New collection... with an empty name | Type a name |
+| can: takes commander, oathbreaker or brawl | `can:` with another word | Use one of the three |
+| Write store: as a store and a price, such as store:cardkingdom<5 | `store:` without a known store or a price | Fix the filter |
+| in: needs a connection to the server | `in:` on a phone without a connection | Search again with a connection |
+| name cannot lead a Format deck | A commander MTGJSON says cannot lead the format | Choose another commander |
+| Not found in Play booster, Foundations | A pulled card its pack cannot hold | Check the card, or Move to pack... / Remove from pack... |
+| This picture has no transparent background, so it keeps its own colors. | A JPEG or opaque main symbol with Rarity colors on | Use an SVG, or a PNG or WebP with a transparent background |
+
 ## Problems reported by the server
 
 | Message | Cause |

@@ -2,12 +2,13 @@
 // for the set and for each rarity, a sample card and the set's cards; and the right-click menu of a set ----------
 import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchFile, pickFile, request } from "../api";
-import { blankFace, HEIGHT, loadPicture, renderCard, SCALE, WIDTH } from "../card-render";
+import { blankFace, hasTransparency, HEIGHT, loadPicture, renderCard, SCALE, WIDTH } from "../card-render";
 import { loadCardFonts } from "../card-fonts";
 import { type Store, useApp } from "../store";
 import { rowMenu } from "./ContextMenu";
 import { confirmDialog } from "./Dialog";
 import { choices, type Choice, Picker } from "./Picker";
+import { redrawSetCards } from "./CardMaker";
 
 export const RARITIES = ["common", "uncommon", "rare", "mythic", "special"] as const;
 export type Rarity = (typeof RARITIES)[number];
@@ -17,6 +18,8 @@ const RARITY_CHOICES: Choice[] = choices(RARITIES.map((rarity) => [rarity, RARIT
 export type CustomSet = {
   code: string; name: string; releasedAt: string | null; ownerId: number | null; ownerName: string; hasSymbol: boolean; cardCount: number;
   symbolUrl: string | null; symbolType: string | null; rarityColors: boolean;
+  /** The common symbol in white with a dark outline, when Rarity colors is on (0.21.0). */
+  commonWhite?: boolean;
   /** The symbols of single rarities, used instead of the main symbol on cards of that rarity. */
   rarities: Partial<Record<Rarity, { url: string; type: string }>>;
 };
@@ -31,11 +34,15 @@ export const blobToData = (blob: Blob): Promise<string> => new Promise((resolve,
 });
 
 /** The symbol a card of a rarity uses: the rarity's own, or the set's main symbol (tinted by rarity when the set says so). */
-export function symbolFor(set: CustomSet | null, rarity: string): { url: string | null; tint: boolean } {
+export function symbolFor(set: CustomSet | null, rarity: string): { url: string | null; tint: boolean; commonWhite: boolean } {
   const own = set?.rarities[rarity as Rarity];
-  if (own) return { url: own.url, tint: false };
-  return { url: set?.symbolUrl ?? null, tint: !!set?.rarityColors && set.symbolType === "image/svg+xml" };
+  if (own) return { url: own.url, tint: false, commonWhite: false };
+  // SVG, PNG and WebP symbols (0.21.0); a picture with no transparent background keeps its colors when drawn
+  return { url: set?.symbolUrl ?? null, tint: !!set?.rarityColors && TINTABLE.has(set.symbolType ?? ""), commonWhite: !!set?.commonWhite };
 }
+
+/** Symbol pictures that can be drawn in rarity colors (0.21.0). */
+export const TINTABLE = new Set(["image/svg+xml", "image/png", "image/webp"]);
 
 // ---------- the tab is opened from other places on a chosen set ----------
 let askedSet: string | null = null;
@@ -96,8 +103,9 @@ async function uploadSymbol(store: Store): Promise<string | null> {
 const symbolBody = (choice: SymbolChoice): Record<string, unknown> =>
   !choice ? {} : "data" in choice ? { symbol: choice.data } : "from" in choice ? { symbolFrom: choice.from } : { symbol: "" };
 const choiceUrl = (choice: SymbolChoice, saved: string | null) => (!choice ? saved : "data" in choice ? choice.data : "from" in choice ? choice.url : null);
-const choiceSvg = (choice: SymbolChoice, savedType: string | null) =>
-  !choice ? savedType === "image/svg+xml" : "data" in choice ? choice.data.startsWith("data:image/svg+xml") : "from" in choice;
+/** Whether the main symbol can be drawn in rarity colors: SVG, PNG or WebP (0.21.0); Scryfall symbols are SVG. */
+const choiceTintable = (choice: SymbolChoice, savedType: string | null) =>
+  !choice ? TINTABLE.has(savedType ?? "") : "data" in choice ? /^data:image\/(svg\+xml|png|webp)/.test(choice.data) : "from" in choice;
 
 /** Chooses the symbol of a Scryfall set, from the symbols the card database update saved. */
 function ScryfallSymbols({ onPick }: { onPick: (set: ScryfallSet) => void }) {
@@ -150,9 +158,9 @@ function SymbolRow({ store, label, saved, choice, setChoice, fallback, disabled 
 
 // ---------- the tab ----------
 
-type SetDraft = { code: string; name: string; date: string; rarityColors: boolean; main: SymbolChoice; rarities: Partial<Record<Rarity, SymbolChoice>> };
-const blankDraft = (): SetDraft => ({ code: "", name: "", date: new Date().toISOString().slice(0, 10), rarityColors: true, main: null, rarities: {} });
-const draftOf = (set: CustomSet): SetDraft => ({ code: set.code.toUpperCase(), name: set.name, date: set.releasedAt ?? "", rarityColors: set.rarityColors, main: null, rarities: {} });
+type SetDraft = { code: string; name: string; date: string; rarityColors: boolean; commonWhite: boolean; main: SymbolChoice; rarities: Partial<Record<Rarity, SymbolChoice>> };
+const blankDraft = (): SetDraft => ({ code: "", name: "", date: new Date().toISOString().slice(0, 10), rarityColors: true, commonWhite: false, main: null, rarities: {} });
+const draftOf = (set: CustomSet): SetDraft => ({ code: set.code.toUpperCase(), name: set.name, date: set.releasedAt ?? "", rarityColors: set.rarityColors, commonWhite: !!set.commonWhite, main: null, rarities: {} });
 
 let lastChosen: string | null = null;
 
@@ -230,13 +238,23 @@ export function SetMaker() {
 
   // what each rarity shows now, with the changes not saved yet
   const mainUrl = choiceUrl(draft.main, set?.symbolUrl ?? null);
-  const mainSvg = choiceSvg(draft.main, set?.symbolType ?? null);
+  const mainTintable = choiceTintable(draft.main, set?.symbolType ?? null);
   const rarityUrl = (which: Rarity) => choiceUrl(draft.rarities[which] ?? null, set?.rarities[which]?.url ?? null);
 
   // the sample card, drawn again after every change
   const [picture, setPicture] = useState<{ url: string | null; image: HTMLImageElement | null }>({ url: null, image: null });
   const previewUrl = rarityUrl(rarity) ?? mainUrl;
-  const tint = !rarityUrl(rarity) && draft.rarityColors && mainSvg;
+  const tint = !rarityUrl(rarity) && draft.rarityColors && mainTintable;
+  // a main picture with no transparent background keeps its own colors (0.21.0)
+  const [mainOpaque, setMainOpaque] = useState(false);
+  useEffect(() => {
+    let active = true;
+    setMainOpaque(false);
+    if (!mainUrl) return;
+    const source = mainUrl.startsWith("data:") ? Promise.resolve(mainUrl) : fetchFile(mainUrl).then((response) => (response.ok ? response.blob() : null));
+    void source.then((data) => (data ? loadPicture(data) : null)).then((image) => { if (active && image) setMainOpaque(!hasTransparency(image)); }).catch(() => undefined);
+    return () => { active = false; };
+  }, [mainUrl]);
   useEffect(() => {
     let active = true;
     if (!previewUrl) { setPicture({ url: null, image: null }); return; }
@@ -250,7 +268,7 @@ export function SetMaker() {
       if (!canvas.current) return;
       const face = { ...blankFace(), name: draft.name ? `${draft.name} sample` : "Sample card", typeLine: "Creature", rulesText: `A ${RARITY_NAMES[rarity].toLowerCase()} card of this set.`, power: "2", toughness: "2" };
       renderCard(canvas.current, face, { rarity, artist: "", setCode: draft.code || "XXX", collectorNumber: "1", back: false, face: "front" },
-        { art: null, splitArt: null, setSymbol: picture.url === previewUrl ? picture.image : null, symbols: new Map(), setSymbolTint: tint });
+        { art: null, splitArt: null, setSymbol: picture.url === previewUrl ? picture.image : null, symbols: new Map(), setSymbolTint: tint, commonWhite: draft.commonWhite });
     });
     return () => window.cancelAnimationFrame(frame);
   });
@@ -266,7 +284,7 @@ export function SetMaker() {
         const create = { code, name: draft.name, releasedAt: draft.date, ...symbolBody(draft.main) };
         const finish = async () => {
           await request("/api/custom/sets", { method: "POST", body: JSON.stringify(create) });
-          await request(`/api/custom/sets/${encodeURIComponent(code)}`, { method: "PATCH", body: JSON.stringify({ rarityColors: draft.rarityColors, ...(hasRarities ? { rarities: rarityBody } : {}) }) });
+          await request(`/api/custom/sets/${encodeURIComponent(code)}`, { method: "PATCH", body: JSON.stringify({ rarityColors: draft.rarityColors, commonWhite: draft.commonWhite, ...(hasRarities ? { rarities: rarityBody } : {}) }) });
         };
         await finish();
         store.pushUndo({
@@ -277,12 +295,12 @@ export function SetMaker() {
         store.flash(`Custom set ${code.toUpperCase()} created`);
       } else {
         // what the set was, so the change can be undone
-        const before: Record<string, unknown> = { name: set.name, code: set.code, rarityColors: set.rarityColors, ...(set.releasedAt ? { releasedAt: set.releasedAt } : {}) };
+        const before: Record<string, unknown> = { name: set.name, code: set.code, rarityColors: set.rarityColors, commonWhite: !!set.commonWhite, ...(set.releasedAt ? { releasedAt: set.releasedAt } : {}) };
         if (draft.main) before.symbol = await savedData(set.symbolUrl);
         if (hasRarities) {
           before.rarities = Object.fromEntries(await Promise.all(Object.keys(rarityBody).map(async (which) => [which, { symbol: await savedData(set.rarities[which as Rarity]?.url) }] as const)));
         }
-        const body: Record<string, unknown> = { name: draft.name, code, releasedAt: draft.date || undefined, rarityColors: draft.rarityColors, ...symbolBody(draft.main), ...(hasRarities ? { rarities: rarityBody } : {}) };
+        const body: Record<string, unknown> = { name: draft.name, code, releasedAt: draft.date || undefined, rarityColors: draft.rarityColors, commonWhite: draft.commonWhite, ...symbolBody(draft.main), ...(hasRarities ? { rarities: rarityBody } : {}) };
         const saved = await request<CustomSet>(`/api/custom/sets/${encodeURIComponent(set.code)}`, { method: "PATCH", body: JSON.stringify(body) });
         store.pushUndo({
           label: `Edit set ${set.name}`,
@@ -290,6 +308,11 @@ export function SetMaker() {
           redo: async () => { await request(`/api/custom/sets/${encodeURIComponent(set.code)}`, { method: "PATCH", body: JSON.stringify({ ...body, code: saved.code }) }); await reloadOn(saved.code); },
         });
         store.flash(`${saved.name} (${saved.code.toUpperCase()}) saved`);
+        // the saved pictures of the set's cards are drawn again with the new symbol colors (0.21.0)
+        if ((set.rarityColors !== draft.rarityColors || !!set.commonWhite !== draft.commonWhite || draft.main) && set.cardCount > 0) {
+          const count = await redrawSetCards(store, saved.code);
+          if (count) store.flash(`${saved.name} saved; ${count} ${count === 1 ? "card picture" : "card pictures"} drawn again`);
+        }
       }
       await reloadOn(code);
     } catch (reason) {
@@ -368,10 +391,16 @@ export function SetMaker() {
         {set && draft.code.toLowerCase() !== set.code && set.cardCount > 0 && <p className="note">The {set.cardCount} {set.cardCount === 1 ? "card" : "cards"} of the set move to the new code.</p>}
         <div className="prow"><label htmlFor="sm-date">Release date</label>
           <input id="sm-date" type="date" value={draft.date} disabled={!mine} onChange={(event) => change({ date: event.target.value })} /></div>
-        <label className="ck"><input type="checkbox" checked={draft.rarityColors} disabled={!mine} onChange={(event) => change({ rarityColors: event.target.checked })} /> Rarity colors (a one-color SVG main symbol)</label>
+        <label className="ck"><input type="checkbox" checked={draft.rarityColors} disabled={!mine} onChange={(event) => change({ rarityColors: event.target.checked })} /> Rarity colors (a one-color SVG, PNG or WebP main symbol)</label>
+        {draft.rarityColors && (
+          <div className="prow"><label htmlFor="sm-common">Common symbol</label>
+            <Picker id="sm-common" label="Common symbol" value={draft.commonWhite ? "white" : "black"} options={choices([["black", "Black"], ["white", "White"]])} disabled={!mine}
+              onChange={(value) => change({ commonWhite: value === "white" })} /></div>
+        )}
+        {draft.rarityColors && mainUrl && mainOpaque && <p className="note">This picture has no transparent background, so it keeps its own colors.</p>}
 
         <h4>Symbols</h4>
-        <SymbolRow store={store} label="Main" saved={set?.symbolUrl ?? null} choice={draft.main} setChoice={(main) => change({ main })} fallback="No symbol" disabled={!mine} />
+        <SymbolRow store={store} label="Main" saved={set?.symbolUrl ?? null} choice={draft.main} setChoice={(main) => change({ main, ...(main ? { rarityColors: true } : {}) })} fallback="No symbol" disabled={!mine} />
         {RARITIES.map((which) => (
           <SymbolRow key={which} store={store} label={RARITY_NAMES[which]} saved={set?.rarities[which]?.url ?? null} choice={draft.rarities[which] ?? null}
             setChoice={(choice) => changeRarity(which, choice)} fallback="Uses the main symbol" disabled={!mine} />

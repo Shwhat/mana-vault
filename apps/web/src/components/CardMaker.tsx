@@ -83,6 +83,52 @@ function pictureData(face: FaceDesign, info: Parameters<typeof renderCard>[2], a
   return canvas.toDataURL("image/jpeg", 0.9);
 }
 
+/**
+ * Draws the saved pictures of a custom set's cards again (0.21.0), after the set's symbol colors change. Only cards
+ * the account made are saved again. Returns how many were drawn.
+ */
+export async function redrawSetCards(store: Store, code: string): Promise<number> {
+  const [cards, sets] = await Promise.all([request<CustomCardSummary[]>("/api/custom/cards"), request<CustomSet[]>("/api/custom/sets")]);
+  const set = sets.find((item) => item.code === code) ?? null;
+  await loadCardFonts();
+  let drawn = 0;
+  for (const summary of cards.filter((card) => card.setCode === code && card.ownerId === store.user.id)) {
+    try {
+      const detail = await request<CustomCardDetail>(`/api/custom/cards/${encodeURIComponent(summary.id)}`);
+      const design = detail.design ?? {};
+      const draft: Draft = {
+        ...newDraft(code), ...design, setCode: code, collectorNumber: summary.collectorNumber,
+        front: { ...blankFace(), ...(design.front ?? {}) }, back: design.back ? { ...blankFace(), ...design.back } : null,
+      };
+      const pictureOf = async (url: string | null) => {
+        if (!url) return null;
+        const response = await fetchFile(url);
+        return response.ok ? loadPicture(await response.blob()) : null;
+      };
+      const [front, back] = await Promise.all([pictureOf(detail.artUrl), pictureOf(detail.backArtUrl)]);
+      const symbol = symbolFor(set, draft.rarity);
+      const setSymbol = symbol.url ? await setSymbolPicture(symbol.url) : null;
+      const codes = [...new Set([draft.front, draft.back].flatMap((face) => (face ? [...symbolsIn(face.manaCost), ...symbolsIn(face.rulesText)] : [])))];
+      const symbols = new Map<string, HTMLImageElement | null>(await Promise.all(codes.map(async (item) => [symbolFile(item), await symbolPicture(item)] as [string, HTMLImageElement | null])));
+      const assets = (which: "front" | "back"): Assets => ({ art: which === "front" ? front : back, splitArt: back, setSymbol, symbols, setSymbolTint: symbol.tint, commonWhite: symbol.commonWhite });
+      const info = (which: "front" | "back") => ({ rarity: draft.rarity, artist: draft.artist, setCode: code, collectorNumber: draft.collectorNumber, back: !!draft.back, face: which });
+      await request(`/api/custom/cards/${encodeURIComponent(summary.id)}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          card: cardData(draft), design: draft, picture: pictureData(draft.front, info("front"), assets("front")),
+          backPicture: draft.back ? pictureData(draft.back, info("back"), assets("back")) : null,
+        }),
+      });
+      forgetCardPicture(summary.id);
+      drawn += 1;
+    } catch {
+      // a card that cannot be drawn keeps its picture
+    }
+  }
+  if (drawn) refreshCardSearches();
+  return drawn;
+}
+
 /** Chooses the art of any card in the card database. */
 function ArtSearch({ onPick }: { onPick: (card: Card) => void }) {
   const [term, setTerm] = useState("");
@@ -240,7 +286,7 @@ export function CardMaker() {
 
   const info = (which: "front" | "back") => ({ rarity: draft.rarity, artist: draft.artist, setCode: draft.setCode || "XXX", collectorNumber: draft.collectorNumber, back: !!draft.back, face: which });
   const assets = (which: "front" | "back"): Assets => ({
-    art: arts[which].image, splitArt: arts.back.image, setSymbol, symbols, setSymbolTint: symbol.tint,
+    art: arts[which].image, splitArt: arts.back.image, setSymbol, symbols, setSymbolTint: symbol.tint, commonWhite: symbol.commonWhite,
   });
 
   // the preview is drawn again after every change
@@ -500,7 +546,6 @@ export function CardMaker() {
           <input className="search" value={term} onChange={(event) => setTerm(event.target.value)} placeholder="Find a custom card" aria-label="Find a custom card" />
           <button type="button" className="btn small" onClick={() => void startNew()}>New card</button>
         </div>
-        <div className="navbar"><button type="button" className="btn small grow" onClick={() => openSets()}>Custom sets...</button></div>
         {cards === null && <p className="note pad">Loading custom cards</p>}
         {cards?.length === 0 && <p className="note pad">No custom cards yet</p>}
         {/* cards under their custom set; right-click (or long press) a set for its commands */}

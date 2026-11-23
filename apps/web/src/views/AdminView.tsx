@@ -425,6 +425,61 @@ function DatabaseParts() {
   );
 }
 
+type MtgjsonStatus = { parts: Array<Part & { bytes: number | null; result: string }>; unmatched: number; history: "downloaded" | "skipped" | "ask"; running: string | null };
+
+/**
+ * MTGJSON (0.21.0): each part with its count, size on disk, date and the result of its last run; Update MTGJSON data now
+ * and Update prices now; and the one-time question about the 90-day price history, with its download size.
+ */
+function MtgjsonParts() {
+  const store = useApp();
+  const [status, setStatus] = useState<MtgjsonStatus | null>(null);
+  const [size, setSize] = useState<number | null | undefined>(undefined);
+  const load = useCallback(() => { void request<MtgjsonStatus>("/api/admin/mtgjson").then(setStatus).catch(() => setStatus(null)); }, []);
+  useEffect(() => { load(); }, [load]);
+  // while an update runs, the parts are read again every few seconds
+  useEffect(() => {
+    if (!status?.running) return;
+    const timer = window.setInterval(load, 4000);
+    return () => window.clearInterval(timer);
+  }, [status?.running, load]);
+  useEffect(() => {
+    if (status?.history !== "ask" || size !== undefined) return;
+    void request<{ bytes: number | null }>("/api/admin/mtgjson/history-size").then((value) => setSize(value.bytes)).catch(() => setSize(null));
+  }, [status?.history, size]);
+  if (!status) return null;
+  const run = (what: "data" | "prices" | "history") => void request("/api/admin/mtgjson/update", { method: "POST", body: JSON.stringify({ what }) })
+    .then(() => { store.flash(what === "history" ? "Downloading the 90-day price history" : what === "prices" ? "Updating today's prices" : "Updating the MTGJSON data"); load(); })
+    .catch((reason: unknown) => store.fail(reason, "Could not start the update."));
+  return (
+    <Section title="MTGJSON">
+      <table className="admtable"><thead><tr><th>Part</th><th>Count</th><th>Size</th><th>Updated</th><th>Last run</th></tr></thead><tbody>
+        {status.parts.map((part) => (
+          <tr key={part.part}><td>{part.part}</td><td>{part.count.toLocaleString()}</td><td>{part.bytes === null ? "" : bytes(part.bytes)}</td><td>{when(part.at)}</td>
+            <td className={part.result === "Failed" ? "err" : part.result === "Kept previous copy" ? "warn" : ""}>{part.result || "Not run yet"}</td></tr>
+        ))}
+      </tbody></table>
+      {status.unmatched > 0 && <p className="note">{status.unmatched.toLocaleString()} MTGJSON printings match no card in the database. Their records are kept.</p>}
+      <div className="btnrow">
+        <button type="button" className="btn small" disabled={!!status.running} onClick={() => run("data")}>Update MTGJSON data now</button>
+        <button type="button" className="btn small" disabled={!!status.running} onClick={() => run("prices")}>Update prices now</button>
+        {status.running && <span className="sub" role="status">Running: {status.running === "data" ? "MTGJSON data" : status.running === "prices" ? "today's prices" : "price history"}</span>}
+      </div>
+      {status.history === "ask" && (
+        <div className="admbox">
+          <p><b>90-day price history.</b> Every store's prices for the last 90 days, so the price charts start with history. The download is {size ? bytes(size) : size === null ? "of unknown size" : "being measured"}.</p>
+          <div className="btnrow">
+            <button type="button" className="btn small primary" disabled={!!status.running} onClick={() => run("history")}>Download price history</button>
+            <button type="button" className="btn small" onClick={() => void request("/api/admin/mtgjson/history/skip", { method: "POST" }).then(load)}>Skip</button>
+          </div>
+          <p className="note">Skipping keeps each day's prices from now on.</p>
+        </div>
+      )}
+      {status.history !== "ask" && <p className="note">90-day price history: {status.history === "downloaded" ? "downloaded" : "skipped"}. <button type="button" className="lnk" disabled={!!status.running} onClick={() => run("history")}>Download it now</button></p>}
+    </Section>
+  );
+}
+
 /** Card languages: English and unofficial languages, all languages, or chosen ones, with the size shown before saving. */
 function CardLanguages({ overview, save }: TabProps) {
   const settings = overview.settings;

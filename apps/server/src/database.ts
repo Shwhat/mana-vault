@@ -1,4 +1,5 @@
 import { mkdirSync } from "node:fs";
+import { initializeMtgjson } from "./mtgjson.js";
 import { dirname } from "node:path";
 import { randomUUID } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
@@ -34,6 +35,7 @@ export function openDatabase(path = process.env.DATABASE_PATH ?? "data/mana-vaul
 export function initializeDatabase(database: DatabaseSync): void {
   database.exec(`
     PRAGMA foreign_keys = ON;
+    PRAGMA busy_timeout = 10000;
     CREATE TABLE IF NOT EXISTS cards (
       id TEXT PRIMARY KEY,
       oracle_id TEXT NOT NULL,
@@ -110,6 +112,8 @@ export function initializeDatabase(database: DatabaseSync): void {
   `);
   initializeAuthTables(database);
   initializeLibrary(database);
+  // MTGJSON data (0.21.0): store prices, card details, boosters
+  initializeMtgjson(database);
 }
 
 /** Collections, set data, ownership and sharing (0.2.0). Also moves pre-0.2.0 data into the new tables. */
@@ -535,6 +539,8 @@ function initializeExtras(database: DatabaseSync): void {
   // a printing Scryfall deleted keeps its row, marked, so copies of it keep their name (0.15.0)
   if (!columnsOf("cards").has("removed")) database.exec("ALTER TABLE cards ADD COLUMN removed INTEGER NOT NULL DEFAULT 0");
   if (!columnsOf("custom_sets").has("rarity_colors")) database.exec("ALTER TABLE custom_sets ADD COLUMN rarity_colors INTEGER NOT NULL DEFAULT 1");
+  // a white common symbol for sets where black would not stand out (0.21.0)
+  if (!columnsOf("custom_sets").has("common_white")) database.exec("ALTER TABLE custom_sets ADD COLUMN common_white INTEGER NOT NULL DEFAULT 0");
   // 0.20.0: a set symbol for each rarity, used instead of the main symbol on cards of that rarity
   database.exec(`
     CREATE TABLE IF NOT EXISTS custom_set_symbols (

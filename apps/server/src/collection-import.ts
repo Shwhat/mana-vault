@@ -70,6 +70,11 @@ const COLUMNS = {
   language: ["language", "lang"],
   trade: ["tradelist count", "trade count", "trade"],
   scryfall: ["scryfall id", "scryfall_id", "scryfallid"],
+  // store ids (0.21.0), matched through MTGJSON before names and set codes
+  sku: ["sku id", "sku", "tcgplayer sku", "tcgplayer sku id", "skuid"],
+  tcgplayer: ["tcgplayer product id", "tcgplayer id", "product id", "tcgplayer_id", "productid"],
+  cardkingdom: ["card kingdom id", "cardkingdom id", "ck id", "cardkingdom_id"],
+  cardsphere: ["cardsphere id", "cardsphere_id", "cs id"],
   price: ["purchase price", "price paid"],
   currency: ["purchase price currency", "purchase currency"],
   added: ["added", "date added"],
@@ -81,7 +86,7 @@ const COLUMNS = {
 
 type Parsed = {
   sourceRow: number; name: string; quantity: string; set: string; setCode: string; number: string; finish: string; condition: string;
-  language: string; trade: string; scryfall: string; price: string; currency: string; added: string; proxy: string; misprint: string;
+  language: string; trade: string; scryfall: string; sku?: string; tcgplayer?: string; cardkingdom?: string; cardsphere?: string; price: string; currency: string; added: string; proxy: string; misprint: string;
   altered: string; signed: string;
 };
 
@@ -110,6 +115,7 @@ function readCsvRows(text: string, format: ImportFormat): Parsed[] {
     return {
       sourceRow: index + 2, name: cell("name"), quantity: cell("quantity"), set: cell("set"), setCode: cell("setCode"), number: cell("number"),
       finish: cell("finish"), condition: cell("condition"), language: cell("language"), trade: cell("trade"), scryfall: cell("scryfall"),
+      sku: cell("sku"), tcgplayer: cell("tcgplayer"), cardkingdom: cell("cardkingdom"), cardsphere: cell("cardsphere"),
       price: cell("price"), currency: cell("currency"), added: cell("added"), proxy: cell("proxy"), misprint: cell("misprint"),
       altered: cell("altered"), signed: cell("signed"),
     };
@@ -175,6 +181,9 @@ export function importCollectionCsv(database: DatabaseSync, text: string, commit
      LIMIT 1`,
   );
   const byId = database.prepare("SELECT id FROM cards WHERE id = ?");
+  // a store's own id finds the exact printing (and its finish); a TCGplayer SKU also its condition and language (0.21.0)
+  const byStore = database.prepare("SELECT card_id AS id, finish FROM mtgjson_ids WHERE store = ? AND ext_id = ?");
+  const bySku = database.prepare("SELECT card_id AS id, finish, condition, language FROM mtgjson_skus WHERE sku_id = ?");
   const unmatched: CollectionImportResult["unmatched"] = [];
   const additions = new Map<string, Addition>();
   let matchedRows = 0;
@@ -182,7 +191,10 @@ export function importCollectionCsv(database: DatabaseSync, text: string, commit
 
   for (const row of rows) {
     const skip = (reason: string) => unmatched.push({ row: row.sourceRow, name: row.name, reason });
-    if (!row.name && !row.scryfall) {
+    const sku = row.sku ? bySku.get(row.sku.replace(/\D/g, "")) : undefined;
+    const stored = sku ?? [["tcgplayer", row.tcgplayer], ["cardkingdom", row.cardkingdom], ["cardsphere", row.cardsphere]]
+      .map(([store, id]) => (id ? byStore.get(String(store), String(id).trim()) : undefined)).find(Boolean);
+    if (!row.name && !row.scryfall && !stored) {
       skip("Card name is empty");
       continue;
     }
@@ -191,17 +203,18 @@ export function importCollectionCsv(database: DatabaseSync, text: string, commit
       skip("Quantity must be a whole number from 1 to 10,000");
       continue;
     }
-    const foil = readFinishCell(row.finish, row.condition);
+    const listed = readFinishCell(row.finish, row.condition);
+    const foil = stored && stored.finish !== null && stored.finish !== undefined && (!row.finish || sku) ? Number(stored.finish) as typeof listed : listed;
     if (foil === null) {
       skip(`Unrecognized finish "${row.finish}"`);
       continue;
     }
-    const condition = readCondition(row.condition.replace(/\s+foil$/i, ""));
+    const condition = sku && !row.condition ? readCondition(String(sku.condition)) : readCondition(row.condition.replace(/\s+foil$/i, ""));
     if (!condition) {
       skip(`Unrecognized condition "${row.condition}"`);
       continue;
     }
-    const language = readLanguage(row.language);
+    const language = sku && !row.language ? readLanguage(String(sku.language)) : readLanguage(row.language);
     if (!language) {
       skip(`Unrecognized language "${row.language}"`);
       continue;
@@ -213,7 +226,8 @@ export function importCollectionCsv(database: DatabaseSync, text: string, commit
     }
     const set = row.setCode || row.set;
     const named = set === row.set ? "" : row.set;
-    const printing = (row.scryfall ? byId.get(row.scryfall.toLowerCase()) : undefined)
+    const printing = (stored ? { id: stored.id } : undefined)
+      ?? (row.scryfall ? byId.get(row.scryfall.toLowerCase()) : undefined)
       ?? findPrinting.get(...nameMatch(row.name), set, set, set, row.number, row.number, row.name)
       ?? (named ? findPrinting.get(...nameMatch(row.name), named, named, named, row.number, row.number, row.name) : undefined);
     if (!printing) {

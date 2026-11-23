@@ -28,7 +28,7 @@ test("custom sets: right-click menu, Edit set with a new code and an SVG symbol,
   await expect(page.locator("#ctxmenu .dd")).toHaveText(["Edit set...", "Show its cards", "New card in this set", "Delete..."]);
   await page.locator("#ctxmenu .dd", { hasText: "Edit set..." }).click();
   await expect(page.locator("#sm-name")).toHaveValue("Quiet Woods");
-  await expect(page.getByRole("checkbox", { name: "Rarity colors (a one-color SVG main symbol)" })).toBeChecked();
+  await expect(page.getByRole("checkbox", { name: "Rarity colors (a one-color SVG, PNG or WebP main symbol)" })).toBeChecked();
   await page.locator("#sm-name").fill("Quiet Forest");
   const next = `${code}x`.slice(0, 6);
   await page.locator("#sm-code").fill(next.toUpperCase());

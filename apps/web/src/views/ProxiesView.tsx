@@ -26,6 +26,7 @@ import { CountPip, PricePip } from "../components/CardMarks";
 import { CardFrame } from "../components/CardFrame";
 import { LayoutRows, OptionsButton } from "../components/Options";
 import type { GridSize } from "../types";
+import { CollectionPicker } from "../components/CollectionPicker";
 
 const FACE_CHOICES: Choice[] = choices([["front", "Front"], ["back", "Back"], ["both", "Both faces"]]);
 const PAPER_CHOICES: Choice[] = choices([["letter", "Letter (8.5 x 11 in)"], ["a4", "A4 (210 x 297 mm)"], ["legal", "Legal (8.5 x 14 in)"], ["custom", "Custom size"]]);
@@ -509,8 +510,8 @@ function ExportPanel({ lines }: { lines: PrintLine[] }) {
         <Picker label="Add the printed proxies to" value={target} options={targets} onChange={setTarget} />
         {kind === "deck" && (
           <div className="prow"><label htmlFor="pp-holder">Proxy copies go in</label>
-            <Picker id="pp-holder" label="Proxy copies go in" value={holder}
-              options={(store.collections ?? []).filter((item) => item.kind === "collection").map((item) => ({ value: item.id, label: item.name }))} onChange={setHolder} /></div>
+            <CollectionPicker store={store} id="pp-holder" label="Proxy copies go in" value={holder}
+              list={(store.collections ?? []).filter((item) => item.kind === "collection")} onChange={setHolder} /></div>
         )}
       </>}
     </section>

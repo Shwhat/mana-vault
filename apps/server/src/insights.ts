@@ -2,8 +2,9 @@
 import type { FastifyInstance } from "fastify";
 import type { DatabaseSync } from "node:sqlite";
 import { type Currency, priceSql, readCurrency } from "./copies.js";
-import { ENTRY_COLUMNS, toEntry } from "./library.js";
+import { entryColumns, toEntry } from "./library.js";
 import { deckLinks } from "./links.js";
+import { usdEtchedSql, usdFoilSql, usdSql } from "./price-context.js";
 
 export type Bucket = { key: string; label: string; count: number; value: number };
 type StatRow = {
@@ -114,12 +115,12 @@ export function summarize(rows: StatRow[], withFinish: boolean) {
 /** The price of a printing in its regular finish, or its foil price when it only comes in foil. */
 const anyFinishPrice = (currency: Currency, card = "c") => (currency === "eur"
   ? `COALESCE(${card}.price_eur, ${card}.price_eur_foil)`
-  : `COALESCE(${card}.price_usd, ${card}.price_usd_foil, ${card}.price_usd_etched)`);
+  : `COALESCE(${usdSql(card)}, ${usdFoilSql(card)}, ${usdEtchedSql(card)})`);
 
 /** The price of a deck card's printing in the deck card's finish (dc.finish), falling back to the other finishes. */
 const deckFinishPrice = (currency: Currency) => (currency === "eur"
   ? "(CASE dc.finish WHEN 0 THEN COALESCE(c.price_eur, c.price_eur_foil) ELSE COALESCE(c.price_eur_foil, c.price_eur) END)"
-  : "(CASE dc.finish WHEN 1 THEN COALESCE(c.price_usd_foil, c.price_usd, c.price_usd_etched) WHEN 2 THEN COALESCE(c.price_usd_etched, c.price_usd_foil, c.price_usd) ELSE COALESCE(c.price_usd, c.price_usd_foil, c.price_usd_etched) END)");
+  : `(CASE dc.finish WHEN 1 THEN COALESCE(${usdFoilSql()}, ${usdSql()}, ${usdEtchedSql()}) WHEN 2 THEN COALESCE(${usdEtchedSql()}, ${usdFoilSql()}, ${usdSql()}) ELSE COALESCE(${usdSql()}, ${usdFoilSql()}, ${usdEtchedSql()}) END)`);
 
 /** Deck cards with the printing shown for them. Normal decks are priced at the cheapest printing of each card. */
 function deckRows(database: DatabaseSync, deckId: string, currency: Currency) {
@@ -200,7 +201,7 @@ export function registerInsightRoutes(app: FastifyInstance, database: DatabaseSy
 
   // copies marked for trade in the collections this account owns
   app.get("/api/trade", async (request) => database.prepare(
-    `SELECT ${ENTRY_COLUMNS}, col.id AS collection_id, col.name AS collection_name
+    `SELECT ${entryColumns()}, col.id AS collection_id, col.name AS collection_name
      FROM collection_cards i JOIN cards c ON c.id = i.card_id JOIN collections col ON col.id = i.collection_id
      WHERE col.owner_id = ? AND col.kind = 'collection' AND i.trade > 0 AND i.proxy = 0
      ORDER BY c.name, c.set_code, c.collector_number, col.created_at`,

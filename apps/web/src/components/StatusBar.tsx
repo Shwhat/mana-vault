@@ -5,6 +5,8 @@ import { request } from "../api";
 import type { Action } from "../actions";
 import { customDialog } from "./Dialog";
 import { useApp, zoneLabel } from "../store";
+import { changeCollectionDialog } from "./PurchaseDialogs";
+import { PURCHASES_CHANGED } from "../live";
 
 const VIEW_NAMES = { home: "Home", cards: "Card search", collection: "Collection", deck: "Deck", trade: "Trade", proxies: "Proxies", purchases: "Purchases", about: "About", admin: "Administration" } as const;
 
@@ -75,6 +77,10 @@ export function StatusBar({ actions }: { actions: Record<string, Action> }) {
       )}
       {opening?.hasNext && (
         <span id="st-nextpack" className="pt" role="button" title="This pack is done: the next pack becomes where cards are tied" onClick={() => void goNextPack(store)}>NEXT PACK</span>
+      )}
+      {opening && (
+        <span id="st-changecoll" className="pt" role="button" title={`Where this pack's cards go: ${opening.collectionId ? store.collectionName(opening.collectionId) : "no collection"}. Click to change it`}
+          onClick={() => changeCollectionDialog(store, opening, () => window.dispatchEvent(new Event(PURCHASES_CHANGED)))}>CHANGE COLLECTION...</span>
       )}
       <span id="st-toggles">
         <span id="st-target" className="pt on-plain addingto" role="button"

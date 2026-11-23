@@ -1,3 +1,4 @@
+import { priceCols, usdEtchedSql, usdFoilSql, usdSql } from "./price-context.js";
 // ---------- copies: the key of a collection row (printing, finish, condition, language) and price rules ----------
 
 /** 0 regular, 1 foil, 2 etched. */
@@ -106,9 +107,10 @@ export const FINISH_NAMES = ["regular", "foil", "etched"] as const;
 export function priceSql(currency: Currency, finish = "i.foil", card = "c"): string {
   return currency === "eur"
     ? `(CASE ${finish} WHEN 0 THEN ${card}.price_eur ELSE ${card}.price_eur_foil END)`
-    : `(CASE ${finish} WHEN 0 THEN ${card}.price_usd WHEN 1 THEN ${card}.price_usd_foil ELSE COALESCE(${card}.price_usd_etched, ${card}.price_usd_foil) END)`;
+    : `(CASE ${finish} WHEN 0 THEN ${usdSql(card)} WHEN 1 THEN ${usdFoilSql(card)} ELSE COALESCE(${usdEtchedSql(card)}, ${usdFoilSql(card)}) END)`;
 }
 
 export const readCurrency = (value: unknown): Currency => (value === "eur" ? "eur" : "usd");
 
-export const PRICE_COLUMNS = "c.price_usd, c.price_usd_foil, c.price_usd_etched, c.price_eur, c.price_eur_foil";
+/** The price columns the interface reads, from the main price source of the request (0.21.0). */
+export const priceColumnList = () => priceCols("c");

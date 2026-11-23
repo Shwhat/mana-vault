@@ -4,6 +4,7 @@ import { gzipSync } from "node:zlib";
 import type { DatabaseSync } from "node:sqlite";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { tokenKey, type User } from "./auth.js";
+import { activeSource, usdEtchedSql, usdFoilSql, usdSql } from "./price-context.js";
 
 /** The formats the phone's card list knows legality for (Scryfall's legality keys), one bit each. */
 export const LEGAL_FORMATS = [
@@ -230,7 +231,9 @@ export function registerMobileRoutes(app: FastifyInstance, database: DatabaseSyn
   app.get("/api/catalog/compact", async (request, reply) => {
     const stamp = String(database.prepare("SELECT value FROM catalog_metadata WHERE key = 'updated_at'").get()?.value ?? "") +
       `:${Number(database.prepare("SELECT COUNT(*) AS count FROM cards").get()?.count ?? 0)}` +
-      `:${String(database.prepare("SELECT value FROM catalog_metadata WHERE key = 'custom_at'").get()?.value ?? "")}`;
+      `:${String(database.prepare("SELECT value FROM catalog_metadata WHERE key = 'custom_at'").get()?.value ?? "")}` +
+      // MTGJSON prices and card details (0.21.0), and the account's main price source
+      `:${String(database.prepare("SELECT MAX(at) AS at FROM mtgjson_parts").get()?.at ?? "")}:${activeSource()}`;
     if (request.headers["if-none-match"] === `"${stamp}"`) return reply.code(304).send();
     if (compact?.stamp !== stamp) {
       // 0.17.0: everything the search syntax reads, so the app answers full searches without a connection
@@ -238,12 +241,17 @@ export function registerMobileRoutes(app: FastifyInstance, database: DatabaseSyn
         `SELECT id, oracle_id, name, mana_cost, mana_value, type_line, colors, set_code, set_name, collector_number, rarity,
                 image_url, released_at, finishes, flavor_name, promo, variation, oracle_text, power, toughness,
                 color_identity, artist, keywords, promo_types, frame, frame_effects, border_color, full_art, lang, custom, legalities,
-                COALESCE(price_usd, price_usd_foil, price_usd_etched) AS usd
+                COALESCE(${usdSql("")}, ${usdFoilSql("")}, ${usdEtchedSql("")}) AS usd,
+                is_reprint, is_starter, lead_commander, lead_oathbreaker, lead_brawl,
+                tcg_r, tcg_rf, tcg_re, ck_r, ck_rf, ck_re, cs_r, cs_rf, cs_re, cm_r, cm_rf, cm_re, ch_r, ch_rf,
+                NULLIF(MAX(COALESCE(tcg_b, 0), COALESCE(tcg_bf, 0), COALESCE(tcg_be, 0), COALESCE(ck_b, 0), COALESCE(ck_bf, 0), COALESCE(ck_be, 0)), 0) AS buy
          FROM cards WHERE removed = 0 OR id IN (SELECT card_id FROM collection_cards) ORDER BY name, released_at DESC`,
       ).all();
       const fields = ["id", "oracle_id", "name", "mana_cost", "mana_value", "type_line", "colors", "set_code", "set_name", "collector_number",
         "rarity", "image_url", "released_at", "finishes", "flavor_name", "promo", "variation", "oracle_text", "power", "toughness",
-        "color_identity", "artist", "keywords", "promo_types", "frame", "frame_effects", "border_color", "full_art", "lang", "custom", "usd", "legal"];
+        "color_identity", "artist", "keywords", "promo_types", "frame", "frame_effects", "border_color", "full_art", "lang", "custom", "usd", "legal",
+        "is_reprint", "is_starter", "lead_commander", "lead_oathbreaker", "lead_brawl",
+        "tcg_r", "tcg_rf", "tcg_re", "ck_r", "ck_rf", "ck_re", "cs_r", "cs_rf", "cs_re", "cm_r", "cm_rf", "cm_re", "ch_r", "ch_rf", "buy"];
       // formats a card is legal in, as bits in the order of LEGAL_FORMATS
       const legal = (text: unknown) => {
         let mask = 0;

@@ -2,6 +2,7 @@
 import type { FastifyInstance } from "fastify";
 import type { DatabaseSync } from "node:sqlite";
 import { bestName, buildNameIndex, MIN_NAME_SCORE, type NameIndex, type NameMatch, readInfoLine } from "./scan-core.js";
+import { priceCols } from "./price-context.js";
 
 export { MIN_NAME_SCORE, normalize, readInfoLine, similarity } from "./scan-core.js";
 
@@ -85,7 +86,7 @@ export function registerScanRoutes(app: FastifyInstance, database: DatabaseSync)
     const card = database.prepare("SELECT oracle_id FROM cards WHERE id = ?").get(request.params.cardId);
     if (!card) return reply.code(404).send({ error: "Card printing not found" });
     return database.prepare(
-      `SELECT ${CARD_COLUMNS}, promo, variation, price_usd, price_usd_foil, price_usd_etched, price_eur, price_eur_foil FROM cards WHERE oracle_id = ? AND (removed = 0 OR id = ?) ${NEWEST}`,
+      `SELECT ${CARD_COLUMNS}, promo, variation, ${priceCols("cards")} FROM cards WHERE oracle_id = ? AND (removed = 0 OR id = ?) ${NEWEST}`,
     ).all(String(card.oracle_id), request.params.cardId);
   });
 }

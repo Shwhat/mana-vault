@@ -104,6 +104,8 @@ The card maker makes custom cards with a live preview. A saved custom card is a 
 
 The list on the left shows every custom card under a heading for its custom set, with its number, type and maker, and a search box. A right-click (long press) on a set heading opens the custom set menu: **Edit set...**, **Show its cards**, **New card in this set** and **Delete...**. The card maker opens on the card opened last; with no card made yet, it starts a new one. **New card** starts an empty card in the set chosen last with the next free collector number. **Custom sets...** opens the Custom sets tab on the card's set (on a new set when no set is chosen), and **Edit set...** in a set heading's menu opens it on that set. Clicking a card opens it. Leaving a card with changes that are not saved asks first. The card being made stays while other views are used.
 
+Custom sets are reached from the **Custom sets** tab beside Print and Card maker; the card maker's list has no Custom sets... button. **Edit set...** on a set heading's right-click menu opens the Custom sets tab with that set chosen.
+
 ### Buttons
 
 | Button | What it does |
@@ -246,6 +248,14 @@ A set has a main symbol and can have its own symbol for each rarity: Common, Unc
 | Remove | Removes the symbol |
 
 A card uses its rarity's symbol when the set has one, drawn in its own colors. Otherwise it uses the main symbol, in rarity colors when that is on. A rarity row with no symbol shows "Uses the main symbol". With no symbol at all, the card shows the set code in a circle. The set list, card search, printing lists and set filters show the main symbol.
+
+#### Rarity colors and the common symbol
+
+With **Rarity colors** on, a main symbol in SVG, or in PNG or WebP with a transparent background, is drawn in the card's rarity color: common black, uncommon silver, rare gold, mythic orange-red, special purple, with shading and a thin outline. Its shape is filled; its own colors are not used. A JPEG, or a PNG or WebP with no transparent pixels, keeps its own colors, and its row shows "This picture has no transparent background, so it keeps its own colors." Rarity colors is turned on for a new set and when a new main symbol is chosen.
+
+**Common symbol** (shown with Rarity colors on): **Black** (the default) or **White**, which draws the common symbol in white with a thin dark outline, for sets where black would not stand out.
+
+A rarity's own symbol is drawn as uploaded. The colors show in the card maker preview, the sample card, saved card pictures, printed proxies and the card page. Saving a change to Rarity colors, Common symbol or the main symbol draws the saved pictures of the set's cards again (the cards your account made), as part of the save.
 
 ### Sample card
 

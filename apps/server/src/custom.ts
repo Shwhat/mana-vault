@@ -222,14 +222,14 @@ function raritySymbols(database: DatabaseSync) {
 export function listCustomSets(database: DatabaseSync) {
   const rarities = raritySymbols(database);
   return database.prepare(
-    `SELECT cs.code, s.name, s.released_at, cs.owner_id, u.name AS owner_name, cs.symbol IS NOT NULL AS has_symbol, cs.symbol_type, cs.rarity_colors, length(cs.symbol) AS symbol_size,
+    `SELECT cs.code, s.name, s.released_at, cs.owner_id, u.name AS owner_name, cs.symbol IS NOT NULL AS has_symbol, cs.symbol_type, cs.rarity_colors, cs.common_white, length(cs.symbol) AS symbol_size,
             (SELECT COUNT(*) FROM cards c WHERE c.set_code = cs.code AND c.custom = 1) AS card_count
      FROM custom_sets cs JOIN sets s ON s.code = cs.code LEFT JOIN users u ON u.id = cs.owner_id ORDER BY s.name`,
   ).all().map((row) => ({
     code: String(row.code), name: String(row.name), releasedAt: (row.released_at as string | null) ?? null, ownerId: (row.owner_id as number | null) ?? null,
     ownerName: String(row.owner_name ?? ""), hasSymbol: Number(row.has_symbol) === 1, cardCount: Number(row.card_count),
     symbolUrl: Number(row.has_symbol) === 1 ? `/api/custom/sets/${String(row.code)}/symbol?v=${Number(row.symbol_size)}` : null,
-    symbolType: (row.symbol_type as string | null) ?? null, rarityColors: Number(row.rarity_colors) === 1,
+    symbolType: (row.symbol_type as string | null) ?? null, rarityColors: Number(row.rarity_colors) === 1, commonWhite: Number(row.common_white ?? 0) === 1,
     rarities: rarities.get(String(row.code)) ?? {},
   }));
 }
@@ -301,6 +301,7 @@ export function registerCustomRoutes(app: FastifyInstance, database: DatabaseSyn
       : request.body?.symbol === undefined ? undefined : readSymbol(request.body.symbol);
     if (typeof symbol === "string") return reply.code(400).send({ error: symbol });
     const rarityColors = typeof request.body?.rarityColors === "boolean" ? request.body.rarityColors : undefined;
+    const commonWhite = typeof request.body?.commonWhite === "boolean" ? request.body.commonWhite : undefined;
     // symbols of single rarities (0.20.0): { rare: { symbol: data URL or "" } } or { rare: { symbolFrom: set code } }
     const rarityChanges: Array<[Rarity, Picture | null]> = [];
     const rarityBody = request.body?.rarities;
@@ -337,6 +338,7 @@ export function registerCustomRoutes(app: FastifyInstance, database: DatabaseSyn
         }
       }
       if (rarityColors !== undefined) database.prepare("UPDATE custom_sets SET rarity_colors = ? WHERE code = ?").run(rarityColors ? 1 : 0, newCode);
+      if (commonWhite !== undefined) database.prepare("UPDATE custom_sets SET common_white = ? WHERE code = ?").run(commonWhite ? 1 : 0, newCode);
       if (name) {
         database.prepare("UPDATE sets SET name = ? WHERE code = ?").run(name, newCode);
         database.prepare("UPDATE cards SET set_name = ? WHERE set_code = ? AND custom = 1").run(name, newCode);
