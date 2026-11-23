@@ -177,6 +177,17 @@ This page lists what Mana Vault does in the current version, followed by what is
 - Notifications for new offers in the Inbox, checked in the background about every 15 minutes, optionally only on Wi-Fi.
 - The Back button, the Android share sheet for exports and backups, sharing lists into the app to import them and pictures or PDFs to read as receipts, background sync as soon as the phone is online, https only, and a daily check of your server for a newer app.
 
+### 0.22.0 additions
+
+- Notes on every deck and collection (the Notes tab; a deck's top page is its description), and pages not attached to anything, in trees of child pages.
+- A rich text editor with a toolbar and typed shortcuts: headings, bold, italic, strikethrough, code, lists, checklists, quotes, code blocks, dividers, tables, web links, page links (`[[`), card links with the card's picture, and pictures that are pasted, dropped or chosen. Pages save themselves and are stored as markdown.
+- The Wiki tab: search across every page, Pinned, Recent, and the Decks, Collections and My pages sections, with drag and drop to reorder pages and move them between decks, collections and My pages.
+- Built-in templates (Deck primer, Combo, Sideboard guide, Collection plan) and your own, from Save as template....
+- History of each page with Restore, and a choice of which text to keep when two people save the same page.
+- Notes follow sharing; My pages stay private.
+- Markdown import (files or an Obsidian-style zip, with pictures) and export as a zip of .md files with pictures; deck text exports carry the deck's notes.
+- Notes in the Android app without a connection, with pictures added offline and a choice of text when a page changed meanwhile.
+
 ### 0.21.0 additions
 
 - MTGJSON data kept on the server: every printing's MTGJSON record, prices from TCGplayer, Card Kingdom, CardSphere, Cardmarket and Cardhoarder (retail and buylist, for each finish), booster contents, sealed product contents, TCGplayer SKUs and the keyword and card type lists, with their own part list and buttons in Administration.

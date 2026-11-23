@@ -1,4 +1,7 @@
 // ---------- offline use in the Android app: a copy of the library on the phone, queued changes and sync ----------
+import { answerNotes, applyNotesLocally, refreshNotes } from "./notes-offline";
+import type { ClashDetail, Conflict } from "../notes-state";
+import { NOTE_CLASH } from "../note-files";
 import type { CardDetail, Collection, CollectionEntry, DeckCard, DeckDetail, Deck, DeckLink, FinishCode } from "../types";
 import { compactCard, matchOnPhone, printingsOf, refreshCatalog, refreshRulings, rulingsOf, searchCards, suggestOnPhone } from "./catalog";
 import { idbAll, idbDelete, idbGet, idbSet } from "./idb";
@@ -127,6 +130,10 @@ type Local = { response: unknown; base?: unknown; url?: string; label: string };
 async function applyLocally(method: string, url: string, body: Record<string, unknown>): Promise<Local | null> {
   let match: RegExpExecArray | null;
   const path = url.split("?")[0]!;
+  if (path.startsWith("/api/notes")) {
+    const children = new URLSearchParams(url.split("?")[1] ?? "").get("children");
+    return applyNotesLocally(method, path, children ? { ...body, children } : body);
+  }
   if (method === "PUT" && url === "/api/prefs") {
     await setCopy("/api/prefs", body);
     return { response: { ok: true }, label: "Settings" };
@@ -303,6 +310,18 @@ async function applyLocally(method: string, url: string, body: Record<string, un
 async function addToQueue(method: string, url: string, body: unknown, local: Local) {
   // only the newest settings change matters
   if (url === "/api/prefs") for (const old of await queue()) if (old.url === "/api/prefs") await idbDelete("queue", old.id);
+  // saves of one notes page join into one change, sent from the version the first one started from
+  if (method === "PUT" && /^\/api\/notes\/pages\/[^/]+$/.test(url)) {
+    const waiting = (await queue()).filter((old) => old.url === url && old.method === "PUT");
+    const first = waiting[0];
+    if (first) {
+      const joined = { ...(first.body as Record<string, unknown>), ...(body as Record<string, unknown>), baseVersion: (first.body as Record<string, unknown>).baseVersion };
+      await idbSet("queue", first.id, { ...first, body: joined, at: Date.now() });
+      for (const old of waiting.slice(1)) await idbDelete("queue", old.id);
+      await countQueue();
+      return;
+    }
+  }
   const id = crypto.randomUUID();
   seq = Math.max(seq, ...(await queue()).map((item) => item.seq)) + 1;
   const item: Queued = { id, seq, at: Date.now(), method, url: local.url ?? url, body, label: local.label, ...(local.base !== undefined ? { base: local.base } : {}) };
@@ -339,6 +358,10 @@ async function detailOnPhone(id: string): Promise<CardDetail> {
 async function answerOnPhone(url: string): Promise<unknown> {
   const [path, query = ""] = url.split("?") as [string, string?];
   if (path === "/api/cards") return searchCards(new URLSearchParams(query));
+  if (path.startsWith("/api/notes/")) {
+    const notes = await answerNotes(path, new URLSearchParams(query));
+    if (notes !== undefined) return notes;
+  }
   if (path === "/api/catalog/suggest") return suggestOnPhone(new URLSearchParams(query), await getCopy<Record<string, string[]>>("/api/catalog/lists"));
   let match: RegExpExecArray | null;
   if ((match = /^\/api\/cards\/([^/]+)\/printings$/.exec(path))) return printingsOf(decodeURIComponent(match[1]!));
@@ -480,9 +503,18 @@ async function sendQueue(): Promise<SyncProblem[]> {
     const answer = await readJson<{ results: Array<{ id: string; status: number; error: string | null }> }>(
       await appFetch("/api/sync", { method: "POST", body: JSON.stringify({ changes: batch.map(({ id, method, url, body, base }) => ({ id, method, url, body, base })) }) }, 60_000),
     );
-    for (const result of answer.results) {
+    for (const result of answer.results as Array<{ id: string; status: number; error: string | null; body?: unknown }>) {
       const item = batch.find((candidate) => candidate.id === result.id);
       if (result.status >= 500) throw new OfflineError("The server could not take the changes now.");
+      // a page saved offline met a newer save on the server: the page asks which text to keep
+      const conflict = (result.body as { conflict?: Conflict } | null)?.conflict;
+      if (result.status === 409 && conflict && item && /^\/api\/notes\/pages\/[^/]+$/.test(item.url)) {
+        const mine = item.body as { title?: string; body?: string };
+        const pageId = decodeURIComponent(item.url.split("/").pop()!);
+        window.dispatchEvent(new CustomEvent<ClashDetail>(NOTE_CLASH, { detail: { pageId, mine: { title: mine.title ?? conflict.title, body: mine.body ?? conflict.body }, theirs: conflict } }));
+        await idbDelete("queue", result.id);
+        continue;
+      }
       if (result.status >= 400 && item) problems.push({ label: item.label, error: result.error ?? "The server refused this change." });
       await idbDelete("queue", result.id);
     }
@@ -520,6 +552,8 @@ async function refreshCopy(force: boolean): Promise<boolean> {
       await get(`/api/collections/${enc(collection.id)}/completion`);
     }
     const decks = (await get<Deck[]>("/api/decks")) ?? [];
+    // notes pages (0.22.0)
+    await refreshNotes(get);
     for (const deck of decks) {
       const before = oldDecks.get(deck.id) as (Deck & { updated_at?: string }) | undefined;
       const url = `/api/decks/${enc(deck.id)}`;

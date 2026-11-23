@@ -34,12 +34,16 @@ const finishWord = (foil: number) => (foil === 2 ? "etched" : foil === 1 ? "foil
 const yes = (value: boolean | undefined) => (value ? "true" : "false");
 const csv = (rows: Array<Array<string | number | boolean | null | undefined>>) => rows.map((row) => row.map((cell) => csvCell(cell ?? "")).join(",")).join("\r\n");
 
-/** Builds the file text for a list of rows. */
-export function exportText(rows: ExportRow[], format: ExportFormat): { text: string; extension: string; type: string } {
+/**
+ * Builds the file text for a list of rows. A deck's notes (its top notes page, 0.22.0) go at the end of a plain text
+ * list as comment lines starting with "//", which deck imports skip.
+ */
+export function exportText(rows: ExportRow[], format: ExportFormat, notes = ""): { text: string; extension: string; type: string } {
   const condition = (row: ExportRow) => row.condition ?? "NM";
   const language = (row: ExportRow) => row.language ?? "en";
   if (format === "text") {
     const lines = rows.map((row) => `${row.quantity} ${row.name} (${row.set_code.toUpperCase()}) ${row.collector_number}${row.foil === 2 ? " *E*" : row.foil ? " *F*" : ""}`);
+    if (notes.trim()) lines.push("", "// Notes", ...notes.trim().split(/\r?\n/).map((line) => (line ? `// ${line}` : "//")));
     return { text: lines.join("\r\n"), extension: "txt", type: "text/plain;charset=utf-8" };
   }
   const table: Array<Array<string | number | boolean | null | undefined>> = [];

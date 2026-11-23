@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEven
 import { useKeptScroll } from "../kept";
 import type { Action } from "../actions";
 import { request } from "../api";
-import { renderMarkdown } from "../components/About";
+import { NotesPane } from "../components/NotesPane";
 import { rowMenu } from "../components/ContextMenu";
 import { formatDialog, tagsDialog } from "../components/DeckDialogs";
 import { linkDialog } from "../components/LibraryDialogs";
@@ -556,37 +556,23 @@ function start(cards: Playing[], mulligans: number): Game {
   return { library: library.slice(7), hand: library.slice(0, 7), field: [] as Playing[], graveyard: [] as Playing[], turn: 1, mulligans, bottom: Math.min(7, mulligans) };
 }
 
-function Description() {
+/** The Notes tab (0.22.0, in place of Description): the cover card and format, then the deck's notes pages. */
+function DeckNotes() {
   const store = useApp();
   const deck = store.deck!;
-  const [editing, setEditing] = useState(false);
-  const [text, setText] = useState(deck.description ?? "");
-  useEffect(() => { if (!editing) setText(deck.description ?? ""); }, [deck.description, editing]);
   const cover = deck.cards.find((card) => card.card_id === deck.cover_card_id);
   return (
-    <div className="list deckinfo">
-      <div className="prow"><label htmlFor="deck-cover">Cover card</label>
-        <Picker id="deck-cover" label="Cover card" value={deck.cover_card_id ?? ""}
-          onChange={(value) => void store.updateDeckInfo({ coverCardId: value || null }, value ? "Cover card changed" : "Cover card removed")}
-          options={[{ value: "", label: "The commander" }, ...[...new Map(deck.cards.map((card) => [card.card_id, card])).values()].sort((a, b) => a.name.localeCompare(b.name))
-            .map((card) => ({ value: card.card_id, label: card.name, detail: card.set_code.toUpperCase() }))]} /></div>
-      {(cover?.image_url ?? deck.image_url) && <img className="coverimg" src={cover?.image_url ?? deck.image_url ?? ""} alt="" />}
-      <div className="prow"><label>Format</label><span><button type="button" className="lnk" onClick={() => formatDialog(store)}>{formatName(deck.format)}</button></span></div>
-      <h4>Description</h4>
-      {editing ? (
-        <>
-          <textarea className="desctext" aria-label="Deck description" value={text} onChange={(event) => setText(event.target.value)} />
-          <div className="btnrow">
-            <button type="button" className="btn primary" onClick={() => void store.updateDeckInfo({ description: text }, "Description saved").then((ok) => { if (ok) setEditing(false); })}>Save</button>
-            <button type="button" className="btn" onClick={() => setEditing(false)}>Cancel</button>
-          </div>
-        </>
-      ) : (
-        <>
-          {deck.description ? <div className="abpage desc" dangerouslySetInnerHTML={{ __html: renderMarkdown(deck.description) }} /> : <p className="note">No description yet</p>}
-          <div className="btnrow"><button type="button" className="btn" onClick={() => setEditing(true)}>Edit description</button></div>
-        </>
-      )}
+    <div className="decknotes">
+      <div className="deckinfo inline">
+        {(cover?.image_url ?? deck.image_url) && <img className="coverimg small" src={cover?.image_url ?? deck.image_url ?? ""} alt="" />}
+        <div className="prow"><label htmlFor="deck-cover">Cover card</label>
+          <Picker id="deck-cover" label="Cover card" value={deck.cover_card_id ?? ""}
+            onChange={(value) => void store.updateDeckInfo({ coverCardId: value || null }, value ? "Cover card changed" : "Cover card removed")}
+            options={[{ value: "", label: "The commander" }, ...[...new Map(deck.cards.map((card) => [card.card_id, card])).values()].sort((a, b) => a.name.localeCompare(b.name))
+              .map((card) => ({ value: card.card_id, label: card.name, detail: card.set_code.toUpperCase() }))]} /></div>
+        <div className="prow"><label>Format</label><span><button type="button" className="lnk" onClick={() => formatDialog(store)}>{formatName(deck.format)}</button></span></div>
+      </div>
+      <NotesPane scope={{ kind: "deck", itemId: deck.id, name: deck.name }} view="deck" />
     </div>
   );
 }
@@ -635,7 +621,7 @@ export function DeckView({ actions }: { actions: Record<string, Action> }) {
   }
   const counted = deck.cards.filter((card) => card.zone === "main" || card.zone === "commander").reduce((sum, card) => sum + card.quantity, 0);
   const tabs: Array<[DeckTab, string]> = [["cards", "Cards"], ["add", "Add"], ["ownership", "Ownership"], ["stats", "Statistics"], ["playtest", "Playtest"],
-    ["description", "Description"], ["history", "History"]];
+    ["notes", "Notes"], ["history", "History"]];
   const currency = store.prefs.currency;
   const errors = legality.problems.filter((item) => item.level === "err").length;
   const tab = store.deckTab;
@@ -681,7 +667,7 @@ export function DeckView({ actions }: { actions: Record<string, Action> }) {
       {tab === "ownership" && <OwnershipTab actions={actions} />}
       {tab === "stats" && <StatsPanel stats={store.deckStats} kind="deck" extra={<ManaBalance cards={deck.cards} />} />}
       {tab === "playtest" && <Playtest />}
-      {tab === "description" && <Description />}
+      {tab === "notes" && <DeckNotes key={deck.id} />}
       {tab === "history" && <History />}
     </div>
   );

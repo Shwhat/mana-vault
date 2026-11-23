@@ -83,6 +83,7 @@ export const RI: Record<string, string> = {
   edittext: `<svg viewBox="0 0 20 20"><rect x="3" y="2" width="12" height="16" fill="#fff" stroke="#556" stroke-width="1.2"/><path d="M5.5 6h7M5.5 8.5h7M5.5 11h4" stroke="#556"/><path d="M11 17l1-3 5-5 2 2-5 5z" fill="#fff3d6" stroke="${S}" stroke-width="1.1" stroke-linejoin="round"/></svg>`,
   legal: '<svg viewBox="0 0 20 20"><path d="M10 2l6.5 2.5v5c0 4-2.8 6.8-6.5 8.5-3.7-1.7-6.5-4.5-6.5-8.5v-5z" fill="#e3f1e3" stroke="#2f7d32" stroke-width="1.2" stroke-linejoin="round"/><path d="M7 10l2.2 2.2L13.5 8" fill="none" stroke="#2f7d32" stroke-width="1.6"/></svg>',
   playtest: `<svg viewBox="0 0 20 20"><g transform="rotate(-14 7 12)">${card(3, 5, "#dbe6f7")}</g>${card(6.5, 4, "#fff")}<g transform="rotate(14 13 12)">${card(10, 5, "#fff3d6")}</g></svg>`,
+  notes: `<svg viewBox="0 0 20 20"><path d="M4 2.5h8.5L16 6v11.5H4z" fill="#dbe6f7" stroke="${S}" stroke-width="1.2" stroke-linejoin="round"/><path d="M12.5 2.5V6H16" fill="none" stroke="${S}" stroke-width="1.1"/><path d="M6.5 9h7M6.5 11.5h7M6.5 14h4.5" stroke="#1f5fbf" stroke-width="1.2"/></svg>`,
   history: `<svg viewBox="0 0 20 20"><circle cx="10.5" cy="10" r="6.5" fill="#fff" stroke="${S}" stroke-width="1.3"/><path d="M10.5 6v4l2.8 1.8" fill="none" stroke="#1f5fbf" stroke-width="1.5"/><path d="M2 7.5l2 2.6 2.4-2.2" fill="none" stroke="${S}" stroke-width="1.3"/></svg>`,
   zmaybe: `<svg viewBox="0 0 20 20">${card(5.5, 3.5, "#e3e7ee")}<text x="10" y="13" font-size="7" text-anchor="middle" font-family="Arial" font-weight="bold" fill="#556">?</text></svg>`,
 };

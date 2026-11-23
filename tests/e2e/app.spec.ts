@@ -236,8 +236,8 @@ test("the menu bar opens menus and switches between them; the mode tabs switch t
   await page.keyboard.press("Escape");
   await expect(page.locator("#dropdown")).toHaveCount(0);
   // tabs switch the program
-  await expect(page.locator("#modetabs .mtab")).toHaveText(["Home", "Search", "Collection", "Decks", "Trade", "Proxies", "Purchases"]);
-  for (const [name, view] of [["Purchases", "#view-purchases"], ["Proxies", "#view-proxies"], ["Trade", "#view-trade"], ["Collection", "#view-collection"], ["Search", "#view-cards"]] as const) {
+  await expect(page.locator("#modetabs .mtab")).toHaveText(["Home", "Search", "Collection", "Decks", "Trade", "Proxies", "Purchases", "Wiki"]);
+  for (const [name, view] of [["Wiki", "#view-wiki"], ["Purchases", "#view-purchases"], ["Proxies", "#view-proxies"], ["Trade", "#view-trade"], ["Collection", "#view-collection"], ["Search", "#view-cards"]] as const) {
     await page.locator("#modetabs .mtab", { hasText: name }).click();
     await expect(page.locator(view)).toBeVisible();
     await expect(page.locator("#modetabs .mtab.active")).toHaveText(name);

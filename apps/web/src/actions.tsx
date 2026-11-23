@@ -19,6 +19,7 @@ import { refreshCardSearches } from "./card-search";
 import type { Prefs } from "./prefs";
 import { editTextDialog, formatDialog, tagsDialog } from "./components/DeckDialogs";
 import { entryKey } from "./library-state";
+import { exportDialog, importMarkdown, newPageDialog, openWikiPage, templatesDialog } from "./components/NotesPane";
 import { isOpen, type PanelId, PANELS, PRESET_NAMES, removePanel } from "./dock";
 import { type Store, useApp, zoneLabel } from "./store";
 import { capitalize, type CollectionTab, type DeckTab, formatName, type Zone } from "./types";
@@ -46,6 +47,7 @@ export const SHORTCUTS: Array<[group: string, key: string, action: string]> = [
   ["Search", "4", "view.trade"],
   ["Search", "5", "view.proxies"],
   ["Search", "6", "view.purchases"],
+  ["Search", "7", "view.wiki"],
   ["Search", "Up, Down", "Select the previous or next row"],
   ["Adding cards", "Enter", "addCollection"],
   ["Adding cards", "Shift+Enter", "addDeck"],
@@ -205,6 +207,11 @@ export function useActions(store: Store): Record<string, Action> {
       "view.trade": { label: "Trade view", short: "Trade", icon: "trade", key: "4", on: store.view === "trade", run: () => store.setView("trade") },
       "view.proxies": { label: "Proxies view", short: "Proxies", icon: "print", key: "5", on: store.view === "proxies", run: () => store.setView("proxies") },
       "view.purchases": { label: "Purchases view", short: "Purchases", icon: "usd", key: "6", on: store.view === "purchases", run: () => store.setView("purchases") },
+      "view.wiki": { label: "Wiki view", short: "Wiki", icon: "notes", key: "7", on: store.view === "wiki", run: () => store.setView("wiki") },
+      "wiki.new": { label: "New notes page...", short: "New page", icon: "notes", run: () => newPageDialog(store, {}, (page) => { store.setView("wiki"); openWikiPage(page.id); }) },
+      "wiki.import": { label: "Import markdown...", short: "Import markdown", icon: "listin", run: () => { store.setView("wiki"); void importMarkdown(store, {}); } },
+      "wiki.export": { label: "Export notes...", short: "Export notes", icon: "txt", run: () => exportDialog(store, null) },
+      "wiki.templates": { label: "Notes templates...", short: "Templates", icon: "notes", run: () => templatesDialog() },
       "purchases.new": { label: "New purchase...", short: "New purchase", icon: "usd", run: () => newEntry(store, "purchase", (entry) => { store.setView("purchases"); void entry; }) },
       "purchases.sale": {
         label: picked ? "Sell selected cards..." : "New card sale...", short: "Sell", icon: "usd",

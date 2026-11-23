@@ -199,7 +199,10 @@ function ExportWindow({ initial, collectionId }: { initial: ExportWhat; collecti
         }));
       }
       if (!rows.length) return setError("There is nothing to export");
-      const file = exportText(rows, format);
+      // a deck's notes (its top notes page) go along with a plain text list
+      const notes = what === "deck" && format === "text" && store.deck
+        ? (await request<{ description?: string }>(`/api/decks/${encodeURIComponent(store.deck.id)}`).catch(() => store.deck))?.description ?? "" : "";
+      const file = exportText(rows, format, notes);
       downloadText(`${slugify(name)}.${file.extension}`, file.text, file.type);
       store.flash(`${rows.length} cards exported`);
       closeDialog();

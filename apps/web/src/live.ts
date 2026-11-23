@@ -1,4 +1,5 @@
 // ---------- live updates (0.18.0): changes made on another device or by someone sharing with you show at once ----------
+import { NOTES_CHANGED } from "./notes-state";
 import { useEffect, useRef } from "react";
 import { CLIENT_ID } from "./api";
 import { apiUrl, appSettings, isApp, saveSettings } from "./android/platform";
@@ -7,7 +8,7 @@ import { currentOpening, nextPack, type Opening, reloadOpening, setActiveOpening
 import type { Store } from "./store";
 import { confirmDialog } from "./components/Dialog";
 
-export type ChangeArea = "library" | "decks" | "purchases" | "trades" | "inbox" | "prints" | "prefs" | "opening" | "other";
+export type ChangeArea = "library" | "decks" | "purchases" | "trades" | "inbox" | "prints" | "prefs" | "opening" | "notes" | "other";
 type ChangeEvent = { areas: ChangeArea[]; by: number; at: number; opening?: Opening | null };
 
 /** Sent on the window when purchases changed elsewhere, so the Purchases view loads its list and entry again. */
@@ -66,6 +67,7 @@ export function useLiveUpdates(store: Store) {
       if (areas.has("inbox")) void current.reloadOffers();
       if (areas.has("trades")) void current.reloadTrades();
       if (areas.has("prints")) void current.loadPrintList();
+      if (areas.has("notes")) window.dispatchEvent(new Event(NOTES_CHANGED));
       if (areas.has("purchases") || areas.has("opening")) window.dispatchEvent(new Event(PURCHASES_CHANGED));
       if (event.opening !== undefined) {
         const before = currentOpening();
@@ -91,7 +93,7 @@ export function useLiveUpdates(store: Store) {
         setActiveOpening(hello.opening);
         rememberOpening(hello.opening);
         // back after a dropped connection: load what may have changed meanwhile
-        if (wasOpen) apply({ areas: ["library", "decks", "purchases", "trades", "inbox", "prints"], by: 0, at: Date.now() });
+        if (wasOpen) apply({ areas: ["library", "decks", "purchases", "trades", "inbox", "prints", "notes"], by: 0, at: Date.now() });
         wasOpen = true;
       });
       source.addEventListener("change", (message) => {

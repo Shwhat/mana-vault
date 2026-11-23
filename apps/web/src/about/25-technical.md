@@ -20,6 +20,7 @@
 | Android app | The same interface inside Capacitor, with a Java plugin for text recognition, encrypted settings, the background Inbox check and background sync (WorkManager), files shared in and out, and the Back button. It connects over https only. Its copy of the library is kept in IndexedDB |
 | Phone sign-in | A random device token per phone, sent as a Bearer token; the server stores only its SHA-256 hash. The server accepts requests from the app's page origin (https://localhost) |
 | Live updates | Server-sent events on /api/events. Each change (any request that changes something) is sent to the open pages and apps of the account and of the accounts sharing a collection, deck, trade or offer with it, except the page that made it (named by its x-mana-vault-client header). A comment every 25 seconds keeps tunnels and proxies from closing the stream; the page connects again on its own. The app signs in to the stream with its device token in the address |
+| Notes | Pages stored as markdown in the database with their versions (note_versions) and pictures (note_files). Saves carry the version they started from; an older one is answered with the newer text so the page can ask which to keep. Picture addresses are long random codes served without sign-in |
 | Sync | Changes made offline are sent in order to /api/sync with a unique id each; the server applies each once and keeps the ids for 30 days. /api/sync/state reports a revision that changes with every change, and new offers |
 
 ## Installation
@@ -75,6 +76,7 @@ The container checks itself every 30 seconds by running the server with `-health
 - Power, toughness, two-faced rules text and rulings arrive with the first card database update after installing 0.6.0.
 - The scanner's live camera needs HTTPS or a local address (in the browser).
 - In the Android app without a connection, searches by art tags and Oracle tags (`art:`, `otag:`) need the server.
+- Notes pages hold up to 500,000 characters and pictures up to 20 MB; an import takes up to 2,000 pages at a time. Two people editing the same page are asked which text to keep, rather than seeing each other type.
 - Removed deck links are kept for 60 minutes, so undo of a remove can link the copies again; after that, undo puts the cards back as missing.
 - The Android app reads English card text, checks for offers about every 15 minutes rather than at once, and signs in to one server and account at a time.
 
@@ -86,7 +88,9 @@ The container checks itself every 30 seconds by running the server with `-health
 | Vite | Building the interface | MIT |
 | Tesseract.js, Tesseract.js core | Card text recognition | Apache 2.0 |
 | pdf-lib | Making the proxy PDF | MIT |
-| fflate | Making the zip files of MakePlayingCards pictures | MIT |
+| fflate | Making and reading zip files (MakePlayingCards pictures, notes import and export) | MIT |
+| Tiptap (@tiptap/core, @tiptap/react, @tiptap/pm, @tiptap/starter-kit, @tiptap/markdown and extensions) and ProseMirror | The notes editor and its markdown | MIT |
+| marked | Reading markdown in the notes editor | MIT |
 | Tesseract English model (@tesseract.js-data/eng) | Card text recognition | Apache 2.0 |
 | Capacitor (@capacitor/core, @capacitor/android, @capacitor/cli) | Android app | MIT |
 | pdf.js (pdfjs-dist) | Reading PDF receipts on the server | Apache 2.0 |

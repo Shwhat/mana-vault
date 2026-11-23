@@ -5,6 +5,7 @@ import { type Dispatch, type RefObject, type SetStateAction, useCallback, useEff
 
 const memory = new Map<string, unknown>();
 const RESET = "mana-vault:reset-tab";
+const SET = "mana-vault:set-kept";
 
 /** Like useState, but the value is kept while the tab is closed. */
 export function useKept<T>(key: string, initial: T | (() => T)): [T, Dispatch<SetStateAction<T>>] {
@@ -22,8 +23,16 @@ export function useKept<T>(key: string, initial: T | (() => T)): [T, Dispatch<Se
       const tab = (event as CustomEvent<string>).detail;
       if (key.startsWith(`${tab}:`)) setValue(first());
     };
+    const set = (event: Event) => {
+      const detail = (event as CustomEvent<{ key: string; value: unknown }>).detail;
+      if (detail.key === key) setValue(detail.value as T);
+    };
     window.addEventListener(RESET, reset);
-    return () => window.removeEventListener(RESET, reset);
+    window.addEventListener(SET, set);
+    return () => {
+      window.removeEventListener(RESET, reset);
+      window.removeEventListener(SET, set);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
   return [value, set];
@@ -54,3 +63,9 @@ export function resetTab(tab: string): void {
 
 /** Reads a kept value outside a component (tests and the tab switch). */
 export const keptValue = (key: string) => memory.get(key);
+
+/** Sets a kept value from outside its tab (such as opening a Wiki page from a menu). */
+export function setKept(key: string, value: unknown): void {
+  memory.set(key, value);
+  window.dispatchEvent(new CustomEvent(SET, { detail: { key, value } }));
+}
