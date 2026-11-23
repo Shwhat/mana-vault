@@ -24,7 +24,7 @@ Messages appear at the right end of the status bar (on the phone, in a banner ab
 | You left name | Leaving a shared collection or deck |
 | Deck renamed to name, or Deck name deleted | Rename deck, Delete deck |
 | Sent to name. It is added when they accept it. | Sending a collection or deck |
-| Set name (CODE) saved | Edit set |
+| Set name (CODE) saved | Save in the Custom sets tab |
 | Name used on the card | Choosing art from the art library |
 | Name added to the art library, or Name deleted from the art library | Art library |
 | Card back uploaded | Upload back... |
@@ -84,7 +84,7 @@ Messages appear at the right end of the status bar (on the phone, in a banner ab
 | MakePlayingCards pictures saved | MakePlayingCards pictures |
 | MPC Autofill list saved, or MPC Autofill list and custom card pictures saved | MPC Autofill list |
 | N printed proxies added to name | After exporting, with the printed cards added as proxies |
-| Custom set CODE created, Set renamed, Release date changed, Set symbol changed, Set name deleted | The custom sets window |
+| Custom set CODE created, Set name deleted | Create set and Delete... in the Custom sets tab |
 | Card name saved to the card database | Saving in the card maker |
 | Card name deleted | Deleting a custom card |
 | Copy made, not saved yet | Duplicate in the card maker |
@@ -166,7 +166,7 @@ Messages appear at the right end of the status bar (on the phone, in a banner ab
 | The listed cards make no tokens that are not already listed | Add tokens with nothing new to add | |
 | Pick cards in a collection first (Select several cards in Options, or Ctrl+click) | Selected cards with no rows picked | Pick rows in a collection |
 | Name has no missing cards, or Name has no cards | From deck... or Missing cards... with nothing to add | |
-| Create a custom set first (Custom sets...) | Saving a custom card with no custom set | Create a set |
+| Create a custom set first (Custom sets tab) | Saving a custom card with no custom set | Create a set |
 | Give the card a name, Give the card a type line, Give the back face a name | Saving a custom card without them | Fill them in |
 | Art can be up to 10 MB | Uploading larger art | Use a smaller picture |
 | A set symbol can be up to 512 KB | Choosing a larger set symbol | Use a smaller picture |
@@ -215,6 +215,8 @@ Messages appear at the right end of the status bar (on the phone, in a banner ab
 | The release date must be a date such as 2026-11-19 | A custom set release date that is not a date |
 | Delete or move the cards in this set first | Deleting a custom set that has cards |
 | Only the account that made this set can change it, or delete it | Changing another account's custom set |
+| The rarity symbols are not valid | Saving a symbol for a rarity that is not Common, Uncommon, Rare, Mythic rare or Special |
+| Leave this set without saving the changes? | Choosing another set, New set or opening a card with changes not saved in the Custom sets tab |
 | Only the account that made this card can change it, or delete it | Changing another account's custom card |
 | Choose a custom set | A custom card without a custom set |
 | SET already has a card numbered number | The collector number is taken in that set |

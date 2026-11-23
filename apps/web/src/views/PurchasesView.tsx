@@ -464,7 +464,7 @@ function EntryPage({ id, list, onClose, onChanged }: { id: string; list: Purchas
             <tbody>
               {entry.lines.map((line) => (
                 <tr key={line.id}>
-                  <td>{line.product === "single" ? line.name : line.productLabel}{line.packs > 1 ? <span className="sub"> ({line.packs} packs each)</span> : null}</td>
+                  <td>{line.product === "single" ? line.name : line.productLabel}{line.product !== "single" && line.product !== "other" && line.name ? <b className="pname"> {line.name}</b> : null}{line.packs > 1 ? <span className="sub"> ({line.packs} packs each)</span> : null}</td>
                   <td>{line.setCode && <><SetIcon code={line.setCode} />{line.setCode.toUpperCase()}</>}</td>
                   <td className="numcell">{line.quantity}</td>
                   <td className="numcell">{money(line.full, currency)}</td>
@@ -494,7 +494,7 @@ function EntryPage({ id, list, onClose, onChanged }: { id: string; list: Purchas
               <div key={line.id} className="openingline">
                 {/* the line's figures added up over its opened packs (0.19.0) */}
                 <div className="openlinehead">
-                  <b>{line.productLabel}{line.setCode ? `, ${line.setCode.toUpperCase()}` : ""}</b>
+                  <b>{line.productLabel}{line.product !== "other" && line.name ? ` ${line.name}` : ""}{line.setCode ? `, ${line.setCode.toUpperCase()}` : ""}</b>
                   <span className="sub">{sum((opening) => opening.cards)} cards from {opened} {line.packs > 0 ? (opened === 1 ? "pack" : "packs") : "opened"}, {money(opened ? sum((opening) => opening.valuePulled) / opened : 0, currency)} per pack</span>
                   <span className="openfigs">
                     <span>Cost <b>{money(sum((opening) => opening.packCost), currency)}</b></span>

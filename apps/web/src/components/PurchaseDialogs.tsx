@@ -4,7 +4,7 @@ import { pickFile, request, sendFile } from "../api";
 import { isApp, native } from "../android/platform";
 import type { FoundCard } from "../card-search";
 import {
-  type Entry, type EntryKind, type EntryLine, KIND_LABELS, type Place, type PlaceKind, PLACE_KINDS, type Product, type PurchaseList, type ReceiptFields, type ReceiptLine, reloadOpening, setActiveOpening,
+  type Entry, type EntryKind, type EntryLine, KIND_LABELS, type Place, type PlaceKind, PLACE_KINDS, type Product, type PurchaseList, type ReceiptFields, type ReceiptLine, reloadOpening, type SealedChoice, setActiveOpening,
 } from "../purchase-state";
 import { finishCode, type ScanCard, type ScanItem } from "../scan-state";
 import { type Store } from "../store";
@@ -75,6 +75,68 @@ export function PlaceField({ id, value, places, onValue, placeholder }: { id: st
   );
 }
 
+const sealedLists = new Map<string, Promise<SealedChoice[]>>();
+/** The named sealed products of a set and product (0.20.0), loaded once per set and product. */
+function sealedList(setCode: string, product: string): Promise<SealedChoice[]> {
+  const key = `${setCode}\n${product}`;
+  let list = sealedLists.get(key);
+  if (!list) {
+    list = request<SealedChoice[]>(`/api/purchases/products?set=${encodeURIComponent(setCode)}&product=${encodeURIComponent(product)}`).catch(() => {
+      sealedLists.delete(key);
+      return [];
+    });
+    sealedLists.set(key, list);
+  }
+  return list;
+}
+
+/**
+ * Product name (0.20.0): the name of a named product, such as a Commander deck or a bundle. The list under it holds the
+ * named products of the line's set and product; any other name can be typed.
+ */
+function ProductNameField({ id, label, setCode, product, value, placeholder, onValue }: {
+  id: string; label: string; setCode: string; product: string; value: string; placeholder: string; onValue: (value: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [index, setIndex] = useState(0);
+  const [choices, setChoices] = useState<SealedChoice[]>([]);
+  useEffect(() => {
+    let active = true;
+    if (!setCode || product === "single") { setChoices([]); return; }
+    void sealedList(setCode, product).then((list) => { if (active) setChoices(list); });
+    return () => { active = false; };
+  }, [setCode, product]);
+  const words = value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const shown = choices.filter((choice) => words.every((word) => `${choice.name} ${choice.fullName}`.toLowerCase().includes(word))).slice(0, 12);
+  const exact = choices.find((choice) => choice.name.toLowerCase() === value.trim().toLowerCase());
+  const pick = (name: string) => { onValue(name); setOpen(false); };
+  return (
+    <span className="combo">
+      <input id={id} aria-label={label} value={value} maxLength={120} placeholder={placeholder} autoComplete="off" role="combobox" aria-expanded={open && shown.length > 0} aria-controls={`${id}-list`}
+        onFocus={() => setOpen(true)} onBlur={() => window.setTimeout(() => setOpen(false), 150)}
+        onChange={(event) => { onValue(event.target.value); setOpen(true); setIndex(0); }}
+        onKeyDown={(event) => {
+          if (!open || !shown.length) return;
+          if (event.key === "ArrowDown") { event.preventDefault(); setIndex(Math.min(shown.length - 1, index + 1)); }
+          else if (event.key === "ArrowUp") { event.preventDefault(); setIndex(Math.max(0, index - 1)); }
+          else if (event.key === "Enter" && !exact) { event.preventDefault(); pick(shown[index]!.name); }
+          else if (event.key === "Escape") { event.stopPropagation(); setOpen(false); }
+        }} />
+      {open && shown.length > 0 && (
+        <div className="combolist" id={`${id}-list`} role="listbox">
+          {shown.map((choice, at) => (
+            <div key={choice.id} role="option" aria-selected={at === index} className={at === index ? "pkopt hi" : "pkopt"}
+              onMouseDown={(event) => { event.preventDefault(); pick(choice.name); }}>
+              <span className="pktext"><span>{choice.name}</span><span className="pkdetail">{choice.fullName}{choice.hasDeck ? ", decklist" : ""}</span></span>
+            </div>
+          ))}
+        </div>
+      )}
+      {exact && <span className="sub comboadd">{exact.hasDeck ? "Listed product, with decklist" : "Listed product"}</span>}
+    </span>
+  );
+}
+
 /** The header fields every entry has: date, place and note. Amounts are in USD. */
 function HeaderFields({ value, set, places, kind }: {
   value: { date: string; place: string; note: string }; set: (change: Partial<{ date: string; place: string; note: string }>) => void;
@@ -132,7 +194,7 @@ export type PurchaseDraft = {
 };
 
 const draftOf = (line: EntryLine): LineDraft => ({
-  id: line.id, product: line.product, name: line.product === "other" ? line.name : "", setCode: line.setCode ?? "", quantity: String(line.quantity),
+  id: line.id, product: line.product, name: line.name, setCode: line.setCode ?? "", quantity: String(line.quantity),
   each: fixed(line.cost / line.quantity), total: fixed(line.cost), packs: String(line.packs), locked: line.opened + line.sold,
 });
 const singleOf = (line: EntryLine): SingleDraft => ({
@@ -410,7 +472,7 @@ function PurchaseEditor({ store, list, start, close, onSaved, reopen }: {
   const [panel, setPanel] = useState<"" | "find" | "scanned">("");
   const [matching, setMatching] = useState<MatchRow[] | null>(null);
   const lineFromReceipt = (line: ReceiptLine): LineDraft => ({
-    product: line.product, name: line.product === "other" ? `${line.name}${line.note ? ` ${line.note}` : ""}` : "", setCode: line.setCode ?? "", quantity: String(line.quantity),
+    product: line.product, name: line.product === "other" ? `${line.name}${line.note ? ` ${line.note}` : ""}` : line.productName ?? "", setCode: line.setCode ?? "", quantity: String(line.quantity),
     each: fixed(line.cost / Math.max(1, line.quantity)), total: fixed(line.cost), packs: String(list.products.find((item) => item.id === line.product)?.packs ?? 0), locked: 0,
   });
   const [error, setError] = useState("");
@@ -561,7 +623,8 @@ function PurchaseEditor({ store, list, start, close, onSaved, reopen }: {
               <td>
                 <Picker label={`Product of line ${index + 1}`} value={line.product} options={productOptions}
                   onChange={(product) => setLine(index, { product, packs: String(list.products.find((item) => item.id === product)?.packs ?? 0) })} />
-                {line.product === "other" && <input aria-label={`Name of line ${index + 1}`} value={line.name} placeholder="Product name" maxLength={120} onChange={(event) => setLine(index, { name: event.target.value })} />}
+                <ProductNameField id={`pe-name-${index}`} label={`Name of line ${index + 1}`} setCode={line.setCode} product={line.product} value={line.name}
+                  placeholder={line.product === "other" ? "Product name" : "Product name (optional)"} onValue={(name) => setLine(index, { name })} />
               </td>
               <td><SetPicker label={`Set of line ${index + 1}`} value={line.setCode} onChange={(setCode) => setLine(index, { setCode })} /></td>
               <td><input aria-label={`Quantity of line ${index + 1}`} type="number" min={Math.max(1, line.locked)} value={line.quantity} className="num"
@@ -871,22 +934,40 @@ function OpenEditor({ store, entry, line, close, onDone }: { store: Store; entry
   const [count, setCount] = useState(packs ? "1" : String(line.sealed));
   const [collectionId, setCollectionId] = useState(store.prefs.targetCollection && owned.some((item) => item.id === store.prefs.targetCollection) ? store.prefs.targetCollection : owned[0]?.id ?? "");
   const [error, setError] = useState("");
+  // a named deck with a decklist adds its cards in one step (0.20.0)
+  const deckList = !packs && line.hasDeck;
+  const [useDeck, setUseDeck] = useState(true);
   const open = async () => {
     setError("");
     try {
-      const opening = await request<{ id: string; name: string; collectionId: string; entryId: string; packs: Array<{ id: string; name: string }> }>(`/api/purchases/${entry.id}/lines/${line.id}/open`, {
-        method: "POST", body: JSON.stringify({ count: Number(count), collectionId }),
+      const opening = await request<{
+        id: string; name: string; collectionId: string; entryId: string; packs: Array<{ id: string; name: string }>;
+        deck: { name: string; cards: number; missing: number } | null; deckError?: string;
+      }>(`/api/purchases/${entry.id}/lines/${line.id}/open`, {
+        method: "POST", body: JSON.stringify({ count: Number(count), collectionId, decklist: deckList && useDeck }),
       });
-      setActiveOpening({ ...opening, groupIndex: 1, groupSize: opening.packs.length, hasNext: opening.packs.length > 1 });
+      const where = owned.find((item) => item.id === collectionId)?.name ?? "the collection";
+      if (!opening.deck) setActiveOpening({ ...opening, groupIndex: 1, groupSize: opening.packs.length, hasNext: opening.packs.length > 1 });
       store.setTargetCollection(collectionId);
       store.pushUndo({
         label: `Open ${opening.name}`,
-        undo: async () => { await request(`/api/purchases/openings/${opening.id}`, { method: "DELETE" }); await reloadOpening(); onDone(); },
+        undo: async () => {
+          await request(`/api/purchases/openings/${opening.id}${opening.deck ? "?copies=1" : ""}`, { method: "DELETE" });
+          await reloadOpening();
+          if (opening.deck) await store.refreshAfterChange();
+          onDone();
+        },
         redo: async () => { store.flash("Open the product again from its purchase", "err"); },
       });
       close();
       onDone();
-      store.flash(`Opening ${opening.packs.length > 1 ? `Pack 1 of ${opening.packs.length}, ` : ""}${opening.name}: cards added to ${owned.find((item) => item.id === collectionId)?.name ?? "the collection"} are tied to it`);
+      if (opening.deck) {
+        await store.refreshAfterChange();
+        store.flash(`${opening.deck.cards} cards of ${opening.deck.name} added to ${where} and tied to ${opening.name}${opening.deck.missing ? `. ${opening.deck.missing} are not in the card database` : ""}`);
+        return;
+      }
+      if (opening.deckError) store.flash(`${opening.deckError}. Cards added to ${where} are tied to ${opening.name}`, "err");
+      else store.flash(`Opening ${opening.packs.length > 1 ? `Pack 1 of ${opening.packs.length}, ` : ""}${opening.name}: cards added to ${where} are tied to it`);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Could not open the product.");
     }
@@ -898,6 +979,8 @@ function OpenEditor({ store, entry, line, close, onDone }: { store: Store; entry
         <input id="op-count" type="number" min={1} max={left} className="num" autoFocus value={count} onChange={(event) => setCount(event.target.value)} />
         <span className="sub">{packs ? `of ${left} ${left === 1 ? "pack" : "packs"} left${line.quantity * line.packs > 1 ? ` in the ${line.productLabel.toLowerCase()}${line.quantity > 1 ? "es" : ""}` : ""}` : `of ${line.sealed} sealed`}</span></div>
       {packs && Number(count) > 1 && <p className="note">Each pack is its own opening. Cards go to Pack 1 first; Next pack moves on to the next one.</p>}
+      {deckList && <label className="ck"><input type="checkbox" checked={useDeck} onChange={(event) => setUseDeck(event.target.checked)} /> Add the decklist of {line.name}</label>}
+      {deckList && useDeck && <p className="note">The deck's cards are added to the collection and tied to the opening. Printings and finishes can be changed afterward.</p>}
       <div className="prow"><label htmlFor="op-coll">Pulled cards go to</label>
         <Picker id="op-coll" label="Collection" value={collectionId} options={owned.map((item) => ({ value: item.id, label: item.name }))} onChange={setCollectionId} /></div>
       <div className="btnrow end">
@@ -908,7 +991,7 @@ function OpenEditor({ store, entry, line, close, onDone }: { store: Store; entry
 }
 
 export const openDialog = (store: Store, entry: Entry, line: EntryLine, onDone: () => void) =>
-  customDialog(`Open ${line.productLabel}${line.setCode ? `, ${line.setCode.toUpperCase()}` : ""}`, (close) => <OpenEditor store={store} entry={entry} line={line} close={close} onDone={onDone} />, 520, "Cancel");
+  customDialog(`Open ${line.product !== "other" && line.name ? line.name : line.productLabel}${line.setCode ? `, ${line.setCode.toUpperCase()}` : ""}`, (close) => <OpenEditor store={store} entry={entry} line={line} close={close} onDone={onDone} />, 520, "Cancel");
 
 /** Set current value...: the value each of a sealed line is worth today. */
 function ValueEditor({ store, entry, line, close, onDone }: { store: Store; entry: Entry; line: EntryLine; close: () => void; onDone: () => void }) {

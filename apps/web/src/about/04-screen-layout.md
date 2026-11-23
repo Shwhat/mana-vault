@@ -53,7 +53,7 @@ Commands for one collection, deck, card or trade are where that thing is shown: 
 | Deck history, Playtest | The tabs of the deck view |
 | New trade..., Complete trade..., Send trade..., Copy trade list, Share trade binder... | The Trade view |
 | Print a deck..., Print missing cards... (Print deck, Print missing; From deck..., Missing cards...) | The Print tab of the Proxies view |
-| Print list, Card maker | The tabs of the Proxies view |
+| Print list, Card maker, Custom sets | The tabs of the Proxies view |
 | Sell... | Right-click menu of a collection card; see [Purchases](/about/purchases) |
 | Collection cards, Set completion, Missing cards, Collection statistics (Cards, Completion, Missing, Statistics) | The tabs of the collection view |
 | Deck cards, Deck ownership, Deck statistics (Cards, Ownership, Statistics) | The tabs of the deck view |
@@ -91,7 +91,7 @@ The work area in the middle shows one of six views, chosen with the Views group 
 | Collection | The open collection, in four tabs: Cards (a grid of card pictures, binder pages or a list), Completion, Missing and Statistics; see [Collections](/about/collections), [Set completion](/about/set-completion) and [Prices and statistics](/about/prices-and-statistics) |
 | Deck | The open deck, in seven tabs: Cards (the format check and the cards by zone and group as a list, text, stacks or grid), Add (Quick add and a card search), Ownership, Statistics, Playtest, Description and History; see [Decks](/about/decks) |
 | Trade | Saved trades: You give and You get with their searches, the balance bar and wishlist matches; see [Wishlists and trading](/about/wishlists-and-trading) |
-| Proxies | The print list with sheet settings, preview and exports (Print tab), and the card maker (Card maker tab); see [Proxies and the card maker](/about/proxies) |
+| Proxies | The print list with sheet settings, preview and exports (Print tab), the card maker (Card maker tab) and custom sets with their symbols (Custom sets tab); see [Proxies and the card maker](/about/proxies) |
 
 Click a row to select it; its details appear in the Card panel. Up and Down select the previous or next row. The About guide and the card page also open in the work area and close with **Close**, **Back** or Esc. The About guide also closes when you open a collection, deck, card or view, or select a card in a panel.
 

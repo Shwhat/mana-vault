@@ -4,6 +4,8 @@
 |---|---|
 | Pack | One pack of a product with packs in it, opened as its own opening and named with its number (Pack 3 of 36) |
 | Pack cost | A product's full cost divided by its packs |
+| Named product | A sealed product with a name of its own, such as a Commander deck or a bundle, listed for each set with the card database; picked or typed as a line's Product name |
+| Rarity symbol | A custom set's symbol for one rarity, used on cards of that rarity instead of the main symbol |
 | Finish lines | The lines under a picture that stands for more than one kind of copy, one per finish |
 | Match cards | The step after reading a receipt that matches card lines to printings |
 | Card layout | Where the pips and buttons sit around card pictures, set in View, Card layout... |

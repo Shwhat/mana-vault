@@ -7,6 +7,7 @@ import type { Action } from "../actions";
 import { downloadBlob, downloadText, pickFile, request } from "../api";
 import { blobToData } from "../components/CustomSets";
 import { CardMaker } from "../components/CardMaker";
+import { SetMaker } from "../components/CustomSets";
 import { choiceDialog, confirmDialog, customDialog, dialog } from "../components/Dialog";
 import { choosePrinting } from "../components/PrintingDialog";
 import { choices, type Choice, Picker } from "../components/Picker";
@@ -564,9 +565,10 @@ export function ProxiesView({ actions }: { actions: Record<string, Action> }) {
         <div className="seg" role="tablist" aria-label="Proxies view">
           <button type="button" role="tab" aria-selected={tab === "print"} className={tab === "print" ? "on" : ""} onClick={actions["proxies.print"]?.run}>Print</button>
           <button type="button" role="tab" aria-selected={tab === "maker"} className={tab === "maker" ? "on" : ""} onClick={actions["proxies.maker"]?.run}>Card maker</button>
+          <button type="button" role="tab" aria-selected={tab === "sets"} className={tab === "sets" ? "on" : ""} onClick={actions["proxies.sets"]?.run}>Custom sets</button>
         </div>
       </div>
-      {tab === "print" ? <PrintTab /> : <CardMaker />}
+      {tab === "print" ? <PrintTab /> : tab === "sets" ? <SetMaker /> : <CardMaker />}
     </div>
   );
 }

@@ -11,6 +11,7 @@ import { relinkRemoved, trimLinks } from "./links.js";
 import { mergeHooks } from "./scryfall-extras.js";
 import { isAdmin } from "./admin.js";
 import { CONDITION_NOTE, conditionOf, finishOf, parseReceipt, pdfText, pictureText, setOf } from "./receipts.js";
+import { initializeSealed, matchSealed, sealedChoices, sealedDeckCards } from "./sealed.js";
 
 export const ENTRY_KINDS = ["purchase", "card_sale", "product_sale", "trade"] as const;
 export type EntryKind = (typeof ENTRY_KINDS)[number];
@@ -151,6 +152,9 @@ export function initializePurchases(database: DatabaseSync): void {
     database.exec("UPDATE purchase_openings SET count = count * (SELECT packs FROM purchase_lines l WHERE l.id = line_id) WHERE (SELECT packs FROM purchase_lines l WHERE l.id = line_id) > 0");
   }
   const lineColumns = new Set(database.prepare("PRAGMA table_info(purchase_lines)").all().map((row) => String(row.name)));
+  // 0.20.0: the MTGJSON sealed product a line's product name matched
+  if (!lineColumns.has("sealed_id")) database.exec("ALTER TABLE purchase_lines ADD COLUMN sealed_id TEXT");
+  initializeSealed(database);
   if (!lineColumns.has("packs_opened")) {
     database.exec("ALTER TABLE purchase_lines ADD COLUMN packs_opened INTEGER NOT NULL DEFAULT 0");
     database.exec("UPDATE purchase_lines SET packs_opened = opened * packs WHERE packs > 0");
@@ -462,7 +466,8 @@ const KIND_LABEL: Record<string, string> = { purchase: "Purchase", card_sale: "C
 function lineLabel(line: LineRow): string {
   const product = PRODUCTS[String(line.product)];
   if (line.product === "single") return String(line.name || "Single cards");
-  return `${Number(line.quantity)} ${line.product === "other" ? String(line.name) : product?.label ?? String(line.product)}${line.set_code ? `, ${String(line.set_code).toUpperCase()}` : ""}`;
+  const named = line.product !== "other" && String(line.name) ? ` ${String(line.name)}` : "";
+  return `${Number(line.quantity)} ${line.product === "other" ? String(line.name) : `${product?.label ?? String(line.product)}${named}`}${line.set_code ? `, ${String(line.set_code).toUpperCase()}` : ""}`;
 }
 
 /** A short description of an entry for the history. */
@@ -661,6 +666,8 @@ export function purchaseEntry(database: DatabaseSync, userId: number, id: string
     lines: figures.lines.map((line) => ({
       id: String(line.id), product: String(line.product), productLabel: line.product === "other" ? String(line.name) : PRODUCTS[String(line.product)]?.label ?? String(line.product),
       name: String(line.name), setCode: line.set_code ? String(line.set_code) : null, quantity: Number(line.quantity), cost: Number(line.cost), full: line.full,
+      sealedId: line.sealed_id ? String(line.sealed_id) : null,
+      hasDeck: !!line.sealed_id && !!database.prepare("SELECT 1 FROM sealed_products WHERE id = ? AND deck_name IS NOT NULL").get(String(line.sealed_id)),
       packs: Number(line.packs), opened: Number(line.opened), sold: Number(line.sold), sealed: line.sealed, sealedValue: line.sealedValue, valueDate: line.valueDate,
       packsOpened: Number(line.packs_opened ?? 0), packsLeft: Number(line.packs) > 0 ? packsLeft(line) : line.sealed,
       cardId: line.card_id ? String(line.card_id) : null, foil: line.foil === null ? null : Number(line.foil), condition: line.condition ? String(line.condition) : null,
@@ -767,6 +774,14 @@ function insertEntry(database: DatabaseSync, userId: number, kind: EntryKind, he
   return id;
 }
 
+/** The sealed product of a line (0.20.0), checked again whenever the line is saved. */
+function setSealed(database: DatabaseSync, lineId: string): void {
+  const line = database.prepare("SELECT product, name, set_code FROM purchase_lines WHERE id = ?").get(lineId);
+  if (!line) return;
+  const found = matchSealed(database, { setCode: line.set_code ? String(line.set_code) : null, product: String(line.product), name: String(line.name) });
+  database.prepare("UPDATE purchase_lines SET sealed_id = ? WHERE id = ?").run(found?.id ?? null, lineId);
+}
+
 function insertLine(database: DatabaseSync, entryId: string, position: number, line: LineInput): string {
   const id = line.id && !database.prepare("SELECT 1 FROM purchase_lines WHERE id = ?").get(line.id) ? line.id : randomUUID();
   const single = line.single;
@@ -776,6 +791,7 @@ function insertLine(database: DatabaseSync, entryId: string, position: number, l
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(id, entryId, position, line.product, name, single ? String(database.prepare("SELECT set_code FROM cards WHERE id = ?").get(single.key.cardId)?.set_code ?? "") || null : line.setCode,
     line.quantity, line.cost, line.packs, single?.key.cardId ?? null, single?.key.foil ?? null, single?.key.condition ?? null, single?.key.language ?? null, single?.collectionId ?? null);
+  setSealed(database, id);
   return id;
 }
 
@@ -885,7 +901,7 @@ const csv = (rows: unknown[][]) => rows.map((row) => row.map(csvCell).join(","))
 
 // ---------- routes ----------
 
-export function registerPurchaseRoutes(app: FastifyInstance, database: DatabaseSync, ocrFolder = "") {
+export function registerPurchaseRoutes(app: FastifyInstance, database: DatabaseSync, ocrFolder = "", fetcher: (url: string, init?: RequestInit) => Promise<Response> = fetch) {
   const userOf = (request: FastifyRequest) => request.user!.id;
   const fail = (reply: FastifyReply, error: unknown, fallback: string) => reply.code(400).send({ error: error instanceof Error ? error.message : fallback });
   const own = (request: FastifyRequest<{ Params: { entryId: string } }>) =>
@@ -997,6 +1013,7 @@ export function registerPurchaseRoutes(app: FastifyInstance, database: DatabaseS
               database.prepare("UPDATE purchase_lines SET position = ?, product = ?, name = ?, set_code = ?, quantity = ?, cost = ?, packs = ? WHERE id = ?")
                 .run(position, old.product === "single" ? "single" : line.product, old.product === "single" ? String(old.name) : line.name, old.product === "single" ? old.set_code as string | null : line.setCode,
                   line.quantity, line.cost, line.packs, String(old.id));
+              setSealed(database, String(old.id));
               kept.add(String(old.id));
             } else {
               if (line.single) throw new Error("Single cards are added as a new purchase");
@@ -1047,7 +1064,8 @@ export function registerPurchaseRoutes(app: FastifyInstance, database: DatabaseS
 
   // opens part of a product line. A product with packs (0.19.0) opens a number of packs, each its own opening: the first
   // is where pulled cards are tied, the others wait in order for Next pack. A product without packs opens as one opening.
-  app.post<{ Params: { entryId: string; lineId: string }; Body: { count?: unknown; collectionId?: unknown } }>("/api/purchases/:entryId/lines/:lineId/open", async (request, reply) => {
+  // A named deck with a decklist (0.20.0) adds its cards and ties them to the opening in one step, unless decklist is false.
+  app.post<{ Params: { entryId: string; lineId: string }; Body: { count?: unknown; collectionId?: unknown; decklist?: unknown } }>("/api/purchases/:entryId/lines/:lineId/open", async (request, reply) => {
     const userId = userOf(request);
     const entry = own(request);
     if (!entry) return missing(reply);
@@ -1058,13 +1076,24 @@ export function registerPurchaseRoutes(app: FastifyInstance, database: DatabaseS
     const opened = count(request.body?.count, 10_000);
     if (!opened || opened > left) return reply.code(400).send({ error: packs > 0 ? `Open from 1 to ${left} packs` : `Open from 1 to ${left}` });
     if (!ownCollection(database, request.body?.collectionId, userId)) return reply.code(400).send({ error: "Choose the collection the pulled cards go to" });
-    const label = line.product === "other" ? String(line.name) : PRODUCTS[String(line.product)]!.label;
+    const named = line.product !== "other" && String(line.name) ? String(line.name) : "";
+    const label = line.product === "other" ? String(line.name) : named || PRODUCTS[String(line.product)]!.label;
+    // the decklist of a named deck, downloaded before anything changes
+    let deck: Awaited<ReturnType<typeof sealedDeckCards>> = null;
+    let deckError = "";
+    if (packs === 0 && line.sealed_id && request.body?.decklist !== false) {
+      try {
+        deck = await sealedDeckCards(database, String(line.sealed_id), fetcher);
+      } catch (error) {
+        deckError = error instanceof Error ? error.message : "The decklist could not be downloaded";
+      }
+    }
     const setName = line.set_code ? String(database.prepare("SELECT name FROM sets WHERE code = ?").get(String(line.set_code))?.name ?? String(line.set_code).toUpperCase()) : "";
     const date = new Date(`${String(entry.date)}T12:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
     const collectionId = String(request.body!.collectionId);
     const created: Array<{ id: string; name: string }> = [];
     transaction(database, () => {
-      database.prepare("UPDATE purchase_openings SET active = 0 WHERE user_id = ?").run(userId);
+      if (!deck) database.prepare("UPDATE purchase_openings SET active = 0 WHERE user_id = ?").run(userId);
       const insert = database.prepare(
         "INSERT INTO purchase_openings (id, user_id, entry_id, line_id, count, name, collection_id, active, pack_number, group_id, waiting) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
       );
@@ -1079,16 +1108,28 @@ export function registerPurchaseRoutes(app: FastifyInstance, database: DatabaseS
           created.push({ id, name });
         }
       } else {
-        const plural = opened === 1 ? label : label.endsWith("x") ? `${label}es` : `${label}s`;
+        const plural = named || opened === 1 ? label : label.endsWith("x") ? `${label}es` : `${label}s`;
         const id = randomUUID();
-        const name = `${opened} ${plural}${setName ? `, ${setName}` : ""} (Purchase of ${date})`;
-        insert.run(id, userId, String(entry.id), String(line.id), opened, name, collectionId, 1, null, null, 0);
+        const name = `${named && opened === 1 ? "" : `${opened} `}${plural}${setName ? `, ${setName}` : ""} (Purchase of ${date})`;
+        insert.run(id, userId, String(entry.id), String(line.id), opened, name, collectionId, deck ? 0 : 1, null, null, 0);
         created.push({ id, name });
+        if (deck) {
+          // every card of the decklist, once for each deck opened; the opening is done
+          for (const card of deck.cards) {
+            putCopies(database, collectionId, card.key, card.quantity * opened);
+            insertTie(database, userId, String(entry.id), { lineId: String(line.id), openingId: id }, collectionId, card.key, card.quantity * opened);
+          }
+          database.prepare(`UPDATE purchase_openings SET done_at = ${now} WHERE id = ?`).run(id);
+        }
       }
       syncOpened(database, String(line.id));
     });
     const first = created[0]!;
-    return reply.code(201).send({ id: first.id, name: first.name, collectionId, entryId: String(entry.id), packs: created });
+    return reply.code(201).send({
+      id: first.id, name: first.name, collectionId, entryId: String(entry.id), packs: created,
+      deck: deck ? { name: deck.name, cards: deck.cards.reduce((sum, card) => sum + card.quantity, 0) * opened, missing: deck.missing * opened } : null,
+      ...(deckError ? { deckError } : {}),
+    });
   });
 
   // Next pack (0.19.0): the current pack is done and the next waiting pack of its group is where cards are tied
@@ -1147,7 +1188,8 @@ export function registerPurchaseRoutes(app: FastifyInstance, database: DatabaseS
   });
 
   // undo of Open...: the opening goes, with the ties of its cards (the cards stay in the collection)
-  app.delete<{ Params: { openingId: string } }>("/api/purchases/openings/:openingId", async (request, reply) => {
+  // copies=1 (0.20.0, undo of opening a named deck) also takes the tied copies still held out of their collections
+  app.delete<{ Params: { openingId: string }; Querystring: { copies?: string } }>("/api/purchases/openings/:openingId", async (request, reply) => {
     const opening = ownOpening(request);
     if (!opening) return reply.code(404).send({ error: "That opening is not in your purchase history" });
     // the packs of one Open... go together (0.19.0)
@@ -1156,6 +1198,13 @@ export function registerPurchaseRoutes(app: FastifyInstance, database: DatabaseS
       : [String(opening.id)];
     transaction(database, () => {
       for (const id of group) {
+        if (request.query.copies === "1") {
+          for (const tie of database.prepare("SELECT * FROM purchase_ties WHERE opening_id = ?").all(id)) {
+            const key = keyOfRow(tie);
+            const take = Math.min(Number(tie.quantity), heldQuantity(database, String(tie.collection_id), key));
+            if (take > 0) takeCopies(database, String(tie.collection_id), key, take);
+          }
+        }
         database.prepare("DELETE FROM purchase_ties WHERE opening_id = ?").run(id);
         database.prepare("DELETE FROM purchase_openings WHERE id = ?").run(id);
       }
@@ -1463,6 +1512,10 @@ export function registerPurchaseRoutes(app: FastifyInstance, database: DatabaseS
     }
   });
 
+  // the named sealed products a line of a set and product can be (0.20.0)
+  app.get<{ Querystring: { set?: string; product?: string } }>("/api/purchases/products", async (request) =>
+    sealedChoices(database, request.query.set ? String(request.query.set) : null, request.query.product ? String(request.query.product) : null).slice(0, 300));
+
   // reads text a phone already recognized
   app.post<{ Body: { text?: unknown } }>("/api/purchases/receipts/parse", async (request) => ({ fields: matchReceiptCards(database, parseReceipt(String(request.body?.text ?? "").slice(0, 200_000), receiptSets(database))) }));
 
@@ -1528,7 +1581,15 @@ const VERSION_WORDS: Array<[RegExp, string]> = [
 export function matchReceiptCards(database: DatabaseSync, fields: ReturnType<typeof parseReceipt>): ReturnType<typeof parseReceipt> {
   const sets = receiptSets(database);
   for (const line of fields.lines) {
-    if (line.product !== "other") continue;
+    // a named product (0.20.0): the sealed product whose name is in the line
+    if (line.product !== "other") {
+      const found = matchSealed(database, { setCode: line.setCode, product: line.product, name: line.productName, text: line.name });
+      if (found) {
+        line.sealedId = found.id;
+        line.productName = found.name;
+      }
+      continue;
+    }
     const all = `${line.name} ${line.note}`;
     const bracket = [...line.name.matchAll(/[[(]([^\])]+)[\])]/g)].map((match) => match[1]!);
     const bare = line.name.replace(/[[(][^\])]*[\])]/g, " ").replace(new RegExp(CONDITION_NOTE.source, "gi"), " ").replace(/\s*[-/|:]\s*$/g, "").replace(/\s+/g, " ").trim();

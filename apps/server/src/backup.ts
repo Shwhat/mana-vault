@@ -27,7 +27,11 @@ type BackupLink = {
 };
 
 /** A custom set (0.9.0), with its symbol as base64. */
-type BackupCustomSet = { code: string; name: string; released_at: string | null; symbol: string | null; symbol_type: string | null };
+type BackupCustomSet = {
+  code: string; name: string; released_at: string | null; symbol: string | null; symbol_type: string | null;
+  /** The symbols of single rarities (0.20.0). */
+  rarity_symbols?: Array<{ rarity: string; symbol: string; symbol_type: string }>;
+};
 /** A custom card (0.9.0): its card maker design, pictures and art as base64, and the card data kept outside the card row. */
 type BackupCustomCard = {
   id: string; design: string; picture: string | null; picture_type: string | null; back_picture: string | null; back_picture_type: string | null;
@@ -129,6 +133,8 @@ export function createBackup(database: DatabaseSync, userId: number): ManaVaultB
     const row = database.prepare("SELECT cs.code, s.name, s.released_at, cs.symbol, cs.symbol_type FROM custom_sets cs JOIN sets s ON s.code = cs.code WHERE cs.code = ?").get(code);
     return row ? [{
       code: String(row.code), name: String(row.name), released_at: (row.released_at as string | null) ?? null, symbol: base64(row.symbol), symbol_type: (row.symbol_type as string | null) ?? null,
+      rarity_symbols: database.prepare("SELECT rarity, symbol, symbol_type FROM custom_set_symbols WHERE code = ? ORDER BY rarity").all(code)
+        .map((symbol) => ({ rarity: String(symbol.rarity), symbol: base64(symbol.symbol) ?? "", symbol_type: String(symbol.symbol_type) })),
     }] : [];
   });
   const back = database.prepare("SELECT bytes, type FROM card_backs WHERE id = ?").get(`user:${userId}`);
@@ -186,6 +192,11 @@ export function restoreBackup(database: DatabaseSync, source: string, userId: nu
       const symbol = set.symbol_type === "image/svg+xml" && set.symbol ? cleanSvg(Buffer.from(set.symbol, "base64").toString("utf8")) : null;
       database.prepare("INSERT INTO custom_sets (code, owner_id, symbol, symbol_type) VALUES (?, ?, ?, ?)").run(set.code, userId,
         set.symbol_type === "image/svg+xml" ? (symbol ? new Uint8Array(Buffer.from(symbol, "utf8")) : null) : bytes(set.symbol), set.symbol_type === "image/svg+xml" && !symbol ? null : set.symbol_type);
+      for (const item of set.rarity_symbols ?? []) {
+        const svg = item.symbol_type === "image/svg+xml" ? cleanSvg(Buffer.from(item.symbol, "base64").toString("utf8")) : null;
+        const data = item.symbol_type === "image/svg+xml" ? (svg ? new Uint8Array(Buffer.from(svg, "utf8")) : null) : bytes(item.symbol);
+        if (data) database.prepare("INSERT OR REPLACE INTO custom_set_symbols (code, rarity, symbol, symbol_type) VALUES (?, ?, ?, ?)").run(set.code, item.rarity, data, item.symbol_type);
+      }
     }
     // version 6: the art library and the card back are replaced by the backup's (older backups leave them as they are)
     if (layoutOf(backup) >= 6) {
@@ -479,6 +490,11 @@ function validateBackup(value: unknown): ManaVaultBackup {
     return {
       code: entry.code, name: entry.name.slice(0, 100), released_at: typeof entry.released_at === "string" ? entry.released_at : null,
       symbol: base64(entry.symbol)!, symbol_type: entry.symbol_type === "image/svg+xml" ? "image/svg+xml" : pictureType(entry.symbol_type)!,
+      rarity_symbols: (Array.isArray(entry.rarity_symbols) ? entry.rarity_symbols : []).flatMap((item: unknown) => {
+        if (!isRecord(item) || !["common", "uncommon", "rare", "mythic", "special"].includes(String(item.rarity)) || typeof item.symbol !== "string" || !base64(item.symbol)) return [];
+        const type = item.symbol_type === "image/svg+xml" ? "image/svg+xml" : pictureType(item.symbol_type);
+        return type ? [{ rarity: String(item.rarity), symbol: item.symbol, symbol_type: type }] : [];
+      }),
     };
   });
   const customCards = (Array.isArray(value.customCards) ? value.customCards : []).map((entry: unknown, index: number) => {

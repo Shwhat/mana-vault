@@ -177,6 +177,13 @@ This page lists what Mana Vault does in the current version, followed by what is
 - Notifications for new offers in the Inbox, checked in the background about every 15 minutes, optionally only on Wi-Fi.
 - The Back button, the Android share sheet for exports and backups, sharing lists into the app to import them and pictures or PDFs to read as receipts, background sync as soon as the phone is online, https only, and a daily check of your server for a newer app.
 
+### 0.20.0 additions
+
+- Purchases: a Product name on every line, with the named products of the line's set (Commander decks, bundles and others from MTGJSON) to pick from; receipts fill it ("Landing Party", "Beam Me Up Bundle").
+- Opening a named Commander deck adds its decklist to the collection and ties every card to the opening in one step.
+- Opening names, the product table and the history use the product name.
+- A Custom sets tab beside Print and Card maker: the set list, the set's fields, a main symbol and a symbol for each rarity, a sample card for each rarity and the set's cards.
+
 ### 0.19.0 additions
 
 - The printing chooser in Grid (the default), List or Binder with a card size, kept for your account, and finish buttons with prices under each picture.
@@ -211,7 +218,7 @@ This page lists what Mana Vault does in the current version, followed by what is
 - Card layout (View menu): drag the count, printings, finish, status marks, price and buttons to the corners of the picture, the row under it (left or right), a second line or the bottom, or hide them; one layout for every section or one per section (Card search, Collections, Decks, Trade, Proxies).
 - Live updates: changes made in the app, on another device or by someone sharing a collection or deck show on open pages within a second or two, without reloading.
 - In the Android app one tap opens a collection or deck.
-- Custom sets have a right-click menu (Edit set..., Show its cards, New card in this set, Delete...); Edit set changes the name, code, release date and symbol, with undo. Set symbols can be SVG, a Scryfall set symbol or a picture, drawn in rarity colors.
+- Custom sets have a right-click menu (Edit set..., Show its cards, New card in this set, Delete...) and their own tab to change the name, code, release date and symbols, with undo. Set symbols can be SVG, a Scryfall set symbol or a picture, drawn in rarity colors, with a symbol of its own for any rarity.
 - One Symbols window in the card maker puts symbols at the cursor of the mana cost or rules text, with Scryfall's full symbol list and names.
 - An art library per account for the card maker.
 - Set symbols and block, parent set and digital details in filters, set pickers, set completion, the card page and the printing chooser.

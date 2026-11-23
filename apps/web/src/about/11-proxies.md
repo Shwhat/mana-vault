@@ -1,6 +1,6 @@
 # Proxies and the card maker
 
-The Proxies view prints proxies of any card and makes custom cards. Open it with the **Proxies** tab (key 5), or the Proxies tab on a phone. It has two tabs: **Print** and **Card maker**.
+The Proxies view prints proxies of any card and makes custom cards. Open it with the **Proxies** tab (key 5), or the Proxies tab on a phone. It has three tabs: **Print**, **Card maker** and **Custom sets**.
 
 ## The print list
 
@@ -102,7 +102,7 @@ The card maker makes custom cards with a live preview. A saved custom card is a 
 
 ### The list
 
-The list on the left shows every custom card under a heading for its custom set, with its number, type and maker, and a search box. A right-click (long press) on a set heading opens the custom set menu: **Edit set...**, **Show its cards**, **New card in this set** and **Delete...**. The card maker opens on the card opened last; with no card made yet, it starts a new one. **New card** starts an empty card in the set chosen last with the next free collector number. **Custom sets...** opens the custom sets window. Clicking a card opens it. Leaving a card with changes that are not saved asks first. The card being made stays while other views are used.
+The list on the left shows every custom card under a heading for its custom set, with its number, type and maker, and a search box. A right-click (long press) on a set heading opens the custom set menu: **Edit set...**, **Show its cards**, **New card in this set** and **Delete...**. The card maker opens on the card opened last; with no card made yet, it starts a new one. **New card** starts an empty card in the set chosen last with the next free collector number. **Custom sets...** opens the Custom sets tab on the card's set (on a new set when no set is chosen), and **Edit set...** in a set heading's menu opens it on that set. Clicking a card opens it. Leaving a card with changes that are not saved asks first. The card being made stays while other views are used.
 
 ### Buttons
 
@@ -122,7 +122,7 @@ The list on the left shows every custom card under a heading for its custom set,
 |---|---|
 | Custom set | The custom set the card belongs to; required |
 | Collector number | Up to 10 letters, digits and dashes, unique in the set |
-| Rarity | Common, Uncommon, Rare, Mythic rare or Special. Colors the set symbol when the set has no picture |
+| Rarity | Common, Uncommon, Rare, Mythic rare or Special. Picks the set's symbol for that rarity when it has one, and colors the main symbol when the set uses rarity colors |
 | Artist | Shown on the card's information line as "Illus." |
 | Double-faced card | Adds a back face, edited the same way with the **Front face** and **Back face** tabs |
 | Kind | Normal, Creature, Planeswalker, Saga, Token or Split card |
@@ -207,26 +207,53 @@ The art library keeps pictures for the card maker. There is one art library for 
 
 Art uploaded on a card or chosen with **Art of a card...** is added to the library when the card is saved; the same picture is kept once. The first start of 0.15.0 adds the art of every custom card you made. The first start of 0.17.0 joins every account's art library into the one library, keeping one copy of each picture. Deleting a picture from the library leaves the cards that use it unchanged.
 
-### Custom sets
+## Custom sets
 
-The **Custom sets** window lists every custom set with its symbol, code, name, release date, card count and maker. A right-click (a long press on a phone, or the menu key) on a set opens its menu; a double click on your own set opens **Edit set...**.
+The **Custom sets** tab makes and changes custom sets. It is laid out like the card maker: the list of sets on the left, the chosen set's fields and symbols in the middle and a sample card on the right. On a phone the parts are stacked, as in the card maker.
+
+### The set list
+
+The list shows every custom set with its main symbol, name, code, card count and maker, and a search box (**Find a custom set**) that keeps the sets whose name or code holds the text. **New set** starts an empty set; **Create set** saves it. Clicking a set opens it. The tab opens on the set asked for (from the card maker), or on the set opened last, or your first set. Leaving a set with changes that are not saved asks first.
+
+A right-click (a long press on a phone) on a set opens its menu, the same as on a set heading in the card maker:
 
 | Command | What it does |
 |---|---|
-| **Edit set...** | Your own sets: the Edit set window |
+| **Edit set...** | Your own sets: opens the set in the tab |
 | **Show its cards** | Card search for `set:` and the set's code |
-| **New card in this set** | Starts a new card in the set, numbered after its last card |
+| **New card in this set** | Opens the card maker on a new card in the set, numbered after its last card |
 | **Delete...** | Your own sets without cards: asks, then deletes the set |
 
-| Field | Notes |
-|---|---|
-| Set code | 2 to 6 letters or digits, such as XXX. A code used by a Scryfall set or another custom set cannot be taken |
-| Set name | Required |
-| Release date | Cards of the set get the date |
-| Set symbol | **Upload symbol...** (SVG, PNG, JPEG or WebP up to 512 KB), **Scryfall set symbol...** (the symbol of any Scryfall set, from the symbols the card database update saved, found by name or code) or **Remove symbol**. The symbol is shown on the type line |
-| Rarity colors (SVG symbols) | On by default. An SVG symbol is drawn in the card's rarity colors with a white outline: black for common, silver for uncommon, gold for rare, orange for mythic rare and purple for special. Off: the symbol keeps its own colors |
+### Set fields
 
-**Create set** adds the set with the fields under New custom set. **Save** in Edit set saves every change at once. A new code moves every card of the set to it, and is checked the same way as a new set's code. Edit set changes can be undone and redone (Edit, Undo and Redo).
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| Name | Text, up to 100 characters | Yes | |
+| Code | 2 to 6 letters or digits, such as XXX | Yes | A code used by a Scryfall set or another custom set cannot be taken. A new code moves every card of the set to it |
+| Release date | Date | No | Today for a new set. Cards of the set get the date |
+| Rarity colors (a one-color SVG main symbol) | Check box | No | On by default. A card of a rarity with no symbol of its own draws an SVG main symbol in its rarity colors with a white outline: black for common, silver for uncommon, gold for rare, orange for mythic rare and purple for special. Off: the symbol keeps its own colors |
+
+**Save** (**Create set** for a new set) saves every change at once, the symbols included, and can be undone and redone (Edit, Undo and Redo). Undo of a new set deletes it. **Not saved yet** shows while there are changes. **New card in this set** opens the card maker on a new card in the set. Another account's set is shown read only, with "Made by name. Only its maker can change it."
+
+### Symbols
+
+A set has a main symbol and can have its own symbol for each rarity: Common, Uncommon, Rare, Mythic rare and Special. Each has a row with the symbol shown and:
+
+| Button | What it does |
+|---|---|
+| Upload... | An SVG, PNG, JPEG or WebP file up to 512 KB |
+| Scryfall set symbol... | The symbol of any Scryfall set, from the symbols the card database update saved, found by name or code |
+| Remove | Removes the symbol |
+
+A card uses its rarity's symbol when the set has one, drawn in its own colors. Otherwise it uses the main symbol, in rarity colors when that is on. A rarity row with no symbol shows "Uses the main symbol". With no symbol at all, the card shows the set code in a circle. The set list, card search, printing lists and set filters show the main symbol.
+
+### Sample card
+
+A sample card shows the set's code and the symbol a card of the chosen **Rarity** would get, with the changes not saved yet.
+
+### Cards in the set
+
+The cards of the set, by collector number, with their name, rarity and maker. A double click (or Enter) opens a card in the card maker.
 
 SVG symbols are cleaned when they are saved: scripts, event handlers, links to other files and embedded pages are removed, and an SVG without any drawing left is refused with "This SVG has no drawing Mana Vault can use".
 

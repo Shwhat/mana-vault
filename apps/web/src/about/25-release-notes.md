@@ -2,6 +2,16 @@
 
 The installed version is shown at the top of this guide.
 
+## 0.20.0 (2026-11-22): Named products and the Custom sets tab
+
+- Purchases: every product line has a Product name, such as "Landing Party" for a Commander deck or "Beam Me Up Bundle". The list under the field holds the named products of the line's set and product, downloaded from MTGJSON with each card database update; any other name can be typed. The separate name of Other lines is now this field.
+- Read receipt: the product name is read from the product line ("Magic the Gathering: Star Trek: Commander Deck: Landing Party" gives Landing Party) and matched to the set's named products.
+- Purchases: Open... on a named Commander deck with a decklist adds the deck's cards to the collection, in the decklist's printings and finishes, and ties every card to the opening in one step. Undo takes them out again.
+- Purchases: opening names, the product table, the opening list and the history use the product name ("Landing Party, Star Trek Commander (Purchase of Nov 20)").
+- Custom sets: a Custom sets tab beside Print and Card maker, laid out like the card maker, with the set list, the set's fields, a sample card and the set's cards. The Custom sets window and the Edit set window are replaced by it.
+- Custom sets: a symbol for each rarity (Common, Uncommon, Rare, Mythic rare, Special) besides the main symbol; a card uses its rarity's symbol when there is one. Backups include them.
+- Named products appear after the first card database update with this version.
+
 ## 0.19.1 (2026-11-22): Receipts with names that wrap
 
 - Fixed: a product name that wraps over several rows of a receipt (such as "Magic the Gathering: Star Trek: Commander Deck: Landing Party") was cut to its first row, so the Commander deck became an Other line with no set; the rows are now joined into one line.

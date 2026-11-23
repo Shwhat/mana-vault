@@ -87,7 +87,7 @@ export type Prefs = {
   printSize: GridSize;
   /** Proxies: the sheet settings for printing, and the tab shown (Print or Card maker). */
   proxySheet: SheetSettings;
-  proxyTab: "print" | "maker";
+  proxyTab: "print" | "maker" | "sets";
   /** The printing chooser's layout and card size (0.19.0), its own setting. */
   chooserLayout: CollectionLayout;
   chooserSize: GridSize;
@@ -171,7 +171,7 @@ export function mergePrefs(saved: unknown): Prefs {
     scanSets: Array.isArray(value.scanSets) ? value.scanSets.filter((code): code is string => typeof code === "string" && /^[a-z0-9]{2,8}$/.test(code)).slice(0, 50) : [],
     scanIgnorePromos: value.scanIgnorePromos === true,
     proxySheet: readSheet(value.proxySheet),
-    proxyTab: value.proxyTab === "maker" ? "maker" : "print",
+    proxyTab: value.proxyTab === "maker" || value.proxyTab === "sets" ? value.proxyTab : "print",
     scanProxy: value.scanProxy === true,
     scanCondition: ["M", "NM", "LP", "MP", "HP", "DMG"].includes(String(value.scanCondition)) ? String(value.scanCondition) : "NM",
     scanLanguage: typeof value.scanLanguage === "string" && /^[a-z]{2,3}$/.test(value.scanLanguage) ? value.scanLanguage : "en",

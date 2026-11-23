@@ -54,7 +54,8 @@ A purchase has one line per product.
 
 | Field | Choices | Notes |
 |---|---|---|
-| Product | Play booster, Draft booster, Set booster, Collector booster, Jumpstart booster, Other booster, Booster box, Bundle, Commander deck, Starter or other deck, Prerelease kit, Secret Lair, Single cards, Other | Other needs a product name |
+| Product | Play booster, Draft booster, Set booster, Collector booster, Jumpstart booster, Other booster, Booster box, Bundle, Commander deck, Starter or other deck, Prerelease kit, Secret Lair, Single cards, Other | |
+| Product name | Text, up to 120 characters | Required for Other, optional for the rest. The name of a named product, such as a Commander deck ("Landing Party") or a bundle ("Beam Me Up Bundle"). The list under the field holds the named products of the line's set and product; any other name can be typed |
 | Set | A set from a searchable list, or No set | Each set shows its symbol, name, code in capitals and year. Type to find a set by name or code |
 | Quantity | Whole number from 1 to 10000 | A line cannot go below what is opened or sold |
 | Cost each, Total | Amounts | Typing either one fills the other |
@@ -62,6 +63,14 @@ A purchase has one line per product.
 | Tax, Shipping | Amounts for the whole purchase | Spread over the lines by cost |
 
 A new purchase starts with no lines. **Add product** adds a product line.
+
+### Named products
+
+The named products of each set (Commander decks, bundles, boxes and other sealed products, with their decklists for preconstructed decks) are downloaded with every card database update. The Product name list shows the products of the line's set, its parent set and its companion sets, of the line's product (every product for Other), with each product's full name and "decklist" when it has one.
+
+A name picked from the list, or typed exactly as a listed product's name (case and punctuation ignored), links the line to that product; beside the field, **Listed product** or **Listed product, with decklist** shows the link. Changing the set, the product or the name checks the link again when the purchase is saved. A name that is not listed is kept as typed.
+
+The product name shows beside the product in the entry's product table, in the opening list, in the history description and in the names of the line's openings.
 
 ### Single cards
 
@@ -87,6 +96,7 @@ A purchase can be read from a receipt: a photo, a PDF or a screenshot.
 - **Ignored text**: buttons, links and status text of order pages (such as Buy again, Track all your orders, View order, Reorder, Picked up, Confirmed, times such as "at 5:22 PM") are never read as products or as the place. Bought from comes only from rows above the first price that are not product names, and is left empty when the receipt names no store; the date is today when the receipt shows none.
 - **Order number**: "Order #Z-301783" and the like go into the Note.
 - **Sets**: a set named in a product line fills its set, ignoring punctuation ("Star Trek: Commander Deck" names Star Trek); a Commander product finds the set's Commander companion.
+- **Product names**: what is left of a product line after the brand ("Magic the Gathering"), the set name and the product words becomes the Product name: "Magic the Gathering: Star Trek: Commander Deck: Landing Party" gives Landing Party, and "Star Trek Beam Me Up Bundle" gives Beam Me Up Bundle. A line that names a listed product of its set is linked to it with the product's own name.
 
 #### Match cards
 
@@ -121,7 +131,7 @@ Example: 6 Play boosters for 30.00 and a Bundle for 10.00, with 3.00 tax and 1.0
 A product line is sealed until it is opened.
 
 1. On the entry page, **Open...** on a line asks the collection the pulled cards go to and, for a product with packs in it (Packs in it above 0, such as a booster, a booster box or a bundle), **Open how many packs?** out of the packs left (for example 3 of 36 left in the box). A product with no packs in it (a Commander deck) asks how many of it to open. Once packs are opened the button reads **Open more packs...**.
-2. Each pack opened is its own **opening**, named with its number in the product, like "Pack 1 of 36, Booster box, Foundations (Purchase of Nov 20)". The first is where pulled cards are tied; the other packs opened at the same time wait in order. **Next pack** (on the entry page, NEXT PACK in the status bar, beside the opening chip in the Purchases header, and on the scanner) ends the current pack and moves to the next one; the last pack has **Done opening**. The status bar shows OPENING: name (1 of 3). A product with no packs makes one opening, named like "1 Commander deck, Star Trek (Purchase of Nov 20)".
+2. Each pack opened is its own **opening**, named with its number in the product, like "Pack 1 of 36, Booster box, Foundations (Purchase of Nov 20)". The first is where pulled cards are tied; the other packs opened at the same time wait in order. **Next pack** (on the entry page, NEXT PACK in the status bar, beside the opening chip in the Purchases header, and on the scanner) ends the current pack and moves to the next one; the last pack has **Done opening**. The status bar shows OPENING: name (1 of 3). A product with no packs makes one opening, named like "1 Commander deck, Star Trek (Purchase of Nov 20)". A line with a product name uses it instead of the product: "Landing Party, Star Trek Commander (Purchase of Nov 20)", "Pack 1 of 9, Beam Me Up Bundle, Star Trek Commander (Purchase of Nov 20)".
 3. While the opening is active, every card added to that collection is tied to it: from card search, Quick add, the scanner, pasted lists, imports and count changes. The status bar shows **OPENING: name**, and ADDING TO names the opening. A pulled card stays on its pack for good: removing it from the collection, moving it, changing its printing, selling it or trading it never takes it off the pack. Only **Remove from pack...** on the entry page does, and an undo of adding the card (the card was added by mistake).
 4. The opening on the entry page has buttons to fill it:
 
@@ -133,6 +143,12 @@ A product line is sealed until it is opened.
 | Done opening | Ends the opening |
 
 5. A click on **OPENING** in the status bar, or on the opening chip in the Purchases header, opens the entry. **Continue opening** makes an ended opening active again, so a box of 36 packs can be recorded over several days.
+
+### Opening a named deck with a decklist
+
+Open... on a line linked to a named deck with a decklist (such as a Commander deck) has **Add the decklist of name**, on to start with. Opening then adds every card of the decklist (the commander and the main deck) to the chosen collection, once for each deck opened, in the printing the decklist names and foil where the decklist says so, in Near Mint and English. Each card is tied to the opening with its value when pulled, and the opening is ended at once. The status bar says "N cards of name added to collection and tied to opening", and how many cards of the decklist are not in the card database.
+
+The decklist is downloaded the first time the deck is opened and kept. When it cannot be downloaded, the deck opens as a product with no decklist and the status bar says so. Printings and finishes can be changed afterward in the collection; the cards stay on the opening. With the box cleared, the deck opens as any product with no packs.
 
 A box counts as opened from its first pack: its State shows packs opened and packs left (such as "3 of 36 packs opened, 33 left"), and its packs not yet opened keep counting at the box's value divided by its packs. A waiting pack has **Start this pack**; an ended pack has **Continue opening**. Undo of Open... removes every pack opened at the same time, with their cards' ties.
 
@@ -286,7 +302,7 @@ A click or Enter opens an entry; the right-click menu has **Open**.
 
 ## Undo
 
-Saving, editing and deleting entries, **Open...**, **Set current value...**, **Untie**, card sales and **Make purchases from imported prices...** can be undone (Edit, Undo). Undo of Open... removes the opening and the ties of its cards; the cards stay in the collection. Redo of Open... and Untie asks you to do them again from the entry.
+Saving, editing and deleting entries, **Open...**, **Set current value...**, **Untie**, card sales and **Make purchases from imported prices...** can be undone (Edit, Undo). Undo of Open... removes the opening and the ties of its cards; the cards stay in the collection, except the cards a decklist added, which are taken out again. Redo of Open... and Untie asks you to do them again from the entry.
 
 ## Export
 
@@ -343,6 +359,9 @@ Purchases works online. Without a connection, the history and the summary show f
 | Choose One purchase or One purchase per date added | Make purchases from imported prices without a choice |
 | Purchase of date saved, Card sale of date saved: N cards removed from collections, Product sale of date saved | Saving an entry |
 | Opening name: cards added to collection are tied to it | Open... |
+| N cards of name added to collection and tied to opening | Open... on a named deck with its decklist |
+| The decklist could not be downloaded (status). Cards added to collection are tied to opening | Open... on a named deck when the decklist cannot be downloaded |
+| The decklist has no cards | Open... on a named deck whose decklist is empty |
 | Done opening | Ending an opening |
 | Name valued at amount each | Set current value... |
 | N purchases made from imported prices | Make purchases from imported prices... |

@@ -535,6 +535,16 @@ function initializeExtras(database: DatabaseSync): void {
   // a printing Scryfall deleted keeps its row, marked, so copies of it keep their name (0.15.0)
   if (!columnsOf("cards").has("removed")) database.exec("ALTER TABLE cards ADD COLUMN removed INTEGER NOT NULL DEFAULT 0");
   if (!columnsOf("custom_sets").has("rarity_colors")) database.exec("ALTER TABLE custom_sets ADD COLUMN rarity_colors INTEGER NOT NULL DEFAULT 1");
+  // 0.20.0: a set symbol for each rarity, used instead of the main symbol on cards of that rarity
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS custom_set_symbols (
+      code TEXT NOT NULL,
+      rarity TEXT NOT NULL CHECK(rarity IN ('common', 'uncommon', 'rare', 'mythic', 'special')),
+      symbol BLOB NOT NULL,
+      symbol_type TEXT NOT NULL,
+      PRIMARY KEY (code, rarity)
+    );
+  `);
   database.exec(`
     CREATE TABLE IF NOT EXISTS set_symbols (
       code TEXT PRIMARY KEY,
