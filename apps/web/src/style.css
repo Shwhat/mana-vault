@@ -1309,6 +1309,8 @@ input.setcode{width:60px}
 /* 0.17.0: every row of tabs or buttons wraps onto another line when it runs out of room */
 .btnrow,.navbar,.deckzones,.phfilters,.pehead{flex-wrap:wrap}
 .phone .seg{flex:1 1 100%}
+/* 0.23.1: the deck's zone buttons sit in a column, where a 100% basis is the height: they stay one row */
+.phone .seg.deckzones{flex:none;align-self:stretch}
 .makerform > .btnrow{gap:6px;margin:2px 0 8px;padding-top:2px}
 .csetlist{display:flex;align-items:center;gap:6px;cursor:context-menu}
 .csetlist .setsym{width:16px;height:16px;border:0;background:none}

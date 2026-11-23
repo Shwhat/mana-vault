@@ -206,7 +206,7 @@ The List layout of a deck, a collection, All collections, card search and the pr
 | Mana cost | Shown as mana symbols |
 | Menu button | The **...** button on each row opens the same menu as a right-click |
 
-Type groups are Creatures, Planeswalkers, Battles, Instants, Sorceries, Artifacts, Enchantments, Lands and Other. SubType groups by the first subtype. Color groups are White, Blue, Black, Red, Green, Multicolor and Colorless; Color Identity groups each combination of colors by name, such as "Blue and Red". Mana Value groups go from 0 to 7+, with lands last.
+Type groups are, in this order, Planeswalkers, Creatures, Sorceries, Instants, Artifacts, Enchantments, Battles, Lands and Other. SubType groups by the first subtype. Color groups are White, Blue, Black, Red, Green, Multicolor and Colorless; Color Identity groups each combination of colors by name, such as "Blue and Red". Mana Value groups go from 0 to 7+, with lands last.
 
 ## Choice lists
 
