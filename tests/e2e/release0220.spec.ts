@@ -247,6 +247,14 @@ test("markdown import of a folder zip, export as a zip, and templates", async ({
   expect(names.filter((name) => name.endsWith(".md"))).toEqual(["Vault.md", "Vault/Decks.md", "Vault/Decks/Elves.md"]);
   expect(names.some((name) => /^attachments\/[0-9a-f-]{36}\.png$/.test(name))).toBe(true);
   expect(strFromU8(files["Vault/Decks/Elves.md"]!)).toMatch(/!\[elf\.png\]\(\.\.\/\.\.\/attachments\/[0-9a-f-]{36}\.png\)/);
+  // import under a chosen page
+  const under = page.waitForEvent("filechooser");
+  await page.locator(".ntree [role=treeitem]", { hasText: "Elves" }).first().click({ button: "right" });
+  await page.locator("#ctxmenu [role=menuitem]", { hasText: "Import markdown here..." }).click();
+  await (await under).setFiles({ name: "Mulligans.md", mimeType: "text/markdown", buffer: Buffer.from("Keep two lands") });
+  await expect(status(page)).toHaveText("Imported 1 page");
+  const after = await notes(page);
+  expect(after.pages.find((item) => item.title === "Mulligans")!.parentId).toBe(after.pages.find((item) => item.title === "Elves")!.id);
   // save a page as a template, then use it
   await page.locator(".ntree [role=treeitem]", { hasText: "Decks" }).first().click({ button: "right" });
   await page.locator("#ctxmenu [role=menuitem]", { hasText: "Save as template..." }).first().click();

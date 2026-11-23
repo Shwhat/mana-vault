@@ -74,11 +74,11 @@ Clicking a link opens the page with that title: one in the same deck or collecti
 
 ### Card links
 
-**Card link** opens a find box for card names (type at least two letters). The link shows the card name in green. Pointing at it on the desktop shows the card's picture (the newest printing); clicking it opens the card page.
+**Card link** opens a find box for card names (type at least two letters). The link shows the card name in green. Pointing at it on the desktop shows the card's picture (the newest printing); clicking or tapping it opens the card page.
 
 ### Pictures
 
-Pictures (PNG, JPEG, GIF, WebP, AVIF or SVG, up to 20 MB) are kept on the server with the page. Pictures larger than 2,000 pixels on a side are made smaller before they are sent. A picture's address is a long random code, so it can be shown in the Android app and in exported pages; anyone who has the address can open the picture.
+Pictures (PNG, JPEG, GIF, WebP, AVIF or SVG, up to 20 MB) are kept on the server with the page. Pictures larger than 2,000 pixels on a side are made smaller before they are sent. A picture opens full size in a new tab with a click while reading, or a double click while editing. A picture's address is a long random code, so it can be shown in the Android app and in exported pages; anyone who has the address can open the picture.
 
 ## Child pages, moving and deleting
 
@@ -90,6 +90,7 @@ Pictures (PNG, JPEG, GIF, WebP, AVIF or SVG, up to 20 MB) are kept on the server
 | Save as template... | Right-click menu | Saves the page's text as one of your templates |
 | Move to... | Right-click menu | Moves the page and its child pages under another page, to the top of a deck's or collection's notes, or to My pages (top level) |
 | Export... | Right-click menu | See Import and export below |
+| Import markdown here... | Right-click menu | Imports markdown files as child pages of this page |
 | History... | The page header and the right-click menu | See History below |
 | Delete... | Right-click menu | Deletes the page. A page with child pages asks: **Delete with child pages** or **Move child pages up** (they take the deleted page's place) |
 | More... | The page header | Opens the right-click menu of the page |
@@ -138,7 +139,7 @@ The notes of a deck or collection follow its sharing: everyone it is shared with
 
 **Export...** offers **This page and its child pages**, **The whole deck or collection tree** (for a page in a deck or collection) and **The whole Wiki**. The download is a zip of .md files in folders that follow the tree: a page with child pages is a .md file with a folder of the same name beside it. Pictures are in an `attachments` folder and the pages point to them there. Page and card links stay as `[[Page title]]` and `[[card:Card name]]`.
 
-**Import markdown...** takes .md, .markdown and .txt files, or a zip of them (such as an Obsidian vault). Each folder becomes a page with the files in it as its child pages, and a file named like a folder becomes that folder's page. Settings at the top of a file between `---` lines are left out. Pictures in the zip are added when a page names them as `![text](path/name.png)` or `![[name.png]]`. In the Wiki the imported pages go into My pages. Import can be undone, which deletes the imported pages.
+**Import markdown...** takes .md, .markdown and .txt files, or a zip of them (such as an Obsidian vault). Each folder becomes a page with the files in it as its child pages, and a file named like a folder becomes that folder's page. Settings at the top of a file between `---` lines are left out. Pictures in the zip are added when a page names them as `![text](path/name.png)` or `![[name.png]]`. From the Wiki header and the File menu the imported pages go into My pages; Import markdown here... puts them under the page chosen. Import can be undone, which deletes the imported pages.
 
 Deck exports in **Plain text list** end with the deck's description (its top notes page) as lines starting with `//` under `// Notes`. Deck imports skip lines that start with `//`.
 

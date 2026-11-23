@@ -260,6 +260,12 @@ export function NoteEditor({ pageId, body, editable, near, onChange, onOpenPage,
       });
       return;
     }
+    // a picture opens full size with a click while reading, or a double click while editing
+    if (target instanceof HTMLImageElement && target.classList.contains("notepic") && (!editable || event.detail >= 2)) {
+      event.preventDefault();
+      window.open(target.src, "_blank", "noopener,noreferrer");
+      return;
+    }
     const link = target.closest<HTMLAnchorElement>("a[href]");
     if (link && (!editable || event.ctrlKey || event.metaKey)) {
       event.preventDefault();

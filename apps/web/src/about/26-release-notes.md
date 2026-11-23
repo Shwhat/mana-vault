@@ -12,7 +12,7 @@ The installed version is shown at the top of this guide.
 - Templates: Deck primer, Combo, Sideboard guide and Collection plan are built in; Save as template... adds your own, and Templates... renames and deletes them.
 - History... lists each page's versions with Restore. When someone saved a page while you were editing it, you choose Keep mine, Keep theirs or Keep both.
 - Notes follow the sharing of their deck or collection. Deleting a deck or collection deletes its notes.
-- Import markdown... reads .md files or a zip (such as an Obsidian vault) with pictures; Export notes... saves a page with its child pages, a deck's or collection's tree, or the whole Wiki as a zip of .md files with pictures. A deck exported as a Plain text list ends with its notes as `//` lines.
+- Import markdown... (and Import markdown here... on a page) reads .md files or a zip (such as an Obsidian vault) with pictures; Export notes... saves a page with its child pages, a deck's or collection's tree, or the whole Wiki as a zip of .md files with pictures. A deck exported as a Plain text list ends with its notes as `//` lines.
 - Android app: notes are kept on the phone and can be read, searched and changed without a connection; pictures added offline are sent with the changes.
 - Backups include notes pages, their versions and pictures, pins and templates.
 - Each deck's existing description becomes its top notes page when the server starts with this version.

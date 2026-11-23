@@ -336,6 +336,7 @@ function pageMenu(store: Store, page: PageMeta, open: (id: string) => void) {
     { label: "Save as template...", run: () => void readPage(page.id).then((detail) => saveTemplateDialog(store, detail)) },
     !page.top && { label: "Move to...", run: () => moveToDialog(store, page) },
     { label: "Export...", run: () => exportDialog(store, page) },
+    { label: "Import markdown here...", run: () => void importMarkdown(store, { parentId: page.id }) },
     { label: "History...", run: () => void readPage(page.id).then((detail) => historyDialog(detail, () => void reloadNotes())) },
     !page.top && { label: "Delete...", run: () => void askDelete(store, page) },
   ]);
