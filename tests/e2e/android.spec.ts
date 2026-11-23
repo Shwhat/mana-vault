@@ -204,6 +204,39 @@ test.describe("Android app", () => {
       .toBe("Online text and offline text again\n");
   });
 
+  test("pictures pasted offline stay as links and are copied when the page is opened online (0.23.0)", async ({ page, context, baseURL }) => {
+    await fakePhone(page);
+    await signUpOnPhone(page, baseURL!, "paste");
+    await page.getByRole("button", { name: "Wiki" }).click();
+    for (const title of ["Web notes", "Other"]) {
+      await page.locator("#view-wiki .wikihead").getByRole("button", { name: "New page..." }).click();
+      await page.locator("dialog#dlg[open]").getByRole("textbox", { name: "Title" }).fill(title);
+      await page.locator("dialog#dlg[open]").getByRole("button", { name: "Make page" }).click();
+      await expect(page.locator("input.ntitle")).toHaveValue(title);
+      await page.getByRole("button", { name: "Pages", exact: true }).click();
+    }
+    await page.locator(".ntree [role=treeitem]", { hasText: "Web notes" }).click();
+    await context.setOffline(true);
+    await page.getByRole("button", { name: "Edit", exact: true }).click();
+    await page.locator(".notebody").click();
+    await page.evaluate(() => {
+      const data = new DataTransfer();
+      data.setData("text/html", `<p>An elf</p><p><img src="https://example.test/pics/elf.png" alt="Elf"></p>`);
+      document.querySelector(".notebody")!.dispatchEvent(new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true }));
+    });
+    await expect(page.locator(".notebody img.notepic")).toHaveAttribute("src", "https://example.test/pics/elf.png");
+    await expect(page.locator(".nstatus")).toHaveText("Saved", { timeout: 6000 });
+    await page.getByRole("button", { name: "Done", exact: true }).click();
+    await context.setOffline(false);
+    await expect(chip(page)).toHaveText(/^Synced/, { timeout: 15_000 });
+    // opening the page again online copies the picture
+    await page.getByRole("button", { name: "Pages", exact: true }).click();
+    await page.locator(".ntree [role=treeitem]", { hasText: "Other" }).click();
+    await page.getByRole("button", { name: "Pages", exact: true }).click();
+    await page.locator(".ntree [role=treeitem]", { hasText: "Web notes" }).click();
+    await expect(page.locator(".notebody img.notepic")).toHaveAttribute("src", /\/api\/notes\/files\/[0-9a-f-]{36}$/, { timeout: 10_000 });
+  });
+
   test("Back button, devices, notifications and sign out", async ({ page, baseURL }) => {
     await fakePhone(page);
     await signUpOnPhone(page, baseURL!, "back");

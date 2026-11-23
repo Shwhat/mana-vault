@@ -62,8 +62,28 @@ database.prepare("UPDATE cards SET removed = 1 WHERE id = 'sol-old'").run();
 const webRoot = fileURLToPath(new URL("../../apps/web/dist", import.meta.url));
 // the test machine may not reach Scryfall: card pictures and mana symbols are never downloaded in the browser tests
 const fetcher = async () => { throw new Error("No internet in the browser tests"); };
+// 0.23.0: a stand-in for the web for notes: an article page and a picture at example.test
+const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
+const ARTICLE = `<!doctype html><html><head><title>Elf ball primer - Example Site</title><style>p{color:red}</style></head><body>
+<nav><a href="/">Home</a> <a href="/decks">Decks</a> <a href="/login">Sign in</a></nav>
+<aside class="sidebar"><h3>Ads</h3><p>Buy cheap cards now at our sponsor store today.</p></aside>
+<article><h1>Elf ball primer</h1>
+<p style="color:green">The deck plays <b>many elves</b> and wins with <a href="/combo">one big combo</a> that draws the whole library in a single turn.</p>
+<p><img src="/pics/elf.png" alt="An elf"></p>
+<h2>Key cards</h2><ul><li>Llanowar Elves</li><li>Priest of Titania</li></ul>
+<table><tr><th>Turn</th><th>Play</th></tr><tr><td>1</td><td>Elf</td></tr></table>
+<iframe src="https://www.youtube.com/embed/abc123"></iframe>
+<p>Read the <a href="#rules">rules</a> section for every detail about how the combo resolves.</p>
+<p><img src="https://missing.example.test/gone.png" alt="Gone"></p>
+</article><footer>Copyright Example Site</footer></body></html>`;
+const notesFetcher = async (url) => {
+  if (url === "https://example.test/primer") return { url, type: "text/html; charset=utf-8", bytes: Buffer.from(ARTICLE) };
+  if (url === "https://example.test/pics/elf.png") return { url, type: "image/png", bytes: PNG };
+  throw new Error("The site was not found");
+};
 const app = await buildApp(database, webRoot, undefined, () => false, {
   passwordIterations: 1000, addressAttemptLimit: 10_000, version: "test", fetcher, pictureRetryDelay: 0, pictureDownloads: false, settingsEnv: { forced: {}, locks: {} },
+  notesFetcher,
 });
 // 0.20.0: MTGJSON's named products of Limited Edition Alpha, with a decklist already downloaded for Landing Party
 const sealed = database.prepare("INSERT INTO sealed_products (id, set_code, name, short_name, category, subtype, product, card_count, deck_name, deck_code) VALUES (?, 'lea', ?, ?, ?, ?, ?, ?, ?, ?)");

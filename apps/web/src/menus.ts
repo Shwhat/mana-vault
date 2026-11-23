@@ -5,7 +5,7 @@ export type Menu = { id: string; name: string; items: string[] };
 export const MENUS: Menu[] = [
   {
     id: "file", name: "File", items: [
-      "collection.new", "newDeck", "-", "precon.deck", "precon.collection", "-", "io.import", "io.export", "purchases.export", "-", "purchases.new", "purchases.sale", "purchases.barcode", "boosters.open", "-", "wiki.new", "wiki.import", "wiki.export", "wiki.templates", "-", "scan", "-", "backup", "restore", "-", "updateCatalog", "-", "signout",
+      "collection.new", "newDeck", "-", "precon.deck", "precon.collection", "-", "io.import", "io.export", "purchases.export", "-", "purchases.new", "purchases.sale", "purchases.barcode", "boosters.open", "-", "wiki.new", "wiki.web", "wiki.import", "wiki.export", "wiki.templates", "-", "scan", "-", "backup", "restore", "-", "updateCatalog", "-", "signout",
     ],
   },
   { id: "edit", name: "Edit", items: ["undo", "redo", "-", "find", "pickAll", "clearFilters"] },

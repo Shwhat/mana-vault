@@ -75,6 +75,7 @@ The full user guide is built into the app: Help tab, **About Mana Vault**. The p
 - Search syntax `is:reprint`, `is:starter`, `can:commander`, `can:oathbreaker`, `can:brawl`, `store:`, `buylist` and `in:`; imports matched by TCGplayer, Card Kingdom and CardSphere ids and TCGplayer SKUs.
 - Every tab opens where it was left (its card page, filters, entry and scroll position); pressing the tab already shown goes back to its first screen.
 - Notes and the Wiki (0.22.0): a Notes tab on every deck (its top page is the deck's description) and collection, with child pages to any depth; a rich text editor with a toolbar (headings, lists, checklists, tables, quotes, code, links, `[[Page]]` links, card links with the card's picture, and pictures) saved as markdown; a Wiki tab with search, Pinned, Recent, Decks, Collections and My pages for pages not attached to anything, and drag and drop; built-in and own templates; page history with Restore and a choice of text when two people save the same page; notes that follow sharing; markdown import (files or an Obsidian-style zip) and zip export with pictures; offline notes in the Android app.
+- Web pages into notes (0.23.0): paste from a browser with pictures copied to the server, Import pages... with .html files and saved web pages, and New page from web address... keeping the main article, simplified, with a Source line; the server never fetches addresses on its own network.
 - Built-in About guide with release notes.
 
 ## Keyboard shortcuts

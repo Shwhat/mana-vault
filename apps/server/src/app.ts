@@ -36,7 +36,8 @@ import {
 import { enterSource, priceCols } from "./price-context.js";
 import { priceSourceOf } from "./mtgjson.js";
 import { registerMtgjsonRoutes, startMtgjsonRunner } from "./mtgjson-routes.js";
-import { NOTES_PUBLIC, registerNoteRoutes } from "./notes.js";
+import { NOTES_PUBLIC, type NoteFetcher, registerNoteRoutes } from "./notes.js";
+import { registerNoteWebRoutes } from "./notes-web.js";
 
 declare module "fastify" {
   interface FastifyRequest {
@@ -71,6 +72,8 @@ export interface AppOptions {
   setUpdateInterval?: (hours: number) => void;
   /** Turns off the background picture downloads (tests). */
   pictureDownloads?: boolean;
+  /** Fetches web pages and pictures for notes (0.23.0); tests replace it so no site is reached. */
+  notesFetcher?: NoteFetcher;
   /** Checks once an hour whether today's MTGJSON prices are saved (off in tests). */
   mtgjsonSchedule?: boolean;
 }
@@ -233,6 +236,7 @@ export async function buildApp(
   registerDeckRoutes(app, database);
   registerDeckBuilderRoutes(app, database);
   registerNoteRoutes(app, database);
+  registerNoteWebRoutes(app, database, options.notesFetcher);
   registerTradeRoutes(app, database);
   initializePurchases(database);
   registerPurchaseRoutes(app, database, join(webRoot, "ocr"), options.fetcher as ((url: string, init?: RequestInit) => Promise<Response>) | undefined);

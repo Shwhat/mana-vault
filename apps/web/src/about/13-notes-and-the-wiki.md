@@ -29,7 +29,7 @@ The tab shows the deck's or collection's tree on the left and the open page on t
 
 ## The Wiki tab
 
-**Wiki** is a mode tab on the desktop (key 7) and a **Wiki** button on the phone's Home screen; **Wiki view** is also in the View menu and the phone's Menu. The header has **New page...**, **Import markdown...**, **Export...** and **Templates...**.
+**Wiki** is a mode tab on the desktop (key 7) and a **Wiki** button on the phone's Home screen; **Wiki view** is also in the View menu and the phone's Menu. The header has **New page...**, **From web address...**, **Import pages...**, **Export...** and **Templates...**.
 
 The left side, from top to bottom:
 
@@ -90,7 +90,8 @@ Pictures (PNG, JPEG, GIF, WebP, AVIF or SVG, up to 20 MB) are kept on the server
 | Save as template... | Right-click menu | Saves the page's text as one of your templates |
 | Move to... | Right-click menu | Moves the page and its child pages under another page, to the top of a deck's or collection's notes, or to My pages (top level) |
 | Export... | Right-click menu | See Import and export below |
-| Import markdown here... | Right-click menu | Imports markdown files as child pages of this page |
+| New child page from web address... | Right-click menu | Makes a child page from a web page (see Web pages below) |
+| Import pages here... | Right-click menu | Imports markdown and HTML files as child pages of this page |
 | History... | The page header and the right-click menu | See History below |
 | Delete... | Right-click menu | Deletes the page. A page with child pages asks: **Delete with child pages** or **Move child pages up** (they take the deleted page's place) |
 | More... | The page header | Opens the right-click menu of the page |
@@ -139,13 +140,29 @@ The notes of a deck or collection follow its sharing: everyone it is shared with
 
 **Export...** offers **This page and its child pages**, **The whole deck or collection tree** (for a page in a deck or collection) and **The whole Wiki**. The download is a zip of .md files in folders that follow the tree: a page with child pages is a .md file with a folder of the same name beside it. Pictures are in an `attachments` folder and the pages point to them there. Page and card links stay as `[[Page title]]` and `[[card:Card name]]`.
 
-**Import markdown...** takes .md, .markdown and .txt files, or a zip of them (such as an Obsidian vault). Each folder becomes a page with the files in it as its child pages, and a file named like a folder becomes that folder's page. Settings at the top of a file between `---` lines are left out. Pictures in the zip are added when a page names them as `![text](path/name.png)` or `![[name.png]]`. From the Wiki header and the File menu the imported pages go into My pages; Import markdown here... puts them under the page chosen. Import can be undone, which deletes the imported pages.
+**Import pages...** (Import markdown... before 0.23.0) takes .md, .markdown, .txt, .html and .htm files and pictures, or a zip of them (such as an Obsidian vault or a saved web page). Each folder becomes a page with the files in it as its child pages, and a file named like a folder becomes that folder's page. Settings at the top of a markdown file between `---` lines are left out. Pictures among the files are added when a page names them as `![text](path/name.png)`, `![[name.png]]` or (in an HTML file) `<img src="path/name.png">`; they are found by their path or their file name. HTML files are read as described in Web pages below. From the Wiki header and the File menu the imported pages go into My pages; Import pages here... puts them under the page chosen. Import can be undone, which deletes the imported pages.
+
+## Web pages
+
+Web pages come into notes in three ways:
+
+| Way | How | What is kept |
+|---|---|---|
+| Paste | Copy part or all of a web page in a browser and paste it into a notes page | What was selected |
+| Import pages... | Choose .html files, or a page saved from a browser: its .html file with the pictures from its folder (Page_files), chosen together or in a zip | The page's main article |
+| From web address... | Type a web address (https:// is added when it is left out). The server fetches the page; the new page is titled from the article | The page's main article |
+
+- **Main article:** for whole pages, menus, navigation, ads, sidebars, comments, footers, scripts and forms are dropped. When no article is found, the whole page is kept. A page title that adds the site's name to the article's heading ("Primer - Site") is shortened to the heading, and a first heading that repeats the title is dropped.
+- **Source line:** an imported or fetched page starts with "Source: address, copied date". For a saved page the address is the one the browser noted when saving it; without one it is the file name.
+- **Simplified:** headings, bold, italic, strikethrough, lists, tables, links, quotes, code blocks, dividers and pictures stay, in reading order. Colors, fonts, columns, boxes and backgrounds are dropped. An embedded video, map or sound becomes a link: **Watch the video**, **Open the map**, **Listen to the audio** or **Open the embedded content**. Links to places on the same page become plain text, and links on the page become full web addresses.
+- **Pictures:** each picture from the web is copied to the server and kept as a note picture (the same kinds and 20 MB limit as other pictures). While pasted pictures are copied, the page shows **Copying N pictures**. A picture that cannot be copied stays as a link to its web address, and a message names how many.
+- **Limits:** the server fetches http and https addresses only, up to 10 MB in 20 seconds, following up to 5 redirects. Addresses on the server's own network (localhost, private, local and link-local addresses, and names that lead to them) are refused. Pages behind a sign-in cannot be fetched by the server; copy and paste them instead.
 
 Deck exports in **Plain text list** end with the deck's description (its top notes page) as lines starting with `//` under `// Notes`. Deck imports skip lines that start with `//`.
 
 ## Android app
 
-Pages you can read are kept on the phone and can be read, searched, changed, made, moved, pinned and deleted without a connection. Pictures added offline are kept on the phone and sent with the changes. When the connection returns, the changes are sent; when a page was changed on the server meanwhile, the app asks which text to keep (see Two people editing at once). Templates, History, import and export need a connection.
+Pages you can read are kept on the phone and can be read, searched, changed, made, moved, pinned and deleted without a connection. Pictures added offline are kept on the phone and sent with the changes. When the connection returns, the changes are sent; when a page was changed on the server meanwhile, the app asks which text to keep (see Two people editing at once). Templates, History, import, export and New page from web address... need a connection. Pictures pasted from the web while offline stay as links; they are copied when the connection returns while the page is open, or the next time the page is opened online.
 
 ## Backups
 

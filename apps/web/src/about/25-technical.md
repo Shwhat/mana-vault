@@ -20,6 +20,7 @@
 | Android app | The same interface inside Capacitor, with a Java plugin for text recognition, encrypted settings, the background Inbox check and background sync (WorkManager), files shared in and out, and the Back button. It connects over https only. Its copy of the library is kept in IndexedDB |
 | Phone sign-in | A random device token per phone, sent as a Bearer token; the server stores only its SHA-256 hash. The server accepts requests from the app's page origin (https://localhost) |
 | Live updates | Server-sent events on /api/events. Each change (any request that changes something) is sent to the open pages and apps of the account and of the accounts sharing a collection, deck, trade or offer with it, except the page that made it (named by its x-mana-vault-client header). A comment every 25 seconds keeps tunnels and proxies from closing the stream; the page connects again on its own. The app signs in to the stream with its device token in the address |
+| Notes from the web | The server fetches pages and pictures for notes with its own name lookups, refusing private and local addresses at every redirect; the browser finds the article (Readability) and simplifies it with the notes editor |
 | Notes | Pages stored as markdown in the database with their versions (note_versions) and pictures (note_files). Saves carry the version they started from; an older one is answered with the newer text so the page can ask which to keep. Picture addresses are long random codes served without sign-in |
 | Sync | Changes made offline are sent in order to /api/sync with a unique id each; the server applies each once and keeps the ids for 30 days. /api/sync/state reports a revision that changes with every change, and new offers |
 
@@ -91,6 +92,7 @@ The container checks itself every 30 seconds by running the server with `-health
 | fflate | Making and reading zip files (MakePlayingCards pictures, notes import and export) | MIT |
 | Tiptap (@tiptap/core, @tiptap/react, @tiptap/pm, @tiptap/starter-kit, @tiptap/markdown and extensions) and ProseMirror | The notes editor and its markdown | MIT |
 | marked | Reading markdown in the notes editor | MIT |
+| @mozilla/readability | Finding the main article of a web page for notes | Apache-2.0 |
 | Tesseract English model (@tesseract.js-data/eng) | Card text recognition | Apache 2.0 |
 | Capacitor (@capacitor/core, @capacitor/android, @capacitor/cli) | Android app | MIT |
 | pdf.js (pdfjs-dist) | Reading PDF receipts on the server | Apache 2.0 |

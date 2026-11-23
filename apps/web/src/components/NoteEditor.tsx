@@ -2,12 +2,64 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { EditorContent, useEditor, type Editor } from "@tiptap/react";
 import { noteExtensions, parseNote, writeNote } from "../notes-md";
-import { cardForLink, findByTitle, type NoteKind, notesTree, uploadPicture } from "../notes-state";
+import { cardForLink, copyPicture, findByTitle, type NoteKind, notesTree, uploadPicture } from "../notes-state";
+import { simplifyPasted } from "../notes-html";
+import { SYNCED_EVENT } from "../android/offline";
 import { request } from "../api";
 import { useApp } from "../store";
 import { customDialog, dialog } from "./Dialog";
 
 type Near = { kind: NoteKind | null; itemId: string | null };
+
+// ---------- pictures in pasted web pages (0.23.0) ----------
+// Pasted pictures from the web are copied to the server. Pictures that could not be copied because the phone was
+// offline are kept in a list and copied the next time their page is opened online.
+// Each page's list maps a web address to its copy's address once copied ("" until then), so a copy made after the
+// page was closed is shown the next time it opens without copying again.
+const WAITING = "mana-vault-note-pictures";
+type Waiting = Record<string, string>;
+function waitingPictures(): Record<string, Waiting> {
+  try {
+    const all = JSON.parse(localStorage.getItem(WAITING) ?? "{}") as Record<string, Waiting>;
+    return all && typeof all === "object" ? all : {};
+  } catch {
+    return {};
+  }
+}
+function setWaiting(pageId: string, waiting: Waiting) {
+  try {
+    const all = waitingPictures();
+    if (Object.keys(waiting).length) all[pageId] = waiting;
+    else delete all[pageId];
+    localStorage.setItem(WAITING, JSON.stringify(all));
+  } catch {
+    // the list is a convenience; without storage the pictures stay as links
+  }
+}
+const offline = (reason: unknown) => !navigator.onLine || (reason instanceof Error && (reason.name === "OfflineError" || /offline/i.test(reason.message)));
+
+/** Puts the copy's address on every picture that shows the web address. */
+function swapPicture(editor: Editor, from: string, to: string): boolean {
+  const { tr } = editor.state;
+  let changed = false;
+  editor.state.doc.descendants((node, pos) => {
+    if (node.type.name === "image" && node.attrs.src === from) {
+      tr.setNodeMarkup(pos, undefined, { ...node.attrs, src: to });
+      changed = true;
+    }
+  });
+  if (changed) editor.view.dispatch(tr);
+  return changed;
+}
+
+/** The web pictures (http and https) shown in the editor. */
+function webPicturesIn(editor: Editor): string[] {
+  const found = new Set<string>();
+  editor.state.doc.descendants((node) => {
+    if (node.type.name === "image" && /^https?:/.test(String(node.attrs.src ?? ""))) found.add(String(node.attrs.src));
+  });
+  return [...found];
+}
 
 /** The searchable list behind the page link and card link buttons, and behind typing [[. */
 function LinkFinder({ kind, close, onPick }: { kind: "page" | "card"; close: () => void; onPick: (text: string) => void }) {
@@ -173,6 +225,38 @@ export function NoteEditor({ pageId, body, editable, near, onChange, onOpenPage,
   tickRef.current = onTick;
   const shown = useRef(body);
   const [hover, setHover] = useState<{ url: string; x: number; y: number } | null>(null);
+  const [copying, setCopying] = useState(0);
+  const pasted = useRef(new Set<string>());
+  /** Copies web pictures to the server, one at a time, and shows the copies in their place. */
+  const copyPictures = async (urls: string[]) => {
+    const current = editorRef.current;
+    if (!current || !urls.length) return;
+    setCopying((count) => count + urls.length);
+    let failed = 0;
+    for (const url of urls) {
+      const waiting = { ...(waitingPictures()[pageId] ?? {}) };
+      try {
+        const copy = waiting[url] || await copyPicture(url, pageId.startsWith("v") ? null : pageId);
+        // the copy's address is kept until the page is opened showing it, so a page closed before the copy came
+        // back (or before its save reached the server) shows the copy the next time it opens
+        const live = editorRef.current && !editorRef.current.isDestroyed ? editorRef.current : null;
+        if (live) swapPicture(live, url, copy);
+        waiting[url] = copy;
+      } catch (reason) {
+        if (offline(reason)) waiting[url] = "";
+        else {
+          delete waiting[url];
+          failed += 1;
+        }
+      } finally {
+        setCopying((count) => Math.max(0, count - 1));
+        setWaiting(pageId, waiting);
+      }
+    }
+    if (failed) store.flash(`${failed} ${failed === 1 ? "picture" : "pictures"} could not be copied and stay as links`, "err");
+  };
+  const copyRef = useRef(copyPictures);
+  copyRef.current = copyPictures;
   const editor = useEditor({
     extensions: noteExtensions({ onReadOnlyChecked: () => { window.setTimeout(() => tickRef.current?.(), 0); return true; } }),
     content: parseNote(body),
@@ -196,6 +280,16 @@ export function NoteEditor({ pageId, body, editable, near, onChange, onOpenPage,
           return true;
         }
         return false;
+      },
+      transformPastedHTML(html) {
+        const simple = simplifyPasted(html);
+        for (const match of simple.matchAll(/<img[^>]+src="(https?:[^"]+)"/g)) pasted.current.add(match[1]!.replace(/&amp;/g, "&"));
+        window.setTimeout(() => {
+          const urls = [...pasted.current];
+          pasted.current.clear();
+          void copyRef.current(urls);
+        }, 0);
+        return simple;
       },
       handlePaste(_view, event) {
         const files = [...(event.clipboardData?.files ?? [])].filter((item) => item.type.startsWith("image/"));
@@ -230,6 +324,32 @@ export function NoteEditor({ pageId, body, editable, near, onChange, onOpenPage,
   };
 
   useEffect(() => { editor?.setEditable(editable, false); }, [editor, editable]);
+  // pictures pasted while offline are copied when the page is opened online, or when the connection comes back
+  useEffect(() => {
+    if (!editor) return;
+    let busy = false;
+    const retry = () => {
+      if (busy || !navigator.onLine) return;
+      const waiting = waitingPictures()[pageId] ?? {};
+      if (!Object.keys(waiting).length) return;
+      const shown = new Set(webPicturesIn(editor));
+      const still = Object.keys(waiting).filter((url) => shown.has(url));
+      // addresses the page no longer shows are done
+      const kept: Waiting = {};
+      for (const url of still) kept[url] = waiting[url]!;
+      setWaiting(pageId, kept);
+      if (!still.length) return;
+      busy = true;
+      void copyRef.current(still).finally(() => { busy = false; });
+    };
+    retry();
+    window.addEventListener("online", retry);
+    window.addEventListener(SYNCED_EVENT, retry);
+    return () => {
+      window.removeEventListener("online", retry);
+      window.removeEventListener(SYNCED_EVENT, retry);
+    };
+  }, [editor, pageId]);
   // a newer text from the server replaces the shown text when nothing here is waiting to be saved
   useEffect(() => {
     if (!editor || body === shown.current) return;
@@ -304,6 +424,7 @@ export function NoteEditor({ pageId, body, editable, near, onChange, onOpenPage,
   return (
     <div className={editable ? "noteedit" : "noteedit reading"}>
       {editable && <Toolbar editor={editor} pageId={pageId} />}
+      {copying > 0 && <div className="ncopying" role="status">Copying {copying} {copying === 1 ? "picture" : "pictures"}</div>}
       <div className="notescroll" onClick={click} onMouseOver={over} onMouseLeave={() => setHover(null)} onContextMenu={menu}>
         <EditorContent editor={editor} />
       </div>

@@ -66,7 +66,7 @@ The app goes **Offline** only when the server cannot be reached: when a request 
 | Renaming collections and decks, creating collections and decks (New collection... and New deck... in Add to, and the Import window's new collection) | Sending, accepting and declining offers |
 | Scanning cards and adding the scanned list | Updating the card database |
 | Undo and redo | Devices, Change password and statistics not opened before |
-| Reading, searching, changing, making, moving, pinning and deleting notes pages, and adding pictures to them | Notes templates, page history, and importing and exporting notes |
+| Reading, searching, changing, making, moving, pinning and deleting notes pages, adding pictures to them, and pasting web pages (pictures are copied once online) | Notes templates, page history, importing and exporting notes, and New page from web address... |
 
 A command that needs a connection while offline shows "You are offline. This needs a connection to the server."
 

@@ -19,7 +19,7 @@ import { refreshCardSearches } from "./card-search";
 import type { Prefs } from "./prefs";
 import { editTextDialog, formatDialog, tagsDialog } from "./components/DeckDialogs";
 import { entryKey } from "./library-state";
-import { exportDialog, importMarkdown, newPageDialog, openWikiPage, templatesDialog } from "./components/NotesPane";
+import { exportDialog, importPages, newPageDialog, newPageFromWeb, openWikiPage, templatesDialog } from "./components/NotesPane";
 import { isOpen, type PanelId, PANELS, PRESET_NAMES, removePanel } from "./dock";
 import { type Store, useApp, zoneLabel } from "./store";
 import { capitalize, type CollectionTab, type DeckTab, formatName, type Zone } from "./types";
@@ -209,7 +209,8 @@ export function useActions(store: Store): Record<string, Action> {
       "view.purchases": { label: "Purchases view", short: "Purchases", icon: "usd", key: "6", on: store.view === "purchases", run: () => store.setView("purchases") },
       "view.wiki": { label: "Wiki view", short: "Wiki", icon: "notes", key: "7", on: store.view === "wiki", run: () => store.setView("wiki") },
       "wiki.new": { label: "New notes page...", short: "New page", icon: "notes", run: () => newPageDialog(store, {}, (page) => { store.setView("wiki"); openWikiPage(page.id); }) },
-      "wiki.import": { label: "Import markdown...", short: "Import markdown", icon: "listin", run: () => { store.setView("wiki"); void importMarkdown(store, {}); } },
+      "wiki.web": { label: "New page from web address...", short: "From web", icon: "notes", run: () => newPageFromWeb(store, {}, (page) => { store.setView("wiki"); openWikiPage(page.id); }) },
+      "wiki.import": { label: "Import pages...", short: "Import pages", icon: "listin", run: () => { store.setView("wiki"); void importPages(store, {}); } },
       "wiki.export": { label: "Export notes...", short: "Export notes", icon: "txt", run: () => exportDialog(store, null) },
       "wiki.templates": { label: "Notes templates...", short: "Templates", icon: "notes", run: () => templatesDialog() },
       "purchases.new": { label: "New purchase...", short: "New purchase", icon: "usd", run: () => newEntry(store, "purchase", (entry) => { store.setView("purchases"); void entry; }) },
