@@ -26,6 +26,9 @@ export type GroupCard = {
 const frontType = (typeLine: string) => typeLine.split(" // ")[0] ?? typeLine;
 
 /** The heading a card is listed under in Type groups. Creatures win over other types ("Artifact Creature" is a creature). */
+// TYPE_ORDER decides which type a card with several types is listed under; TYPE_GROUP_ORDER is the order the groups
+// are shown in (0.23.1: the order Moxfield uses).
+export const TYPE_GROUP_ORDER = ["Planeswalker", "Creature", "Sorcery", "Instant", "Artifact", "Enchantment", "Battle", "Land", "Other"] as const;
 export const TYPE_ORDER = ["Creature", "Planeswalker", "Battle", "Instant", "Sorcery", "Artifact", "Enchantment", "Land", "Other"] as const;
 export function mainType(typeLine: string): string {
   const front = frontType(typeLine);
@@ -52,7 +55,7 @@ type Key = { key: string; label: string; order: number | string };
 
 function typeKey(card: GroupCard): Key {
   const type = mainType(card.type_line);
-  return { key: type, label: PLURAL[type] ?? type, order: TYPE_ORDER.indexOf(type as (typeof TYPE_ORDER)[number]) };
+  return { key: type, label: PLURAL[type] ?? type, order: TYPE_GROUP_ORDER.indexOf(type as (typeof TYPE_GROUP_ORDER)[number]) };
 }
 
 /** The groups a card is listed under. A card with several tags is listed under each tag. */

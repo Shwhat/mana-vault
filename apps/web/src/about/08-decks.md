@@ -194,7 +194,7 @@ The Cards tab shows only the deck's cards. **Options** holds:
 | Edit as text... | See Edit as text |
 | Done | Closes Options |
 
-The cards are shown under a heading for each zone (Commander, Main deck, Sideboard, Maybeboard) with its count, and inside each zone under a heading for each group with its count. Type groups are Creatures, Planeswalkers, Battles, Instants, Sorceries, Artifacts, Enchantments, Lands and Other; a creature that is also an artifact is a creature. Mana value groups go from 0 to 7+, with lands last. A card with several tags is listed under each tag; cards without one are under No tag.
+The cards are shown under a heading for each zone (Commander, Main deck, Sideboard, Maybeboard) with its count, and inside each zone under a heading for each group with its count. Type groups are, in this order, Planeswalkers, Creatures, Sorceries, Instants, Artifacts, Enchantments, Battles, Lands and Other (the Commander zone comes first); a creature that is also an artifact is a creature. Mana value groups go from 0 to 7+, with lands last. A card with several tags is listed under each tag; cards without one are under No tag.
 
 | View | Shows |
 |---|---|

@@ -2,6 +2,11 @@
 
 The installed version is shown at the top of this guide.
 
+## 0.23.1 (2026-11-23): Type group order
+
+- Type groups are shown in the order Moxfield uses: Planeswalkers, Creatures, Sorceries, Instants, Artifacts, Enchantments, Battles, Lands, Other. This applies to decks and to every list grouped by Type.
+- Fixed: on a phone, the deck's All, Commander, Main, Sideboard and Maybeboard buttons stretched to fill the screen and pushed the cards out of view.
+
 ## 0.23.0 (2026-11-23): Web pages into notes
 
 - Paste part or all of a web page into a notes page: headings, lists, tables, links and pictures come along, simplified, and the pictures are copied to the server (Copying N pictures shows while they are copied).
