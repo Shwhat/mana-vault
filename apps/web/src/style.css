@@ -1602,3 +1602,4 @@ input.ntitle:focus{border-color:var(--accent);box-shadow:0 0 0 2px #cfe0fa;outli
 :root[data-theme=dark] .trow.on,:root[data-theme=dark] .ntool.on{color:#cfe0ff}
 :root[data-theme=dark] .ntool:hover:not(:disabled){background:#2c333d}
 :root[data-theme=dark] .cardlink{color:#7fcf83;border-bottom-color:#7fcf83}
+.ncopying{font-size:11.5px;color:var(--accent);padding:3px 2px;flex:none}

@@ -177,6 +177,10 @@ This page lists what Mana Vault does in the current version, followed by what is
 - Notifications for new offers in the Inbox, checked in the background about every 15 minutes, optionally only on Wi-Fi.
 - The Back button, the Android share sheet for exports and backups, sharing lists into the app to import them and pictures or PDFs to read as receipts, background sync as soon as the phone is online, https only, and a daily check of your server for a newer app.
 
+### 0.23.0 additions
+
+- Web pages into notes: paste from a browser, Import pages... with .html files and saved web pages, and New page from web address..., keeping the main article of whole pages, simplified to what the editor shows, with copies of the pictures and a Source line.
+
 ### 0.22.0 additions
 
 - Notes on every deck and collection (the Notes tab; a deck's top page is its description), and pages not attached to anything, in trees of child pages.

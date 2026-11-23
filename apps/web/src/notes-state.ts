@@ -223,6 +223,30 @@ async function shrink(file: Blob): Promise<{ data: string; type: string }> {
   }
 }
 
+/** Keeps a copy of a picture from the web (0.23.0). Returns its address on the server. */
+export async function copyPicture(url: string, pageId: string | null): Promise<string> {
+  const result = await request<{ url: string }>("/api/notes/files/copy", { method: "POST", body: JSON.stringify({ id: crypto.randomUUID(), url, pageId }) });
+  return result.url;
+}
+
+/** Copies every web picture in a page's markdown. Pictures that cannot be copied keep their web address. */
+export async function copyWebPictures(markdown: string, pageId: string | null, pictures: string[]): Promise<{ markdown: string; failed: string[] }> {
+  const failed: string[] = [];
+  let out = markdown;
+  for (const url of pictures) {
+    try {
+      const copy = await copyPicture(url, pageId);
+      out = out.split(`](${url})`).join(`](${copy})`);
+    } catch {
+      failed.push(url);
+    }
+  }
+  return { markdown: out, failed };
+}
+
+/** Fetches a web page through the server, for New page from web address.... */
+export const fetchWebPage = (url: string) => request<{ url: string; html: string }>("/api/notes/fetch", { method: "POST", body: JSON.stringify({ url }) });
+
 /** The newest printing of a card named in a card link, for its picture. Kept for the session. */
 const cards = new Map<string, Promise<{ id: string; name: string; image_url: string | null } | null>>();
 export function cardForLink(name: string) {

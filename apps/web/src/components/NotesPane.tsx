@@ -2,13 +2,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from "react";
 import { strToU8, zipSync } from "fflate";
 import { readMarkdownFiles, safeName } from "../notes-io";
+import { pageFromHtml, savedFrom, sourceLine, webPictures } from "../notes-html";
 import { downloadBlob, fetchFile, pickFiles, request, slugify } from "../api";
 import { setKept, useKept } from "../kept";
 import { usePhone } from "../narrow";
 import {
   childrenOf, type ClashDetail, type Conflict, createPage, deletePage, deleteTemplate, descendantsOf, findByTitle, movePage, NOTE_CLASH, NOTES_CHANGED, openItemNotes,
   type NoteKind, notesTree, type PageDetail, type PageMeta, pageOpened, pageVersions, pathOf, pinPage, readPage, reloadNotes, renameTemplate, restorePages,
-  restoreVersion, savePage, saveTemplate, searchNotes, type Found, type Template, topOf, useNotesTree, type Version,
+  restoreVersion, savePage, saveTemplate, searchNotes, copyWebPictures, fetchWebPage, type Found, type Template, topOf, useNotesTree, type Version,
 } from "../notes-state";
 import { type Store, useApp } from "../store";
 import { Icon } from "../icons";
@@ -299,12 +300,26 @@ export function exportDialog(store: Store, page: PageMeta | null) {
   });
 }
 
-export async function importMarkdown(store: Store, where: { parentId?: string | null; kind?: NoteKind | null; itemId?: string | null }) {
-  const picked = await pickFiles(".md,.markdown,.txt,.zip,text/markdown,application/zip");
+/** Import pages...: markdown, text and HTML files, or zips of them (an Obsidian vault, a saved web page with its folder). */
+export async function importPages(store: Store, where: { parentId?: string | null; kind?: NoteKind | null; itemId?: string | null }) {
+  const picked = await pickFiles(".md,.markdown,.txt,.html,.htm,.zip,.png,.jpg,.jpeg,.gif,.webp,.svg,.avif,text/markdown,text/html,application/zip,image/*");
   if (!picked.length) return;
   try {
     const read = await readMarkdownFiles(await Promise.all(picked.map(async (file) => ({ name: file.name, bytes: new Uint8Array(await file.arrayBuffer()) }))));
-    if (!read.pages.length) return store.flash("There are no .md files to import", "err");
+    if (!read.pages.length) return store.flash("There are no .md or .html files to import", "err");
+    // web pages: their main article, simplified, with a source line and copies of their web pictures
+    let failed = 0;
+    for (const page of read.pages) {
+      if (page.html === undefined) continue;
+      const source = savedFrom(page.html);
+      // pictures of a saved page are in its own folder among the files, so their paths are kept as they are
+      const converted = pageFromHtml(page.html, { base: source, fallbackTitle: page.title, pictureBase: null });
+      const copied = await copyWebPictures(converted.markdown, null, webPictures(converted.markdown));
+      failed += copied.failed.length;
+      page.title = converted.title;
+      page.body = `${sourceLine(source ?? `${page.key.split("/").pop()}.html`)}${copied.markdown}`;
+      delete page.html;
+    }
     const result = await request<{ created: number; ids: string[] }>("/api/notes/import", { method: "POST", body: JSON.stringify({ ...where, ...read }) });
     await reloadNotes();
     store.pushUndo({
@@ -312,10 +327,41 @@ export async function importMarkdown(store: Store, where: { parentId?: string | 
       undo: async () => { await restorePagesGone(result.ids); },
       redo: async () => undefined,
     });
-    store.flash(`Imported ${result.created} ${result.created === 1 ? "page" : "pages"}`);
+    store.flash(`Imported ${result.created} ${result.created === 1 ? "page" : "pages"}${failed ? `; ${failed} ${failed === 1 ? "picture" : "pictures"} could not be copied and stay as links` : ""}`);
   } catch (reason) {
     store.fail(reason, "Could not import the files.");
   }
+}
+
+/** New page from web address...: the page's main article as a new page, with copies of its pictures. */
+export function newPageFromWeb(store: Store, where: { parentId?: string | null; kind?: NoteKind | null; itemId?: string | null }, opened: (page: PageDetail) => void) {
+  dialog("New page from web address", [["url", "Web address", ""]], async (values) => {
+    const typed = String(values.url).trim();
+    if (!typed) {
+      store.flash("Type a web address", "err");
+      return false;
+    }
+    const address = /^[a-z][a-z0-9+.-]*:/i.test(typed) ? typed : `https://${typed}`;
+    store.flash("Fetching the page");
+    try {
+      const fetched = await fetchWebPage(address);
+      const converted = pageFromHtml(fetched.html, { base: fetched.url, fallbackTitle: new URL(fetched.url).hostname });
+      const copied = await copyWebPictures(converted.markdown, null, webPictures(converted.markdown));
+      const page = await createPage({ title: converted.title, body: `${sourceLine(fetched.url)}${copied.markdown}`, ...where });
+      store.pushUndo({
+        label: `New page ${page.title}`,
+        undo: async () => { await deletePage(page.id, "delete"); },
+        redo: async () => undefined,
+      });
+      store.flash(copied.failed.length
+        ? `Page ${page.title} made; ${copied.failed.length} ${copied.failed.length === 1 ? "picture" : "pictures"} could not be copied and stay as links`
+        : `Page ${page.title} made`);
+      opened(page);
+    } catch (reason) {
+      store.fail(reason, "Could not fetch the page.");
+      return false;
+    }
+  }, "Make page");
 }
 
 async function restorePagesGone(ids: string[]) {
@@ -336,7 +382,8 @@ function pageMenu(store: Store, page: PageMeta, open: (id: string) => void) {
     { label: "Save as template...", run: () => void readPage(page.id).then((detail) => saveTemplateDialog(store, detail)) },
     !page.top && { label: "Move to...", run: () => moveToDialog(store, page) },
     { label: "Export...", run: () => exportDialog(store, page) },
-    { label: "Import markdown here...", run: () => void importMarkdown(store, { parentId: page.id }) },
+    { label: "New child page from web address...", run: () => newPageFromWeb(store, { parentId: page.id }, (made) => open(made.id)) },
+    { label: "Import pages here...", run: () => void importPages(store, { parentId: page.id }) },
     { label: "History...", run: () => void readPage(page.id).then((detail) => historyDialog(detail, () => void reloadNotes())) },
     !page.top && { label: "Delete...", run: () => void askDelete(store, page) },
   ]);
@@ -779,7 +826,8 @@ export function NotesPane({ scope, view }: { scope: NotesScope; view: string }) 
               {!scope && (
                 <span className="btnrow">
                   <button type="button" className="btn primary" onClick={() => newPageDialog(store, where, (page) => open(page.id))}>New page...</button>
-                  <button type="button" className="btn" onClick={() => void importMarkdown(store, where)}>Import markdown...</button>
+                  <button type="button" className="btn" onClick={() => newPageFromWeb(store, where, (page) => open(page.id))}>New page from web address...</button>
+                  <button type="button" className="btn" onClick={() => void importPages(store, where)}>Import pages...</button>
                 </span>
               )}
             </div>

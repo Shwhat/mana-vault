@@ -150,7 +150,7 @@ Lines that name a set and collector number are linked to free copies of exactly 
 
 ## Notes
 
-Notes pages are imported from .md files or a zip of them with **Import markdown...**, and exported as a zip of .md files with pictures with **Export notes...** (File menu) or **Export...** in the Wiki; see [Notes and the Wiki](/about/notes-and-the-wiki).
+Notes pages are imported from markdown and HTML files or a zip of them with **Import pages...**, made from a web address with **New page from web address...**, and exported as a zip of .md files with pictures with **Export notes...** (File menu) or **Export...** in the Wiki; see [Notes and the Wiki](/about/notes-and-the-wiki).
 
 ## Import review panel
 

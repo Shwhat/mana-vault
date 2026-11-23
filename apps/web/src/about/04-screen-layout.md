@@ -14,7 +14,7 @@ Click a menu to open it. While a menu is open, pointing at another menu opens th
 
 | Menu | Commands |
 |---|---|
-| File | New collection..., New deck..., Add precon as deck... (Precon deck), Add precon to collection... (Precon to collection), Import..., Export..., Export purchase history... (Export purchases), New purchase..., New card sale... or Sell selected cards... when cards are picked in a collection (Sell), Scan barcode... (Scan barcode), Open virtual packs... (Virtual packs), New notes page... (New page), Import markdown..., Export notes..., Notes templates... (Templates), Scan card..., Download backup, Restore backup..., Update card database (Update database, admins only), Sign out |
+| File | New collection..., New deck..., Add precon as deck... (Precon deck), Add precon to collection... (Precon to collection), Import..., Export..., Export purchase history... (Export purchases), New purchase..., New card sale... or Sell selected cards... when cards are picked in a collection (Sell), Scan barcode... (Scan barcode), Open virtual packs... (Virtual packs), New notes page... (New page), New page from web address... (From web), Import pages..., Export notes..., Notes templates... (Templates), Scan card..., Download backup, Restore backup..., Update card database (Update database, admins only), Sign out |
 | Edit | Undo, Redo, Find, Select all cards, Clear filters |
 | View | Purchases view (Purchases), Wiki view (Wiki); Light theme, Dark theme, System theme; Prices on pictures; Main price source... (Price source); Buylist prices in lists (Buylist); Card layout...; Filters panel, Collections panel, Decks panel, Card panel, Deck list panel, Import review panel |
 | Help | Keyboard shortcuts, About Mana Vault |

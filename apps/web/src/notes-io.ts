@@ -1,4 +1,4 @@
-// ---------- notes (0.22.0): reading markdown files and zips into pages for an import ----------
+// ---------- notes (0.22.0, .html in 0.23.0): reading markdown and HTML files and zips into pages for an import ----------
 import { strFromU8, unzipSync } from "fflate";
 
 /** A page title as a file or folder name. */
@@ -20,7 +20,7 @@ export async function readMarkdownFiles(files: Array<{ name: string; bytes: Uint
       for (const [path, bytes] of Object.entries(unzipSync(file.bytes))) if (!path.endsWith("/") && !/(^|\/)(\.|__MACOSX)/.test(path)) entries.push({ path, bytes });
     } else entries.push({ path: file.name, bytes: file.bytes });
   }
-  const pages: Array<{ key: string; parentKey: string | null; title: string; body: string }> = [];
+  const pages: Array<{ key: string; parentKey: string | null; title: string; body: string; html?: string }> = [];
   const keys = new Set<string>();
   const folder = (path: string): string | null => {
     const parts = path.split("/");
@@ -33,18 +33,23 @@ export async function readMarkdownFiles(files: Array<{ name: string; bytes: Uint
     }
     return key;
   };
-  const markdown = entries.filter((entry) => /\.(md|markdown|txt)$/i.test(entry.path)).sort((a, b) => a.path.localeCompare(b.path));
+  // pages: markdown and text files, and HTML files that are not parts of a saved web page's own folder (Page_files)
+  const PAGE = /\.(md|markdown|txt|html?)$/i;
+  const markdown = entries.filter((entry) => PAGE.test(entry.path) && !/(^|\/)[^/]+_files\//i.test(entry.path)).sort((a, b) => a.path.localeCompare(b.path));
   // a note named like its folder (Folder.md beside Folder/) is the folder's page
   for (const entry of markdown) {
-    const key = entry.path.replace(/\.(md|markdown|txt)$/i, "");
-    const body = strFromU8(entry.bytes).replace(/^---\n[\s\S]*?\n---\n/, "");
+    const key = entry.path.replace(PAGE, "");
+    const text = strFromU8(entry.bytes);
+    const html = /\.html?$/i.test(entry.path) ? text : undefined;
+    const body = html === undefined ? text.replace(/^---\n[\s\S]*?\n---\n/, "") : "";
     const existing = pages.find((page) => page.key === key);
     if (existing) {
       existing.body = body;
+      if (html !== undefined) existing.html = html;
       continue;
     }
     keys.add(key);
-    pages.push({ key, parentKey: folder(entry.path), title: key.split("/").pop()!, body });
+    pages.push({ key, parentKey: folder(entry.path), title: key.split("/").pop()!, body, ...(html !== undefined ? { html } : {}) });
   }
   const pictures = entries.filter((entry) => PICTURE.test(entry.path)).map((entry) => ({
     name: entry.path, type: TYPES[entry.path.split(".").pop()!.toLowerCase()] ?? "image/png", data: base64(entry.bytes),

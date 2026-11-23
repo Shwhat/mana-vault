@@ -113,7 +113,9 @@ Messages appear at the right end of the status bar (on the phone, in a banner ab
 | Template name saved, Template renamed, Template name deleted | Save as template..., Rename and Delete in Templates... |
 | Your text was kept, Their text was kept, Your text was kept as title (my copy) | The answer to Page changed by someone else |
 | Version of time restored | Restore in History... |
-| Imported N pages, Exported N pages | Import markdown..., Export notes... |
+| Imported N pages, Exported N pages | Import pages..., Export notes... |
+| Fetching the page | New page from web address..., while the server fetches the page |
+| N pictures could not be copied and stay as links (also after Page title made and Imported N pages) | Pictures from the web that the server could not fetch, or that are not pictures |
 
 ## Questions
 
@@ -227,7 +229,8 @@ Messages appear at the right end of the status bar (on the phone, in a banner ab
 | Could not load the versions. / Could not restore the version. / Could not open the notes. | The server could not be reached | Try again with a connection |
 | Could not save the template. / Could not rename the template. / Could not delete the template. | The change failed | Try again |
 | There are no pages to export | Export... with no pages | None |
-| There are no .md files to import, Could not import the files. | The files chosen hold no .md, .markdown or .txt files, or could not be read | Choose markdown files or a zip of them |
+| There are no .md or .html files to import, Could not import the files. | The files chosen hold no .md, .markdown, .txt, .html or .htm files, or could not be read | Choose markdown or HTML files or a zip of them |
+| Type a web address, Could not fetch the page. | New page from web address... with an empty address, or the page could not be fetched | Type the address; for pages behind a sign-in, copy and paste instead |
 | Could not export the pages. | The export failed | Try again |
 | No card named name in the card database | Clicking a card link whose card is not in the card database | Change the link to a card name in the database |
 | Someone changed the page meanwhile. Try again. | Rename... while another save changed the page | Rename it again |
@@ -244,7 +247,11 @@ Messages appear at the right end of the status bar (on the phone, in a banner ab
 | The page can no longer be put back | Undo of a delete more than a day later, or after the page's deck or collection was deleted |
 | Add a PNG, JPEG, GIF, WebP, AVIF or SVG picture, A picture can be up to 20 MB, The picture is empty | Adding another kind of file, a larger picture or an empty file to a page |
 | A template name can be 1 to 100 characters, Template not found, Version not found | A template name is empty or too long; a template or version was deleted meanwhile |
-| Import up to 2,000 pages at a time | Import markdown... with more files |
+| Import up to 2,000 pages at a time | Import pages... with more files |
+| Type a web address that starts with http:// or https:// | New page from web address... with another kind of address |
+| Addresses on the server's own network are not fetched, Web addresses with a name and password are not fetched | The address (or the name it leads to) is on the server's own network, or holds a name and password |
+| Could not fetch the page: reason, Could not copy the picture: reason | The site could not be reached, answered with an error, took longer than 20 seconds, sent too many redirects or a file larger than the limit (The site was not found, The site answered with an error (N), The site took too long to answer, The site sent too many redirects, The file is larger than N MB) |
+| That address is not a web page, That address is not a PNG, JPEG, GIF, WebP, AVIF or SVG picture | The address gives another kind of file |
 | CSV needs a "Name" or "Card Name" column | The first line has no name column |
 | CSV can contain at most 5,000 rows per import | The file is too long; split it |
 | Could not read CSV: reason | The file is not valid CSV |

@@ -230,7 +230,7 @@ test("markdown import of a folder zip, export as a zip, and templates", async ({
     "Vault/attachments/elf.png": new Uint8Array(PNG),
   });
   const chooser = page.waitForEvent("filechooser");
-  await page.locator("#view-wiki .wikihead").getByRole("button", { name: "Import markdown..." }).click();
+  await page.locator("#view-wiki .wikihead").getByRole("button", { name: "Import pages..." }).click();
   await (await chooser).setFiles({ name: "vault.zip", mimeType: "application/zip", buffer: Buffer.from(zip) });
   await expect(status(page)).toHaveText("Imported 3 pages");
   const tree = await notes(page);
@@ -250,7 +250,7 @@ test("markdown import of a folder zip, export as a zip, and templates", async ({
   // import under a chosen page
   const under = page.waitForEvent("filechooser");
   await page.locator(".ntree [role=treeitem]", { hasText: "Elves" }).first().click({ button: "right" });
-  await page.locator("#ctxmenu [role=menuitem]", { hasText: "Import markdown here..." }).click();
+  await page.locator("#ctxmenu [role=menuitem]", { hasText: "Import pages here..." }).click();
   await (await under).setFiles({ name: "Mulligans.md", mimeType: "text/markdown", buffer: Buffer.from("Keep two lands") });
   await expect(status(page)).toHaveText("Imported 1 page");
   const after = await notes(page);

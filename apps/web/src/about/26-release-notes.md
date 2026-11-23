@@ -2,6 +2,15 @@
 
 The installed version is shown at the top of this guide.
 
+## 0.23.0 (2026-11-23): Web pages into notes
+
+- Paste part or all of a web page into a notes page: headings, lists, tables, links and pictures come along, simplified, and the pictures are copied to the server (Copying N pictures shows while they are copied).
+- New page from web address... (Wiki header From web address..., File menu, and New child page from web address... on a page): the server fetches the page, the main article is kept, its pictures are copied, and the page starts with a Source line.
+- Import markdown... is now Import pages... (and Import pages here...) and also takes .html files and pages saved from a browser with their pictures folder, alone or in a zip.
+- Colors, fonts, columns and boxes are dropped; embedded videos, maps and sounds become links; pictures that cannot be copied stay as links.
+- The server never fetches addresses on its own network (localhost, private and local addresses).
+- Android app: pictures pasted offline stay as links and are copied when the connection returns or the page is opened online.
+
 ## 0.22.0 (2026-11-22): Notes and the Wiki
 
 - Notes: decks and collections have a Notes tab with a tree of pages. A deck's Description tab is now its Notes tab: the description is the text of the deck's top page, and the Cover card and Format are at the top of the tab.
@@ -12,7 +21,7 @@ The installed version is shown at the top of this guide.
 - Templates: Deck primer, Combo, Sideboard guide and Collection plan are built in; Save as template... adds your own, and Templates... renames and deletes them.
 - History... lists each page's versions with Restore. When someone saved a page while you were editing it, you choose Keep mine, Keep theirs or Keep both.
 - Notes follow the sharing of their deck or collection. Deleting a deck or collection deletes its notes.
-- Import markdown... (and Import markdown here... on a page) reads .md files or a zip (such as an Obsidian vault) with pictures; Export notes... saves a page with its child pages, a deck's or collection's tree, or the whole Wiki as a zip of .md files with pictures. A deck exported as a Plain text list ends with its notes as `//` lines.
+- Import markdown... (Import pages... since 0.23.0; and Import markdown here... on a page) reads .md files or a zip (such as an Obsidian vault) with pictures; Export notes... saves a page with its child pages, a deck's or collection's tree, or the whole Wiki as a zip of .md files with pictures. A deck exported as a Plain text list ends with its notes as `//` lines.
 - Android app: notes are kept on the phone and can be read, searched and changed without a connection; pictures added offline are sent with the changes.
 - Backups include notes pages, their versions and pictures, pins and templates.
 - Each deck's existing description becomes its top notes page when the server starts with this version.

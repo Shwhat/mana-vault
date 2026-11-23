@@ -409,6 +409,25 @@ function saveFile(database: DatabaseSync, userId: number, pageId: string | null,
 
 export const fileUrl = (id: string) => `/api/notes/files/${id}`;
 
+/** A page or picture fetched from the web (0.23.0). */
+export type Fetched = { url: string; type: string; bytes: Buffer };
+/** Fetches an address with a size limit; throws an Error whose message is shown. Tests replace it. */
+export type NoteFetcher = (url: string, limit: number) => Promise<Fetched>;
+
+/** Keeps a picture for a page (or for no page yet). Returns its address, or a message when the page is not found. */
+export function attachPicture(database: DatabaseSync, userId: number, pageId: string | null, file: { name: string; type: string; bytes: Buffer }, wanted?: unknown): { id: string; url: string } | string {
+  if (pageId && !pageOf(database, pageId, userId)) return "Page not found";
+  if (typeof wanted === "string" && database.prepare("SELECT 1 FROM note_files WHERE id = ?").get(wanted)) return { id: wanted, url: fileUrl(wanted) };
+  const id = saveFile(database, userId, pageId, file, wanted);
+  return { id, url: fileUrl(id) };
+}
+
+/** Pictures kept before their page was saved (copied from the web, added while making a page) join the page that shows them. */
+function claimPictures(database: DatabaseSync, pageId: string, body: string, userId: number): void {
+  const claim = database.prepare("UPDATE note_files SET page_id = ? WHERE id = ? AND page_id IS NULL AND owner_id = ?");
+  for (const match of body.matchAll(/\/api\/notes\/files\/([0-9a-f-]{36})/g)) claim.run(pageId, match[1]!, userId);
+}
+
 // ---------- backups ----------
 
 export type NotesBackup = {
@@ -574,6 +593,7 @@ export function registerNoteRoutes(app: FastifyInstance, database: DatabaseSync)
         .run(id, userId, kind, itemId, parentId, title, text, userId);
       placePage(database, id, parentId, kind, itemId, userId, typeof body.before === "string" ? body.before : null);
       if (text) addVersion(database, id, title, text, userId, clientOf(request));
+      claimPictures(database, id, text, userId);
     });
     return reply.code(201).send(pageDetail(database, pageOf(database, id, userId)!, userId));
   });
@@ -601,6 +621,7 @@ export function registerNoteRoutes(app: FastifyInstance, database: DatabaseSync)
       const keptTitle = isTop(page) ? page.title : title;
       database.prepare(`UPDATE note_pages SET title = ?, body = ?, version = version + 1, updated_at = ${now}, updated_by = ? WHERE id = ?`).run(keptTitle, text, userId, page.id);
       const started = addVersion(database, page.id, keptTitle, text, userId, clientOf(request));
+      claimPictures(database, page.id, text, userId);
       // a deck's history names each new version of its notes (not every save)
       if (started && page.kind === "deck" && page.item_id) {
         logDeck(database, page.item_id, String(request.user?.name ?? ""), isTop(page) ? "Description changed" : `Notes page ${keptTitle} changed`);
