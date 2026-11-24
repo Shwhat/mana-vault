@@ -24,13 +24,14 @@ export type CustomCardSummary = {
   rarity: string; typeLine: string; imageUrl: string; hasBack: boolean;
 };
 type CustomCardDetail = { id: string; ownerId: number | null; ownerName: string; design: Partial<Draft>; version: number; artUrl: string | null; backArtUrl: string | null;
+  printingOf: { id: string; name: string } | null;
   use: { others: number; copies: number; deckCards: number } };
 
 /** Everything the card maker edits, saved as the card's design. */
 type Draft = {
   front: FaceDesign; back: FaceDesign | null; setCode: string; collectorNumber: string; rarity: string; artist: string; finishes: string[];
   priceUsd: string; priceEur: string; legal: string[]; colorsAuto: boolean; colors: string[]; identityAuto: boolean; identity: string[];
-  tokens: Array<{ id: string; name: string }>;
+  tokens: Array<{ id: string; name: string }>; printingOf: { id: string; name: string } | null;
 };
 /** The art of a face: the picture shown, its data to upload, and whether it changed since the last save. */
 type Art = { image: HTMLImageElement | null; data: string | null; changed: boolean };
@@ -46,7 +47,7 @@ const FINISH_NAMES: Array<[string, string]> = [["nonfoil", "Regular"], ["foil", 
 const LEGAL_FORMATS = FORMATS.filter((format) => format !== "casual");
 const newDraft = (setCode = ""): Draft => ({
   front: blankFace(), back: null, setCode, collectorNumber: "1", rarity: "common", artist: "", finishes: ["nonfoil"], priceUsd: "", priceEur: "",
-  legal: [], colorsAuto: true, colors: [], identityAuto: true, identity: [], tokens: [],
+  legal: [], colorsAuto: true, colors: [], identityAuto: true, identity: [], tokens: [], printingOf: null,
 });
 const noArt = (): Art => ({ image: null, data: null, changed: false });
 
@@ -72,7 +73,7 @@ function cardData(draft: Draft) {
     colors: draft.colorsAuto ? null : draft.colors, colorIdentity: draft.identityAuto ? null : draft.identity,
     legalities: Object.fromEntries(draft.legal.map((format) => [format, "legal"])),
     price: { usd: draft.priceUsd.trim() ? Number(draft.priceUsd) : null, eur: null },
-    tokens: draft.tokens, flavorText: draft.front.flavorText.trim(),
+    tokens: draft.tokens, flavorText: draft.front.flavorText.trim(), printingOf: draft.printingOf?.id ?? null,
   };
 }
 
@@ -97,7 +98,7 @@ export async function redrawSetCards(store: Store, code: string): Promise<number
       const detail = await request<CustomCardDetail>(`/api/custom/cards/${encodeURIComponent(summary.id)}`);
       const design = detail.design ?? {};
       const draft: Draft = {
-        ...newDraft(code), ...design, setCode: code, collectorNumber: summary.collectorNumber,
+        ...newDraft(code), ...design, setCode: code, collectorNumber: summary.collectorNumber, printingOf: detail.printingOf,
         front: { ...blankFace(), ...(design.front ?? {}) }, back: design.back ? { ...blankFace(), ...design.back } : null,
       };
       const pictureOf = async (url: string | null) => {
@@ -130,14 +131,15 @@ export async function redrawSetCards(store: Store, code: string): Promise<number
 }
 
 /** Chooses the art of any card in the card database. */
-function ArtSearch({ onPick }: { onPick: (card: Card) => void }) {
-  const [term, setTerm] = useState("");
+function ArtSearch({ onPick, official = false, initial = "" }: { onPick: (card: Card) => void; official?: boolean; initial?: string }) {
+  const [term, setTerm] = useState(initial);
   const [results, setResults] = useState<Card[] | null>(null);
   const [error, setError] = useState("");
   const run = async () => {
     setError("");
     try {
-      setResults(await request<Card[]>(`/api/cards?q=${encodeURIComponent(term.trim())}&limit=24`));
+      const query = official ? `${term.trim()} -is:custom` : term.trim();
+      setResults(await request<Card[]>(`/api/cards?q=${encodeURIComponent(query)}&limit=24`));
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Could not search.");
     }
@@ -146,7 +148,7 @@ function ArtSearch({ onPick }: { onPick: (card: Card) => void }) {
     <div className="artsearch">
       <label className="searchbox"><Icon name="find" className="nicon" />
         <input autoFocus value={term} onChange={(event) => setTerm(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void run(); }}
-          placeholder="Find a card (Enter)" aria-label="Find a card for its art" /></label>
+          placeholder="Find a card (Enter)" aria-label={official ? "Find an existing card" : "Find a card for its art"} /></label>
       {error && <p className="note err">{error}</p>}
       <div className="artgrid">
         {results?.length === 0 && <p className="note pad">No matching cards</p>}
@@ -357,7 +359,7 @@ export function CardMaker() {
       const base = newDraft(summary.setCode);
       const design = detail.design ?? {};
       const loaded: Draft = {
-        ...base, ...design, setCode: summary.setCode, collectorNumber: summary.collectorNumber,
+        ...base, ...design, setCode: summary.setCode, collectorNumber: summary.collectorNumber, printingOf: detail.printingOf,
         front: { ...blankFace(), ...(design.front ?? {}) }, back: design.back ? { ...blankFace(), ...design.back } : null,
       };
       const artOf = async (url: string | null): Promise<Art> => {
@@ -477,6 +479,12 @@ export function CardMaker() {
       })();
     }} />
   ), 720, "Cancel");
+  const chooseOriginal = () => customDialog("Link to an existing card", (close) => (
+    <ArtSearch official initial={draft.front.name} onPick={(card) => {
+      change({ printingOf: { id: card.id, name: card.name } });
+      close();
+    }} />
+  ), 720, "Cancel");
 
   const useLibraryArt = async (art: ArtItem) => {
     const response = await fetchFile(art.url);
@@ -588,6 +596,14 @@ export function CardMaker() {
               onChange={(value) => change({ setCode: value, collectorNumber: id ? draft.collectorNumber : nextNumber(value, id) })} />
             : <button type="button" className="btn small" onClick={() => openSets("new")}>Create a custom set...</button>}
         </div>
+        <div className="prow"><label>Printing of</label>
+          <span className="btnrow">
+            <span>{draft.printingOf?.name ?? "Independent custom card"}</span>
+            <button type="button" className="btn small" disabled={!mine} onClick={chooseOriginal}>Choose card...</button>
+            {draft.printingOf && <button type="button" className="btn small" disabled={!mine} onClick={() => change({ printingOf: null })}>Remove link</button>}
+          </span>
+        </div>
+        <p className="note">Link an existing card to show this custom card among its printings. The design and card data remain yours to edit.</p>
         <div className="prow"><label htmlFor="cm-number">Collector number</label>
           <input id="cm-number" value={draft.collectorNumber} maxLength={10} disabled={!mine} onChange={(event) => change({ collectorNumber: event.target.value })} /></div>
         <div className="prow"><label htmlFor="cm-rarity">Rarity</label>

@@ -1,5 +1,6 @@
 // ---------- offline use in the Android app: a copy of the library on the phone, queued changes and sync ----------
 import { answerNotes, applyNotesLocally, refreshNotes } from "./notes-offline";
+import { deckProfile } from "../../../server/src/deck-profile";
 import type { ClashDetail, Conflict } from "../notes-state";
 import { NOTE_CLASH } from "../note-files";
 import type { CardDetail, Collection, CollectionEntry, DeckCard, DeckDetail, Deck, DeckLink, FinishCode } from "../types";
@@ -43,6 +44,14 @@ const NOT_KEPT = /^\/api\/(cards\?|cards\/match\?|cards\/[^/]+\/printings|catalo
 const keep = (url: string) => url.startsWith("/api/") && !NOT_KEPT.test(url);
 const getCopy = <T>(url: string) => idbGet<T>("cache", url);
 const setCopy = (url: string, value: unknown) => idbSet("cache", url, value);
+
+async function saveDeckCards(id: string, detail: DeckDetail) {
+  const profile = deckProfile(detail.cards);
+  Object.assign(detail, profile);
+  await setCopy(`/api/decks/${encodeURIComponent(id)}`, detail);
+  const decks = await getCopy<Deck[]>("/api/decks");
+  if (decks) await setCopy("/api/decks", decks.map((deck) => deck.id === id ? { ...deck, ...profile } : deck));
+}
 
 async function queue(): Promise<Queued[]> {
   return (await idbAll<Queued>("queue")).sort((a, b) => a.seq - b.seq);
@@ -213,7 +222,7 @@ async function applyLocally(method: string, url: string, body: Record<string, un
     const me = (await getCopy<{ id: number; name: string }>("/api/me")) ?? { id: 0, name: "" };
     const created: Deck = {
       id: body.id, name: body.name, realName: body.name, format: typeof body.format === "string" ? body.format : "casual", mode: "theme", card_count: 0,
-      collection_id: typeof body.collectionId === "string" ? body.collectionId : null, role: "owner", owner: me, displayName: null, sharedWith: [],
+      collection_id: typeof body.collectionId === "string" ? body.collectionId : null, color_identity: "", themes: [], role: "owner", owner: me, displayName: null, sharedWith: [],
     };
     await setCopy("/api/decks", [created, ...((await getCopy<Deck[]>("/api/decks")) ?? [])]);
     await setCopy(`/api/decks/${enc(body.id)}`, { ...created, cards: [] } satisfies DeckDetail);
@@ -251,7 +260,7 @@ async function applyLocally(method: string, url: string, body: Record<string, un
       existing = {
         entry_id: -Date.now() - Math.floor(Math.random() * 1000), card_id: card.id, oracle_id: card.oracle_id, printing_id: printing, quantity, zone,
         name: card.name, mana_cost: card.mana_cost, type_line: card.type_line, set_code: card.set_code, set_name: card.set_name,
-        collector_number: card.collector_number, image_url: card.image_url, links: [], finish,
+        collector_number: card.collector_number, image_url: card.image_url, color_identity: card.color_identity, oracle_text: card.oracle_text, links: [], finish,
       };
       detail.cards.push(existing);
     }
@@ -268,7 +277,7 @@ async function applyLocally(method: string, url: string, body: Record<string, un
       }
     }
     existing.missing = Math.max(0, existing.quantity - (existing.links ?? []).reduce((sum, link) => sum + link.quantity, 0));
-    await setCopy(`/api/decks/${enc(id)}`, detail);
+    await saveDeckCards(id, detail);
     return { response: { status: "added" }, label: `Add ${quantity} ${card.name} to ${detail.name}` };
   }
   if ((match = /^\/api\/decks\/([^/]+)\/cards\/([^/]+)$/.exec(path)) && (method === "PATCH" || method === "DELETE")) {
@@ -301,7 +310,7 @@ async function applyLocally(method: string, url: string, body: Record<string, un
         entry.zone = nextZone;
       }
     }
-    await setCopy(`/api/decks/${enc(id)}`, detail);
+    await saveDeckCards(id, detail);
     return { response: { status: quantity === 0 ? "removed" : "updated" }, base: method === "PATCH" ? base : undefined, url: sendUrl, label: `Change ${entry.name} in ${await deckName(id)}` };
   }
   return null;

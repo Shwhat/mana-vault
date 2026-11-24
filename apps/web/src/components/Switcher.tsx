@@ -1,5 +1,6 @@
 // ---------- switcher: one searchable list for opening a collection or a deck ----------
 import { choices, Picker } from "./Picker";
+import { DeckProfile } from "./DeckProfile";
 import { collectionMenu, deckMenu } from "./ItemMenus";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Action } from "../actions";
@@ -10,6 +11,7 @@ import { ALL_COLLECTIONS, type Collection, type Currency, formatName, money, typ
 type Item = {
   id: string; name: string; detail: string; badge?: string; created: string; updated: string; cards: number; value: number; format: string; commander: string;
   image?: string | null;
+  color_identity?: string; themes?: string[];
   /** Stays at the top of the list whatever the sort: All collections. */
   pinned?: boolean;
 };
@@ -39,7 +41,7 @@ export function Switcher({ kind, actions }: { kind: "collection" | "deck"; actio
       id: item.id, name: item.name, detail: [item.commander, formatName(item.format), `${item.card_count ?? 0} cards`].filter(Boolean).join(", "),
       badge: item.role === "member" || (item.sharedWith?.length ?? 0) > 0 ? "Shared" : undefined,
       created: item.created_at ?? "", updated: item.updated_at ?? "", cards: item.card_count ?? 0, value: 0, format: item.format,
-      commander: item.commander ?? "", image: item.image_url,
+      commander: item.commander ?? "", image: item.image_url, color_identity: item.color_identity, themes: item.themes,
     }))), [kind, store.collections, store.decks, currency, store.prefs.allWishlists]);
   const current = items.find((item) => item.id === currentId);
   const label = current?.name ?? (kind === "collection" ? "Choose a collection" : "Choose a deck");
@@ -68,7 +70,7 @@ function SwitcherList({ kind, items, currentId, anchor, actions, onClose }: {
   const recent = store.prefs.recent;
   const shown = useMemo(() => {
     const words = term.trim().toLowerCase().split(/\s+/).filter(Boolean);
-    const list = items.filter((item) => words.every((word) => `${item.name} ${item.commander} ${item.format}`.toLowerCase().includes(word)));
+    const list = items.filter((item) => words.every((word) => `${item.name} ${item.commander} ${item.format} ${(item.themes ?? []).join(" ")}`.toLowerCase().includes(word)));
     const byName = (a: Item, b: Item) => a.name.localeCompare(b.name);
     const sorts: Record<SwitchSort, (a: Item, b: Item) => number> = {
       recent: (a, b) => (recent[b.id] ?? 0) - (recent[a.id] ?? 0) || b.updated.localeCompare(a.updated) || byName(a, b),
@@ -149,6 +151,7 @@ function SwitcherList({ kind, items, currentId, anchor, actions, onClose }: {
             <span className="swtext">
               <span className="swtitle"><b>{item.name}</b>{item.badge && <span className={item.badge === "Wishlist" ? "badge wish" : "badge"}>{item.badge}</span>}</span>
               <span className="swdetail">{item.detail}</span>
+              {kind === "deck" && <DeckProfile deck={item} />}
             </span>
             {(kind === "collection" ? store.prefs.addTo === "collection" && store.prefs.targetCollection === item.id : store.prefs.addTo === "deck" && store.deck?.id === item.id)
               && <span className="target-mark strong" title="New cards are added here">Adding here</span>}

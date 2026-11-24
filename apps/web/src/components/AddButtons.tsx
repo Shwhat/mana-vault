@@ -35,8 +35,6 @@ export function addTargetOf(store: Store, target: AddTarget = "auto"): { kind: "
   return collection ? { kind: "collection", name: store.collectionName(collection) } : null;
 }
 
-const printingCache = new Map<string, Printing[]>();
-
 /** Adds the chosen printing in the chosen finish to the target. */
 function addPrinting(store: Store, printing: Pick<Card, "id" | "name">, finish: FinishCode, target: { kind: "collection" | "deck" }, zone?: Zone) {
   if (target.kind === "deck") void store.addToDeck(printing.id, printing.name, undefined, { zone: zone ?? store.prefs.zone, finish: finishName(finish) });
@@ -50,14 +48,12 @@ function addPrinting(store: Store, printing: Pick<Card, "id" | "name">, finish: 
 export async function addCard(store: Store, card: Pick<Card, "id" | "name" | "finishes">, target: AddTarget = "auto", zone?: Zone) {
   const where = addTargetOf(store, target);
   if (!where) return store.flash(target === "deck" ? "Open a deck first" : "Create a collection first", "err");
-  let printings = printingCache.get(card.id);
-  if (!printings) {
-    try {
-      printings = await request<Printing[]>(`/api/cards/${encodeURIComponent(card.id)}/printings`);
-      printingCache.set(card.id, printings);
-    } catch {
-      printings = [];
-    }
+  let printings: Printing[];
+  try {
+    printings = await request<Printing[]>(`/api/cards/${encodeURIComponent(card.id)}/printings`);
+  } catch (reason) {
+    store.fail(reason, "Could not load the printings.");
+    return;
   }
   // one printing (0.18.0): no printing list; one finish adds at once, more ask only for the finish
   if (printings.length === 1) {
@@ -66,7 +62,6 @@ export async function addCard(store: Store, card: Pick<Card, "id" | "name" | "fi
     if (finishes.length === 1) return addPrinting(store, only, finishes[0]!, where, zone);
     return chooseFinish(`Add ${card.name} to ${where.name}`, only, store.prefs.currency, (finish) => addPrinting(store, only, finish, where, zone), defaultFinish(store, card));
   }
-  if (printings.length === 0 && finishesOfCard(card).length === 1) return addPrinting(store, card, finishesOfCard(card)[0]!, where, zone);
   choosePrinting(card.name, card.id, card.id, {
     finish: defaultFinish(store, card), currency: store.prefs.currency, title: `Add ${card.name} to ${where.name}`, allowCurrent: true,
   }, (printing, finish) => addPrinting(store, printing, finish, where, zone));

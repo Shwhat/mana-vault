@@ -439,6 +439,9 @@ dialog::backdrop{background:rgba(20,28,40,.35)}
 .colline .meter{flex:1}
 .colline.sub{margin:0}
 .colline .cnt{margin-left:0}
+.deckprofile{display:flex;align-items:center;flex-wrap:wrap;gap:3px;white-space:normal}
+.deckcolors{display:inline-flex;align-items:center;gap:2px}
+.decktheme{font-size:10px}
 .setpick{margin-top:8px}
 .chips{display:flex;flex-wrap:wrap;gap:4px;margin:6px 0}
 .chip{display:inline-flex;align-items:center;gap:4px;padding:1px 4px 1px 8px;border-radius:8px;background:var(--accent-soft);color:var(--on-text);font-size:11.5px}
@@ -1532,6 +1535,8 @@ input.setcode{width:60px}
 .tfold:disabled{cursor:default}
 .tpin{color:var(--warn);font-weight:700}
 .nmain{display:flex;flex-direction:column;min-height:0;min-width:0;overflow:hidden}
+.nguide{flex:1}
+.nguide .nhead{padding:8px 14px}
 .notespane.phone .nmain{flex:1}
 .nphonebar{padding:6px 8px 0}
 .npage{flex:1;display:flex;flex-direction:column;min-height:0;min-width:0;padding:8px 14px 0}

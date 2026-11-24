@@ -24,7 +24,7 @@ async function saveMeta(meta: PageMeta) {
 function metaOf(page: PageDetail): PageMeta {
   return {
     id: page.id, title: page.title, kind: page.kind, itemId: page.itemId, parentId: page.parentId, position: page.position, updatedAt: page.updatedAt,
-    updatedBy: page.updatedBy, version: page.version, pinned: page.pinned, empty: page.body === "", top: page.top,
+    updatedBy: page.updatedBy, version: page.version, pinned: page.pinned, empty: page.body === "", top: page.top, builtin: page.builtin,
   };
 }
 
@@ -75,8 +75,11 @@ export async function applyNotesLocally(method: string, path: string, body: Reco
       itemId = body.itemId;
       parentId = top.id;
     }
+    const siblings = tree.pages.filter((page) => page.parentId === parentId && (parentId !== null || !page.kind)).sort((a, b) => a.position - b.position);
+    const last = siblings[siblings.length - 1];
+    const position = !parentId && !body.before && last?.builtin === "about" ? last.position - 0.5 : nextPosition(tree, parentId);
     const detail: PageDetail = {
-      id: body.id, title: body.title.trim(), body: typeof body.body === "string" ? body.body : "", kind, itemId, parentId, position: nextPosition(tree, parentId),
+      id: body.id, title: body.title.trim(), body: typeof body.body === "string" ? body.body : "", kind, itemId, parentId, position,
       version: 1, updatedAt: stamp(), updatedBy: "", createdAt: stamp(), top: false, backlinks: [], pinned: false,
     };
     await setCopy(pageUrl(detail.id), detail);
@@ -142,6 +145,7 @@ export async function applyNotesLocally(method: string, path: string, body: Reco
         for (const item of tree.pages) if (item.parentId && deleted.includes(item.parentId) && !deleted.includes(item.id)) { deleted.push(item.id); grew = true; }
       }
     }
+    if (tree.pages.some((item) => deleted.includes(item.id) && item.builtin === "about")) return null;
     const lifted = lift ? tree.pages.filter((item) => item.parentId === id).map((item) => ({ id: item.id, parentId: id, position: item.position })) : [];
     const pages = tree.pages.filter((item) => !deleted.includes(item.id)).map((item) => (item.parentId === id ? { ...item, parentId: page.parentId } : item));
     await setCopy(TREE, { ...tree, pages });

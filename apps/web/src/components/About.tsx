@@ -2,6 +2,7 @@
 // The About guide is a set of Markdown files in src/about, bundled with each build. A file named
 // "NN-slug.md" becomes the page /about/slug, ordered by NN, titled by its first "# " heading.
 import { Picker } from "./Picker";
+import { useState } from "react";
 import { APP_VERSION } from "../api";
 import { useApp } from "../store";
 
@@ -87,9 +88,8 @@ export function renderMarkdown(source: string): string {
   return out.join("\n");
 }
 
-export function About() {
-  const store = useApp();
-  const current = aboutPages.find((page) => page.slug === store.aboutSlug) ?? (store.aboutSlug ? null : aboutPages[0]);
+function Guide({ slug, open }: { slug: string; open: (slug: string) => void }) {
+  const current = aboutPages.find((page) => page.slug === slug) ?? (slug ? null : aboutPages[0]);
   const index = current ? aboutPages.indexOf(current) : -1;
   const previous = index > 0 ? aboutPages[index - 1] : undefined;
   const next = index >= 0 && index < aboutPages.length - 1 ? aboutPages[index + 1] : undefined;
@@ -99,26 +99,20 @@ export function About() {
     const href = link?.getAttribute("href") ?? "";
     if (href.startsWith("/about")) {
       event.preventDefault();
-      store.openAbout(href.replace(/^\/about\/?/, ""));
-      document.querySelector(".abpage")?.scrollTo(0, 0);
+      open(href.replace(/^\/about\/?/, ""));
+      event.currentTarget.closest(".aboutwrap")?.scrollTo(0, 0);
     }
   };
 
   return (
-    <div className="view aboutview" id="view-about">
-      <div id="pagetabs">
-        <span className="phname">About Mana Vault</span>
-        <span className="phwhere">Version {APP_VERSION}</span>
-        <button type="button" className="btn small closebtn" onClick={store.closeAbout} aria-label="Close the About guide">Close</button>
-      </div>
       <div className="aboutwrap">
         <div className="about">
           <nav className="abtoc" aria-label="Guide pages">
             {aboutPages.map((page) => (
-              <a key={page.slug} href={`/about/${page.slug}`} className={page === current ? "on" : ""} onClick={(event) => { event.preventDefault(); store.openAbout(page.slug); }}>{page.title}</a>
+              <a key={page.slug} href={`/about/${page.slug}`} className={page === current ? "on" : ""} onClick={(event) => { event.preventDefault(); open(page.slug); }}>{page.title}</a>
             ))}
           </nav>
-          <Picker className="abselect" label="Guide page" value={current?.slug ?? ""} onChange={(slug) => store.openAbout(slug)}
+          <Picker className="abselect" label="Guide page" value={current?.slug ?? ""} onChange={open}
             options={aboutPages.map((page) => ({ value: page.slug, label: page.title }))} />
           <article className="abpage" onClick={onClick}>
             {current ? (
@@ -131,11 +125,29 @@ export function About() {
               </>
             ) : (
               <div className="empty"><b>Page not found</b><span>There is no guide page at this address.</span>
-                <button type="button" className="btn primary" onClick={() => store.openAbout("")}>Go to Overview</button></div>
+                <button type="button" className="btn primary" onClick={() => open("")}>Go to Overview</button></div>
             )}
           </article>
         </div>
       </div>
+  );
+}
+
+export function WikiGuide() {
+  const [slug, setSlug] = useState("");
+  return <Guide slug={slug} open={setSlug} />;
+}
+
+export function About() {
+  const store = useApp();
+  return (
+    <div className="view aboutview" id="view-about">
+      <div id="pagetabs">
+        <span className="phname">About Mana Vault</span>
+        <span className="phwhere">Version {APP_VERSION}</span>
+        <button type="button" className="btn small closebtn" onClick={store.closeAbout} aria-label="Close the About guide">Close</button>
+      </div>
+      <Guide slug={store.aboutSlug} open={store.openAbout} />
     </div>
   );
 }
