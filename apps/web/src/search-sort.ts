@@ -1,13 +1,12 @@
 // ---------- search sorting: the order of card search results kept in the browser, the same rules as the server ----------
 import { anyPrice, type Card, type Currency, pricesOf, type SearchSort } from "./types";
+import { searchPlainWords } from "../../server/src/search-expression";
 
 type Sortable = Card & { owned?: number };
 
 /** The plain words of a search, without filter words such as t:creature (the same rule as the server). */
 export function plainWords(query: string): string {
-  const tokens = query.match(/(?:[^\s"]+|"[^"]*")+/g) ?? [];
-  return tokens.filter((token) => !/^(-?)([a-z]+)(>=|<=|>|<|=|:)/i.test(token) && !token.startsWith("-"))
-    .map((token) => token.replace(/^"|"$/g, "")).filter(Boolean).join(" ");
+  return searchPlainWords(query);
 }
 
 /** How well a card name matches the search words: 0 exact, 1 starts with them, 2 holds every word, 3 other. */

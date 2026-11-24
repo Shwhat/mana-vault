@@ -3,7 +3,7 @@ import { answerNotes, applyNotesLocally, refreshNotes } from "./notes-offline";
 import type { ClashDetail, Conflict } from "../notes-state";
 import { NOTE_CLASH } from "../note-files";
 import type { CardDetail, Collection, CollectionEntry, DeckCard, DeckDetail, Deck, DeckLink, FinishCode } from "../types";
-import { compactCard, matchOnPhone, printingsOf, refreshCatalog, refreshRulings, rulingsOf, searchCards, suggestOnPhone } from "./catalog";
+import { compactCard, matchCards, matchOnPhone, printingsOf, refreshCatalog, refreshRulings, rulingsOf, searchCards, suggestOnPhone } from "./catalog";
 import { idbAll, idbDelete, idbGet, idbSet } from "./idb";
 import { appFetch, OfflineError, readJson, SignedOutError } from "./net";
 import { native } from "./platform";
@@ -358,6 +358,7 @@ async function detailOnPhone(id: string): Promise<CardDetail> {
 async function answerOnPhone(url: string): Promise<unknown> {
   const [path, query = ""] = url.split("?") as [string, string?];
   if (path === "/api/cards") return searchCards(new URLSearchParams(query));
+  if (path === "/api/cards/match") return matchCards(new URLSearchParams(query));
   if (path.startsWith("/api/notes/")) {
     const notes = await answerNotes(path, new URLSearchParams(query));
     if (notes !== undefined) return notes;

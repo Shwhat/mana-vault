@@ -2,6 +2,8 @@
 // rules as the server (card-search.ts) from the card list kept on the phone. Each rule here matches one on the server;
 // a change to one is made to both. ----------
 
+import { searchColors, searchExpression, searchRarity } from "../../server/src/search-expression";
+
 /** What a card on the phone carries for searching. */
 export type QueryCard = {
   oracle_id?: string; name: string; type_line: string; oracle_text: string | null; flavor_name?: string | null; mana_cost: string | null;
@@ -31,9 +33,8 @@ export type QueryContext = {
 
 type Test = (card: QueryCard) => boolean;
 
-const COLORS: Record<string, string> = { white: "W", blue: "U", black: "B", red: "R", green: "G" };
 const RARITIES = new Set(["common", "uncommon", "rare", "mythic", "special", "bonus"]);
-const COMPARE = ["=", ":", ">", "<", ">=", "<="];
+const COMPARE = ["=", ":", ">", "<", ">=", "<=", "!="];
 
 const has = (list: string | null | undefined, word: string) => `,${(list ?? "").toLowerCase()},`.includes(`,${word},`);
 const like = (text: string | null | undefined, value: string) => (text ?? "").toLowerCase().includes(value.toLowerCase());
@@ -43,6 +44,7 @@ const compare = (left: number, operator: string, right: number) => {
     case "<": return left < right;
     case ">=": return left >= right;
     case "<=": return left <= right;
+    case "!=": return left !== right;
     default: return left === right;
   }
 };
@@ -53,6 +55,7 @@ const IS_WORDS: Record<string, Test> = {
   nonfoil: (card) => has(card.finishes, "nonfoil"),
   etched: (card) => has(card.finishes, "etched"),
   fullart: (card) => Number(card.full_art ?? 0) === 1,
+  full: (card) => Number(card.full_art ?? 0) === 1,
   borderless: (card) => card.border_color === "borderless",
   showcase: (card) => has(card.frame_effects, "showcase"),
   extendedart: (card) => has(card.frame_effects, "extendedart"),
@@ -60,31 +63,41 @@ const IS_WORDS: Record<string, Test> = {
   variation: (card) => Number(card.variation ?? 0) === 1,
   reprint: (card) => Number(card.is_reprint ?? 0) === 1,
   starter: (card) => Number(card.is_starter ?? 0) === 1,
+  commander: (card) => Number(card.lead_commander ?? 0) === 1,
+  brawler: (card) => Number(card.lead_brawl ?? 0) === 1,
+  oathbreaker: (card) => Number(card.lead_oathbreaker ?? 0) === 1,
 };
-
-function normalizeColors(value: string): string {
-  const normalized = value.toLowerCase().replace(/[\s,]+/g, "");
-  const expanded = COLORS[normalized] ?? normalized;
-  return [...expanded.toUpperCase()].every((color) => "WUBRG".includes(color)) ? expanded.toUpperCase() : "";
-}
 
 /** Reads a search into one test for a card. Throws an Error with the server's message for a search it cannot read. */
 export function compileQuery(query: string, context: QueryContext = {}): Test {
+  return searchExpression(query, (token) => compileTerm(token, query, context),
+    (operator, left, right) => operator === "and" ? (card) => left(card) && right(card) : (card) => left(card) || right(card),
+    (test) => (card) => !test(card)) ?? (() => true);
+}
+
+function compileTerm(input: string, query: string, context: QueryContext): Test {
   const tests: Test[] = [];
-  const tokens = query.match(/(?:[^\s"]+|"[^"]*")+/g) ?? [];
-  for (const token of tokens) {
-    const filter = /^(-?)([a-z]+)(>=|<=|>|<|=|:)(.*)$/i.exec(token);
+  for (const token of [input]) {
+    const filter = /^(-?)([a-z]+)(>=|<=|!=|>|<|=|:)(.*)$/i.exec(token);
     if (!filter) {
-      const term = token.replace(/^"|"$/g, "");
-      if (term) tests.push((card) => like(card.name, term) || like(card.type_line, term) || like(card.oracle_text, term) || like(card.flavor_name, term));
+      const negative = token.startsWith("-");
+      const raw = negative ? token.slice(1) : token;
+      const exact = raw.startsWith("!");
+      const term = (exact ? raw.slice(1) : raw).replace(/^"|"$/g, "");
+      if (!term) throw new Error("Expected a search term");
+      const test: Test = exact
+        ? (card) => card.name.toLowerCase() === term.toLowerCase() || card.flavor_name?.toLowerCase() === term.toLowerCase()
+        : (card) => like(card.name, term) || like(card.type_line, term) || like(card.oracle_text, term) || like(card.flavor_name, term);
+      tests.push(negative ? (card) => !test(card) : test);
       continue;
     }
     const negative = !!filter[1];
     const rawKey = filter[2] ?? "";
     const operator = filter[3] ?? "";
-    const key = rawKey.toLowerCase();
+    const key = ({ s: "set", e: "set", edition: "set", identity: "id", manavalue: "mv", format: "legal" } as Record<string, string>)[rawKey.toLowerCase()] ?? rawKey.toLowerCase();
     const value = (filter[4] ?? "").replace(/^"|"$/g, "");
     if (!value) throw new Error(`Search filter ${rawKey} needs a value`);
+    if (value.startsWith("/")) throw new Error("Regular expression searches are not supported");
     const add = (test: Test) => tests.push(negative ? (card) => !test(card) : test);
     const colonOnly = () => { if (operator !== ":") throw new Error(`${rawKey} only supports the ":" operator`); };
 
@@ -95,22 +108,43 @@ export function compileQuery(query: string, context: QueryContext = {}): Test {
       else if (key === "o" || key === "oracle") add((card) => like(card.oracle_text, value));
       else if (key === "set") add((card) => card.set_code.toLowerCase() === value.toLowerCase() || like(card.set_name, value));
       else if (key === "r" || key === "rarity") {
-        if (!RARITIES.has(value.toLowerCase())) throw new Error(`Unknown rarity "${value}"`);
-        add((card) => card.rarity === value.toLowerCase());
+        const rarity = searchRarity(value);
+        if (!RARITIES.has(rarity)) throw new Error(`Unknown rarity "${value}"`);
+        add((card) => card.rarity === rarity);
       } else add((card) => like(card.mana_cost, value));
       continue;
     }
     if (key === "c" || key === "color" || key === "id") {
-      colonOnly();
       const field = (card: QueryCard) => (key === "id" ? card.color_identity ?? "" : card.colors ?? "");
-      if (["c", "colorless"].includes(value.toLowerCase())) { add((card) => field(card) === ""); continue; }
-      const wanted = normalizeColors(value);
-      if (!wanted) throw new Error(`Invalid color filter "${value}"`);
-      add((card) => [...wanted].every((color) => field(card).includes(color)));
+      const count = (card: QueryCard) => [..."WUBRG"].filter((color) => field(card).includes(color)).length;
+      if (/^[0-5]$/.test(value)) { add((card) => compare(count(card), operator, Number(value))); continue; }
+      if (["m", "multicolor"].includes(value.toLowerCase())) {
+        if (operator !== ":" && operator !== "=") throw new Error(`${rawKey} multicolor only supports ":" or "="`);
+        add((card) => count(card) > 1);
+        continue;
+      }
+      const wanted = searchColors(value);
+      if (wanted === null) throw new Error(`Invalid color filter "${value}"`);
+      add((card) => {
+        const contains = [...wanted].every((color) => field(card).includes(color));
+        const subset = [..."WUBRG"].every((color) => !field(card).includes(color) || wanted.includes(color));
+        const exact = contains && subset;
+        if (operator === ":" && wanted) return contains;
+        if (operator === ":" || operator === "=") return exact;
+        if (operator === "!=") return !exact;
+        if (operator === ">=") return contains;
+        if (operator === "<=") return subset;
+        return operator === ">" ? contains && !exact : subset && !exact;
+      });
       continue;
     }
     if (key === "mv" || key === "cmc") {
       if (!COMPARE.includes(operator)) throw new Error("Mana value needs a comparison operator");
+      if (operator === ":" && ["even", "odd"].includes(value.toLowerCase())) {
+        const remainder = value.toLowerCase() === "even" ? 0 : 1;
+        add((card) => card.mana_value !== null && card.mana_value % 2 === remainder);
+        continue;
+      }
       const amount = Number(value);
       if (!Number.isFinite(amount) || amount < 0 || amount > 100) throw new Error("Mana value must be from 0 to 100");
       add((card) => compare(card.mana_value ?? 0, operator, amount));
@@ -134,7 +168,7 @@ export function compileQuery(query: string, context: QueryContext = {}): Test {
       const found = /^([a-z]+)(>=|<=|>|<|=)(\d+(?:\.\d+)?)$/i.exec(value);
       const prefix = found ? STORE_KEYS[found[1]!.toLowerCase()] : undefined;
       if (!found || !prefix) throw new Error("Write store: as a store and a price, such as store:cardkingdom<5");
-      const foilOnly = /(^|\s)is:foil(\s|$)/i.test(query);
+      const foilOnly = /(^|[\s(])is:foil(?=$|[\s)])/i.test(query);
       const field = (card: QueryCard) => {
         const read = (suffix: string) => (card as Record<string, unknown>)[`${prefix}_${suffix}`] as number | null | undefined;
         return (foilOnly ? read("rf") ?? read("re") : read("r") ?? read("rf") ?? read("re")) ?? null;
@@ -201,5 +235,5 @@ export function compileQuery(query: string, context: QueryContext = {}): Test {
     }
     throw new Error(`Unsupported search filter "${rawKey}"`);
   }
-  return (card) => tests.every((test) => test(card));
+  return tests[0]!;
 }

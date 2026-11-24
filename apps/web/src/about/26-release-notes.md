@@ -2,6 +2,12 @@
 
 The installed version is shown at the top of this guide.
 
+## 0.24.0 (2026-11-23): Card search syntax
+
+- The Filters panel has a Search syntax field, combined with the search box and the other filters for each view.
+- Card search supports more Scryfall-style syntax locally: grouped alternatives, negation, exact names, color comparisons and names, rarity shortcuts and odd or even mana values. The supported subset is listed in Card search.
+- The phone can apply supported syntax to its downloaded collection and deck cards while offline; filters that need server-only data still require a connection.
+
 ## 0.23.1 (2026-11-23): Type group order
 
 - Type groups are shown in the order Moxfield uses: Planeswalkers, Creatures, Sorceries, Instants, Artifacts, Enchantments, Battles, Lands, Other. This applies to decks and to every list grouped by Type.

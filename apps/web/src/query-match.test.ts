@@ -43,4 +43,21 @@ describe("search syntax on the phone", () => {
     expect(() => run("is:owned")).toThrow("is:owned needs a connection");
     expect(() => run("otag:removal")).toThrow("need a connection");
   });
+  it("supports grouped alternatives, exact and negative names, aliases and color comparisons", () => {
+    expect(run('t:creature (e:2x2 or s:m10) -!"Lightning Bolt"')).toEqual(["Grizzly Bears"]);
+    expect(run('!"Grizzly Bears"')).toEqual(["Grizzly Bears"]);
+    expect(run('-(t:creature or name:bolt)')).toEqual([]);
+    expect(run("-bear identity:g manavalue!=1")).toEqual([]);
+    expect(run("identity<=simic c=1 format:modern")).toEqual([]);
+    expect(run("identity<=simic c=1")).toEqual(["Grizzly Bears"]);
+    expect(run("c!=r")).toEqual(["Grizzly Bears"]);
+    expect(run("r:c mv:even")).toEqual(["Grizzly Bears"]);
+    expect(run("r:u manavalue:odd")).toEqual(["Lightning Bolt"]);
+    expect(compileQuery("-mv:even")({ ...bear, mana_value: null })).toBe(true);
+    const multicolor = { ...bear, colors: "G,U", color_identity: "G,U" };
+    expect(compileQuery("c:simic c>g id<=simic c=2")(multicolor)).toBe(true);
+    expect(compileQuery("c=g")(multicolor)).toBe(false);
+    expect(() => run("(t:creature or")).toThrow("Expected a search term");
+    expect(() => run('name:"bear')).toThrow("Unclosed quote");
+  });
 });

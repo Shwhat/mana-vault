@@ -37,6 +37,7 @@ const quoted = (value: string) => (/[\s"]/.test(value) ? `"${value.replace(/"/g,
  */
 export function serverQuery(filters: Filters, currency: Currency = "usd"): string {
   const words: string[] = [];
+  if (filters.syntax.trim()) words.push(`( ${filters.syntax.trim()} )`);
   const text = (key: string, value: string) => { if (value.trim()) words.push(`${key}:${quoted(value.trim())}`); };
   const range = (key: string, min: string, max: string) => {
     if (min.trim() && Number.isFinite(Number(min))) words.push(`${key}>=${Number(min)}`);
@@ -66,18 +67,20 @@ export function serverQuery(filters: Filters, currency: Currency = "usd"): strin
  * For a collection or deck view: the printing ids that match the filters only the card database can answer, or null
  * while there are none (or while the answer is loading, when every card is shown).
  */
-export function useServerMatch(filters: Filters, currency: Currency): Set<string> | null {
-  const query = serverQuery(filters, currency);
-  const [matched, setMatched] = useState<{ query: string; ids: Set<string> } | null>(null);
+export function useServerMatch(filters: Filters, currency: Currency, enabled = true): { ids: Set<string> | null; error: string } {
+  const query = enabled ? serverQuery(filters, currency) : "";
+  const [matched, setMatched] = useState<{ query: string; ids: Set<string>; error: string } | null>(null);
   useEffect(() => {
     if (!query) return;
     let live = true;
-    void request<{ ids: string[] }>(`/api/cards/match?q=${encodeURIComponent(query)}`)
-      .then((answer) => { if (live) setMatched({ query, ids: new Set(answer.ids) }); })
-      .catch(() => { if (live) setMatched({ query, ids: new Set() }); });
-    return () => { live = false; };
+    const timer = window.setTimeout(() => {
+      void request<{ ids: string[] }>(`/api/cards/match?q=${encodeURIComponent(query)}`)
+        .then((answer) => { if (live) setMatched({ query, ids: new Set(answer.ids), error: "" }); })
+        .catch((reason: unknown) => { if (live) setMatched({ query, ids: new Set(), error: reason instanceof Error ? reason.message : "The filter search failed." }); });
+    }, 250);
+    return () => { live = false; window.clearTimeout(timer); };
   }, [query]);
-  return query && matched?.query === query ? matched.ids : null;
+  return query && matched?.query === query ? matched : { ids: null, error: "" };
 }
 
 /** The same rules as the card search on the server, applied to cards already loaded (a collection or a deck). */
@@ -101,7 +104,9 @@ export function matchesFilters(card: Filterable & { id?: string; card_id?: strin
 
 /** The search address for the card database: /api/cards with the filters, a page offset and the total. */
 export function searchParams(filters: Filters, offset: number, limit: number, options: { group?: boolean; currency?: Currency; sort?: SearchSort } = {}): URLSearchParams {
-  const query = [filters.query.trim(), serverQuery(filters, options.currency)].filter(Boolean).join(" ");
+  const search = filters.query.trim();
+  const panel = serverQuery(filters, options.currency);
+  const query = search && panel ? `( ${search} ) ${panel}` : search || panel;
   const params = new URLSearchParams({ q: query, paged: "1", offset: String(offset), limit: String(limit) });
   // one result per card unless every printing is wanted
   if (options.group) params.set("group", "1");

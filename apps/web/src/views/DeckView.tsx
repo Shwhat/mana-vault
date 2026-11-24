@@ -608,7 +608,7 @@ export function DeckView({ actions }: { actions: Record<string, Action> }) {
   const { deck } = store;
   const legality = useMemo(() => checkDeck(deck?.format ?? "casual", deck?.cards ?? []), [deck?.format, deck?.cards]);
   const filters = store.filterSets.deck;
-  const match = useServerMatch(filters, store.prefs.currency);
+  const { ids: match } = useServerMatch(filters, store.prefs.currency);
   const shown = useMemo(() => (deck?.cards ?? []).filter((card) => matchesFilters(card, filters, match)), [deck?.cards, filters, match]);
   const search = useViewSearch(store.filterSets.deckAdd, !!deck && store.deckTab === "add", "deckAdd");
   if (!deck) {

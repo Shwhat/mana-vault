@@ -370,6 +370,7 @@ export const copyPrice = (entry: CollectionEntry, currency: Currency): number | 
 
 export type Filters = {
   query: string;
+  syntax: string;
   type: string;
   set: string;
   color: string;
@@ -404,7 +405,7 @@ export type Filters = {
 };
 
 export const EMPTY_FILTERS: Filters = {
-  query: "", type: "", set: "", color: "", rarity: "", format: "", mvMin: "", mvMax: "",
+  query: "", syntax: "", type: "", set: "", color: "", rarity: "", format: "", mvMin: "", mvMax: "",
   art: "", role: "", name: "", text: "", creature: "", keyword: "", powMin: "", powMax: "", touMin: "", touMax: "",
   priceMin: "", priceMax: "", made: "", owned: "", artist: "", yearMin: "", yearMax: "", frame: "", foilType: "",
 };

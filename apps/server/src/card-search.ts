@@ -1,12 +1,10 @@
 import { usdEtchedSql, usdFoilSql, usdSql } from "./price-context.js";
+import { searchColors, searchExpression, searchPlainWords, searchRarity } from "./search-expression.js";
 export interface SearchClause {
   sql: string;
   values: string[];
 }
 
-const colors: Record<string, string> = {
-  white: "W", blue: "U", black: "B", red: "R", green: "G",
-};
 const rarities = new Set(["common", "uncommon", "rare", "mythic", "special", "bonus"]);
 
 /** Tags (Art or Oracle) with a label, and every tag under them, as a SQL list of tag ids. */
@@ -15,7 +13,7 @@ const tagIds = (kind: "art" | "oracle") => `(WITH RECURSIVE found(id) AS (
     UNION SELECT c.child_id FROM tag_children c JOIN found ON c.tag_id = found.id
   ) SELECT id FROM found)`;
 
-const COMPARE = ["=", ":", ">", "<", ">=", "<="];
+const COMPARE = ["=", ":", ">", "<", ">=", "<=", "!="];
 const compare = (operator: string) => (operator === ":" ? "=" : operator);
 
 // is: words for printings: finishes, frames and the special foils Scryfall lists as promo types
@@ -25,6 +23,7 @@ const IS_WORDS: Record<string, string> = {
   nonfoil: "(',' || finishes || ',') LIKE '%,nonfoil,%'",
   etched: "(',' || finishes || ',') LIKE '%,etched,%'",
   fullart: "full_art = 1",
+  full: "full_art = 1",
   borderless: "border_color = 'borderless'",
   showcase: "(',' || frame_effects || ',') LIKE '%,showcase,%'",
   extendedart: "(',' || frame_effects || ',') LIKE '%,extendedart,%'",
@@ -33,6 +32,9 @@ const IS_WORDS: Record<string, string> = {
   // from MTGJSON (0.21.0)
   reprint: "is_reprint = 1",
   starter: "is_starter = 1",
+  commander: "lead_commander = 1",
+  brawler: "lead_brawl = 1",
+  oathbreaker: "lead_oathbreaker = 1",
 };
 
 /** Store names the store: filter takes, with their price columns (0.21.0). */
@@ -43,14 +45,30 @@ const STORE_KEYS: Record<string, string> = {
 export type SearchContext = { userId?: number };
 
 export function parseCardQuery(query: string, context: SearchContext = {}): SearchClause[] {
+  const result = searchExpression(query, (token) => parseCardTerm(token, query, context),
+    (operator, left, right) => ({
+      sql: `(${left.sql} ${operator.toUpperCase()} ${right.sql})`,
+      values: [...left.values, ...right.values],
+    }), (value) => ({ sql: `NOT COALESCE((${value.sql}), 0)`, values: value.values }));
+  return result ? [result] : [];
+}
+
+function parseCardTerm(input: string, query: string, context: SearchContext): SearchClause {
   const clauses: SearchClause[] = [];
-  const tokens = query.match(/(?:[^\s"]+|"[^"]*")+/g) ?? [];
-  for (const token of tokens) {
-    const filter = /^(-?)([a-z]+)(>=|<=|>|<|=|:)(.*)$/i.exec(token);
+  for (const token of [input]) {
+    const filter = /^(-?)([a-z]+)(>=|<=|!=|>|<|=|:)(.*)$/i.exec(token);
     if (!filter) {
-      const term = token.replace(/^"|"$/g, "");
+      const negative = token.startsWith("-");
+      const raw = negative ? token.slice(1) : token;
+      const exact = raw.startsWith("!");
+      const term = (exact ? raw.slice(1) : raw).replace(/^"|"$/g, "");
+      if (!term) throw new Error("Expected a search term");
+      if (exact) {
+        clauses.push({ sql: `${negative ? "NOT " : ""}(name = ? COLLATE NOCASE OR COALESCE(flavor_name, '') = ? COLLATE NOCASE)`, values: [term, term] });
+        continue;
+      }
       if (term) clauses.push({
-        sql: "(name LIKE ? ESCAPE '\\' OR type_line LIKE ? ESCAPE '\\' OR oracle_text LIKE ? ESCAPE '\\' OR flavor_name LIKE ? ESCAPE '\\')",
+        sql: `${negative ? "NOT " : ""}(name LIKE ? ESCAPE '\\' OR type_line LIKE ? ESCAPE '\\' OR COALESCE(oracle_text, '') LIKE ? ESCAPE '\\' OR COALESCE(flavor_name, '') LIKE ? ESCAPE '\\')`,
         values: Array(4).fill(pattern(term)),
       });
       continue;
@@ -60,32 +78,34 @@ export function parseCardQuery(query: string, context: SearchContext = {}): Sear
     const rawKey = filter[2] ?? "";
     const operator = filter[3] ?? "";
     const rawValue = filter[4] ?? "";
-    const key = rawKey.toLowerCase();
+    const key = ({ s: "set", e: "set", edition: "set", identity: "id", manavalue: "mv", format: "legal" } as Record<string, string>)[rawKey.toLowerCase()] ?? rawKey.toLowerCase();
     const value = rawValue.replace(/^"|"$/g, "");
     if (!value) throw new Error(`Search filter ${rawKey} needs a value`);
+    if (value.startsWith("/")) throw new Error("Regular expression searches are not supported");
     const negate = negative ? "NOT " : "";
     if (["name", "type", "t", "o", "oracle", "set", "r", "rarity", "m", "mana"].includes(key)) {
       if (operator !== ":") throw new Error(`${rawKey} only supports the ":" operator`);
       let sql: string;
       let values: string[];
       if (key === "name") {
-        sql = "(name LIKE ? ESCAPE '\\' OR flavor_name LIKE ? ESCAPE '\\')";
+        sql = "(name LIKE ? ESCAPE '\\' OR COALESCE(flavor_name, '') LIKE ? ESCAPE '\\')";
         values = [pattern(value), pattern(value)];
       } else if (key === "type" || key === "t") {
         sql = "type_line LIKE ? ESCAPE '\\'";
         values = [pattern(value)];
       } else if (key === "o" || key === "oracle") {
-        sql = "oracle_text LIKE ? ESCAPE '\\'";
+        sql = "COALESCE(oracle_text, '') LIKE ? ESCAPE '\\'";
         values = [pattern(value)];
       } else if (key === "set") {
         sql = "(lower(set_code) = lower(?) OR set_name LIKE ? ESCAPE '\\')";
         values = [value, pattern(value)];
       } else if (key === "r" || key === "rarity") {
-        if (!rarities.has(value.toLowerCase())) throw new Error(`Unknown rarity "${value}"`);
+        const rarity = searchRarity(value);
+        if (!rarities.has(rarity)) throw new Error(`Unknown rarity "${value}"`);
         sql = "rarity = ?";
-        values = [value.toLowerCase()];
+        values = [rarity];
       } else {
-        sql = "mana_cost LIKE ? ESCAPE '\\'";
+        sql = "COALESCE(mana_cost, '') LIKE ? ESCAPE '\\'";
         values = [pattern(value)];
       }
       clauses.push({ sql: `${negate}(${sql})`, values });
@@ -93,24 +113,38 @@ export function parseCardQuery(query: string, context: SearchContext = {}): Sear
     }
 
     if (key === "c" || key === "color" || key === "id") {
-      if (operator !== ":") throw new Error(`${rawKey} only supports the ":" operator`);
-      const identity = key === "id";
-      if (["c", "colorless"].includes(value.toLowerCase())) {
-        clauses.push({ sql: `${negate}(${identity ? "color_identity" : "colors"} = '')`, values: [] });
+      const field = key === "id" ? "color_identity" : "colors";
+      const count = `(${[..."WUBRG"].map((letter) => `(instr(COALESCE(${field}, ''), '${letter}') > 0)`).join(" + ")})`;
+      if (/^[0-5]$/.test(value)) {
+        clauses.push({ sql: `${negate}(${count} ${compare(operator)} CAST(? AS INTEGER))`, values: [value] });
         continue;
       }
-      const colorsValue = normalizeColors(value);
-      if (!colorsValue) throw new Error(`Invalid color filter "${value}"`);
-      const field = identity ? "color_identity" : "colors";
-      clauses.push({
-        sql: `${negate}(${[...colorsValue].map(() => `instr(${field}, ?) > 0`).join(" AND ")})`,
-        values: [...colorsValue],
-      });
+      if (["m", "multicolor"].includes(value.toLowerCase())) {
+        if (operator !== ":" && operator !== "=") throw new Error(`${rawKey} multicolor only supports ":" or "="`);
+        clauses.push({ sql: `${negate}(${count} > 1)`, values: [] });
+        continue;
+      }
+      const wanted = searchColors(value);
+      if (wanted === null) throw new Error(`Invalid color filter "${value}"`);
+      const contains = [...wanted].map((letter) => `instr(COALESCE(${field}, ''), '${letter}') > 0`).join(" AND ") || "1";
+      const subset = [..."WUBRG"].filter((letter) => !wanted.includes(letter)).map((letter) => `instr(COALESCE(${field}, ''), '${letter}') = 0`).join(" AND ") || "1";
+      const exact = `(${contains} AND ${subset})`;
+      const expression = operator === ":" && wanted ? contains
+        : operator === ":" || operator === "=" ? exact
+          : operator === "!=" ? `NOT ${exact}`
+            : operator === ">=" ? contains : operator === "<=" ? subset
+              : operator === ">" ? `(${contains} AND NOT ${exact})`
+                : `(${subset} AND NOT ${exact})`;
+      clauses.push({ sql: `${negate}(${expression})`, values: [] });
       continue;
     }
 
     if (key === "mv" || key === "cmc") {
-      if (!["=", ":", ">", "<", ">=", "<="].includes(operator)) throw new Error("Mana value needs a comparison operator");
+      if (!COMPARE.includes(operator)) throw new Error("Mana value needs a comparison operator");
+      if (operator === ":" && ["even", "odd"].includes(value.toLowerCase())) {
+        clauses.push({ sql: `${negate}(mana_value IS NOT NULL AND mana_value = CAST(mana_value AS INTEGER) AND mana_value % 2 = CAST(? AS INTEGER))`, values: [value.toLowerCase() === "even" ? "0" : "1"] });
+        continue;
+      }
       const amount = Number(value);
       if (!Number.isFinite(amount) || amount < 0 || amount > 100) throw new Error("Mana value must be from 0 to 100");
       clauses.push({ sql: `${negate}(mana_value ${operator === ":" ? "=" : operator} ?)`, values: [String(amount)] });
@@ -118,7 +152,7 @@ export function parseCardQuery(query: string, context: SearchContext = {}): Sear
     }
 
     if (key === "usd") {
-      if (!["=", ":", ">", "<", ">=", "<="].includes(operator)) throw new Error(`${rawKey} needs a comparison operator`);
+      if (!COMPARE.includes(operator)) throw new Error(`${rawKey} needs a comparison operator`);
       const amount = Number(value);
       if (!Number.isFinite(amount) || amount < 0 || amount > 1_000_000) throw new Error("Prices must be a number of 0 or more");
       // the regular price, or the foil price for printings that only come in foil
@@ -141,7 +175,7 @@ export function parseCardQuery(query: string, context: SearchContext = {}): Sear
       const found = /^([a-z]+)(>=|<=|>|<|=)(\d+(?:\.\d+)?)$/i.exec(value);
       if (!found || !STORE_KEYS[found[1]!.toLowerCase()]) throw new Error("Write store: as a store and a price, such as store:cardkingdom<5");
       const prefix = STORE_KEYS[found[1]!.toLowerCase()]!;
-      const finish = /(^|\s)is:foil(\s|$)/i.test(query) ? `COALESCE(${prefix}_rf, ${prefix}_re)` : `COALESCE(${prefix}_r, ${prefix}_rf, ${prefix}_re)`;
+      const finish = /(^|[\s(])is:foil(?=$|[\s)])/i.test(query) ? `COALESCE(${prefix}_rf, ${prefix}_re)` : `COALESCE(${prefix}_r, ${prefix}_rf, ${prefix}_re)`;
       clauses.push({ sql: `${negate}(${finish} ${found[2]} CAST(? AS REAL))`, values: [found[3]!] });
       continue;
     }
@@ -244,13 +278,7 @@ export function parseCardQuery(query: string, context: SearchContext = {}): Sear
     }
     throw new Error(`Unsupported search filter "${rawKey}"`);
   }
-  return clauses;
-}
-
-function normalizeColors(value: string): string {
-  const normalized = value.toLowerCase().replace(/[\s,]+/g, "");
-  const expanded = colors[normalized] ?? normalized;
-  return [...expanded.toUpperCase()].every((color) => "WUBRG".includes(color)) ? expanded.toUpperCase() : "";
+  return clauses[0]!;
 }
 
 function pattern(value: string): string {
@@ -263,9 +291,7 @@ export type SearchSort = (typeof SEARCH_SORTS)[number];
 
 /** The plain words of a search (the words that are not filters like t:creature), joined by spaces. */
 export function plainWords(query: string): string {
-  const tokens = query.match(/(?:[^\s"]+|"[^"]*")+/g) ?? [];
-  return tokens.filter((token) => !/^(-?)([a-z]+)(>=|<=|>|<|=|:)/i.test(token) && !token.startsWith("-"))
-    .map((token) => token.replace(/^"|"$/g, "")).filter(Boolean).join(" ");
+  return searchPlainWords(query);
 }
 
 /** An ORDER BY for card search; `with` is a WITH step it needs (its values come first). */

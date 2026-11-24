@@ -10,7 +10,7 @@ import { type Store, useApp, zoneLabel } from "../store";
 import { capitalize, type Deck, type Filters, FORMATS, formatName, money, type OwnedIn, SPECIAL_FOILS } from "../types";
 import { collectionMenu, deckMenu } from "../components/ItemMenus";
 import { choices, Picker } from "../components/Picker";
-import { SCOPE_NAMES } from "../filters";
+import { SCOPE_NAMES, useServerMatch } from "../filters";
 import { Meter } from "../views/CollectionView";
 import { NoDeck, Quantity, zoneGroups } from "../views/Views";
 import { cardMenu, ZoneButtons } from "../views/DeckView";
@@ -23,6 +23,8 @@ import { pickOrOpen } from "../components/PickOpen";
 export function FiltersPanel({ actions }: { actions: Record<string, Action> }) {
   const store = useApp();
   const filters = store.scopeFilters;
+  const localView = store.filterScope === "collection" || store.filterScope === "deck" || store.filterScope === "tradeGive";
+  const { error } = useServerMatch(filters, store.prefs.currency, localView);
   const set = (change: Partial<Filters>) => store.setScopeFilters(change);
   const pick = (key: "color" | "rarity" | "format", options: Array<[string, string]>, label: string) => (
     <Picker id={`flt-${key}`} label={label} value={filters[key]} onChange={(value) => set({ [key]: value })} options={choices(options)} />
@@ -40,6 +42,11 @@ export function FiltersPanel({ actions }: { actions: Record<string, Action> }) {
   return (
     <div className="pbody">
       <div className="fltscope" role="status">Filtering: <b>{SCOPE_NAMES[store.filterScope]}</b></div>
+      <div className="pgrp">
+        <div className="prow"><label htmlFor="flt-syntax">Search syntax</label>
+          <input id="flt-syntax" value={filters.syntax} placeholder="t:dragon mv<=5" onChange={(event) => set({ syntax: event.target.value })} /></div>
+        {error && <p role="alert">{error}</p>}
+      </div>
       <div className="pgrp">
         <h4>Card</h4>
         <div className="prow"><label htmlFor="flt-type">Type</label>{text("type", "Creature")}</div>

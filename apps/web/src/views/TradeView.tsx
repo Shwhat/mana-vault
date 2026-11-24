@@ -121,7 +121,7 @@ function GiveSearch({ trade, editable }: { trade: Trade | null; editable: boolea
   }, [all, store.collections]);
   const filters = store.filterSets.tradeGive;
   const byKey = useMemo(() => new Map((rows ?? []).map((row) => [entryKey(row), row])), [rows]);
-  const match = useServerMatch(filters, store.prefs.currency);
+  const { ids: match } = useServerMatch(filters, store.prefs.currency);
   const cards = useMemo(() => (rows ?? []).filter((row) => matchesFilters(row, filters, match)).map((row): FoundCard => ({
     id: entryKey(row), name: row.name, mana_cost: row.mana_cost, mana_value: row.mana_value, type_line: row.type_line, oracle_text: null, set_code: row.set_code,
     set_name: row.set_name, collector_number: row.collector_number, rarity: row.rarity, colors: row.colors, image_url: row.image_url,

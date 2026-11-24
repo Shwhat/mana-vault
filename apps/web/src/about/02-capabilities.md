@@ -8,6 +8,7 @@ This page lists what Mana Vault does in the current version, followed by what is
 
 - Search the local card database by name, type line and rules text, with one result per card name (the newest regular printing, an N printings badge and owned counts by finish summed over every printing), or one per printing with Show every printing.
 - Narrow results with filter syntax in the search box (type, color, color identity, rules text, set, rarity, mana value, legality, owned, finishes, treatments, special foils, art, role, power, toughness, year, artist, keyword, frame, border, language) and with the Filters panel.
+- Use Scryfall-style syntax in the search box or the Filters panel, including grouped alternatives, exact names and color comparisons, against the local card database.
 - Search by what the art shows (cat, dog, bird...) with Scryfall's Art Tags and by what a card does (ramp, removal...) with Oracle Tags, kept on the server.
 - Filter by name, card text, creature type, keyword, artist, power, toughness and price ranges, the finishes a printing is made in, foil type, frame, release years and owned or not owned, in card search, collections, decks and trades.
 - See special foils (Surge foil, Galaxy foil, Textured foil and others) named on every finish mark and in the printing chooser.

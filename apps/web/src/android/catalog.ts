@@ -132,11 +132,21 @@ export async function searchCards(params: URLSearchParams): Promise<Card[] | { t
     else if (total > offset && found.length < limit) found.push(card);
     else if (!paged && found.length >= limit) break;
   }
+
   if (sorting) {
     const currency: Currency = "usd";
     return { total, cards: sortFound(found, sort, params.get("q") ?? "", currency).slice(offset, offset + limit) };
   }
   return paged ? { total, cards: found } : found;
+}
+
+/** Match all local printings for collection and deck filters. */
+export async function matchCards(params: URLSearchParams): Promise<{ ids: string[] }> {
+  const { cards, formats } = await needCatalog();
+  const query = params.get("q") ?? "";
+  if (!query.trim() || query.length > 400) throw new Error("Invalid card search");
+  const matches = compileQuery(query, { formats, owned: /\b(is|not):owned\b/i.test(query) ? await ownedOnPhone() : null });
+  return { ids: cards.filter((card) => matches(card as unknown as QueryCard)).map((card) => card.id) };
 }
 
 /** Every printing of the card's name, newest first. */

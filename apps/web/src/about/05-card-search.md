@@ -16,19 +16,23 @@ Card search finds cards in the local card database, one result per card name unl
 
 A filter is a key, an operator and a value with no spaces, such as `t:dragon`. Put a minus sign in front to exclude matches, such as `-t:creature`.
 
+The search box and the **Search syntax** field at the top of the Filters panel accept the same Scryfall-style syntax. Both work against the local card database, including custom cards; they do not send searches to Scryfall. The phone uses its downloaded card list when offline. This is a subset of Scryfall's language, not the complete Scryfall search: for example, regular expressions, display keywords and many `is:` categories are not supported. The `is:` words listed below and special foil or promo types are supported.
+
+Use `or` and parentheses for alternatives, for example `t:legendary (t:goblin or t:elf)`. Terms next to each other are combined with AND; AND takes precedence over OR. Prefix a group with `-` to exclude it, as in `-(t:creature or t:land)`. Use `!"Lightning Bolt"` for an exact name or `-dragon` to exclude a plain word. Plain words, including negated words, search names, flavor names, type lines and rules text.
+
 | Filter | Matches | Example |
 |---|---|---|
 | `name:` | Card name or flavor name contains the text | `name:bolt` |
 | `t:` or `type:` | Type line contains the text | `t:legendary` |
 | `o:` or `oracle:` | Rules text contains the text | `o:"enters the battlefield"` |
 | `m:` or `mana:` | Mana cost contains the text | `m:{R}{R}` |
-| `set:` | Set code is exactly the value, or set name contains it | `set:lea` |
-| `r:` or `rarity:` | Rarity is common, uncommon, rare, mythic, special or bonus | `r:mythic` |
+| `set:`, `s:`, `e:` or `edition:` | Set code is exactly the value, or set name contains it | `e:lea` |
+| `r:` or `rarity:` | Rarity is common, uncommon, rare, mythic, special or bonus (also `c`, `u`, `r` or `m`) | `r:mythic` |
 | `c:` or `color:` | Card has all the given colors | `c:ur`, `c:red` |
-| `id:` | Color identity has all the given colors | `id:wubg` |
+| `id:` or `identity:` | Color identity has all the given colors | `id:wubg` |
 | `c:c` or `c:colorless` | Card has no color (with `id:`, no color identity) | `c:c` |
-| `mv` or `cmc` | Mana value compared with =, :, <, >, <= or >= | `mv>=4` |
-| `legal:` or `f:` | Card is legal in the format | `legal:commander` |
+| `mv`, `cmc` or `manavalue` | Mana value compared with =, :, <, >, <=, >= or !=; `:even` and `:odd` match whole values | `mv>=4`, `mv:odd` |
+| `legal:`, `f:` or `format:` | Card is legal in the format | `legal:commander` |
 | `is:custom` | Card is a custom card made in the card maker (`-is:custom` leaves them out) | `is:custom t:goblin` |
 | `is:owned` | Any printing of the card is in one of your collections or one shared with you (not wishlists or proxies). `not:owned` is the opposite | `is:owned r:mythic` |
 | `is:foil`, `is:nonfoil`, `is:etched` | The printing is made in that finish | `is:etched` |
@@ -45,7 +49,7 @@ A filter is a key, an operator and a value with no spaces, such as `t:dragon`. P
 | `lang:` | Printing language: `en`, the languages chosen in Card languages (`es`, `fr`, `de`, `it`, `pt`, `ja`, `ko`, `ru`, `zhs`, `zht`) and unofficial languages such as Phyrexian (`ph`) | `lang:ja` |
 | `usd` | Price compared with =, :, <, >, <= or >=. The regular price, or the foil price for printings only in foil. Printings without a price never match | `usd<1`, `usd>=20` |
 
-Colors are W (white), U (blue), B (black), R (red) and G (green), or a color name. Mana values run from 0 to 100.
+Colors are W (white), U (blue), B (black), R (red) and G (green), a color name, or a guild, shard, wedge, college or four-color nickname. For `c` and `id`, `=` matches exactly, `>=` and `<=` match supersets and subsets, `>` and `<` match strictly more or fewer colors, and `!=` excludes an exact match. Compare with a number from 0 to 5 to match the number of colors, or use `c:multicolor` for more than one. Mana values run from 0 to 100. Numeric comparisons also support `!=`.
 
 ### Filters from MTGJSON (0.21.0)
 
@@ -53,7 +57,7 @@ Colors are W (white), U (blue), B (black), R (red) and G (green), or a color nam
 |---|---|---|
 | `is:reprint` | Printings that are reprints | `is:reprint t:dragon` |
 | `is:starter` | Cards printed only in starter products | `is:starter` |
-| `can:commander`, `can:oathbreaker`, `can:brawl` | Cards that can lead a deck of that format | `can:commander c:g` |
+| `can:commander`, `can:oathbreaker`, `can:brawl` (also `is:commander`, `is:oathbreaker`, `is:brawler`) | Cards that can lead a deck of that format | `can:commander c:g` |
 | `store:` | One store's price (regular, or foil and etched with `is:foil`). Stores: tcgplayer, cardkingdom, cardsphere, cardmarket (euros), cardhoarder (MTGO tix) | `store:cardkingdom<5` |
 | `buylist` | The highest buylist price of any store, any finish | `buylist>2` |
 | `in:` | Printings found in a product type, or in a named product | `in:"collector booster"`, `in:"Landing Party"` |
@@ -83,6 +87,7 @@ These filters work after the first MTGJSON update. On a phone without a connecti
 
 | Field | Default | Effect |
 |---|---|---|
+| Search syntax | Empty | Scryfall-style local search, combined with the search box and the other fields |
 | Type | Empty | Type line contains the text |
 | Set code | Empty | Set code is exactly the text, or set name contains it. The set's symbol shows beside a code it knows |
 | Color | Any color | Card has the chosen color |

@@ -155,3 +155,37 @@ test("the Filters panel has the new fields, and the About guide is not squished 
   await page.locator(".abtoc a", { hasText: "Administration" }).click();
   await expect(page.locator(".abpage h1")).toHaveText("Administration");
 });
+
+test("syntax in card search and the filter panel combines with the other filters", async ({ page }) => {
+  await signUp(page, "syntax");
+  await page.getByRole("textbox", { name: "Search cards" }).fill("t:creature");
+  await page.locator("#flt-syntax").fill("(t:angel or t:dragon) mv>=5");
+  await expect(page.locator("#view-cards .row", { hasText: "Serra Angel" })).toBeVisible();
+  await expect(page.locator("#view-cards .row", { hasText: "Shivan Dragon" })).toBeVisible();
+  await expect(page.locator("#view-cards .row", { hasText: "Llanowar Elves" })).toHaveCount(0);
+  await page.locator("#flt-name").fill("Serra");
+  await expect(page.locator("#view-cards .row", { hasText: "Shivan Dragon" })).toHaveCount(0);
+  await expect(page.locator("#view-cards .row", { hasText: "Serra Angel" })).toBeVisible();
+  await page.locator(".pbody .btn", { hasText: "Clear filters" }).click();
+  await expect(page.locator("#flt-syntax")).toHaveValue("");
+  await expect(page.locator("#view-cards .row", { hasText: "Llanowar Elves" })).toBeVisible();
+
+  const collection = (await (await page.request.get("/api/collections")).json())[0].id;
+  const added = await page.request.post(`/api/collections/${collection}/cards/add`, {
+    headers: guard, data: { items: [
+      { cardId: "serra", foil: 0, condition: "NM", language: "en", quantity: 1 },
+      { cardId: "llanowar", foil: 0, condition: "NM", language: "en", quantity: 1 },
+    ] },
+  });
+  expect(added.ok()).toBe(true);
+  await page.keyboard.press("2");
+  await expect(page.locator(".fltscope")).toHaveText("Filtering: Collection");
+  await expect(page.locator("#view-collection .row")).toHaveCount(2);
+  await page.locator("#flt-syntax").fill("t:angel or t:dragon");
+  await expect(page.locator("#view-collection .row")).toHaveCount(1);
+  await expect(page.locator("#view-collection .row")).toContainText("Serra Angel");
+  await page.locator("#flt-syntax").fill("unsupported:thing");
+  await expect(page.locator('[role="alert"]')).toContainText('Unsupported search filter "unsupported"');
+  await page.locator(".pbody .btn", { hasText: "Clear filters" }).click();
+  await expect(page.locator('[role="alert"]')).toHaveCount(0);
+});

@@ -1132,7 +1132,7 @@ export function useStoreState(user: User, initialPrefs: Prefs) {
 
   // ---------- selection helpers for the keyboard ----------
   // filters only the card database can answer (art, roles, artist...) come back as the matching printings
-  const collectionMatch = useServerMatch(filterSets.collection, prefs.currency);
+  const { ids: collectionMatch } = useServerMatch(filterSets.collection, prefs.currency);
   const visibleCollection = useMemo(() => {
     const term = collectionFilter.trim().toLowerCase();
     const currency = prefs.currency;

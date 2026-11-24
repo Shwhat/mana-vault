@@ -233,6 +233,34 @@ describe("grouped card search, special foils and search words", () => {
     expect(await names("kw:trample frame:2015")).toEqual(["Savannah Cat", "Stone Wall"]);
     expect(await names("-t:wall")).toEqual(["Savannah Cat"]);
   });
+
+  it("supports grouped syntax and color comparisons in search and match", async () => {
+    const { signUp, as, database } = await server();
+    const call = as((await signUp("syntax")).cookie);
+    const id = addCards(database);
+    database.prepare("UPDATE cards SET colors = 'G,U', color_identity = 'G,U' WHERE id = ?").run(id(4));
+    database.prepare("UPDATE cards SET oracle_text = NULL WHERE id = ?").run(id(4));
+    const ids = async (q: string, match = false) => {
+      const path = match ? "/api/cards/match" : "/api/cards";
+      const response = await call("GET", `${path}?q=${encodeURIComponent(q)}${match ? "" : "&paged=1"}`);
+      expect(response.statusCode).toBe(200);
+      return (match ? response.json().ids : response.json().cards.map((card: { id: string }) => card.id)).sort();
+    };
+    for (const match of [false, true]) {
+      expect(await ids('t:creature (e:m21 or !"Stone Wall")', match)).toEqual([id(2), id(4)].sort());
+      expect(await ids('-(t:wall or s:m21) -cat', match)).toEqual([]);
+      expect(await ids("identity<=simic c>g c=2 manavalue!=1", match)).toEqual([id(4)]);
+      expect(await ids("c=g", match)).toEqual([id(1), id(2), id(3)].sort());
+      expect(await ids("c!=g", match)).toEqual([id(4)]);
+      expect(await ids("r:c manavalue:even", match)).toEqual([id(1), id(2), id(3), id(4)].sort());
+      expect(await ids("-(o:trample)", match)).toEqual([id(4)]);
+    }
+    database.prepare("UPDATE cards SET mana_value = NULL WHERE id = ?").run(id(1));
+    expect(await ids("-mv:even")).toEqual([id(1)]);
+    const bad = await call("GET", `/api/cards?q=${encodeURIComponent("(t:cat or")}`);
+    expect(bad.statusCode).toBe(400);
+    expect(bad.json().error).toContain("Expected a search term");
+  });
 });
 
 describe("Art and Oracle tags", () => {
