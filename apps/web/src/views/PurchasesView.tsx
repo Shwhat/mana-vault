@@ -543,9 +543,10 @@ function EntryPage({ id, list, onClose, onChanged, onMissing }: { id: string; li
                         <button type="button" className="btn small" onClick={() => goAdd(opening, true)}>Scan</button>
                         <button type="button" className="btn small" onClick={() => tieCopiesDialog(store, opening.id, changed, opening.collectionId)}>Add existing copies...</button>
                         <button type="button" className="btn small" onClick={() => changeCollectionDialog(store, { id: opening.id, entryId: entry.id, name: opening.name }, changed)}>Change collection...</button>
-                        {packs.some((other) => other.groupId && other.groupId === opening.groupId && other.waiting)
-                          ? <button type="button" className="btn small primary" onClick={() => void goNextPack(store).then(changed)}>Next pack</button>
-                          : <button type="button" className="btn small primary" onClick={() => void setOpening(opening.id, false)}>Done opening</button>}
+                        {packs.some((other) => other.groupId && other.groupId === opening.groupId && other.waiting) && (
+                          <button type="button" className="btn small primary" onClick={() => void goNextPack(store).then(changed)}>Next pack</button>
+                        )}
+                        <button type="button" className={`btn small${packs.some((other) => other.groupId && other.groupId === opening.groupId && other.waiting) ? "" : " primary"}`} onClick={() => void setOpening(opening.id, false)}>Done opening</button>
                       </span>
                     ) : (
                       <span className="btnrow">

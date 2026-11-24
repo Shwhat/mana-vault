@@ -33,6 +33,41 @@ async function setup() {
 }
 
 describe("notes pages", () => {
+  it("adds the built-in guide at the end and preserves its moved position through a backup", async () => {
+    const { call, signUp } = await setup();
+    const existing = (await call("POST", "/api/notes/pages", { title: "Existing" })).json();
+    let tree = (await call("GET", "/api/notes")).json();
+    const guide = tree.pages.find((page: { builtin: string | null }) => page.builtin === "about");
+    expect(guide).toMatchObject({ title: "About Mana Vault", parentId: null, kind: null });
+    expect(tree.pages.map((page: { title: string }) => page.title)).toEqual(["Existing", "About Mana Vault"]);
+    await call("POST", "/api/notes/pages", { title: "New" });
+    tree = (await call("GET", "/api/notes")).json();
+    expect(tree.pages.map((page: { title: string }) => page.title)).toEqual(["Existing", "New", "About Mana Vault"]);
+    await call("POST", "/api/notes/import", { pages: [{ key: "Imported", title: "Imported" }] });
+    tree = (await call("GET", "/api/notes")).json();
+    expect(tree.pages.map((page: { title: string }) => page.title)).toEqual(["Existing", "New", "Imported", "About Mana Vault"]);
+    await call("PATCH", `/api/notes/pages/${guide.id}/move`, { parentId: null, before: existing.id });
+    await call("POST", "/api/notes/pages", { title: "After move" });
+    tree = (await call("GET", "/api/notes")).json();
+    expect(tree.pages.map((page: { title: string }) => page.title)).toEqual(["About Mana Vault", "Existing", "New", "Imported", "After move"]);
+    expect((await call("PATCH", `/api/notes/pages/${guide.id}/move`, { parentId: existing.id })).statusCode).toBe(200);
+    tree = (await call("GET", "/api/notes")).json();
+    expect(tree.pages.filter((page: { builtin: string | null }) => page.builtin === "about")).toHaveLength(1);
+    expect(tree.pages.find((page: { id: string }) => page.id === guide.id).parentId).toBe(existing.id);
+    expect((await call("DELETE", `/api/notes/pages/${guide.id}`)).statusCode).toBe(400);
+    expect((await call("DELETE", `/api/notes/pages/${existing.id}`)).statusCode).toBe(400);
+    const other = await signUp("bob");
+    const otherTree = (await other("GET", "/api/notes")).json();
+    expect(otherTree.pages).toHaveLength(1);
+    expect(otherTree.pages[0].id).not.toBe(guide.id);
+    const backup = (await call("GET", "/api/backup")).body;
+    expect((await call("POST", "/api/backup/restore", backup, { "content-type": "application/vnd.mana-vault.backup+json" })).statusCode).toBeLessThan(300);
+    tree = (await call("GET", "/api/notes")).json();
+    const restored = tree.pages.find((page: { builtin: string | null }) => page.builtin === "about");
+    expect(restored.parentId).toBe(tree.pages.find((page: { title: string }) => page.title === "Existing").id);
+    expect(tree.pages.filter((page: { builtin: string | null }) => page.builtin === "about")).toHaveLength(1);
+  });
+
   it("makes a deck's top page from its description, and keeps the two the same", async () => {
     const { call } = await setup();
     const deck = (await call("POST", "/api/decks", { name: "Elves" })).json();
@@ -90,12 +125,12 @@ describe("notes pages", () => {
     const child = (await call("POST", "/api/notes/pages", { title: "Child", parentId: parent.id })).json();
     const all = (await call("DELETE", `/api/notes/pages/${parent.id}`)).json();
     expect(all.undo.deleted.sort()).toEqual([parent.id, child.id].sort());
-    expect((await call("GET", "/api/notes")).json().pages).toHaveLength(0);
+    expect((await call("GET", "/api/notes")).json().pages.map((page: { title: string }) => page.title)).toEqual(["About Mana Vault"]);
     await call("POST", "/api/notes/restore", all.undo);
-    expect((await call("GET", "/api/notes")).json().pages).toHaveLength(2);
+    expect((await call("GET", "/api/notes")).json().pages).toHaveLength(3);
     const lift = (await call("DELETE", `/api/notes/pages/${parent.id}?children=lift`)).json();
     let pages = (await call("GET", "/api/notes")).json().pages;
-    expect(pages.map((page: { title: string; parentId: string | null }) => [page.title, page.parentId])).toEqual([["Child", null]]);
+    expect(pages.filter((page: { builtin: string | null }) => !page.builtin).map((page: { title: string; parentId: string | null }) => [page.title, page.parentId])).toEqual([["Child", null]]);
     await call("POST", "/api/notes/restore", lift.undo);
     pages = (await call("GET", "/api/notes")).json().pages;
     expect(pages.find((page: { id: string }) => page.id === child.id).parentId).toBe(parent.id);
@@ -153,7 +188,7 @@ describe("notes pages", () => {
     // pages of a private deck are not seen by others
     const carl = await signUp("carl");
     expect((await carl("GET", `/api/notes/pages/${page.id}`)).statusCode).toBe(404);
-    expect((await carl("GET", "/api/notes")).json().pages).toHaveLength(0);
+    expect((await carl("GET", "/api/notes")).json().pages.map((item: { title: string }) => item.title)).toEqual(["About Mana Vault"]);
     const loose = (await call("POST", "/api/notes/pages", { title: "Private" })).json();
     expect((await bob("GET", `/api/notes/pages/${loose.id}`)).statusCode).toBe(404);
   });
@@ -227,7 +262,7 @@ describe("notes pages", () => {
     const restored = await call("POST", "/api/backup/restore", backup, { "content-type": "application/vnd.mana-vault.backup+json" });
     expect(restored.statusCode).toBeLessThan(300);
     const tree = (await call("GET", "/api/notes")).json();
-    expect(tree.pages.map((page: { title: string }) => page.title).sort()).toEqual(["Backed", "Loose", "Sideboard"]);
+    expect(tree.pages.map((page: { title: string }) => page.title).sort()).toEqual(["About Mana Vault", "Backed", "Loose", "Sideboard"]);
     const newDeck = (await call("GET", "/api/decks")).json()[0];
     expect(tree.pages.find((page: { top: boolean }) => page.top).itemId).toBe(newDeck.id);
     expect(newDeck.description ?? (await call("GET", `/api/decks/${newDeck.id}`)).json().description).toBe("Primer");
@@ -239,9 +274,9 @@ describe("notes pages", () => {
     const { call } = await setup();
     const deck = (await call("POST", "/api/decks", { name: "Gone" })).json();
     await call("POST", "/api/notes/pages", { title: "Child", kind: "deck", itemId: deck.id });
-    expect((await call("GET", "/api/notes")).json().pages).toHaveLength(2);
+    expect((await call("GET", "/api/notes")).json().pages).toHaveLength(3);
     await call("DELETE", `/api/decks/${deck.id}`);
-    expect((await call("GET", "/api/notes")).json().pages).toHaveLength(0);
+    expect((await call("GET", "/api/notes")).json().pages.map((page: { title: string }) => page.title)).toEqual(["About Mana Vault"]);
     expect(areasOf("/api/notes/pages/x")).toEqual(["notes"]);
   });
 });

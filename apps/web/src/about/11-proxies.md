@@ -123,6 +123,7 @@ Custom sets are reached from the **Custom sets** tab beside Print and Card maker
 | Field | Notes |
 |---|---|
 | Custom set | The custom set the card belongs to; required |
+| Printing of | Optionally choose an existing official card, such as Sol Ring, to show this custom card in its printing chooser and Versions tab. The custom card keeps its own design and card data. Remove the link to make it independent again; save to apply either change |
 | Collector number | Up to 10 letters, digits and dashes, unique in the set |
 | Rarity | Common, Uncommon, Rare, Mythic rare or Special. Picks the set's symbol for that rarity when it has one, and colors the main symbol when the set uses rarity colors |
 | Artist | Shown on the card's information line as "Illus." |
@@ -271,6 +272,8 @@ SVG symbols are cleaned when they are saved: scripts, event handlers, links to o
 
 - Custom cards and custom sets are shared by every account on the server. Each shows who made it, and only that account can change or delete it.
 - Custom cards work like every other card: card search (also `is:custom` and `set:XXX`), collections, decks with format checks by the chosen legality, deck import and Quick add by name or set and number, trades, statistics, exports and the print list. They show a Custom badge. The scanner does not match them.
+- Linked custom printings share the existing card's identity for owned-card counts and deck matching. Changing or removing a link is blocked if it would make a deck's linked copies or upgrade wishes incompatible; remove those links or wishes first.
+- If an older backup contains a deck using a custom card whose printing link has since changed, restore the card's previous link before restoring that backup.
 - Card database updates never change or remove custom cards.
 - A custom card that is in another account's collection, deck or trade cannot be deleted. Deleting one that is only in your own collections and decks removes those copies and deck cards too.
 - Backups include the custom sets and custom cards you made or use, with their pictures and art.

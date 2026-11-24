@@ -44,6 +44,8 @@ The left side, from top to bottom:
 
 Click a page to open it; the small arrow before a page hides or shows the pages under it. Each section heading hides or shows the section.
 
+**About Mana Vault** is a built-in, read-only guide page at the bottom of My pages when first added. It shows the guide included with the current app version. Drag it or use **Move to...** to put it elsewhere in the tree. It cannot be deleted; move it out before deleting a parent page. A Markdown export includes a link to the guide rather than a copy of its text.
+
 ## Editing a page
 
 Pages are shown formatted at all times. On the desktop you can type in a page at once; on a phone tap **Edit** to start and **Done** to finish. Changes are saved 1 second after the last change, when you open another page and when you leave the program. The word beside the title shows **Saved**, **Not saved yet**, **Saving** or **Not saved** (when saving failed; the next change tries again).

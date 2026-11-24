@@ -3,11 +3,10 @@ import { sendDeckToPrintDialog } from "../views/ProxiesView";
 import { type Store } from "../store";
 import { type Collection, type Deck, formatName, FORMATS } from "../types";
 import { rowMenu } from "./ContextMenu";
-import { dialog } from "./Dialog";
+import { dialog, NEW_COLLECTION, suggestCollectionName } from "./Dialog";
 import { exportWindow } from "./FileWindows";
 import { collectionDialog, sendDialog, sharingDialog } from "./LibraryDialogs";
 import { chosenCollection, collectionFields } from "./CollectionPicker";
-import { suggestCollectionName } from "./Dialog";
 
 /** Renames a collection, keeping its other settings. */
 export function renameCollectionDialog(store: Store, item: Collection) {
@@ -66,16 +65,20 @@ const withDeck = (store: Store, deck: Deck, run: () => void) => {
  */
 export function addDeckToCollectionDialog(store: Store, deck: { id: string; name: string; collection_id?: string | null }) {
   const list = (store.collections ?? []).filter((item) => item.kind !== "wishlist");
-  if (!list.length) return store.flash("Create a collection first", "err");
-  const preferred = [deck.collection_id, store.prefs.targetCollection].find((id) => id && list.some((item) => item.id === id)) ?? list[0]!.id;
+  const preferred = [deck.collection_id, store.prefs.targetCollection].find((id) => id && list.some((item) => item.id === id)) ?? list[0]?.id ?? NEW_COLLECTION;
   suggestCollectionName("collection", deck.name);
   dialog(`Add ${deck.name} to a collection`, [
     ["collection", "Collection", preferred, "select", collectionFields(list)],
     ["mode", "Cards to add", "missing", "select", [["missing", "Missing cards only, linked to the deck"], ["all", "Every card as new copies"]]],
   ], async (values) => {
-    const collection = await chosenCollection(store, values, "collection");
-    if (!collection) return false;
-    await store.addDeckToCollection(deck.id, collection, values.mode === "all" ? "all" : "missing");
+    try {
+      const collection = await chosenCollection(store, values, "collection");
+      if (!collection) return false;
+      await store.addDeckToCollection(deck.id, collection, values.mode === "all" ? "all" : "missing");
+    } catch (reason) {
+      store.fail(reason, "Could not create the collection.");
+      return false;
+    }
   }, "Add cards");
 }
 

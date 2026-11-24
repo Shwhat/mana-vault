@@ -7,7 +7,7 @@ import { idbGet, idbSet } from "./idb";
 import { appFetch, OfflineError } from "./net";
 
 export type CompactCard = Card & {
-  oracle_id: string; finishes: string; flavor_name: string | null; promo: number; variation: number; released_at: string | null;
+  oracle_id: string; color_identity: string; finishes: string; flavor_name: string | null; promo: number; variation: number; released_at: string | null;
 };
 type Stored = { version: string; fields: string[]; rows: unknown[][]; formats?: string[] };
 type Loaded = { version: string; cards: CompactCard[]; byId: Map<string, CompactCard>; names: NameIndex | null; formats: string[]; promoTypes: Set<string> };

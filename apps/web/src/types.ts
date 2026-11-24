@@ -156,6 +156,9 @@ export type Deck = Partial<Sharing> & {
   format: string;
   mode: DeckMode;
   card_count?: number;
+  /** Color identity and possible themes inferred from the deck's cards. */
+  color_identity?: string;
+  themes?: string[];
   /** The value of the cards in the deck (not the maybeboard), each at its printing's price. */
   value?: { usd: number; eur: number };
   /** The collection that receives copies added straight to this deck, remembered per deck. */

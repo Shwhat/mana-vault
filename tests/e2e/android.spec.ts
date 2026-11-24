@@ -182,7 +182,7 @@ test.describe("Android app", () => {
     const token = await page.evaluate(() => (JSON.parse(localStorage.getItem("test.native") ?? "{}") as { token: string }).token);
     const headers = { authorization: `Bearer ${token}`, "x-mana-vault": "1" };
     const tree = await (await page.request.get(`${baseURL}/api/notes`, { headers })).json() as { pages: Array<{ id: string; title: string }> };
-    expect(tree.pages.map((item) => item.title).sort()).toEqual(["Made offline", "Phone page"]);
+    expect(tree.pages.map((item) => item.title).sort()).toEqual(["About Mana Vault", "Made offline", "Phone page"]);
     const phonePage = tree.pages.find((item) => item.title === "Phone page")!;
     const saved = await (await page.request.get(`${baseURL}/api/notes/pages/${phonePage.id}`, { headers })).json() as { body: string; version: number };
     expect(saved.body).toBe("Online text and offline text\n");

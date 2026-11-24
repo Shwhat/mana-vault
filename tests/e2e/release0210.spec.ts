@@ -40,6 +40,34 @@ test("each tab opens where it was left, and pressing it again goes back to its f
   await expect(page.getByRole("tab", { name: "History" })).toHaveAttribute("aria-selected", "true");
 });
 
+test("New from the decks list can create a deck from a precon", async ({ page }) => {
+  await signUp(page, "newprecon");
+  await page.locator('.tab[data-panel="decks"]').click();
+  const panel = page.locator(".pbody", { has: page.getByRole("textbox", { name: "Find a deck" }) });
+  await panel.getByRole("button", { name: "New..." }).click();
+  let dialog = page.locator("dialog#dlg[open]");
+  await expect(dialog.locator(".dlghead")).toHaveText("New deck");
+  await dialog.getByRole("button", { name: "Choose a precon..." }).click();
+  await expect(dialog.locator(".dlghead")).toHaveText("Add precon as deck");
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  expect(await (await page.request.get("/api/decks")).json()).toEqual([]);
+  await panel.getByRole("button", { name: "New..." }).click();
+  dialog = page.locator("dialog#dlg[open]");
+  await dialog.getByRole("button", { name: "Choose a precon..." }).click();
+  await dialog.getByRole("textbox", { name: "Find a precon" }).fill("Landing Party");
+  await dialog.getByRole("option", { name: /Landing Party/ }).click();
+  await expect(page.locator("#view-deck .switcher")).toContainText("Landing Party");
+  await expect(status(page)).toHaveText("Landing Party made with 7 cards");
+  const decks = await (await page.request.get("/api/decks")).json() as Array<{ id: string; name: string }>;
+  expect(decks).toHaveLength(1);
+  const detail = await (await page.request.get(`/api/decks/${decks[0]!.id}`)).json() as { cards: Array<{ card_id: string; quantity: number; finish: number }> };
+  expect(detail.cards).toEqual(expect.arrayContaining([
+    expect.objectContaining({ card_id: "serra", quantity: 1, finish: 1 }),
+    expect.objectContaining({ card_id: "llanowar", quantity: 4, finish: 0 }),
+    expect.objectContaining({ card_id: "swords", quantity: 2, finish: 0 }),
+  ]));
+});
+
 test("New collection... makes a collection from the Open window, and Change collection... moves the pulls", async ({ page }) => {
   await signUp(page, "v21coll");
   await boosterPurchase(page);

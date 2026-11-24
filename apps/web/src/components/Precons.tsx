@@ -45,7 +45,7 @@ export async function preconAsDeck(store: Store, code: string, name: string) {
       undo: async () => { await request(`/api/decks/${encodeURIComponent(made.id)}`, { method: "DELETE" }); await store.refreshAfterChange(); },
       redo: async () => { store.flash("Add the precon as a deck again from the Decks menu", "err"); },
     });
-    store.openDeck?.(made.id);
+    await store.openDeck(made.id);
     store.setView("deck");
     store.flash(`${made.name} made with ${made.cards} cards${made.missing ? `. ${made.missing} are not in the card database` : ""}`);
   } catch (reason) {

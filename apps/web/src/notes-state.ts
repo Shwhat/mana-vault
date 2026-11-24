@@ -12,13 +12,13 @@ setFileResolver((src) => localFile(src) ?? (isApp() && src.startsWith("/") ? api
 export type NoteKind = "deck" | "collection";
 export type PageMeta = {
   id: string; title: string; kind: NoteKind | null; itemId: string | null; parentId: string | null; position: number;
-  updatedAt: string; updatedBy: string; version: number; pinned: boolean; empty: boolean; top: boolean;
+  updatedAt: string; updatedBy: string; version: number; pinned: boolean; empty: boolean; top: boolean; builtin?: string | null;
 };
 export type Template = { id: string; name: string; body: string; builtIn: boolean };
 export type NotesTree = { pages: PageMeta[]; items: Array<{ kind: NoteKind; id: string; name: string }>; recent: string[]; templates: Template[] };
 export type PageDetail = {
   id: string; title: string; body: string; kind: NoteKind | null; itemId: string | null; parentId: string | null; position: number; version: number;
-  updatedAt: string; updatedBy: string; createdAt: string; top: boolean; backlinks: Array<{ id: string; title: string }>; pinned: boolean;
+  updatedAt: string; updatedBy: string; createdAt: string; top: boolean; backlinks: Array<{ id: string; title: string }>; pinned: boolean; builtin?: string | null;
 };
 export type Conflict = { title: string; body: string; version: number; updatedBy: string; updatedAt: string };
 export type Version = { id: number; title: string; at: string; by: string; body: string };
