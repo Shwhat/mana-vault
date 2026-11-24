@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { request } from "./api";
 import { type Currency, EMPTY_FILTERS, type Filters, type SearchSort } from "./types";
+import { scryfallDirectives } from "../../server/src/search-expression";
 
 /** The views the Filters panel can act on. Each keeps its own filters. */
 export type FilterScope = "cards" | "collection" | "deck" | "deckAdd" | "tradeGive" | "tradeGet";
@@ -13,9 +14,13 @@ export const emptyScopes = (): Record<FilterScope, Filters> => ({
   tradeGive: { ...EMPTY_FILTERS }, tradeGet: { ...EMPTY_FILTERS },
 });
 export const filtersOn = (filters: Filters, skipQuery = false) =>
-  (Object.keys(filters) as Array<keyof Filters>).some((key) => (!skipQuery || key !== "query") && filters[key] !== "");
+  (Object.keys(filters) as Array<keyof Filters>).some((key) => key !== "syntaxMode" && (!skipQuery || key !== "query") && filters[key] !== "");
 export const filterCount = (filters: Filters, skipQuery = false) =>
-  (Object.keys(filters) as Array<keyof Filters>).filter((key) => (!skipQuery || key !== "query") && filters[key] !== "").length;
+  (Object.keys(filters) as Array<keyof Filters>).filter((key) => key !== "syntaxMode" && (!skipQuery || key !== "query") && filters[key] !== "").length;
+
+export const onlineDirectives = (filters: Filters) =>
+  filters.syntaxMode === "online" ? scryfallDirectives(filters.syntax) : {};
+const NO_MATCHES = new Set<string>();
 
 /** What a card needs for local filtering. legal is a comma list of formats; legalities is the full record. */
 export type Filterable = {
@@ -37,7 +42,7 @@ const quoted = (value: string) => (/[\s"]/.test(value) ? `"${value.replace(/"/g,
  */
 export function serverQuery(filters: Filters, currency: Currency = "usd"): string {
   const words: string[] = [];
-  if (filters.syntax.trim()) words.push(`( ${filters.syntax.trim()} )`);
+  if (filters.syntaxMode !== "online" && filters.syntax.trim()) words.push(`( ${filters.syntax.trim()} )`);
   const text = (key: string, value: string) => { if (value.trim()) words.push(`${key}:${quoted(value.trim())}`); };
   const range = (key: string, min: string, max: string) => {
     if (min.trim() && Number.isFinite(Number(min))) words.push(`${key}>=${Number(min)}`);
@@ -69,18 +74,23 @@ export function serverQuery(filters: Filters, currency: Currency = "usd"): strin
  */
 export function useServerMatch(filters: Filters, currency: Currency, enabled = true): { ids: Set<string> | null; error: string } {
   const query = enabled ? serverQuery(filters, currency) : "";
+  const scryfall = enabled && filters.syntaxMode === "online" ? filters.syntax.trim() : "";
+  const key = JSON.stringify([query, scryfall]);
   const [matched, setMatched] = useState<{ query: string; ids: Set<string>; error: string } | null>(null);
   useEffect(() => {
-    if (!query) return;
+    if (!query && !scryfall) return;
     let live = true;
+    const controller = new AbortController();
     const timer = window.setTimeout(() => {
-      void request<{ ids: string[] }>(`/api/cards/match?q=${encodeURIComponent(query)}`)
-        .then((answer) => { if (live) setMatched({ query, ids: new Set(answer.ids), error: "" }); })
-        .catch((reason: unknown) => { if (live) setMatched({ query, ids: new Set(), error: reason instanceof Error ? reason.message : "The filter search failed." }); });
+      const params = new URLSearchParams({ q: query });
+      if (scryfall) params.set("scryfall", scryfall);
+      void request<{ ids: string[] }>(`/api/cards/match?${params}`, { signal: controller.signal })
+        .then((answer) => { if (live) setMatched({ query: key, ids: new Set(answer.ids), error: "" }); })
+        .catch((reason: unknown) => { if (live) setMatched({ query: key, ids: new Set(), error: reason instanceof Error ? reason.message : "The filter search failed." }); });
     }, 250);
-    return () => { live = false; window.clearTimeout(timer); };
-  }, [query]);
-  return query && matched?.query === query ? matched : { ids: null, error: "" };
+    return () => { live = false; window.clearTimeout(timer); controller.abort(); };
+  }, [query, scryfall, key]);
+  return (query || scryfall) && matched?.query === key ? matched : { ids: scryfall ? NO_MATCHES : null, error: "" };
 }
 
 /** The same rules as the card search on the server, applied to cards already loaded (a collection or a deck). */
@@ -108,8 +118,9 @@ export function searchParams(filters: Filters, offset: number, limit: number, op
   const panel = serverQuery(filters, options.currency);
   const query = search && panel ? `( ${search} ) ${panel}` : search || panel;
   const params = new URLSearchParams({ q: query, paged: "1", offset: String(offset), limit: String(limit) });
+  if (filters.syntaxMode === "online" && filters.syntax.trim()) params.set("scryfall", filters.syntax.trim());
   // one result per card unless every printing is wanted
-  if (options.group) params.set("group", "1");
+  if (options.group && !onlineDirectives(filters).unique) params.set("group", "1");
   if (options.sort && options.sort !== "best") params.set("sort", options.sort);
   if (options.currency) params.set("currency", options.currency);
   if (filters.type.trim()) params.set("type", filters.type.trim());

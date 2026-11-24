@@ -445,7 +445,7 @@ function AddTab({ actions, search }: { actions: Record<string, Action>; search: 
         <button type="button" className="btn small" onClick={actions["deck.toCollection"]?.run}>Add deck to collection...</button>
       </div>
       <CardResults
-        search={search} layout={store.searchLayout} size={store.prefs.searchSize} label="Cards to add" resetKey={store.filterSets.deckAdd}
+        search={search} layout={store.searchLayout} filters={store.filterSets.deckAdd} size={store.prefs.searchSize} label="Cards to add" resetKey={store.filterSets.deckAdd}
         activeId={store.selection?.view === "cards" ? store.selection.key : null}
         onPick={(card) => store.select({ view: "cards", key: card.id, printingId: card.id })}
         onOpen={(card) => add(card, store.prefs.zone)}

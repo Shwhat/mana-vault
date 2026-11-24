@@ -2,12 +2,12 @@
 // rules as the server (card-search.ts) from the card list kept on the phone. Each rule here matches one on the server;
 // a change to one is made to both. ----------
 
-import { searchColors, searchExpression, searchRarity } from "../../server/src/search-expression";
+import { searchColors, searchExpression, searchPromoType, searchRarity } from "../../server/src/search-expression";
 
 /** What a card on the phone carries for searching. */
 export type QueryCard = {
   oracle_id?: string; name: string; type_line: string; oracle_text: string | null; flavor_name?: string | null; mana_cost: string | null;
-  mana_value: number | null; colors: string; color_identity?: string | null; set_code: string; set_name: string; rarity: string;
+  mana_value: number | null; colors: string; color_identity?: string | null; set_code: string; set_name: string; rarity: string; collector_number?: string;
   released_at?: string | null; finishes?: string | null; promo?: number | null; variation?: number | null; artist?: string | null;
   keywords?: string | null; promo_types?: string | null; frame?: string | null; frame_effects?: string | null; border_color?: string | null;
   full_art?: number | null; lang?: string | null; custom?: number | boolean | null; legal?: number | null; usd?: number | null;
@@ -29,6 +29,8 @@ export type QueryContext = {
   formats?: string[];
   /** Oracle ids of the cards the account owns, for is:owned; without them is:owned needs the server. */
   owned?: Set<string> | null;
+  /** Promo types present in the downloaded catalog. */
+  promoTypes?: Set<string>;
 };
 
 type Test = (card: QueryCard) => boolean;
@@ -138,6 +140,15 @@ function compileTerm(input: string, query: string, context: QueryContext): Test 
       });
       continue;
     }
+    if (key === "cn" || key === "number") {
+      if (/^\d+[a-z]+$/i.test(value) && (operator === ":" || operator === "=" || operator === "!=")) {
+        add((card) => operator === "!=" ? (card.collector_number ?? "").toLowerCase() !== value.toLowerCase() : (card.collector_number ?? "").toLowerCase() === value.toLowerCase());
+        continue;
+      }
+      if (!/^\d+$/.test(value) || !Number.isSafeInteger(Number(value))) throw new Error("Collector number must be a whole number");
+      add((card) => /^[0-9]/.test(card.collector_number ?? "") && compare(Number.parseInt(card.collector_number!, 10), operator, Number(value)));
+      continue;
+    }
     if (key === "mv" || key === "cmc") {
       if (!COMPARE.includes(operator)) throw new Error("Mana value needs a comparison operator");
       if (operator === ":" && ["even", "odd"].includes(value.toLowerCase())) {
@@ -195,9 +206,9 @@ function compileTerm(input: string, query: string, context: QueryContext): Test 
         push((card) => !!card.oracle_id && owned.has(card.oracle_id));
         continue;
       }
-      if (IS_WORDS[word]) { push(IS_WORDS[word]); continue; }
-      if (/^[a-z0-9]{3,30}$/.test(word)) { push((card) => has(card.promo_types, word)); continue; }
-      throw new Error(`Unknown card kind "${value}"`);
+      if (Object.hasOwn(IS_WORDS, word)) { push(IS_WORDS[word]!); continue; }
+      if (/^[a-z0-9_-]{2,60}$/.test(word) && (searchPromoType(word) || context.promoTypes?.has(word))) { push((card) => has(card.promo_types, word)); continue; }
+      throw new Error(`Unsupported card kind "${value}". Use Scryfall online search for more is: filters.`);
     }
     if (key === "art" || key === "atag" || key === "role" || key === "function" || key === "otag") {
       throw new Error("Art tags and Oracle tags need a connection to the server");

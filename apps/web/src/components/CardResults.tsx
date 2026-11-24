@@ -12,11 +12,14 @@ import { Thumb } from "../views/Views";
 import { rowMenu } from "./ContextMenu";
 import { EntryMenuButton, GroupedList, ManaCost } from "./GroupedList";
 import { groupList } from "../list-groups";
+import { onlineDirectives } from "../filters";
+import { SymbolText } from "./SymbolPicker";
 
 type MenuItem = { label: string; run: () => void } | false | null | undefined;
 export type ResultProps = {
   search: CardSearch;
   layout: CollectionLayout;
+  filters?: Filters;
   size: GridSize;
   /** The accessible name of the results list. */
   label: string;
@@ -133,13 +136,17 @@ function ResultPicture({ card, props, store }: { card: FoundCard; props: ResultP
 function ResultRow({ card, props, store }: { card: FoundCard; props: ResultProps; store: Store }) {
   const active = props.activeId === card.id;
   const currency = store.prefs.currency;
+  const display = props.filters ? onlineDirectives(props.filters).display : undefined;
+  const detailed = display === "full" || display === "text";
   return (
-    <div data-key={card.id} role="option" aria-selected={active} className={active ? "row active" : "row"}
+    <div data-key={card.id} role="option" aria-selected={active} className={`row${active ? " active" : ""}${detailed ? ` search-${display}` : ""}`}
       onClick={() => props.onPick(card)} onDoubleClick={() => props.onOpen(card)} {...rowMenu(store, card.name, () => props.menu(card))}>
-      <Thumb url={card.image_url} />
+      {display !== "text" && <Thumb url={card.image_url} />}
       <div className="rowmain">
         <div className="rowtitle"><b>{card.name}</b>{card.custom && <span className="badge custom">Custom</span>}<ManaCost cost={card.mana_cost} /><PrintingsBadge card={card} /><OwnedBadge owned={card.owned} grouped={!!card.printings} /></div>
         <div className="rowsub">{card.type_line}</div>
+        {detailed && card.oracle_text && <div className="search-oracle"><SymbolText text={card.oracle_text} /></div>}
+        {detailed && card.power != null && <div>{card.power}/{card.toughness}</div>}
         <div className="rowmeta">{card.set_name}{" "}
           {props.onTag
             ? <button type="button" className="tag badge" title={`Show only cards from ${card.set_name}`}
@@ -180,7 +187,8 @@ function ResultList({ props, store }: { props: ResultProps; store: Store }) {
   const { root, end } = useMoreOnScroll(props.search, `list:${props.label}`);
   useScrollTopOnReset(root, props.resetKey, `list:${props.label}`);
   const { cards, total } = props.search;
-  const group = store.prefs.listGroups.search;
+  const directives = props.filters ? onlineDirectives(props.filters) : {};
+  const group = directives.order || directives.direction ? "none" : store.prefs.listGroups.search;
   const currency = store.prefs.currency;
   return (
     <div className="list" role="listbox" aria-label={props.label} ref={root}>
@@ -226,8 +234,9 @@ export function CardResults(props: ResultProps) {
   const { search } = props;
   if (search.error) return <div className="emptynote err">{search.error}</div>;
   if (!search.loading && search.cards.length === 0) return <div className="empty"><Icon name="find" />{props.empty}</div>;
-  if (props.layout === "grid") return <ResultGrid props={props} store={store} />;
-  if (props.layout === "binder") return <ResultBinder props={props} store={store} />;
+  const display = props.filters ? onlineDirectives(props.filters).display : undefined;
+  if (display === "grid" || (!display && props.layout === "grid")) return <ResultGrid props={props} store={store} />;
+  if (!display && props.layout === "binder") return <ResultBinder props={props} store={store} />;
   return <ResultList props={props} store={store} />;
 }
 

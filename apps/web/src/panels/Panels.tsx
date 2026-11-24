@@ -23,6 +23,8 @@ import { pickOrOpen } from "../components/PickOpen";
 export function FiltersPanel({ actions }: { actions: Record<string, Action> }) {
   const store = useApp();
   const filters = store.scopeFilters;
+  const [syntaxDraft, setSyntaxDraft] = useState(filters.syntax);
+  useEffect(() => { setSyntaxDraft(filters.syntax); }, [filters.syntax, store.filterScope]);
   const localView = store.filterScope === "collection" || store.filterScope === "deck" || store.filterScope === "tradeGive";
   const { error } = useServerMatch(filters, store.prefs.currency, localView);
   const set = (change: Partial<Filters>) => store.setScopeFilters(change);
@@ -43,8 +45,17 @@ export function FiltersPanel({ actions }: { actions: Record<string, Action> }) {
     <div className="pbody">
       <div className="fltscope" role="status">Filtering: <b>{SCOPE_NAMES[store.filterScope]}</b></div>
       <div className="pgrp">
+        <div className="prow"><label htmlFor="flt-syntax-mode">Syntax source</label>
+          <Picker id="flt-syntax-mode" label="Syntax source" value={filters.syntaxMode} onChange={(value) => set({ syntaxMode: value === "online" ? "online" : "" })}
+            options={choices([["", "Local"], ["online", "Scryfall online"]])} /></div>
         <div className="prow"><label htmlFor="flt-syntax">Search syntax</label>
-          <input id="flt-syntax" value={filters.syntax} placeholder="t:dragon mv<=5" onChange={(event) => set({ syntax: event.target.value })} /></div>
+          <input id="flt-syntax" value={filters.syntaxMode === "online" ? syntaxDraft : filters.syntax} placeholder="t:dragon mv<=5"
+            onChange={(event) => { if (filters.syntaxMode === "online") setSyntaxDraft(event.target.value); else set({ syntax: event.target.value }); }}
+            onKeyDown={(event) => { if (filters.syntaxMode === "online" && event.key === "Enter") set({ syntax: syntaxDraft }); }} /></div>
+        {filters.syntaxMode === "online" && <>
+          <button type="button" className="btn small" onClick={() => set({ syntax: syntaxDraft })}>Search Scryfall</button>
+          <p className="note">Only this syntax is sent to Scryfall. Other filters stay local. Broad searches may take several minutes.</p>
+        </>}
         {error && <p role="alert">{error}</p>}
       </div>
       <div className="pgrp">

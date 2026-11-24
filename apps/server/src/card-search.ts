@@ -1,5 +1,5 @@
 import { usdEtchedSql, usdFoilSql, usdSql } from "./price-context.js";
-import { searchColors, searchExpression, searchPlainWords, searchRarity } from "./search-expression.js";
+import { searchColors, searchExpression, searchPlainWords, searchPromoType, searchRarity } from "./search-expression.js";
 export interface SearchClause {
   sql: string;
   values: string[];
@@ -42,7 +42,7 @@ const STORE_KEYS: Record<string, string> = {
   tcgplayer: "tcg", tcg: "tcg", cardkingdom: "ck", ck: "ck", cardsphere: "cs", cs: "cs", cardmarket: "cm", mcm: "cm", cardhoarder: "ch",
 };
 
-export type SearchContext = { userId?: number };
+export type SearchContext = { userId?: number; isPromoType?: (word: string) => boolean };
 
 export function parseCardQuery(query: string, context: SearchContext = {}): SearchClause[] {
   const result = searchExpression(query, (token) => parseCardTerm(token, query, context),
@@ -139,6 +139,19 @@ function parseCardTerm(input: string, query: string, context: SearchContext): Se
       continue;
     }
 
+    if (key === "cn" || key === "number") {
+      if (/^\d+[a-z]+$/i.test(value) && (operator === ":" || operator === "=" || operator === "!=")) {
+        clauses.push({ sql: `${negate}(collector_number ${operator === "!=" ? "!=" : "="} ? COLLATE NOCASE)`, values: [value] });
+        continue;
+      }
+      if (!/^\d+$/.test(value) || !Number.isSafeInteger(Number(value))) throw new Error("Collector number must be a whole number");
+      clauses.push({
+        sql: `${negate}(collector_number GLOB '[0-9]*' AND CAST(collector_number AS INTEGER) ${compare(operator)} CAST(? AS INTEGER))`,
+        values: [String(Number(value))],
+      });
+      continue;
+    }
+
     if (key === "mv" || key === "cmc") {
       if (!COMPARE.includes(operator)) throw new Error("Mana value needs a comparison operator");
       if (operator === ":" && ["even", "odd"].includes(value.toLowerCase())) {
@@ -218,16 +231,15 @@ function parseCardTerm(input: string, query: string, context: SearchContext): Se
         });
         continue;
       }
-      if (IS_WORDS[word]) {
+      if (Object.hasOwn(IS_WORDS, word)) {
         clauses.push({ sql: `${flip}(${IS_WORDS[word]})`, values: [] });
         continue;
       }
-      // any Scryfall promo type, such as is:surgefoil, is:galaxyfoil, is:textured
-      if (/^[a-z0-9]{3,30}$/.test(word)) {
-        clauses.push({ sql: `${flip}((',' || promo_types || ',') LIKE ?)`, values: [`%,${word},%`] });
+      if (/^[a-z0-9_-]{2,60}$/.test(word) && (searchPromoType(word) || context.isPromoType?.(word))) {
+        clauses.push({ sql: `${flip}(instr(',' || lower(promo_types) || ',', ?) > 0)`, values: [`,${word},`] });
         continue;
       }
-      throw new Error(`Unknown card kind "${value}"`);
+      throw new Error(`Unsupported card kind "${value}". Use Scryfall online search for more is: filters.`);
     }
 
     if (key === "art" || key === "atag" || key === "role" || key === "function" || key === "otag") {

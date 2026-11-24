@@ -16,7 +16,17 @@ Card search finds cards in the local card database, one result per card name unl
 
 A filter is a key, an operator and a value with no spaces, such as `t:dragon`. Put a minus sign in front to exclude matches, such as `-t:creature`.
 
-The search box and the **Search syntax** field at the top of the Filters panel accept the same Scryfall-style syntax. Both work against the local card database, including custom cards; they do not send searches to Scryfall. The phone uses its downloaded card list when offline. This is a subset of Scryfall's language, not the complete Scryfall search: for example, regular expressions, display keywords and many `is:` categories are not supported. The `is:` words listed below and special foil or promo types are supported.
+The search box and the **Search syntax** field at the top of the Filters panel accept the same Scryfall-style syntax by default. Both work against the local card database, including custom cards; they do not send searches to Scryfall. The phone uses its downloaded card list when offline. Local search supports the subset below, not the complete Scryfall language: for example, regular expressions, display keywords and many `is:` categories need online search. Unsupported `is:` words show an error instead of silently matching an unrelated promo type.
+
+### Scryfall online search
+
+Choose **Scryfall online** under **Syntax source**, enter a Scryfall expression in **Search syntax**, and press **Search Scryfall** (or Enter). This sends only that expression to Scryfall's search API. The main search box and all other Mana Vault filters, including Owned and store prices, remain local and are applied to the returned printing IDs. For example, enter `is:reserved` in the online syntax box and use **Owned** to narrow those results locally. Do not put Mana Vault-only terms such as `is:owned` or `store:` in the online box: Scryfall does not understand them.
+
+Online search requires a connection to both your Mana Vault server and Scryfall; it does not search custom cards. Results can only include printings present in the local database, so update the database if a Scryfall result is missing. Scryfall's API returns 175 cards per page and limits requests to two per second; a broad search may take several minutes before results appear. Completed searches are cached on the server for 24 hours. Scryfall errors and warnings about ignored terms are shown instead of treating an incomplete search as successful.
+
+The API retrieves matching printings first. Mana Vault applies its local filters before `unique:cards`, `unique:art` or `unique:prints` selects how results are grouped; `@@` and `++` are also supported. Without `unique:`, the **Show every printing** option controls grouping. `prefer:` selects a printing from those that remain after local filtering; tied printings may differ from Scryfall's choice if its preferred printing was filtered out. Frame, promo and Universes Beyond preferences can take longer because the server asks Scryfall to classify the public search results. The server sends no local filter values when doing so. Scryfall limits queries to 1,000 characters; `unique:cards` and `unique:art` searches need three characters free to request all printings. An explicit `order:` or `direction:` takes precedence over Mana Vault's Sort control. `display:grid`, `display:checklist`, `display:full` and `display:text` select the corresponding Mana Vault result layouts; Full and Text show local card text and are not exact copies of Scryfall's website layouts.
+
+Scryfall's API does not include all website behavior: for example, it does not automatically retry with extras or other languages when a search has no results. Search support and online data are subject to Scryfall's API and the local catalog.
 
 Use `or` and parentheses for alternatives, for example `t:legendary (t:goblin or t:elf)`. Terms next to each other are combined with AND; AND takes precedence over OR. Prefix a group with `-` to exclude it, as in `-(t:creature or t:land)`. Use `!"Lightning Bolt"` for an exact name or `-dragon` to exclude a plain word. Plain words, including negated words, search names, flavor names, type lines and rules text.
 
@@ -27,6 +37,7 @@ Use `or` and parentheses for alternatives, for example `t:legendary (t:goblin or
 | `o:` or `oracle:` | Rules text contains the text | `o:"enters the battlefield"` |
 | `m:` or `mana:` | Mana cost contains the text | `m:{R}{R}` |
 | `set:`, `s:`, `e:` or `edition:` | Set code is exactly the value, or set name contains it | `e:lea` |
+| `cn` or `number` | Collector number compared with =, :, <, >, <=, >= or !=. Numeric comparisons use the printing's numeric prefix; `:` and `=` also accept an exact number with a letter suffix | `set:neo cn>=294 cn<=303`, `cn:107m` |
 | `r:` or `rarity:` | Rarity is common, uncommon, rare, mythic, special or bonus (also `c`, `u`, `r` or `m`) | `r:mythic` |
 | `c:` or `color:` | Card has all the given colors | `c:ur`, `c:red` |
 | `id:` or `identity:` | Color identity has all the given colors | `id:wubg` |
@@ -37,7 +48,7 @@ Use `or` and parentheses for alternatives, for example `t:legendary (t:goblin or
 | `is:owned` | Any printing of the card is in one of your collections or one shared with you (not wishlists or proxies). `not:owned` is the opposite | `is:owned r:mythic` |
 | `is:foil`, `is:nonfoil`, `is:etched` | The printing is made in that finish | `is:etched` |
 | `is:fullart`, `is:borderless`, `is:showcase`, `is:extendedart`, `is:promo`, `is:variation` | The printing has that treatment | `is:borderless t:land` |
-| `is:` and a special foil or promo type | The printing is made in it, such as `is:surgefoil`, `is:galaxyfoil`, `is:textured` or `is:prerelease` | `is:surgefoil` |
+| `is:` and a promo type in the local catalog | The printing has that promo type, such as `is:surgefoil`, `is:galaxyfoil`, `is:textured` or `is:prerelease` | `is:surgefoil` |
 | `art:` or `atag:` | What the art shows, from Scryfall's Art Tags, including narrower tags (art:animal also finds cats) | `art:cat`, `art:dragon` |
 | `role:`, `function:` or `otag:` | What the card does, from Scryfall's Oracle Tags | `role:ramp`, `role:removal` |
 | `pow` or `power`, `tou` or `toughness` | Power or toughness compared with =, :, <, >, <= or >=. Cards with * or no power never match | `pow>=4`, `tou<2` |
@@ -69,7 +80,7 @@ These filters work after the first MTGJSON update. On a phone without a connecti
 | Message | Cause |
 |---|---|
 | Unsupported search filter "x" | The key before the operator is not in the table above |
-| Unknown card kind "x" | `is:` was followed by something that is not a word of letters and digits |
+| Unsupported card kind "x" | The `is:` category is not supported locally; try Scryfall online |
 | x needs a comparison operator | `pow`, `tou` or `year` was followed by something other than =, :, <, >, <= or >= |
 | x must be a number | The power or toughness is not a number |
 | year must be four digits, such as 2019 | The year is not four digits |
@@ -87,7 +98,8 @@ These filters work after the first MTGJSON update. On a phone without a connecti
 
 | Field | Default | Effect |
 |---|---|---|
-| Search syntax | Empty | Scryfall-style local search, combined with the search box and the other fields |
+| Syntax source | Local | Choose local syntax or a separate Scryfall online search |
+| Search syntax | Empty | Local syntax, or the expression sent to Scryfall when online search is selected |
 | Type | Empty | Type line contains the text |
 | Set code | Empty | Set code is exactly the text, or set name contains it. The set's symbol shows beside a code it knows |
 | Color | Any color | Card has the chosen color |

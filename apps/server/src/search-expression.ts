@@ -71,6 +71,32 @@ const COLOR_NAMES: Record<string, string> = {
 };
 const RARITY_NAMES: Record<string, string> = { c: "common", u: "uncommon", r: "rare", m: "mythic" };
 
+const LOCAL_PROMO_TYPES = new Set([
+  "surgefoil", "galaxyfoil", "halofoil", "textured", "manafoil", "raisedfoil", "rainbowfoil", "confettifoil",
+  "oilslick", "ripplefoil", "fracturefoil", "doublerainbow", "stepandcompleat", "firstplacefoil", "neonink",
+  "invisibleink", "gilded", "silverfoil", "dragonscalefoil", "singularityfoil", "cosmicfoil", "ampersand",
+  "embossed", "headliner", "prerelease",
+]);
+
+export const searchPromoType = (word: string): boolean => LOCAL_PROMO_TYPES.has(word);
+
+/** Read display directives without interpreting Scryfall's filtering language. */
+export function scryfallDirectives(query: string): Partial<Record<"unique" | "display" | "order" | "direction" | "prefer", string>> {
+  const found: Partial<Record<"unique" | "display" | "order" | "direction" | "prefer", string>> = {};
+  const tokens = query.match(/(?:[^\s()"\/]|"(?:\\.|[^"\\])*"|\/(?:\\.|[^\/\\])*\/)+/g) ?? [];
+  for (const token of tokens) {
+    if (token === "++") found.unique = "prints";
+    if (token === "@@") found.unique = "art";
+    const match = /^(unique|display|as|order|sort|direction|dir|prefer):([a-z0-9-]+)$/i.exec(token);
+    if (match) {
+      const aliases: Record<string, keyof typeof found> = { as: "display", sort: "order", dir: "direction" };
+      const key = match[1]!.toLowerCase();
+      found[aliases[key] ?? key as keyof typeof found] = match[2]!.toLowerCase();
+    }
+  }
+  return found;
+}
+
 export function searchRarity(value: string): string {
   const word = value.toLowerCase();
   return RARITY_NAMES[word] ?? word;

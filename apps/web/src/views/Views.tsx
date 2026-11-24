@@ -81,7 +81,7 @@ export function CardsView({ actions, onFilters }: { actions: Record<string, Acti
         <span className="phpos">{countLine(search)}</span>
       </div>
       <CardResults
-        search={search} layout={store.searchLayout} size={store.prefs.searchSize} label="Search results" resetKey={filters}
+        search={search} layout={store.searchLayout} filters={filters} size={store.prefs.searchSize} label="Search results" resetKey={filters}
         activeId={selection?.view === "cards" ? selection.key : null}
         onPick={(card) => store.select({ view: "cards", key: card.id, printingId: card.id })}
         onOpen={add}

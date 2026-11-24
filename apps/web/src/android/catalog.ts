@@ -10,7 +10,7 @@ export type CompactCard = Card & {
   oracle_id: string; finishes: string; flavor_name: string | null; promo: number; variation: number; released_at: string | null;
 };
 type Stored = { version: string; fields: string[]; rows: unknown[][]; formats?: string[] };
-type Loaded = { version: string; cards: CompactCard[]; byId: Map<string, CompactCard>; names: NameIndex | null; formats: string[] };
+type Loaded = { version: string; cards: CompactCard[]; byId: Map<string, CompactCard>; names: NameIndex | null; formats: string[]; promoTypes: Set<string> };
 
 let loaded: Loaded | null = null;
 let loading: Promise<Loaded | null> | null = null;
@@ -22,7 +22,8 @@ function expand(stored: Stored): Loaded {
     if (!("oracle_text" in card)) card.oracle_text = null;
     return card as CompactCard;
   });
-  return { version: stored.version, cards, byId: new Map(cards.map((card) => [card.id, card])), names: null, formats: stored.formats ?? [] };
+  const promoTypes = new Set(cards.flatMap((card) => String(card.promo_types ?? "").toLowerCase().split(",").filter(Boolean)));
+  return { version: stored.version, cards, byId: new Map(cards.map((card) => [card.id, card])), names: null, formats: stored.formats ?? [], promoTypes };
 }
 
 /** The catalog on the phone, read into memory once. Null until the first download. */
@@ -102,9 +103,10 @@ async function ownedOnPhone(): Promise<Set<string> | null> {
  * filters from the Filters panel.
  */
 export async function searchCards(params: URLSearchParams): Promise<Card[] | { total: number; cards: Card[] }> {
-  const { cards, formats } = await needCatalog();
+  if (params.get("scryfall")) throw new Error("Scryfall online search needs a connection to the server.");
+  const { cards, formats, promoTypes } = await needCatalog();
   const query = params.get("q") ?? "";
-  const matches = compileQuery(query, { formats, owned: /\b(is|not):owned\b/i.test(query) ? await ownedOnPhone() : null });
+  const matches = compileQuery(query, { formats, promoTypes, owned: /\b(is|not):owned\b/i.test(query) ? await ownedOnPhone() : null });
   const words = normalize(plainWords(query)).split(" ").filter(Boolean);
   const color = params.get("color")?.toUpperCase();
   const type = params.get("type")?.trim().toLowerCase();
@@ -142,10 +144,11 @@ export async function searchCards(params: URLSearchParams): Promise<Card[] | { t
 
 /** Match all local printings for collection and deck filters. */
 export async function matchCards(params: URLSearchParams): Promise<{ ids: string[] }> {
-  const { cards, formats } = await needCatalog();
+  if (params.get("scryfall")) throw new Error("Scryfall online search needs a connection to the server.");
+  const { cards, formats, promoTypes } = await needCatalog();
   const query = params.get("q") ?? "";
   if (!query.trim() || query.length > 400) throw new Error("Invalid card search");
-  const matches = compileQuery(query, { formats, owned: /\b(is|not):owned\b/i.test(query) ? await ownedOnPhone() : null });
+  const matches = compileQuery(query, { formats, promoTypes, owned: /\b(is|not):owned\b/i.test(query) ? await ownedOnPhone() : null });
   return { ids: cards.filter((card) => matches(card as unknown as QueryCard)).map((card) => card.id) };
 }
 

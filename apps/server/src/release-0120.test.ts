@@ -65,6 +65,153 @@ function addCards(database: DatabaseSync) {
   return id;
 }
 
+describe("online Scryfall search", () => {
+  it("recognizes catalog promo types without treating unknown categories as promo types", async () => {
+    const { database, signUp, as } = await server();
+    const id = addCards(database);
+    database.prepare("UPDATE cards SET promo_types = ? WHERE id = ?").run("surgefoil,buyabox,foo_bar", id(3));
+    const call = as((await signUp("local-promos")).cookie);
+    const found = (await call("GET", "/api/cards?q=is:buyabox&paged=1")).json();
+    expect(found).toMatchObject({ total: 1, cards: [{ id: id(3) }] });
+    expect((await call("GET", "/api/cards?q=is:fooXbar")).statusCode).toBe(400);
+    expect((await call("GET", "/api/cards?q=is:constructor")).statusCode).toBe(400);
+  });
+
+  it("pages Scryfall results, intersects local filters, keeps their order and reuses the result", async () => {
+    const calls: URL[] = [];
+    const id = (n: number) => `${n.toString(16).padStart(8, "a")}-0000-4000-8000-000000000000`;
+    const { database, signUp, as } = await server({
+      scryfallSearchFetcher: async (url) => {
+        const parsed = new URL(url);
+        calls.push(parsed);
+        const first = parsed.searchParams.get("page") === "1";
+        return { ok: true, status: 200, json: async () => ({
+          data: (first ? [id(4), id(2)] : [id(1)]).map((cardId) => ({ id: cardId })), has_more: first,
+        }) };
+      },
+    });
+    addCards(database);
+    const call = as((await signUp("scryfall")).cookie);
+    const params = new URLSearchParams({ q: "set:m10", scryfall: "is:reserved", paged: "1", limit: "1" });
+    const first = await call("GET", `/api/cards?${params}`);
+    expect(first.statusCode).toBe(200);
+    expect(first.json()).toMatchObject({ total: 2, cards: [{ id: id(4) }] });
+    params.set("offset", "1");
+    const second = await call("GET", `/api/cards?${params}`);
+    expect(second.json()).toMatchObject({ total: 2, cards: [{ id: id(1) }] });
+    params.set("offset", "0");
+    params.set("group", "1");
+    expect((await call("GET", `/api/cards?${params}`)).json()).toMatchObject({ total: 2, cards: [{ id: id(4) }] });
+    params.delete("group");
+    params.set("sort", "name");
+    expect((await call("GET", `/api/cards?${params}`)).json()).toMatchObject({ total: 2, cards: [{ id: id(1) }] });
+    const match = new URLSearchParams({ q: "set:m10", scryfall: "is:reserved" });
+    expect((await call("GET", `/api/cards/match?${match}`)).json().ids.sort()).toEqual([id(1), id(4)].sort());
+    expect(calls).toHaveLength(2);
+    expect(calls.map((url) => url.searchParams.get("q"))).toEqual(["is:reserved", "is:reserved"]);
+    expect(calls.every((url) => !url.searchParams.toString().includes("m10"))).toBe(true);
+  });
+
+  it("surfaces Scryfall errors and treats its no-results response as empty", async () => {
+    const { signUp, as } = await server({
+      scryfallSearchFetcher: async (url) => {
+        const query = new URL(url).searchParams.get("q");
+        return query === "nothing"
+          ? { ok: false, status: 404, json: async () => ({ code: "not_found" }) }
+          : { ok: false, status: 400, json: async () => ({ details: "Invalid expression" }) };
+      },
+    });
+    const call = as((await signUp("scryfall-errors")).cookie);
+    expect((await call("GET", "/api/cards?scryfall=nothing&paged=1")).json()).toMatchObject({ total: 0, cards: [] });
+    const response = await call("GET", "/api/cards/match?scryfall=bad");
+    expect(response.statusCode).toBe(502);
+    expect(response.json().error).toContain("Invalid expression");
+    const unsupported = await call("GET", "/api/cards?q=is:reserved");
+    expect(unsupported.statusCode).toBe(400);
+    expect(unsupported.json().error).toContain('Unsupported card kind "reserved"');
+  });
+
+  it("groups matching local printings by card or artwork after local filters", async () => {
+    const id = (n: number) => `${n.toString(16).padStart(8, "a")}-0000-4000-8000-000000000000`;
+    const calls: string[] = [];
+    const { database, signUp, as } = await server({
+      scryfallSearchFetcher: async (url) => {
+        calls.push(new URL(url).searchParams.get("q") ?? "");
+        return { ok: true, status: 200, json: async () => ({
+          data: [
+            { id: id(3), set: "p21", illustration_id: "art-b", released_at: "2021-01-01", prices: { usd: "1.00" } },
+            { id: id(2), set: "m21", illustration_id: "art-a", released_at: "2020-07-03", prices: { usd: "2.00" } },
+            { id: id(1), set: "m10", illustration_id: "art-a", released_at: "2009-07-17", prices: { usd: "10.00" } },
+            { id: id(4), set: "m10", illustration_id: "wall", released_at: "2009-07-17", prices: { usd: "9.00" } },
+          ], has_more: false,
+        }) };
+      },
+    });
+    addCards(database);
+    const call = as((await signUp("online-group")).cookie);
+    const params = new URLSearchParams({ q: "set:m21", scryfall: "t:cat unique:cards", paged: "1" });
+    const card = (await call("GET", `/api/cards?${params}`)).json();
+    expect(card).toMatchObject({ total: 1, cards: [{ id: id(2) }] });
+    expect(calls[0]).toBe("t:cat unique:cards ++");
+    const matches = (await call("GET", `/api/cards/match?${params}`)).json().ids;
+    expect(matches).toEqual([id(2)]);
+
+    params.set("q", "");
+    params.set("scryfall", "t:cat unique:art prefer:oldest");
+    const art = (await call("GET", `/api/cards?${params}`)).json();
+    expect(art.total).toBe(3);
+    expect(art.cards.map((row: { id: string }) => row.id)).toEqual([id(3), id(1), id(4)]);
+    params.set("offset", "50");
+    expect((await call("GET", `/api/cards?${params}`)).json()).toMatchObject({ total: 3, cards: [] });
+  });
+
+  it("applies price and categorical printing preferences after local filtering", async () => {
+    const id = (n: number) => `${n.toString(16).padStart(8, "a")}-0000-4000-8000-000000000000`;
+    const calls: string[] = [];
+    const { database, signUp, as } = await server({
+      scryfallSearchFetcher: async (url) => {
+        const q = new URL(url).searchParams.get("q") ?? "";
+        calls.push(q);
+        const data = q.includes("is:default")
+          ? [{ id: id(1), set: "m10" }]
+          : [
+            { id: id(3), set: "p21", prices: { usd: "5.00" } },
+            { id: id(2), set: "m21", prices: { usd: "1.00" } },
+            { id: id(1), set: "m10", prices: { usd: "9.00" } },
+          ];
+        return { ok: true, status: 200, json: async () => ({ data, has_more: false }) };
+      },
+    });
+    addCards(database);
+    const call = as((await signUp("online-prefer")).cookie);
+    const params = new URLSearchParams({ q: "name:Savannah", scryfall: "t:cat unique:cards prefer:usd-low", paged: "1" });
+    expect((await call("GET", `/api/cards?${params}`)).json()).toMatchObject({ total: 1, cards: [{ id: id(2) }] });
+    params.set("scryfall", "t:cat unique:cards prefer:default");
+    expect((await call("GET", `/api/cards?${params}`)).json()).toMatchObject({ total: 1, cards: [{ id: id(1) }] });
+    expect(calls.some((q) => q.includes("is:default"))).toBe(true);
+    expect(calls.every((q) => !q.includes("Savannah"))).toBe(true);
+  });
+
+  it("uses Scryfall's preferred printing to break ties when it survives local filtering", async () => {
+    const id = (n: number) => `${n.toString(16).padStart(8, "a")}-0000-4000-8000-000000000000`;
+    const { database, signUp, as } = await server({
+      scryfallSearchFetcher: async (url) => {
+        const rollup = new URL(url).searchParams.get("unique") === "cards";
+        const data = (rollup ? [id(2)] : [id(3), id(2)]).map((cardId) => ({
+          id: cardId, set: "m21", released_at: "2020-07-03",
+        }));
+        return { ok: true, status: 200, json: async () => ({ data, has_more: false }) };
+      },
+    });
+    addCards(database);
+    const call = as((await signUp("online-ties")).cookie);
+    const params = new URLSearchParams({ scryfall: "t:cat unique:cards prefer:oldest", paged: "1" });
+    expect((await call("GET", `/api/cards?${params}`)).json()).toMatchObject({ total: 1, cards: [{ id: id(2) }] });
+    params.set("q", "set:p21");
+    expect((await call("GET", `/api/cards?${params}`)).json()).toMatchObject({ total: 1, cards: [{ id: id(3) }] });
+  });
+});
+
 describe("admin role and accounts", () => {
   it("makes the first account the admin and keeps Administration from other accounts", async () => {
     const { signUp, as } = await server();
@@ -260,6 +407,24 @@ describe("grouped card search, special foils and search words", () => {
     const bad = await call("GET", `/api/cards?q=${encodeURIComponent("(t:cat or")}`);
     expect(bad.statusCode).toBe(400);
     expect(bad.json().error).toContain("Expected a search term");
+  });
+
+  it("filters printings by collector number ranges", async () => {
+    const { signUp, as, database } = await server();
+    const call = as((await signUp("numbers")).cookie);
+    const id = addCards(database);
+    const update = database.prepare("UPDATE cards SET set_code = 'neo', collector_number = ? WHERE id = ?");
+    update.run("293", id(1)); update.run("294", id(2)); update.run("303a", id(3)); update.run("304", id(4));
+    for (const path of ["/api/cards", "/api/cards/match"]) {
+      const response = await call("GET", `${path}?q=${encodeURIComponent("set:neo cn>=294 cn<=303")}&paged=1`);
+      expect(response.statusCode).toBe(200);
+      const body = response.json();
+      expect((body.ids ?? body.cards.map((card: { id: string }) => card.id)).sort()).toEqual([id(2), id(3)].sort());
+      const suffix = (await call("GET", `${path}?q=${encodeURIComponent("set:neo cn:303A")}&paged=1`)).json();
+      expect(suffix.ids ?? suffix.cards.map((card: { id: string }) => card.id)).toEqual([id(3)]);
+    }
+    const invalid = await call("GET", `/api/cards?q=${encodeURIComponent("cn:abc")}`);
+    expect(invalid.statusCode).toBe(400);
   });
 });
 
