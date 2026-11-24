@@ -42,6 +42,11 @@ describe("search syntax on the phone", () => {
     expect(() => run("zzz:1")).toThrow('Unsupported search filter "zzz"');
     expect(() => run("is:owned")).toThrow("is:owned needs a connection");
     expect(() => run("otag:removal")).toThrow("need a connection");
+    expect(() => run("is:reserved")).toThrow('Unsupported card kind "reserved"');
+    expect(() => run("is:constructor")).toThrow("Unsupported card kind");
+    const promo = { ...bear, promo_types: "buyabox,foo_bar" };
+    expect(compileQuery("is:buyabox", { promoTypes: new Set(["buyabox", "foo_bar"]) })(promo)).toBe(true);
+    expect(() => compileQuery("is:fooXbar", { promoTypes: new Set(["foo_bar"]) })).toThrow("Unsupported card kind");
   });
   it("supports grouped alternatives, exact and negative names, aliases and color comparisons", () => {
     expect(run('t:creature (e:2x2 or s:m10) -!"Lightning Bolt"')).toEqual(["Grizzly Bears"]);
@@ -59,5 +64,16 @@ describe("search syntax on the phone", () => {
     expect(compileQuery("c=g")(multicolor)).toBe(false);
     expect(() => run("(t:creature or")).toThrow("Expected a search term");
     expect(() => run('name:"bear')).toThrow("Unclosed quote");
+  });
+  it("compares collector numbers offline", () => {
+    const cards = [
+      { ...bolt, collector_number: "293" }, { ...bolt, collector_number: "294" },
+      { ...bolt, collector_number: "303a" }, { ...bolt, collector_number: "304" },
+      { ...bolt, collector_number: "A1" },
+    ];
+    expect(cards.filter(compileQuery("set:2x2 cn>=294 cn<=303")).map((card) => card.collector_number)).toEqual(["294", "303a"]);
+    expect(cards.filter(compileQuery("number:303")).map((card) => card.collector_number)).toEqual(["303a"]);
+    expect(cards.filter(compileQuery("cn:303A")).map((card) => card.collector_number)).toEqual(["303a"]);
+    expect(() => compileQuery("cn:abc")).toThrow("Collector number must be a whole number");
   });
 });

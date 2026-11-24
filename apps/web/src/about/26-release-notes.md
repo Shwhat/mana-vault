@@ -2,6 +2,12 @@
 
 The installed version is shown at the top of this guide.
 
+## 0.24.1 (2026-11-23): Scryfall online search
+
+- Search syntax in the Filters panel can use Scryfall online, with the other Mana Vault filters applied locally. Scryfall's grouping, ordering, printing preferences and display options are supported; see Card search for API and offline limitations.
+- Local search supports collector-number comparisons, including `set:neo cn>=294 cn<=303`.
+- Unsupported local `is:` categories now report an error instead of silently searching unrelated promo types.
+
 ## 0.24.0 (2026-11-23): Card search syntax
 
 - The Filters panel has a Search syntax field, combined with the search box and the other filters for each view.

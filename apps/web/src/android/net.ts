@@ -18,8 +18,10 @@ export async function appFetch(path: string, init: RequestInit = {}, timeoutMs =
   const method = (init.method ?? "GET").toUpperCase();
   const token = appSettings().token;
   const controller = new AbortController();
-  const timer = window.setTimeout(() => controller.abort(), timeoutMs);
-  init.signal?.addEventListener("abort", () => controller.abort());
+  const timer = timeoutMs > 0 ? window.setTimeout(() => controller.abort(), timeoutMs) : undefined;
+  const abort = () => controller.abort();
+  init.signal?.addEventListener("abort", abort);
+  if (init.signal?.aborted) abort();
   try {
     const response = await fetch(apiUrl(path), {
       ...init,
@@ -42,7 +44,8 @@ export async function appFetch(path: string, init: RequestInit = {}, timeoutMs =
     if (init.signal?.aborted) throw reason;
     throw new OfflineError("The server cannot be reached.");
   } finally {
-    window.clearTimeout(timer);
+    if (timer !== undefined) window.clearTimeout(timer);
+    init.signal?.removeEventListener("abort", abort);
   }
 }
 

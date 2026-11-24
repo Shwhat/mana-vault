@@ -1,4 +1,4 @@
-import Fastify, { type FastifyInstance } from "fastify";
+import Fastify, { type FastifyInstance, type FastifyReply } from "fastify";
 import { randomUUID } from "node:crypto";
 import fastifyStatic from "@fastify/static";
 import { registerScanRoutes } from "./scan.js";
@@ -38,6 +38,8 @@ import { priceSourceOf } from "./mtgjson.js";
 import { registerMtgjsonRoutes, startMtgjsonRunner } from "./mtgjson-routes.js";
 import { NOTES_PUBLIC, type NoteFetcher, registerNoteRoutes } from "./notes.js";
 import { registerNoteWebRoutes } from "./notes-web.js";
+import { createScryfallSearch, type SearchFetcher } from "./scryfall-search.js";
+import { scryfallDirectives } from "./search-expression.js";
 
 declare module "fastify" {
   interface FastifyRequest {
@@ -60,6 +62,8 @@ export interface AppOptions {
   version?: string;
   /** Downloads card pictures and mana symbols from Scryfall; tests replace it. */
   fetcher?: Fetcher;
+  /** Searches Scryfall; tests replace this so no external requests are made. */
+  scryfallSearchFetcher?: SearchFetcher;
   /** Wait before the second try of a card picture download, in milliseconds (800). */
   pictureRetryDelay?: number;
   /** Settings locked by environment variables (index.ts reads them). */
@@ -112,6 +116,18 @@ export async function buildApp(
 ): Promise<FastifyInstance> {
   initializeDatabase(database);
   const app = Fastify({ logger: process.env.NODE_ENV !== "test" });
+  const promoTypeExists = database.prepare("SELECT 1 FROM cards WHERE instr(',' || lower(promo_types) || ',', ?) > 0 LIMIT 1");
+  const searchScryfall = createScryfallSearch(options.scryfallSearchFetcher);
+  const searchOnlineFor = async (query: string, reply: FastifyReply, variations = false, rollup?: "cards" | "art") => {
+    const controller = new AbortController();
+    const closed = () => { if (!reply.raw.writableEnded) controller.abort(); };
+    reply.raw.once("close", closed);
+    try {
+      return await searchScryfall(query, controller.signal, variations, rollup);
+    } finally {
+      reply.raw.removeListener("close", closed);
+    }
+  };
   const requireSignIn = options.requireSignIn ?? true;
   const secureMode = options.secureCookie ?? "auto";
   const auth = new AuthStore(database, options.passwordIterations ?? DEFAULT_ITERATIONS);
@@ -504,10 +520,10 @@ export async function buildApp(
     }
   });
 
-  app.get<{ Querystring: { q?: string; color?: string; type?: string; set?: string; rarity?: string; format?: string; mvMin?: string; mvMax?: string; limit?: string; offset?: string; paged?: string; group?: string; sort?: string; currency?: string } }>(
+  app.get<{ Querystring: { q?: string; scryfall?: string; color?: string; type?: string; set?: string; rarity?: string; format?: string; mvMin?: string; mvMax?: string; limit?: string; offset?: string; paged?: string; group?: string; sort?: string; currency?: string } }>(
     "/api/cards",
     async (request, reply) => {
-      const { q = "", color, type, set, rarity, format, mvMin, mvMax, limit = "40", offset = "0", paged, group, sort = "best", currency } = request.query;
+      const { q = "", scryfall, color, type, set, rarity, format, mvMin, mvMax, limit = "40", offset = "0", paged, group, sort = "best", currency } = request.query;
       if (typeof sort !== "string" || !(SEARCH_SORTS as readonly string[]).includes(sort)) return reply.code(400).send({ error: "Choose a valid sort" });
       const order = searchOrder(sort as SearchSort, typeof q === "string" ? q : "", { currency: typeof currency === "string" ? currency : undefined, userId: request.user?.id });
       const parsedLimit = Number(limit);
@@ -516,6 +532,7 @@ export async function buildApp(
       if (
         typeof q !== "string" ||
         q.length > 400 ||
+        (scryfall !== undefined && (typeof scryfall !== "string" || !scryfall.trim() || [...scryfall].length > 1000)) ||
         (color !== undefined && typeof color !== "string") ||
         (type !== undefined && typeof type !== "string") ||
         (set !== undefined && typeof set !== "string") ||
@@ -538,7 +555,7 @@ export async function buildApp(
       const conditions: string[] = ["removed = 0"];
       const values: (string | number)[] = [];
       try {
-        for (const clause of parseCardQuery(q, { userId: request.user?.id })) {
+        for (const clause of parseCardQuery(q, { userId: request.user?.id, isPromoType: (word) => !!promoTypeExists.get(`,${word},`) })) {
           conditions.push(clause.sql);
           values.push(...clause.values);
         }
@@ -583,27 +600,88 @@ export async function buildApp(
         return reply.code(400).send({ error: "Minimum mana value cannot exceed maximum" });
       }
 
+      const directives = scryfall ? scryfallDirectives(scryfall) : {};
+      const grouping = directives.unique === "cards" ? "cards" : directives.unique === "art" ? "art"
+        : directives.unique === "prints" ? "none" : group === "1" ? "cards" : "none";
+      const grouped = grouping !== "none";
+      let onlineIds: string | undefined;
+      if (scryfall) {
+        try {
+          const printings = await searchOnlineFor(scryfall, reply);
+          const picked = grouped && (directives.unique || directives.prefer)
+            ? new Set((await searchOnlineFor(scryfall, reply, false, grouping === "art" ? "art" : "cards")).map((card) => card.id))
+            : new Set<string>();
+          const preferenceKinds: Record<string, string> = {
+            promo: "is:promo",
+            default: "is:default", typical: "is:default", normal: "is:default", traditional: "is:default", baseline: "is:default",
+            atypical: "is:atypical", nondefault: "is:atypical", abnormal: "is:atypical", nontraditional: "is:atypical",
+            universesbeyond: "is:universesbeyond", ub: "is:universesbeyond",
+            notuniversesbeyond: "not:universesbeyond", notub: "not:universesbeyond",
+          };
+          const preference = grouped && directives.prefer ? preferenceKinds[directives.prefer] : undefined;
+          const preferred = new Set<string>();
+          if (preference && printings.length) {
+            const sets = [...new Set(printings.map((card) => card.set))];
+            if (sets.some((code) => !/^[a-z0-9]{1,60}$/i.test(code))) throw new Error("Scryfall did not provide a valid set for a printing.");
+            for (let at = 0; at < sets.length;) {
+              const choices: string[] = [];
+              let size = 0;
+              while (at < sets.length && size + sets[at]!.length + 8 <= 700) {
+                const code = sets[at++]!;
+                choices.push(`set:${code}`);
+                size += code.length + 8;
+              }
+              const matching = await searchOnlineFor(`(${choices.join(" or ")}) ${preference} include:extras lang:any unique:prints`, reply, true);
+              for (const card of matching) preferred.add(card.id);
+            }
+          }
+          onlineIds = JSON.stringify(printings.map((card) => ({
+            ...card, preferred: preferred.has(card.id) ? 1 : 0, picked: picked.has(card.id) ? 1 : 0,
+          })));
+        } catch (error) {
+          return reply.code(502).send({ error: error instanceof Error ? error.message : "Scryfall search failed." });
+        }
+      }
       const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
       const columns = `id, oracle_id, name, mana_cost, mana_value, type_line, oracle_text, colors, color_identity, legalities,
                 set_code, set_name, collector_number, rarity, image_url, released_at, artist, ${cardPriceColumns("x")}`;
-      // grouped: one result per card, showing its newest regular English printing, with how many printings matched
-      const grouped = group === "1";
+      const onlineWith = onlineIds !== undefined ? `online AS MATERIALIZED (SELECT json_extract(value, '$.id') AS online_id,
+        json_extract(value, '$.art') AS online_art, json_extract(value, '$.released') AS online_released,
+        json_extract(value, '$.usd') AS online_usd, json_extract(value, '$.eur') AS online_eur,
+        json_extract(value, '$.tix') AS online_tix, json_extract(value, '$.preferred') AS online_preferred,
+        json_extract(value, '$.picked') AS online_picked,
+        CAST(key AS INTEGER) AS online_position FROM json_each(?))` : "";
+      const onlineOrder = onlineIds !== undefined && (sort === "best" || !!directives.order || !!directives.direction);
+      const ctes = [onlineWith, !onlineOrder ? order.with : ""].filter(Boolean).join(", ");
+      const joinOnline = onlineIds !== undefined ? " JOIN online ON online_id = id" : "";
+      const prefixValues = [...(onlineIds !== undefined ? [onlineIds] : []), ...(!onlineOrder ? (order.withValues ?? []) : [])];
+      const orderSql = onlineOrder ? (grouped ? "p.position" : "online_position") : order.sql;
+      const orderValues = onlineOrder ? [] : order.values;
+      const preference = directives.prefer ?? "";
+      const pricePreference = /^(usd|eur|tix)-(low|high)$/.exec(preference);
+      const preferredOrder = preference === "oldest" ? "online_released IS NULL, online_released ASC, online_picked DESC, "
+        : preference === "newest" ? "online_released IS NULL, online_released DESC, online_picked DESC, "
+          : pricePreference ? `online_${pricePreference[1]} IS NULL, online_${pricePreference[1]} ${pricePreference[2] === "low" ? "ASC" : "DESC"}, online_picked DESC, `
+            : preference ? "online_preferred DESC, online_picked DESC, " : "online_picked DESC, ";
+      const partition = grouping === "art" && onlineIds !== undefined ? "oracle_id, online_art" : "oracle_id";
       // Grouped search picks one printing per card. Only the few columns the pick needs go through the window step,
       // and the total comes from the same pass, so the cards table is read once; the page's full rows are joined last.
       const rows = grouped
         ? database.prepare(
-          `WITH ${order.with ? `${order.with},` : ""} ranked AS (SELECT id AS pid, ROW_NUMBER() OVER (PARTITION BY oracle_id ORDER BY removed, lang != 'en', promo, variation, released_at IS NULL, released_at DESC) AS pick,
-                                  COUNT(*) OVER (PARTITION BY oracle_id) AS printings FROM cards ${where}),
-                picked AS (SELECT pid, printings, COUNT(*) OVER () AS matches FROM ranked WHERE pick = 1)
-           SELECT ${columns}, p.printings, p.matches FROM picked p JOIN cards x ON x.id = p.pid ORDER BY ${order.sql} LIMIT ? OFFSET ?`,
-        ).all(...(order.withValues ?? []), ...values, ...order.values, parsedLimit, parsedOffset)
-        : database.prepare(`${order.with ? `WITH ${order.with} ` : ""}SELECT ${columns} FROM cards x ${where} ORDER BY ${order.sql} LIMIT ? OFFSET ?`)
-          .all(...(order.withValues ?? []), ...values, ...order.values, parsedLimit, parsedOffset);
+          `WITH ${ctes ? `${ctes},` : ""} ranked AS (SELECT id AS pid, ${onlineIds !== undefined ? "online_position" : "0"} AS position, ROW_NUMBER() OVER (PARTITION BY ${partition} ORDER BY ${onlineIds !== undefined ? `${preferredOrder}online_position` : "removed, lang != 'en', promo, variation, released_at IS NULL, released_at DESC"}) AS pick,
+                                  COUNT(*) OVER (PARTITION BY ${partition}) AS printings FROM cards ${joinOnline} ${where}),
+                picked AS (SELECT pid, position, printings, COUNT(*) OVER () AS matches FROM ranked WHERE pick = 1)
+           SELECT ${columns}, p.printings, p.matches FROM picked p JOIN cards x ON x.id = p.pid ORDER BY ${orderSql} LIMIT ? OFFSET ?`,
+        ).all(...prefixValues, ...values, ...orderValues, parsedLimit, parsedOffset)
+        : database.prepare(`${ctes ? `WITH ${ctes} ` : ""}SELECT ${columns} FROM cards x ${joinOnline} ${where} ORDER BY ${orderSql} LIMIT ? OFFSET ?`)
+          .all(...prefixValues, ...values, ...orderValues, parsedLimit, parsedOffset);
       if (paged !== "1") return rows.map(toCardRow);
       // a page of results with the total number of matches and how many copies the account owns, by finish
       const total = grouped && rows.length
         ? Number(rows[0]!.matches)
-        : Number(database.prepare(grouped ? `SELECT COUNT(DISTINCT oracle_id) AS count FROM cards ${where}` : `SELECT COUNT(*) AS count FROM cards ${where}`).get(...values)?.count ?? 0);
+        : Number(database.prepare(`${onlineWith ? `WITH ${onlineWith} ` : ""}${grouping === "art"
+          ? `SELECT COUNT(*) AS count FROM (SELECT oracle_id, online_art FROM cards ${joinOnline} ${where} GROUP BY oracle_id, online_art)`
+          : `SELECT ${grouped ? "COUNT(DISTINCT oracle_id)" : "COUNT(*)"} AS count FROM cards ${joinOnline} ${where}`}`).get(...(onlineIds !== undefined ? [onlineIds] : []), ...values)?.count ?? 0);
       const userId = request.user!.id;
       const ownedOf = database.prepare(
         `SELECT i.foil, COALESCE(SUM(i.quantity), 0) AS owned FROM collection_cards i JOIN collections col ON col.id = i.collection_id
@@ -626,17 +704,27 @@ export async function buildApp(
   );
 
   // the printing ids a search matches, for filters on collection and deck cards that need the card database (art, roles...)
-  app.get<{ Querystring: { q?: string } }>("/api/cards/match", async (request, reply) => {
+  app.get<{ Querystring: { q?: string; scryfall?: string } }>("/api/cards/match", async (request, reply) => {
     const q = typeof request.query.q === "string" ? request.query.q : "";
-    if (!q.trim() || q.length > 400) return reply.code(400).send({ error: "Invalid card search" });
+    const scryfall = request.query.scryfall;
+    if ((!q.trim() && !scryfall) || q.length > 400 || (scryfall !== undefined && (typeof scryfall !== "string" || !scryfall.trim() || [...scryfall].length > 1000))) return reply.code(400).send({ error: "Invalid card search" });
+    let clauses;
     try {
-      const clauses = parseCardQuery(q, { userId: request.user?.id });
-      const where = clauses.length ? `WHERE ${clauses.map((clause) => clause.sql).join(" AND ")}` : "";
-      const ids = database.prepare(`SELECT id FROM cards ${where} LIMIT 200000`).all(...clauses.flatMap((clause) => clause.values)).map((row) => String(row.id));
-      return { ids };
+      clauses = parseCardQuery(q, { userId: request.user?.id, isPromoType: (word) => !!promoTypeExists.get(`,${word},`) });
     } catch (error) {
       return reply.code(400).send({ error: error instanceof Error ? error.message : "Invalid card search" });
     }
+    if (scryfall) {
+      try {
+        const ids = JSON.stringify((await searchOnlineFor(scryfall, reply)).map((card) => card.id));
+        clauses.push({ sql: "id IN (SELECT value FROM json_each(?))", values: [ids] });
+      } catch (error) {
+        return reply.code(502).send({ error: error instanceof Error ? error.message : "Scryfall search failed." });
+      }
+    }
+    const where = clauses.length ? `WHERE ${clauses.map((clause) => clause.sql).join(" AND ")}` : "";
+    const ids = database.prepare(`SELECT id FROM cards ${where}`).all(...clauses.flatMap((clause) => clause.values)).map((row) => String(row.id));
+    return { ids };
   });
 
   // tag suggestions for the Art shows and Role filters

@@ -182,6 +182,9 @@ kbd{padding:0 5px;border:1px solid var(--line);border-radius:3px;color:var(--mut
 .row.active{background:var(--accent-soft)}
 .row.active .rowtitle b{color:var(--on-text)}
 .thumb-img{width:30px;height:42px;flex:none;object-fit:cover;border-radius:3px;border:1px solid var(--line2);background:var(--panel)}
+.search-full,.search-text{align-items:flex-start;padding:10px}
+.search-full .thumb-img{width:120px;height:168px}
+.search-oracle{white-space:pre-line;margin:6px 0}
 .thumb-img.none{display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:9px}
 .rowmain{flex:1;min-width:0}
 .rowtitle{display:flex;align-items:baseline;gap:8px;white-space:nowrap;overflow:hidden}

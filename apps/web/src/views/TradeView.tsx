@@ -169,7 +169,7 @@ function SideSearch({ side, search, trade, editable, onAdd, buttonText, extra, d
         <span className="sub">{countLine(search)}</span>
       </div>
       {extra}
-      <CardResults section="trade" search={search} layout={store.searchLayout} size={store.prefs.searchSize} label={side === "give" ? "Cards you can give" : "Cards you can get"}
+      <CardResults section="trade" search={search} layout={store.searchLayout} filters={filters} size={store.prefs.searchSize} label={side === "give" ? "Cards you can give" : "Cards you can get"}
         resetKey={filters} onPick={() => store.setTradeSide(scope)} onOpen={(card) => { if (can) onAdd(card); }}
         menu={(card) => [can && { label: side === "give" ? "Add to what you give" : "Add to what you get", run: () => onAdd(card) }]}
         buttons={(card) => (

@@ -39,7 +39,7 @@ function setStatus(change: Partial<SyncStatus>) {
 // ---------- the copy on the phone ----------
 
 /** Answers that are kept for offline use: everything under /api except these. */
-const NOT_KEPT = /^\/api\/(cards\?|cards\/[^/]+\/printings|catalog\/(?!lists$)|backup|sync|devices|users|scan\/|health|config)/;
+const NOT_KEPT = /^\/api\/(cards\?|cards\/match\?|cards\/[^/]+\/printings|catalog\/(?!lists$)|backup|sync|devices|users|scan\/|health|config)/;
 const keep = (url: string) => url.startsWith("/api/") && !NOT_KEPT.test(url);
 const getCopy = <T>(url: string) => idbGet<T>("cache", url);
 const setCopy = (url: string, value: unknown) => idbSet("cache", url, value);
@@ -428,7 +428,9 @@ function checkBack() {
 }
 
 async function network<T>(url: string, init: RequestInit): Promise<T> {
-  return readJson<T>(await appFetch(url, init));
+  const [path, query = ""] = url.split("?");
+  const onlineSearch = (path === "/api/cards" || path === "/api/cards/match") && new URLSearchParams(query).has("scryfall");
+  return readJson<T>(await appFetch(url, init, onlineSearch ? 0 : 15_000));
 }
 
 /** Every request from the Android app goes through here. */

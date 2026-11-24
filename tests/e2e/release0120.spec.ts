@@ -189,3 +189,33 @@ test("syntax in card search and the filter panel combines with the other filters
   await page.locator(".pbody .btn", { hasText: "Clear filters" }).click();
   await expect(page.locator('[role="alert"]')).toHaveCount(0);
 });
+
+test("online syntax is submitted separately and controls the results display", async ({ page }) => {
+  const searches: URL[] = [];
+  await page.route("**/api/cards?**", async (route) => {
+    const url = new URL(route.request().url());
+    if (!url.searchParams.has("scryfall")) return route.continue();
+    searches.push(new URL(url));
+    url.searchParams.delete("scryfall");
+    const response = await route.fetch({ url: url.toString() });
+    await route.fulfill({ response });
+  });
+  await signUp(page, "online-syntax");
+  await page.getByRole("textbox", { name: "Search cards" }).fill("t:creature");
+  await page.locator("#flt-name").fill("Serra");
+  await page.locator("#flt-syntax-mode").click();
+  await page.getByRole("option", { name: "Scryfall online" }).click();
+  await page.locator("#flt-syntax").fill("is:reserved unique:prints display:full");
+  expect(searches).toHaveLength(0);
+  await page.getByRole("button", { name: "Search Scryfall" }).click();
+  await expect(page.locator("#view-cards .search-full", { hasText: "Serra Angel" })).toBeVisible();
+  expect(searches.at(-1)?.searchParams.get("scryfall")).toBe("is:reserved unique:prints display:full");
+  expect(searches.at(-1)?.searchParams.get("q")).toBe("( t:creature ) name:Serra");
+  expect(searches.at(-1)?.searchParams.has("group")).toBe(false);
+  await page.locator("#flt-syntax").fill("is:reserved display:text");
+  await page.getByRole("button", { name: "Search Scryfall" }).click();
+  await expect(page.locator("#view-cards .search-text", { hasText: "Serra Angel" })).toBeVisible();
+  await page.locator("#flt-syntax").fill("is:reserved display:grid");
+  await page.getByRole("button", { name: "Search Scryfall" }).click();
+  await expect(page.locator("#view-cards .cardgrid")).toBeVisible();
+});
