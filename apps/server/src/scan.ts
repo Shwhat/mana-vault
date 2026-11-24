@@ -10,7 +10,7 @@ export type ScanCard = {
   id: string; oracle_id: string; name: string; set_code: string; set_name: string; collector_number: string;
   rarity: string; image_url: string | null; finishes: string; released_at: string | null;
 };
-export type ScanMatch = { card: ScanCard | null; score: number; by: "printing" | "name" | null; read: string };
+export type ScanMatch = { card: ScanCard | null; score: number; by: "printing" | "name" | null; read: string; exact?: boolean };
 
 const CARD_COLUMNS = "id, oracle_id, name, set_code, set_name, collector_number, rarity, image_url, finishes, released_at, promo_types, lang";
 // newest first; regular printings before promos and variants
@@ -64,7 +64,7 @@ export function matchScan(database: DatabaseSync, matcher: NameMatcher, lines: s
     ? database.prepare(`SELECT ${CARD_COLUMNS} FROM cards WHERE name = ? AND flavor_name = ? ${NEWEST} LIMIT 1`).get(nameOk.name, nameOk.flavor) as ScanCard | undefined
     : undefined;
   const card = inSet ?? flavored ?? database.prepare(`SELECT ${CARD_COLUMNS} FROM cards WHERE name = ? AND custom = 0 ${NEWEST} LIMIT 1`).get(nameOk.name) as ScanCard | undefined;
-  return { card: card ?? null, score: nameOk.score, by: inSet ? "printing" : "name", read: nameOk.read };
+  return { card: card ?? null, score: nameOk.score, by: inSet ? "printing" : "name", read: nameOk.read, ...(inSet ? { exact: false } : {}) };
 }
 
 const textList = (value: unknown, count: number, length: number): string[] | null =>

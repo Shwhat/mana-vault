@@ -430,7 +430,8 @@ export function registerLibraryRoutes(app: FastifyInstance, database: DatabaseSy
     if (params.deckId && !access(database, "deck", params.deckId, request.user.id)) return notFound(reply, "deck");
   });
 
-  app.get<{ Querystring: { q?: string } }>("/api/sets", async (request) => listSets(database, typeof request.query.q === "string" ? request.query.q.slice(0, 60) : ""));
+  app.get<{ Querystring: { q?: string; includeCustom?: string } }>("/api/sets", async (request) =>
+    listSets(database, typeof request.query.q === "string" ? request.query.q.slice(0, 60) : "", request.query.includeCustom === "1"));
 
   app.get("/api/users", async (request) =>
     database.prepare("SELECT id, name FROM users WHERE id != ? ORDER BY name COLLATE NOCASE").all(userOf(request))

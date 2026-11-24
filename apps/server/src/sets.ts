@@ -78,10 +78,10 @@ export function setDetails(database: DatabaseSync, code: string): SetDetails {
 }
 
 /**
- * Every set that has printings in the card database, with its name, printed size, symbol and details. Sets missing from
+ * Every set that has printings in the card database, optionally including empty custom sets. Sets missing from
  * the Scryfall set list (before the first update after 0.2.0) use the name from their printings.
  */
-export function listSets(database: DatabaseSync, query = ""): Array<SetRow & SetDetails & { printings: number }> {
+export function listSets(database: DatabaseSync, query = "", includeCustom = false): Array<SetRow & SetDetails & { printings: number }> {
   const term = `%${query.trim().replace(/[\\%_]/g, (match) => `\\${match}`)}%`;
   const rows = database.prepare(
     `SELECT * FROM (
@@ -90,6 +90,10 @@ export function listSets(database: DatabaseSync, query = ""): Array<SetRow & Set
        FROM cards c LEFT JOIN sets s ON s.code = c.set_code LEFT JOIN set_symbols y ON y.code = c.set_code
        WHERE c.removed = 0
        GROUP BY c.set_code
+       ${includeCustom ? `UNION ALL
+       SELECT s.code, s.name, s.set_type, s.released_at, s.printed_size, s.card_count, 0 AS printings, ${DETAIL_COLUMNS}
+       FROM sets s JOIN custom_sets cs ON cs.code = s.code LEFT JOIN set_symbols y ON y.code = s.code
+       WHERE NOT EXISTS (SELECT 1 FROM cards c WHERE c.set_code = s.code AND c.removed = 0)` : ""}
      ) WHERE code LIKE ? ESCAPE '\\' OR name LIKE ? ESCAPE '\\'
      ORDER BY released_at DESC, name`,
   ).all(term, term) as Array<Record<string, unknown>>;

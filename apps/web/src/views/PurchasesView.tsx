@@ -222,7 +222,7 @@ function History({ list, currency, onOpen, onChanged }: { list: PurchaseList; cu
         <Picker label="Sort" value={sort} options={choices(SORTS)} onChange={setSort} />
       </div>
       <PickBar picks={picks}><button type="button" className="btn small" onClick={() => void deletePicked()}>Delete picked...</button></PickBar>
-      <table className="dtable ptable grid">
+      <div className="gridwrapper"><table className="dtable ptable grid">
         <thead><tr><th className="pickcell">{picks.allBox("Pick every entry shown")}</th><th>Date</th><th>Kind</th><th>Description</th><th>Place</th><th className="numcell">Money out</th><th className="numcell">Money in</th><th className="numcell">Value now</th><th className="numcell">Gain or loss</th></tr></thead>
         <tbody>
           {!shown.length && <tr><td colSpan={9} className="sub">{list.entries.length ? "No entries match" : "No entries yet. Use New entry to record a purchase, a sale or a trade."}</td></tr>}
@@ -241,7 +241,7 @@ function History({ list, currency, onOpen, onChanged }: { list: PurchaseList; cu
             </tr>
           ))}
         </tbody>
-      </table>
+      </table></div>
 
     </div>
   );

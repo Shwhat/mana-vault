@@ -225,8 +225,8 @@ export function PricePip({ price }: { price: number | null | undefined }) {
 }
 
 /** A set's symbol (its Scryfall symbol, or a custom set's own), hidden when the set has none. */
-export function SetIcon({ code, big = false }: { code: string; big?: boolean }) {
-  return <img className={big ? "setico big" : "setico"} src={apiUrl(`/api/set-symbols/${encodeURIComponent(code.toLowerCase())}`)} alt="" loading="lazy"
+export function SetIcon({ code, big = false, symbolUrl }: { code: string; big?: boolean; symbolUrl?: string | null }) {
+  return <img className={big ? "setico big" : "setico"} src={apiUrl(symbolUrl ?? `/api/set-symbols/${encodeURIComponent(code.toLowerCase())}`)} alt="" loading="lazy"
     onError={(event) => { event.currentTarget.style.display = "none"; }} />;
 }
 

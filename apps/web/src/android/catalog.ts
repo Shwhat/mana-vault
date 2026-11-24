@@ -160,7 +160,7 @@ export async function printingsOf(id: string): Promise<CompactCard[]> {
   return cards.filter((other) => other.oracle_id === card.oracle_id).sort(newest);
 }
 
-type Match = { card: CompactCard | null; score: number; by: "printing" | "name" | null; read: string };
+type Match = { card: CompactCard | null; score: number; by: "printing" | "name" | null; read: string; exact?: boolean };
 
 /** The same matching rules as the server's scan matching (apps/server/src/scan.ts), against the catalog on the phone. */
 export async function matchOnPhone(lines: string[], info: string): Promise<Match> {
@@ -181,7 +181,7 @@ export async function matchOnPhone(lines: string[], info: string): Promise<Match
   const inSet = knownSets.length ? named_.find((card) => knownSets.includes(card.set_code)) : undefined;
   const flavored = !inSet && nameOk.flavor ? named_.find((card) => card.flavor_name === nameOk.flavor) : undefined;
   const card = inSet ?? flavored ?? named_[0] ?? null;
-  return { card, score: nameOk.score, by: inSet ? "printing" : "name", read: nameOk.read };
+  return { card, score: nameOk.score, by: inSet ? "printing" : "name", read: nameOk.read, ...(inSet ? { exact: false } : {}) };
 }
 
 /** For tests: replaces the catalog in memory. */

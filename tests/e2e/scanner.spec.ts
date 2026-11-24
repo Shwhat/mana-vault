@@ -111,6 +111,47 @@ test("the scanner reads cards continuously into the scanned list and adds them a
   await expect(rows).toHaveCount(0);
 });
 
+test("set-filtered scans choose the selected language without changing the collector number", async ({ page }) => {
+  await fakeReader(page);
+  await signUp(page, "scanlanguage");
+  let exact = false;
+  let englishAvailable = true;
+  await page.route("**/api/scan/match", async (route) => {
+    const response = await route.fetch();
+    const match = await response.json();
+    if (exact && match.card) match.card = { ...match.card, id: "translated-bolt", lang: "ja" };
+    await route.fulfill({ response, json: match });
+  });
+  await page.route("**/api/cards/*/printings", async (route) => {
+    const response = await page.request.get("/api/cards/bolt-lea/printings");
+    const cards = await response.json() as Array<Record<string, unknown>>;
+    const english = cards.find((card) => card.id === "bolt-lea")!;
+    const translated = { ...english, id: "translated-bolt", lang: "ja" };
+    const otherArt = { ...english, id: "other-art", collector_number: "162", lang: "en" };
+    await route.fulfill({ json: [translated, ...(englishAvailable ? [english] : []), otherArt, ...cards.filter((card) => card.id !== "bolt-lea")] });
+  });
+  await menu(page, "File", "Scan card...");
+  await page.getByRole("button", { name: "Scanner settings" }).click();
+  await page.getByRole("textbox", { name: "Find a set" }).fill("Alpha");
+  await page.locator(".scansetlist .pmrow", { hasText: "Limited Edition Alpha" }).click();
+  await page.locator(".scansettings").getByRole("button", { name: "Done" }).click();
+
+  await show(page, { lines: ["Lightning Bolt"], info: "" });
+  await expect(page.locator(".scanpick")).toHaveCount(2);
+  await expect(page.locator(".scanpick", { hasText: "#161" })).toHaveCount(1);
+  await page.locator(".scanpick", { hasText: "#161" }).click();
+  await expect(listRow(page, "LEA #161")).toContainText("1x Lightning Bolt");
+  exact = true;
+  await show(page, { lines: ["Lightning Bolt"], info: "0161 C\nLEA EN" }, 3);
+  await expect(listRow(page, "LEA #161")).toContainText("2x Lightning Bolt");
+  englishAvailable = false;
+  await show(page, { lines: ["Lightning Bolt"], info: "0161 C\nLEA EN" }, 3);
+  await expect(page.locator(".scanstatus.warn")).toHaveText("No EN printing in selected set: Lightning Bolt");
+  await expect(listRow(page, "LEA #161")).toContainText("2x Lightning Bolt");
+  await show(page, { lines: ["Lightning Bolt"], info: "LEA EN" }, 3);
+  await expect(listRow(page, "LEA #162")).toContainText("1x Lightning Bolt");
+});
+
 test("the scanned list stays after a reload and goes into a deck through a collection for it", async ({ page }) => {
   await fakeReader(page);
   await signUp(page, "scandeck");

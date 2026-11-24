@@ -7,7 +7,7 @@ import { InDeckMarks } from "../components/CardMarks";
 import { CardResults, countLine, SortPicker } from "../components/CardResults";
 import { LayoutRows, OptionsButton } from "../components/Options";
 import { linkDialog } from "../components/LibraryDialogs";
-import { AddButtons, addCard, addMenuItems } from "../components/AddButtons";
+import { AddButtons, addCard, addCardToWishlist, addMenuItems } from "../components/AddButtons";
 import { finishWord, UpgradeBadge, wantedLabel } from "../components/CardMarks";
 import { Icon } from "../icons";
 import { Suggest } from "../components/Suggest";
@@ -23,7 +23,7 @@ export function Thumb({ url, small }: { url: string | null; small?: boolean }) {
 
 /** The menu and buttons of a search result in card search. */
 export function searchMenu(store: Store, card: FoundCard) {
-  const wish = () => void store.addToWishlist([{ cardId: card.id, foil: store.prefs.foil ? 1 : 0, condition: "NM", language: "en", proxy: false, quantity: 1 }], card.name);
+  const wish = () => void addCardToWishlist(store, card);
   return [
     { label: "Card page", run: () => store.setCardPage(card.id) },
     ...addMenuItems(store, card),
@@ -92,7 +92,7 @@ export function CardsView({ actions, onFilters }: { actions: Record<string, Acti
             <AddButtons store={store} card={card} />
             <button type="button" className="btn small" title="Add to wishlist (W)" onClick={(event) => {
               event.stopPropagation();
-              void store.addToWishlist([{ cardId: card.id, foil: store.prefs.foil ? 1 : 0, condition: "NM", language: "en", proxy: false, quantity: 1 }], card.name);
+              void addCardToWishlist(store, card);
             }}>+ Wishlist</button>
           </>
         )}

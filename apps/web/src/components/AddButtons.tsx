@@ -45,9 +45,8 @@ function addPrinting(store: Store, printing: Pick<Card, "id" | "name">, finish: 
  * Adds a card: the printing chooser opens with the printing shown already selected, so Enter takes it; a card made in
  * only one printing and one finish is added at once.
  */
-export async function addCard(store: Store, card: Pick<Card, "id" | "name" | "finishes">, target: AddTarget = "auto", zone?: Zone) {
-  const where = addTargetOf(store, target);
-  if (!where) return store.flash(target === "deck" ? "Open a deck first" : "Create a collection first", "err");
+async function chooseForAdd(store: Store, card: Pick<Card, "id" | "name" | "finishes">, title: string,
+  add: (printing: Printing, finish: FinishCode) => void, preferred = defaultFinish(store, card)) {
   let printings: Printing[];
   try {
     printings = await request<Printing[]>(`/api/cards/${encodeURIComponent(card.id)}/printings`);
@@ -55,16 +54,28 @@ export async function addCard(store: Store, card: Pick<Card, "id" | "name" | "fi
     store.fail(reason, "Could not load the printings.");
     return;
   }
-  // one printing (0.18.0): no printing list; one finish adds at once, more ask only for the finish
+  if (!printings.length) return store.flash("No printings found for this card", "err");
   if (printings.length === 1) {
     const only = printings[0]!;
     const finishes = finishesOf(only);
-    if (finishes.length === 1) return addPrinting(store, only, finishes[0]!, where, zone);
-    return chooseFinish(`Add ${card.name} to ${where.name}`, only, store.prefs.currency, (finish) => addPrinting(store, only, finish, where, zone), defaultFinish(store, card));
+    if (finishes.length === 1) return add(only, finishes[0]!);
+    return chooseFinish(title, only, store.prefs.currency, (finish) => add(only, finish), preferred);
   }
   choosePrinting(card.name, card.id, card.id, {
-    finish: defaultFinish(store, card), currency: store.prefs.currency, title: `Add ${card.name} to ${where.name}`, allowCurrent: true,
-  }, (printing, finish) => addPrinting(store, printing, finish, where, zone));
+    finish: preferred, currency: store.prefs.currency, title, allowCurrent: true,
+  }, add);
+}
+
+export async function addCard(store: Store, card: Pick<Card, "id" | "name" | "finishes">, target: AddTarget = "auto", zone?: Zone) {
+  const where = addTargetOf(store, target);
+  if (!where) return store.flash(target === "deck" ? "Open a deck first" : "Create a collection first", "err");
+  await chooseForAdd(store, card, `Add ${card.name} to ${where.name}`, (printing, finish) => addPrinting(store, printing, finish, where, zone));
+}
+
+export async function addCardToWishlist(store: Store, card: Pick<Card, "id" | "name" | "finishes">, quantity = 1, preferred?: FinishCode) {
+  await chooseForAdd(store, card, `Add ${card.name} to wishlist`, (printing, finish) => {
+    void store.addToWishlist([{ cardId: printing.id, foil: finish, condition: "NM", language: printing.lang ?? "en", proxy: false, quantity }], card.name);
+  }, preferred);
 }
 
 /** The right-click menu item for adding a card to where cards go. */

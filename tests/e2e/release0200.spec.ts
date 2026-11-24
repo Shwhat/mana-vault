@@ -37,6 +37,10 @@ test("a named Commander deck is picked from the set's products and opens with it
   await options.first().click();
   await expect(name).toHaveValue("Landing Party");
   await expect(editor.locator(".pelines tbody tr").first().locator(".comboadd")).toHaveText("Listed product, with decklist");
+  expect(await name.evaluate((input) => input.matches(":placeholder-shown"))).toBe(false);
+  const inputBox = await name.boundingBox();
+  const statusBox = await editor.locator(".pelines tbody tr").first().locator(".comboadd").boundingBox();
+  expect(statusBox!.y).toBeGreaterThanOrEqual(inputBox!.y + inputBox!.height);
   await editor.getByRole("textbox", { name: "Total of line 1" }).fill("60");
   await editor.getByRole("button", { name: "Save purchase" }).click();
   await expect(status(page)).toHaveText("Purchase of 2026-11-01 saved");
@@ -59,6 +63,31 @@ test("a named Commander deck is picked from the set's products and opens with it
   await expect(status(page)).toHaveText("Undone: Open Landing Party, Limited Edition Alpha (Purchase of Nov 1)");
   const after = await (await page.request.get(`/api/collections/${main}/cards`)).json() as Array<{ id: string }>;
   expect(after.find((card) => card.id === "llanowar")).toBeUndefined();
+});
+
+test("the purchase set picker shows a newly created empty custom set and its symbol", async ({ page }) => {
+  await signUp(page, "buyset");
+  let editor = await newPurchase(page);
+  await editor.getByRole("button", { name: "Add product" }).click();
+  await expect(editor.getByRole("button", { name: /^Set of line 1/ })).toBeVisible();
+  await page.locator("dialog#dlg[open] .dlgbtns").getByRole("button", { name: "Cancel" }).click();
+
+  const code = `p${Date.now().toString(36).slice(-4)}`;
+  const symbol = `data:image/svg+xml;base64,${Buffer.from(MAIN_SVG).toString("base64")}`;
+  const created = await page.request.post("/api/custom/sets", { headers: { "x-mana-vault": "1" }, data: { code, name: "Purchase Symbol Set", symbol } });
+  expect(created.status()).toBe(201);
+  try {
+    editor = await newPurchase(page);
+    await editor.getByRole("button", { name: "Add product" }).click();
+    const picker = editor.getByRole("button", { name: /^Set of line 1/ });
+    await choose(page, picker, code);
+    await expect(picker).toContainText("Purchase Symbol Set");
+    const icon = picker.locator("img.setico");
+    await expect(icon).toBeVisible();
+    await expect.poll(() => icon.evaluate((image: HTMLImageElement) => image.naturalWidth)).toBeGreaterThan(0);
+  } finally {
+    expect((await page.request.delete(`/api/custom/sets/${code}`, { headers: { "x-mana-vault": "1" } })).status()).toBe(200);
+  }
 });
 
 test("the Custom sets tab makes a set with a main and a rare symbol, and the card maker opens it", async ({ page, browser }) => {

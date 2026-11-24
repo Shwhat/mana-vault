@@ -283,6 +283,9 @@ describe("custom cards and sets", () => {
     const sets = (await call("GET", "/api/custom/sets")).json();
     expect(sets).toEqual([expect.objectContaining({ code: "xxx", name: "My Set", ownerName: "ann", hasSymbol: true, cardCount: 0 })]);
     expect((await call("GET", "/api/sets?q=My")).json()).toEqual([]);
+    expect((await call("GET", "/api/sets?q=My&includeCustom=1")).json()).toEqual([
+      expect.objectContaining({ code: "xxx", name: "My Set", printings: 0, symbolUrl: expect.stringContaining("/api/custom/sets/xxx/symbol") }),
+    ]);
   });
 
   it("saves a custom card as a card in the card database for every account", async () => {
