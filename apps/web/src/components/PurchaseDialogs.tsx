@@ -7,7 +7,7 @@ import {
   type Entry, type EntryKind, type EntryLine, KIND_LABELS, type Place, type PlaceKind, PLACE_KINDS, type Product, type PurchaseList, type ReceiptFields, type ReceiptLine, reloadOpening, type SealedChoice, setActiveOpening,
 } from "../purchase-state";
 import { finishCode, type ScanCard, type ScanItem } from "../scan-state";
-import { type Store } from "../store";
+import { type Store, useApp } from "../store";
 import { CONDITIONS, type Currency, finishLabel, type FinishCode, LANGUAGES, money } from "../types";
 import { FinishBadge, SetIcon } from "./CardMarks";
 import { LayoutRows, OptionsButton } from "./Options";
@@ -155,21 +155,24 @@ function HeaderFields({ value, set, places, kind }: {
 
 // ---------- sets ----------
 
-type SetRow = { code: string; name: string; set_type: string; released_at: string | null };
-let setCache: Promise<SetRow[]> | null = null;
-/** Every set of the card database, newest first, loaded once. */
+type SetRow = { code: string; name: string; set_type: string; released_at: string | null; symbolUrl?: string | null };
+/** Every set of the card database, newest first. */
 export function loadSets(): Promise<SetRow[]> {
-  if (!setCache) setCache = request<SetRow[]>("/api/sets").catch((reason: unknown) => { setCache = null; throw reason; });
-  return setCache;
+  return request<SetRow[]>("/api/sets?includeCustom=1");
 }
 
 /** A searchable list of sets, each with its symbol, name and code. */
 export function SetPicker({ label, value, onChange, disabled }: { label: string; value: string; onChange: (code: string) => void; disabled?: boolean }) {
   const [sets, setSets] = useState<SetRow[]>([]);
-  useEffect(() => { void loadSets().then(setSets).catch(() => setSets([])); }, []);
+  const store = useApp();
+  useEffect(() => {
+    let active = true;
+    void loadSets().then((items) => { if (active) setSets(items); }).catch((reason: unknown) => { if (active) store.fail(reason, "Could not load sets."); });
+    return () => { active = false; };
+  }, []);
   const options: Choice[] = useMemo(() => [
     { value: "", label: "No set" },
-    ...sets.map((set) => ({ value: set.code, label: set.name, detail: `${set.code.toUpperCase()}${set.released_at ? `, ${set.released_at.slice(0, 4)}` : ""}`, icon: <SetIcon code={set.code} /> })),
+    ...sets.map((set) => ({ value: set.code, label: set.name, detail: `${set.code.toUpperCase()}${set.released_at ? `, ${set.released_at.slice(0, 4)}` : ""}`, icon: <SetIcon key={set.symbolUrl ?? set.code} code={set.code} symbolUrl={set.symbolUrl} /> })),
     ...(value && !sets.some((set) => set.code === value) ? [{ value, label: value.toUpperCase(), icon: <SetIcon code={value} /> }] : []),
   ], [sets, value]);
   return <Picker label={label} value={value} options={options} onChange={onChange} disabled={disabled} className="setpick" />;

@@ -8,7 +8,7 @@ import { rowMenu } from "../components/ContextMenu";
 import { formatDialog, tagsDialog } from "../components/DeckDialogs";
 import { linkDialog } from "../components/LibraryDialogs";
 import { choosePrinting } from "../components/PrintingDialog";
-import { addCard } from "../components/AddButtons";
+import { addCard, addCardToWishlist } from "../components/AddButtons";
 import { CardFrame, chooseKind, useCardLayout } from "../components/CardFrame";
 import { isPlaced } from "../card-layout";
 import { InDeckMarks, CountPip, FinishBadge, FinishPip, finishName, OwnedMarks, PricePip, RemovedPip, ownedVersions, removeCard, switchVersionDialog, linkExact, UpgradeBadge, wantedLabel } from "../components/CardMarks";
@@ -63,7 +63,7 @@ export function cardMenu(store: Store, card: DeckCard) {
     store.deck?.cover_card_id !== card.card_id && { label: "Use as cover card", run: () => void store.updateDeckInfo({ coverCardId: card.card_id }, `${card.name} is the cover card`) },
     missing > 0 && {
       label: "Add missing to wishlist",
-      run: () => void store.addToWishlist([{ cardId: card.card_id, foil: card.finish ?? 0, condition: "NM", language: "en", proxy: false, quantity: missing }], card.name),
+      run: () => void addCardToWishlist(store, { id: card.card_id, name: card.name }, missing, (card.finish ?? 0) as FinishCode),
     },
     { label: "Add to print list", run: () => void store.addToPrintList([{ card: { ...card, id: card.card_id }, count: card.quantity }], card.name) },
     card.quantity > 1 && { label: "Reduce to 1", run: () => remove(1) },
@@ -122,7 +122,7 @@ function ListRow({ card, flag, onHover }: { card: DeckCard; flag?: string } & Ho
             <button type="button" className="tag badge wish" title={`Add ${missing} ${card.name} to your wishlist`}
               onClick={(event) => {
                 event.stopPropagation();
-                void store.addToWishlist([{ cardId: card.card_id, foil: card.finish ?? 0, condition: "NM", language: "en", proxy: false, quantity: missing }], card.name);
+                void addCardToWishlist(store, { id: card.card_id, name: card.name }, missing, (card.finish ?? 0) as FinishCode);
               }}>+ Wishlist</button>
           )}
           <OwnedMarks store={store} card={card} />
@@ -452,7 +452,7 @@ function AddTab({ actions, search }: { actions: Record<string, Action>; search: 
         menu={(card) => [
           { label: "Card page", run: () => store.setCardPage(card.id) },
           ...ADD_BUTTONS.map(([zone]) => ({ label: `Add to ${zoneLabel(zone)}`, run: () => add(card, zone) })),
-          { label: "Add to wishlist", run: () => void store.addToWishlist([{ cardId: card.id, foil: 0, condition: "NM", language: "en", proxy: false, quantity: 1 }], card.name) },
+          { label: "Add to wishlist", run: () => void addCardToWishlist(store, card) },
         ]}
         onTag={(change) => store.setScopeFilters(change, "deckAdd")}
         buttons={(card) => ADD_BUTTONS.map(([zone, text]) => {

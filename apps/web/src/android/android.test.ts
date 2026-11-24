@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { sortLines } from "../recognize";
 import { newerVersion } from "./AppScreens";
 import { isPrivateAddress, normalizeServer } from "./platform";
+import { matchOnPhone, printingsOf, setCatalogForTest } from "./catalog";
 
 describe("server address", () => {
   it("adds https and drops a trailing slash", () => {
@@ -30,6 +31,24 @@ describe("update check", () => {
 });
 
 describe("text read on the phone", () => {
+  it("keeps printing languages and distinguishes set-only recognition offline", async () => {
+    setCatalogForTest({
+      version: "scan-language",
+      fields: ["id", "oracle_id", "name", "set_code", "collector_number", "lang", "released_at", "promo", "variation"],
+      rows: [
+        ["bolt-ja", "bolt", "Lightning Bolt", "lea", "161", "ja", "1993-01-01", 0, 0],
+        ["bolt-en", "bolt", "Lightning Bolt", "lea", "161", "en", "1993-01-01", 0, 0],
+      ],
+    });
+    try {
+      expect(await matchOnPhone(["Lightning Bolt"], "LEA EN")).toMatchObject({ by: "printing", exact: false });
+      expect(await matchOnPhone(["Lightning Bolt"], "161 LEA EN")).toMatchObject({ by: "printing" });
+      expect((await printingsOf("bolt-ja")).map((card) => card.lang)).toEqual(["ja", "en"]);
+    } finally {
+      setCatalogForTest(null);
+    }
+  });
+
   it("sorts lines into the name line and the info line by their place on the card", () => {
     const read = sortLines([
       { text: "Lightning  Bolt", x: 0.06, y: 0.05 },

@@ -1237,6 +1237,7 @@ ul.skipped{max-height:40vh;overflow:auto;margin:6px 0 0;padding-left:18px;font-s
 
 /* ---------- 0.16.0: purchase history ---------- */
 #view-purchases .purchasewrap{padding:10px 12px;overflow:auto}
+#view-purchases #pagetabs{max-height:45%;overflow:auto}
 .purchasetiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;margin:8px 0 12px}
 .stvalue.gain.up,.numcell.gain.up,.pfig .gain.up{color:#1f7a32}
 .stvalue.gain.down,.numcell.gain.down,.pfig .gain.down{color:var(--err)}
@@ -1290,7 +1291,7 @@ input.setcode{width:60px}
 .combo{position:relative;display:inline-block;flex:1;min-width:200px}
 .combo input{width:100%}
 .combolist{position:absolute;left:0;right:0;top:100%;z-index:40;margin-top:2px;max-height:240px;overflow:auto;background:var(--panel2);border:1px solid var(--line);border-radius:4px;box-shadow:0 6px 18px rgba(0,0,0,.18)}
-.comboadd{position:absolute;right:8px;top:50%;transform:translateY(-50%);pointer-events:none;font-size:11px}
+.comboadd{display:block;pointer-events:none;font-size:11px}
 .setpick{min-width:170px;max-width:240px}
 .setpick .pkval,.pktext .ss{white-space:nowrap}
 .singlefind{border:1px solid var(--line2);border-radius:4px;padding:8px;margin:6px 0;background:var(--panel)}

@@ -17,9 +17,9 @@ A wishlist is a collection with **Wishlist** ticked in its settings. It works li
 
 | From | Command |
 |---|---|
-| A selected card | **Add to wishlist** (W, Card panel, card page), or **+ Wishlist** on a search result. Adds one copy, foil when Add as foil is on |
+| A selected card | **Add to wishlist** (W, Card panel, card page), or **+ Wishlist** on a search result. Choose a printing and finish before adding one copy; a card with only one printing and finish is added immediately |
 | The Missing tab of a collection linked to sets | **Add all to wishlist** above the Missing list. Adds one copy of every missing card, foil where foil is missing |
-| A deck | **Add missing to wishlist** on the Ownership tab, or **+ Wishlist** on a missing deck card. Adds the missing number of copies of each card |
+| A deck | **Add missing to wishlist** on the Ownership tab, or **+ Wishlist** on a missing deck card. The latter lets you choose its printing and finish. Adds the missing number of copies of each card |
 
 These commands use your first wishlist. When you have none, a wishlist named **Wishlist** is created. Copies already on the wishlist are added to. Each command undoes as one step, for example "Undo Add missing cards of Blue deck to Wishlist".
 

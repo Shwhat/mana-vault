@@ -43,7 +43,7 @@ Each kind shows as a badge in the history, so the history can be filtered by it.
 | Field | Type | Required | Default | Notes |
 |---|---|---|---|---|
 | Date | Calendar date | Yes | Today | Orders the history and places the entry on the chart |
-| Bought from, Sold to or on, Traded with | A place, up to 120 characters | No | Empty | Places on the server are offered while typing. A name that is not in the list is added as a new place when the entry is saved (shown as **New place** beside the field) |
+| Bought from, Sold to or on, Traded with | A place, up to 120 characters | No | Empty | Places on the server are offered while typing. A name that is not in the list is added as a new place when the entry is saved (shown as **New place** under the field) |
 | Note | Text, up to 1000 characters | No | Empty | Shown in the history and found by the find box |
 
 Amounts are what you type; Mana Vault does not change them. Every amount is 0 or more.
@@ -56,7 +56,7 @@ A purchase has one line per product.
 |---|---|---|
 | Product | Play booster, Draft booster, Set booster, Collector booster, Jumpstart booster, Other booster, Booster box, Bundle, Commander deck, Starter or other deck, Prerelease kit, Secret Lair, Single cards, Other | |
 | Product name | Text, up to 120 characters | Required for Other, optional for the rest. The name of a named product, such as a Commander deck ("Landing Party") or a bundle ("Beam Me Up Bundle"). The list under the field holds the named products of the line's set and product; any other name can be typed |
-| Set | A set from a searchable list, or No set | Each set shows its symbol, name, code in capitals and year. Type to find a set by name or code |
+| Set | A set from a searchable list, or No set | Each set shows its symbol, name, code in capitals and year. Type to find a set by name or code. Custom sets are included even before cards are added |
 | Quantity | Whole number from 1 to 10000 | A line cannot go below what is opened or sold |
 | Cost each, Total | Amounts | Typing either one fills the other |
 | Packs in it | Whole number from 0 to 1000 | Filled for common products: Booster box 36, Bundle 9, Prerelease kit 6, a booster 1; can be changed for boxes, bundles, kits, Secret Lairs and Other |
@@ -68,7 +68,7 @@ A new purchase starts with no lines. **Add product** adds a product line.
 
 The named products of each set (Commander decks, bundles, boxes and other sealed products, with their decklists for preconstructed decks) are downloaded with every card database update. The Product name list shows the products of the line's set, its parent set and its companion sets, of the line's product (every product for Other), with each product's full name and "decklist" when it has one.
 
-A name picked from the list, or typed exactly as a listed product's name (case and punctuation ignored), links the line to that product; beside the field, **Listed product** or **Listed product, with decklist** shows the link. Changing the set, the product or the name checks the link again when the purchase is saved. A name that is not listed is kept as typed.
+A name picked from the list, or typed exactly as a listed product's name (case and punctuation ignored), links the line to that product; under the field, **Listed product** or **Listed product, with decklist** shows the link. Changing the set, the product or the name checks the link again when the purchase is saved. A name that is not listed is kept as typed.
 
 The product name shows beside the product in the entry's product table, in the opening list, in the history description and in the names of the line's openings.
 

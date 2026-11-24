@@ -5,6 +5,24 @@ import { menu, search, signUp, status, test, expect, choose, takePrinting } from
 
 const rows = (page: Page) => page.locator("#view-collection .list .row");
 
+test("wishlist additions choose a printing and finish and cancellation adds nothing", async ({ page }) => {
+  await signUp(page, "wishprinting");
+  await search(page, "Lightning Bolt set:lea");
+  const result = page.locator("#view-cards .row", { hasText: "Lightning Bolt" }).first();
+  await result.getByRole("button", { name: /Wishlist/ }).click();
+  await expect(page.locator("dialog[open] .printpick")).toBeVisible();
+  await page.locator("dialog[open]").getByRole("button", { name: "Cancel" }).click();
+  let collections = await (await page.request.get("/api/collections")).json() as Array<{ id: string; kind: string }>;
+  expect(collections.some((item) => item.kind === "wishlist")).toBe(false);
+  await result.getByRole("button", { name: /Wishlist/ }).click();
+  await page.locator("dialog[open]").getByRole("button", { name: "Foil M10 146" }).click();
+  await expect(status(page)).toHaveText("1 card added to Wishlist");
+  collections = await (await page.request.get("/api/collections")).json() as Array<{ id: string; kind: string }>;
+  const wishlist = collections.find((item) => item.kind === "wishlist")!;
+  const cards = await (await page.request.get(`/api/collections/${wishlist.id}/cards`)).json() as Array<{ id: string; foil: number; quantity: number }>;
+  expect(cards).toEqual([expect.objectContaining({ id: "bolt-m10", foil: 1, quantity: 1 })]);
+});
+
 async function add(page: Page, names: string[]) {
   await page.keyboard.press("1");
   for (const name of names) {
