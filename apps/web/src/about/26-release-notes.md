@@ -2,6 +2,10 @@
 
 The installed version is shown at the top of this guide.
 
+## 0.24.2 (2026-11-23): Rulings download
+
+- Fixed: rulings never downloaded ("Scryfall rulings metadata has no download URL"). Scryfall now lists rulings as a compressed JSON Lines file, which the card database update now reads, with the older file still accepted.
+
 ## 0.24.1 (2026-11-23): Scryfall online search
 
 - Search syntax in the Filters panel can use Scryfall online, with the other Mana Vault filters applied locally. Scryfall's grouping, ordering, printing preferences and display options are supported; see Card search for API and offline limitations.

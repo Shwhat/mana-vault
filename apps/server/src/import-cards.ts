@@ -332,15 +332,23 @@ export async function importRulings(database: DatabaseSync, fetcher: typeof fetc
   const metadataResponse = await fetcher(metadataUrl, { headers: { "User-Agent": userAgent } });
   if (!metadataResponse.ok) throw new Error(`Scryfall bulk-data request failed: ${metadataResponse.status}`);
   const metadata = await metadataResponse.json() as BulkMetadata;
-  const entry = Array.isArray(metadata.data)
-    ? metadata.data.find((item): item is Record<string, unknown> => typeof item === "object" && item !== null && (item as { type?: unknown }).type === "rulings")
-    : undefined;
-  const uri = typeof entry?.download_uri === "string" ? entry.download_uri : null;
-  if (!uri || !uri.startsWith("https://")) throw new Error("Scryfall rulings metadata has no download URL");
-  const response = await fetcher(uri, { headers: { "User-Agent": userAgent } });
+  const entry = findBulk(metadata, (item) => /^rulings?$/i.test(String(item.type ?? "")) || /^rulings?$/i.test(String(item.name ?? "")));
+  // Scryfall now lists a gzipped JSON Lines file (jsonl_download_uri) and may leave out the older JSON array file
+  const jsonlUri = optionalString(entry.jsonl_download_uri);
+  const uri = jsonlUri ?? optionalString(entry.download_uri);
+  if (!uri) throw new Error("Scryfall rulings metadata has no download URL");
+  let url: URL;
+  try {
+    url = new URL(uri);
+  } catch {
+    throw new Error("Scryfall rulings metadata contains an invalid download URL");
+  }
+  if (url.protocol !== "https:") throw new Error("Scryfall rulings download URL must use HTTPS");
+  const response = await fetcher(url, { headers: { "User-Agent": userAgent } });
   if (!response.ok || !response.body) throw new Error(`Scryfall rulings download failed: ${response.status}`);
-  const isGzip = new URL(uri).pathname.toLowerCase().endsWith(".gz");
-  const source = chain([Readable.from(responseChunks(response.body)), isGzip ? createGunzip() : new PassThrough(), parser(), streamArray()]);
+  const isGzip = jsonlUri !== null || url.pathname.toLowerCase().endsWith(".gz");
+  const text = Readable.from(responseChunks(response.body)).pipe(isGzip ? createGunzip() : new PassThrough());
+  const source = jsonlUri !== null ? jsonLines(text) : chain([text, parser(), streamArray()]);
   const insert = database.prepare("INSERT INTO rulings (oracle_id, published_at, source, comment) VALUES (?, ?, ?, ?)");
   let saved = 0;
   database.exec("BEGIN");
@@ -361,6 +369,14 @@ export async function importRulings(database: DatabaseSync, fetcher: typeof fetc
     throw error;
   }
   return saved;
+}
+
+/** Reads a JSON Lines stream, one object per line, in the shape stream-json's streamArray gives. */
+async function* jsonLines(input: NodeJS.ReadableStream): AsyncGenerator<{ value: unknown }> {
+  for await (const line of createInterface({ input, crlfDelay: Infinity })) {
+    const trimmed = line.trim();
+    if (trimmed) yield { value: JSON.parse(trimmed) };
+  }
 }
 
 function optionalString(value: unknown): string | null {
