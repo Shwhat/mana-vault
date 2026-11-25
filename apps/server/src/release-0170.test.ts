@@ -137,6 +137,40 @@ describe("receipts", () => {
     ]);
   });
 
+  it("reads a quantity badge and separates a per-item price from the line total", () => {
+    const receipt = (line: string) => parseReceipt([
+      line,
+      "Subtotal · 2 items $89.98",
+      "Taxes $7.11",
+      "Total USD $97.09",
+    ].join("\n"), [{ code: "hob", name: "The Hobbit" }]);
+    for (const line of [
+      "2\nMTG x The Hobbit Prerelease events $44.99/ea $89.98",
+      "2 MTG x The Hobbit Prerelease events $44.99/ea $89.98",
+    ]) {
+      const fields = receipt(line);
+      expect(fields.lines).toEqual([expect.objectContaining({
+        product: "prerelease_kit", setCode: "hob", quantity: 2, cost: 89.98,
+      })]);
+      expect(fields.linesTotal).toBe(89.98);
+      expect(fields.lines[0]!.cost / fields.lines[0]!.quantity).toBe(44.99);
+      expect(fields).toMatchObject({ tax: 7.11, total: 97.09 });
+    }
+  });
+
+  it("classifies a play booster display as a box, not a single booster", () => {
+    const [line] = parseReceipt("Magic the Gathering: Star Trek: Play Booster Display $139.99", [{ code: "trk", name: "Star Trek" }]).lines;
+    expect(line).toMatchObject({ product: "booster_box", setCode: "trk", quantity: 1, cost: 139.99 });
+  });
+
+  it("cleans prerelease event details into a readable product name", () => {
+    const [line] = parseReceipt(
+      "MTG x The Hobbit Prerelease events 1 B\u00ae Saturday 2HG kit Sealed (entry for 1) - August 8th 2PM $44.99/ea $89.98",
+      [{ code: "hob", name: "The Hobbit" }],
+    ).lines;
+    expect(line).toMatchObject({ product: "prerelease_kit", productName: "Saturday 2HG" });
+  });
+
   it("keeps a receipt with an entry, replaces it with undo data, and leaves with the entry", async () => {
     const { call, app } = await start();
     const entry = (await call("POST", "/api/purchases", { kind: "purchase", date: "2026-11-01", lines: [{ product: "play_booster", quantity: 1, cost: 5 }] })).json();

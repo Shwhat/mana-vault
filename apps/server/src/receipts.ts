@@ -88,12 +88,12 @@ function amounts(line: string): number[] {
 const lastAmount = (line: string) => amounts(line).at(-1) ?? null;
 
 const PRODUCT_WORDS: Array<[RegExp, string]> = [
+  [/booster\s+(box|display)|\bdisplay\b/i, "booster_box"],
   [/collector'?s?\s+booster/i, "collector_booster"],
   [/set\s+booster/i, "set_booster"],
   [/draft\s+booster/i, "draft_booster"],
   [/play\s+booster/i, "play_booster"],
   [/jump\s?start/i, "jumpstart_booster"],
-  [/booster\s+(box|display)|\bdisplay\b/i, "booster_box"],
   [/bundle|fat\s+pack/i, "bundle"],
   [/commander\s+(deck|precon)|\bprecon/i, "commander_deck"],
   [/pre-?release/i, "prerelease_kit"],
@@ -178,6 +178,19 @@ export function productNameOf(text: string, setNames: string[]): string {
   return segments.join(" ").slice(0, 120);
 }
 
+function prereleaseNameOf(text: string, setNames: string[]): string {
+  const months = "jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?";
+  return productNameOf(text, setNames)
+    .replace(new RegExp(`\\b(?:${months})\\s+\\d{1,2}(?:st|nd|rd|th)?(?:,?\\s+\\d{4})?\\b`, "gi"), " ")
+    .replace(/\b\d{1,2}(?::\d{2})?\s*[ap]\.?m\.?\b/gi, " ")
+    .replace(/\bpre-?release(?:\s+events?)?\b|\b(?:kit|sealed|entry|for|ea|each)\b/gi, " ")
+    .replace(/\b\d+\b|\bB\b\u00ae?/gi, " ")
+    .replace(/\u00ae/g, " ")
+    .replace(/^(?:\d+\s*)?x\b/i, " ")
+    .replace(/\s+/g, " ")
+    .replace(/^[\s\W]+|[\s\W]+$/g, "");
+}
+
 /** Reads the fields of a purchase from the text of a receipt. Fields not found stay empty. */
 export function parseReceipt(text: string, sets: Array<{ code: string; name: string }> = []): ReceiptFields {
   const rows = text.split(/\r?\n/).map((row) => row.replace(/\s+/g, " ").trim()).filter(Boolean);
@@ -201,8 +214,18 @@ export function parseReceipt(text: string, sets: Array<{ code: string; name: str
     && !/receipt|invoice|order|thank|welcome|date|tel|phone|www\.|http|track|shop\b/i.test(row) && row.length <= 60) ?? null;
   const orderNumber = text.match(/\border\s*(?:#|no\.?|number)\s*:?\s*#?\s*([A-Z0-9][A-Z0-9-]{3,})/i);
   const lines: ReceiptLine[] = [];
+  let pendingQuantity: number | null = null;
   for (const row of rows) {
-    if (SKIP.test(row) || IGNORED.test(row) || /\border\s*(#|no\.?|number)/i.test(row)) continue;
+    if (SKIP.test(row) || IGNORED.test(row) || /\border\s*(#|no\.?|number)/i.test(row)) {
+      pendingQuantity = null;
+      continue;
+    }
+    if (/^\d{1,3}$/.test(row)) {
+      pendingQuantity = Number(row);
+      continue;
+    }
+    const adjacentQuantity = pendingQuantity;
+    pendingQuantity = null;
     const cost = lastAmount(row);
     // a condition or finish on its own row belongs to the line above it ("Near Mint Foil" under the card name)
     if ((cost === null || cost <= 0) && lines.length && CONDITION_NOTE.test(row) && row.replace(new RegExp(CONDITION_NOTE.source, "gi"), "").replace(/[^a-z]/gi, "").length < 4) {
@@ -225,8 +248,9 @@ export function parseReceipt(text: string, sets: Array<{ code: string; name: str
     }
     let name = cleanRow(row.replace(AMOUNT, " "));
     if (!/[a-z]{3}/i.test(name)) continue;
-    let quantity = 1;
-    const quantityMatch = name.match(/^(\d{1,3})\s*(?:x|@|ea\b)\s*/i) ?? name.match(/\b(?:qty|quantity)[:\s]*(\d{1,3})\b/i) ?? name.match(/\s(?:x|@)\s*(\d{1,3})$/i);
+    let quantity = adjacentQuantity ?? 1;
+    const quantityMatch = name.match(/^(\d{1,3})\s*(?:x|@|ea\b)\s*/i) ?? name.match(/\b(?:qty|quantity)[:\s]*(\d{1,3})\b/i)
+      ?? name.match(/\s(?:x|@)\s*(\d{1,3})$/i) ?? name.match(/^(\d{1,3})\s+(?=[A-Za-z])/);
     if (quantityMatch) {
       quantity = Math.max(1, Number(quantityMatch[1]));
       name = name.replace(quantityMatch[0], " ").replace(/\s+/g, " ").trim();
@@ -239,7 +263,9 @@ export function parseReceipt(text: string, sets: Array<{ code: string; name: str
   const setName = (code: string | null) => sets.find((set) => set.code === code)?.name;
   for (const line of lines) {
     const named = setName(line.setCode);
-    line.productName = line.product === "other" ? "" : productNameOf(line.name, named ? [named] : []);
+    line.productName = line.product === "other" ? ""
+      : line.product === "prerelease_kit" ? prereleaseNameOf(line.name, named ? [named] : [])
+        : productNameOf(line.name, named ? [named] : []);
   }
   return {
     date: findOrderDate(text), place, note: orderNumber ? `Order #${orderNumber[1]}` : null, lines, tax, shipping, total,
