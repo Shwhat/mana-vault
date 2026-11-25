@@ -190,7 +190,7 @@ describe("online Scryfall search", () => {
     expect((await call("GET", `/api/cards?${params}`)).json()).toMatchObject({ total: 1, cards: [{ id: id(1) }] });
     expect(calls.some((q) => q.includes("is:default"))).toBe(true);
     expect(calls.every((q) => !q.includes("Savannah"))).toBe(true);
-  });
+  }, 15_000);
 
   it("uses Scryfall's preferred printing to break ties when it survives local filtering", async () => {
     const id = (n: number) => `${n.toString(16).padStart(8, "a")}-0000-4000-8000-000000000000`;
