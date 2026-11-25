@@ -13,7 +13,7 @@ import { mergeHooks } from "./scryfall-extras.js";
 import { isAdmin } from "./admin.js";
 import { CONDITION_NOTE, conditionOf, finishOf, parseReceipt, pdfText, pictureText, setOf, specialFoilOf } from "./receipts.js";
 import { specialFoil } from "./foil-types.js";
-import { initializeSealed, matchSealed, sealedChoices, sealedDeckCards } from "./sealed.js";
+import { initializeSealed, matchSealed, preconDeckCards, sealedChoices, sealedDeckCards } from "./sealed.js";
 import { activeSource, priceCols } from "./price-context.js";
 import { sourcePriceOn, storeOf } from "./mtgjson.js";
 
@@ -30,6 +30,8 @@ export const PRODUCTS: Record<string, { label: string; packs: number }> = {
   other_booster: { label: "Other booster", packs: 1 },
   booster_box: { label: "Booster box", packs: 36 },
   bundle: { label: "Bundle", packs: 9 },
+  beginner_box: { label: "Beginner box", packs: 0 },
+  starter_collection: { label: "Starter collection", packs: 0 },
   commander_deck: { label: "Commander deck", packs: 0 },
   deck: { label: "Starter or other deck", packs: 0 },
   prerelease_kit: { label: "Prerelease kit", packs: 6 },
@@ -980,6 +982,26 @@ export function registerPurchaseRoutes(app: FastifyInstance, database: DatabaseS
   const own = (request: FastifyRequest<{ Params: { entryId: string } }>) =>
     database.prepare("SELECT * FROM purchase_entries WHERE id = ? AND user_id = ?").get(request.params.entryId, userOf(request));
   const missing = (reply: FastifyReply) => reply.code(404).send({ error: "That entry is not in your purchase history" });
+  const validPrecon = (value: unknown): value is { code: string; name: string } =>
+    !!value && typeof value === "object" && "code" in value && typeof value.code === "string" && !!value.code
+    && "name" in value && typeof value.name === "string" && !!value.name;
+  const selectedPrecon = (precon: { code: string; name: string }) =>
+    database.prepare("SELECT 1 FROM sealed_decks WHERE code = ? AND name = ?").get(precon.code, precon.name)
+      ? preconDeckCards(database, precon.code, precon.name, fetcher) : Promise.resolve(null);
+  const addDeckCopies = (
+    deck: NonNullable<Awaited<ReturnType<typeof preconDeckCards>>>, multiplier: number, collectionId: string,
+    userId: number, entryId: string, lineId: string, openingId: string,
+  ) => {
+    const ids: number[] = [];
+    for (const card of deck.cards) {
+      const quantity = card.quantity * multiplier;
+      if (heldQuantity(database, collectionId, card.key) + quantity > 10_000) throw new Error("Adding the deck would exceed 10,000 copies of a card");
+      putCopies(database, collectionId, card.key, quantity);
+      insertTie(database, userId, entryId, { lineId, openingId }, collectionId, card.key, quantity);
+      ids.push(Number(database.prepare("SELECT last_insert_rowid() AS id").get()!.id));
+    }
+    return ids;
+  };
 
   app.get<{ Querystring: { currency?: string; from?: string; to?: string } }>("/api/purchases", async (request) => {
     const userId = userOf(request);
@@ -1138,7 +1160,7 @@ export function registerPurchaseRoutes(app: FastifyInstance, database: DatabaseS
   // opens part of a product line. A product with packs (0.19.0) opens a number of packs, each its own opening: the first
   // is where pulled cards are tied, the others wait in order for Next pack. A product without packs opens as one opening.
   // A named deck with a decklist (0.20.0) adds its cards and ties them to the opening in one step, unless decklist is false.
-  app.post<{ Params: { entryId: string; lineId: string }; Body: { count?: unknown; collectionId?: unknown; decklist?: unknown } }>("/api/purchases/:entryId/lines/:lineId/open", async (request, reply) => {
+  app.post<{ Params: { entryId: string; lineId: string }; Body: { count?: unknown; collectionId?: unknown; decklist?: unknown; precon?: unknown } }>("/api/purchases/:entryId/lines/:lineId/open", async (request, reply) => {
     const userId = userOf(request);
     const entry = own(request);
     if (!entry) return missing(reply);
@@ -1154,7 +1176,16 @@ export function registerPurchaseRoutes(app: FastifyInstance, database: DatabaseS
     // the decklist of a named deck, downloaded before anything changes
     let deck: Awaited<ReturnType<typeof sealedDeckCards>> = null;
     let deckError = "";
-    if (packs === 0 && line.sealed_id && request.body?.decklist !== false) {
+    if (request.body?.precon !== undefined) {
+      if (line.product !== "commander_deck" || packs !== 0 || !validPrecon(request.body.precon)) return reply.code(400).send({ error: "Choose a Commander deck precon" });
+      try {
+        deck = await selectedPrecon(request.body.precon);
+      } catch (error) {
+        return reply.code(502).send({ error: error instanceof Error ? error.message : "The decklist could not be downloaded" });
+      }
+      if (!deck) return reply.code(404).send({ error: "That precon is not in the deck list" });
+      if (!deck.cards.length) return reply.code(400).send({ error: "None of the decklist's cards are in the card database" });
+    } else if (packs === 0 && line.sealed_id && request.body?.decklist !== false) {
       try {
         deck = await sealedDeckCards(database, String(line.sealed_id), fetcher);
       } catch (error) {
@@ -1165,38 +1196,39 @@ export function registerPurchaseRoutes(app: FastifyInstance, database: DatabaseS
     const date = new Date(`${String(entry.date)}T12:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
     const collectionId = String(request.body!.collectionId);
     const created: Array<{ id: string; name: string }> = [];
-    transaction(database, () => {
-      if (!deck) database.prepare("UPDATE purchase_openings SET active = 0 WHERE user_id = ?").run(userId);
-      const insert = database.prepare(
-        "INSERT INTO purchase_openings (id, user_id, entry_id, line_id, count, name, collection_id, active, pack_number, group_id, waiting) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-      );
-      if (packs > 0) {
-        const total = Number(line.quantity) * packs;
-        const first = Number(line.packs_opened ?? 0) + 1;
-        const group = randomUUID();
-        for (let index = 0; index < opened; index += 1) {
-          const id = randomUUID();
-          const name = `Pack ${first + index} of ${total}, ${label}${setName ? `, ${setName}` : ""} (Purchase of ${date})`;
-          insert.run(id, userId, String(entry.id), String(line.id), 1, name, collectionId, index === 0 ? 1 : 0, first + index, group, index === 0 ? 0 : 1);
-          created.push({ id, name });
-        }
-      } else {
-        const plural = named || opened === 1 ? label : label.endsWith("x") ? `${label}es` : `${label}s`;
-        const id = randomUUID();
-        const name = `${named && opened === 1 ? "" : `${opened} `}${plural}${setName ? `, ${setName}` : ""} (Purchase of ${date})`;
-        insert.run(id, userId, String(entry.id), String(line.id), opened, name, collectionId, deck ? 0 : 1, null, null, 0);
-        created.push({ id, name });
-        if (deck) {
-          // every card of the decklist, once for each deck opened; the opening is done
-          for (const card of deck.cards) {
-            putCopies(database, collectionId, card.key, card.quantity * opened);
-            insertTie(database, userId, String(entry.id), { lineId: String(line.id), openingId: id }, collectionId, card.key, card.quantity * opened);
+    try {
+      transaction(database, () => {
+        if (!deck) database.prepare("UPDATE purchase_openings SET active = 0 WHERE user_id = ?").run(userId);
+        const insert = database.prepare(
+          "INSERT INTO purchase_openings (id, user_id, entry_id, line_id, count, name, collection_id, active, pack_number, group_id, waiting) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        );
+        if (packs > 0) {
+          const total = Number(line.quantity) * packs;
+          const first = Number(line.packs_opened ?? 0) + 1;
+          const group = randomUUID();
+          for (let index = 0; index < opened; index += 1) {
+            const id = randomUUID();
+            const name = `Pack ${first + index} of ${total}, ${label}${setName ? `, ${setName}` : ""} (Purchase of ${date})`;
+            insert.run(id, userId, String(entry.id), String(line.id), 1, name, collectionId, index === 0 ? 1 : 0, first + index, group, index === 0 ? 0 : 1);
+            created.push({ id, name });
           }
-          database.prepare(`UPDATE purchase_openings SET done_at = ${now} WHERE id = ?`).run(id);
+        } else {
+          const plural = named || opened === 1 ? label : label.endsWith("x") ? `${label}es` : `${label}s`;
+          const id = randomUUID();
+          const name = `${named && opened === 1 ? "" : `${opened} `}${plural}${setName ? `, ${setName}` : ""} (Purchase of ${date})`;
+          insert.run(id, userId, String(entry.id), String(line.id), opened, name, collectionId, deck ? 0 : 1, null, null, 0);
+          created.push({ id, name });
+          if (deck) {
+            // every card of the decklist, once for each deck opened; the opening is done
+            addDeckCopies(deck, opened, collectionId, userId, String(entry.id), String(line.id), id);
+            database.prepare(`UPDATE purchase_openings SET done_at = ${now} WHERE id = ?`).run(id);
+          }
         }
-      }
-      syncOpened(database, String(line.id));
-    });
+        syncOpened(database, String(line.id));
+      });
+    } catch (error) {
+      return fail(reply, error, "Could not open the product");
+    }
     const first = created[0]!;
     return reply.code(201).send({
       id: first.id, name: first.name, collectionId, entryId: String(entry.id), packs: created,
@@ -1247,6 +1279,60 @@ export function registerPurchaseRoutes(app: FastifyInstance, database: DatabaseS
 
   const ownOpening = (request: FastifyRequest<{ Params: { openingId: string } }>) =>
     database.prepare("SELECT * FROM purchase_openings WHERE id = ? AND user_id = ?").get(request.params.openingId, userOf(request));
+
+  app.post<{ Params: { openingId: string }; Body: { precon?: unknown } }>("/api/purchases/openings/:openingId/precon", async (request, reply) => {
+    if (!ownOpening(request)) return reply.code(404).send({ error: "That opening is not in your purchase history" });
+    if (!validPrecon(request.body?.precon)) return reply.code(400).send({ error: "Choose a Commander deck precon" });
+    let deck: Awaited<ReturnType<typeof preconDeckCards>>;
+    try {
+      deck = await selectedPrecon(request.body.precon);
+    } catch (error) {
+      return reply.code(502).send({ error: error instanceof Error ? error.message : "The decklist could not be downloaded" });
+    }
+    if (!deck) return reply.code(404).send({ error: "That precon is not in the deck list" });
+    if (!deck.cards.length) return reply.code(400).send({ error: "None of the decklist's cards are in the card database" });
+    const opening = ownOpening(request);
+    if (!opening) return reply.code(404).send({ error: "That opening is not in your purchase history" });
+    const line = database.prepare("SELECT product, packs FROM purchase_lines WHERE id = ? AND entry_id = ?").get(String(opening.line_id), String(opening.entry_id));
+    if (!line || line.product !== "commander_deck" || Number(line.packs) !== 0 || Number(opening.waiting) !== 0) {
+      return reply.code(400).send({ error: "Choose an opened Commander deck" });
+    }
+    const userId = userOf(request);
+    if (!ownCollection(database, opening.collection_id, userId)) return reply.code(400).send({ error: "Choose the collection the pulled cards go to" });
+    const multiplier = Number(opening.count);
+    try {
+      const ids = transaction(database, () => addDeckCopies(deck, multiplier, String(opening.collection_id), userId, String(opening.entry_id), String(opening.line_id), String(opening.id)));
+      return reply.code(201).send({ ids, name: deck.name, cards: deck.cards.reduce((sum, card) => sum + card.quantity, 0) * multiplier, missing: deck.missing * multiplier });
+    } catch (error) {
+      return fail(reply, error, "Could not add the decklist");
+    }
+  });
+
+  app.post<{ Params: { openingId: string }; Body: { ids?: unknown } }>("/api/purchases/openings/:openingId/precon/undo", async (request, reply) => {
+    const opening = ownOpening(request);
+    if (!opening) return reply.code(404).send({ error: "That opening is not in your purchase history" });
+    const ids = request.body?.ids;
+    if (!Array.isArray(ids) || !ids.length || ids.length > 1000 || ids.some((id) => !Number.isSafeInteger(id) || id < 1) || new Set(ids).size !== ids.length) {
+      return reply.code(400).send({ error: "Choose the added cards to undo" });
+    }
+    const userId = userOf(request);
+    const ties = ids.map((id) => database.prepare("SELECT * FROM purchase_ties WHERE id = ? AND opening_id = ? AND user_id = ?").get(id, String(opening.id), userId));
+    if (ties.some((tie) => !tie)) return reply.code(404).send({ error: "An added card is no longer tied to this opening" });
+    try {
+      transaction(database, () => {
+        const held = heldByTie(database, userId);
+        for (const tie of ties) {
+          if (!tie) throw new Error("An added card is no longer tied to this opening");
+          const quantity = held.get(Number(tie.id)) ?? 0;
+          if (quantity > 0) takeCopies(database, String(tie.collection_id), keyOfRow(tie), quantity);
+          database.prepare("DELETE FROM purchase_ties WHERE id = ?").run(Number(tie.id));
+        }
+      });
+      return { status: "undone" };
+    } catch (error) {
+      return fail(reply, error, "Could not undo adding the decklist");
+    }
+  });
 
   // Change collection... on a pack (0.21.0): where its cards go from now on, and optionally the pulls already added
   const movePulls = (userId: number, tieIds: number[] | null, openingIds: string[], to: string) => {

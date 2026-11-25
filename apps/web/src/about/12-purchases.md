@@ -156,6 +156,10 @@ Open... on a line linked to a named deck with a decklist (such as a Commander de
 
 The decklist is downloaded the first time the deck is opened and kept. When it cannot be downloaded, the deck opens as a product with no decklist and the status bar says so. Printings and finishes can be changed afterward in the collection; the cards stay on the opening. With the box cleared, the deck opens as any product with no packs.
 
+For a Commander deck not linked to a decklist, **Choose a decklist...** in Open... searches the precon catalog. Select a deck, then open it to add and tie its cards. This can also replace the linked decklist for that opening; it does not change the purchase line. If the selected decklist cannot be loaded, the product stays sealed so you can retry.
+
+An existing Commander deck opening has **Add decklist...** (also in its right-click menu). Choose a catalog precon and **Add cards** to add its commander and main-deck cards to the opening's collection and tie them to the opening. The list is added once for each deck in that opening, in addition to any cards already there. This can be undone and redone; the opening remains active or ended as it was.
+
 A box counts as opened from its first pack: its State shows packs opened and packs left (such as "3 of 36 packs opened, 33 left"), and its packs not yet opened keep counting at the box's value divided by its packs. A waiting pack has **Start this pack**; an ended pack has **Continue opening**. Undo of Open... removes every pack opened at the same time, with their cards' ties.
 
 Only one opening is active at a time; opening another ends the one before. An opening started on one device is the opening on every device: the phone's scanner shows **Scanning into: name** and fills it in as where scanned cards go (see [Scanning cards](/about/scanning-cards)), and ending it on one device ends it on all of them.

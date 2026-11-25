@@ -54,7 +54,16 @@ export function productOfSealed(category: string, subtype: string): string {
   if (kind === "booster_box") return "booster_box";
   if (kind === "bundle") return "bundle";
   if (kind === "deck" || kind === "deck_box") return sub === "commander" ? "commander_deck" : "deck";
-  if (kind === "kit" && sub === "prerelease") return "prerelease_kit";
+  if (kind === "kit") {
+    if (sub === "prerelease") return "prerelease_kit";
+    if (sub === "beginner" || sub.includes("beginner")) return "beginner_box";
+    return "other";
+  }
+  if (kind === "box_set") {
+    if (sub === "beginner" || sub.includes("beginner")) return "beginner_box";
+    if (sub === "starter" || sub.includes("starter")) return "starter_collection";
+    return "other";
+  }
   return "other";
 }
 
@@ -260,7 +269,12 @@ export function listedCopies(database: DatabaseSync, list: ListedCard[], zones: 
 export async function sealedDeckCards(database: DatabaseSync, sealedId: string, fetcher: Fetcher = fetch): Promise<{ name: string; cards: DeckCard[]; missing: number } | null> {
   const product = database.prepare("SELECT deck_name, deck_code FROM sealed_products WHERE id = ?").get(sealedId);
   if (!product?.deck_name) return null;
-  const deck = await deckList(database, String(product.deck_code ?? ""), String(product.deck_name), fetcher);
+  return preconDeckCards(database, String(product.deck_code ?? ""), String(product.deck_name), fetcher);
+}
+
+/** The commander and main-board copies of a selected catalog precon. */
+export async function preconDeckCards(database: DatabaseSync, code: string, name: string, fetcher: Fetcher = fetch): Promise<{ name: string; cards: DeckCard[]; missing: number } | null> {
+  const deck = await deckList(database, code, name, fetcher);
   if (!deck) return null;
   const { cards, missing } = listedCopies(database, deck.list, ["commander", "main"]);
   // the same printing and finish in two zones is one copy line

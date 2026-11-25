@@ -69,6 +69,50 @@ test("a named Commander deck is picked from the set's products and opens with it
   expect(after.find((card) => card.id === "llanowar")).toBeUndefined();
 });
 
+test("choose a precon for an unmatched Commander deck, before or after opening", async ({ page }) => {
+  await signUp(page, "chooseprecon");
+  const editor = await newPurchase(page);
+  await editor.getByRole("button", { name: "Add product" }).click();
+  await choose(page, editor.getByRole("button", { name: /^Product of line 1/ }), "commander_deck");
+  await choose(page, editor.getByRole("button", { name: /^Set of line 1/ }), "lea");
+  await editor.getByRole("combobox", { name: "Name of line 1" }).fill("Deck Landing Party");
+  await editor.getByRole("spinbutton", { name: "Quantity of line 1" }).fill("2");
+  await editor.getByRole("button", { name: "Save purchase" }).click();
+
+  const row = page.locator(".purchaseentry tbody tr", { hasText: "Deck Landing Party" });
+  await row.getByRole("button", { name: "Open...", exact: true }).click();
+  let dialog = page.locator("dialog#dlg[open]");
+  await dialog.locator("#op-count").fill("1");
+  await dialog.getByRole("button", { name: "Open", exact: true }).click();
+  const opening = page.locator(".packrow").filter({ hasText: "Deck Landing Party" }).first();
+  await expect(opening).toContainText("0 cards");
+  await opening.getByRole("button", { name: "Add decklist..." }).click();
+  dialog = page.locator("dialog#dlg[open]");
+  await dialog.getByRole("textbox", { name: "Find a precon" }).fill("Landing Party");
+  await dialog.getByRole("option", { name: /Landing Party/ }).click();
+  await dialog.getByRole("button", { name: "Add cards", exact: true }).click();
+  await expect(opening).toContainText("7 cards");
+  const main = ((await (await page.request.get("/api/collections")).json()) as Array<{ id: string }>)[0]!.id;
+  const quantity = async () => ((await (await page.request.get(`/api/collections/${main}/cards`)).json()) as Array<{ id: string; quantity: number }>).find((card) => card.id === "llanowar")?.quantity ?? 0;
+  expect(await quantity()).toBe(4);
+  await menu(page, "Edit", "Undo");
+  await expect(opening).toContainText("0 cards");
+  expect(await quantity()).toBe(0);
+  await menu(page, "Edit", "Redo");
+  await expect(opening).toContainText("7 cards");
+  expect(await quantity()).toBe(4);
+
+  await row.getByRole("button", { name: "Open...", exact: true }).click();
+  dialog = page.locator("dialog#dlg[open]");
+  await dialog.getByRole("button", { name: "Choose a decklist..." }).click();
+  await dialog.getByRole("textbox", { name: "Find a precon" }).fill("Landing Party");
+  await dialog.getByRole("option", { name: /Landing Party/ }).click();
+  await expect(dialog.getByRole("checkbox", { name: "Add the decklist of Landing Party" })).toBeChecked();
+  await dialog.getByRole("button", { name: "Open", exact: true }).click();
+  await expect.poll(quantity).toBe(8);
+  await expect(page.locator(".packrow").filter({ hasText: "Deck Landing Party" })).toHaveCount(2);
+});
+
 test("the product selector and name remain stacked at phone width", async ({ page }) => {
   await signUp(page, "buyproductphone");
   const editor = await newPurchase(page);

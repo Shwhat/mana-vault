@@ -5,17 +5,22 @@ import type { Store } from "../store";
 import { CollectionPicker } from "./CollectionPicker";
 import { customDialog } from "./Dialog";
 
-type Precon = { code: string; name: string; type: string; setName: string; releasedAt: string | null; kept: boolean };
+export type Precon = { code: string; name: string; type: string; setName: string; releasedAt: string | null; kept: boolean };
 
-function PreconList({ onPick }: { onPick: (precon: Precon) => void }) {
+export function PreconList({ onPick }: { onPick: (precon: Precon) => void }) {
   const [term, setTerm] = useState("");
   const [list, setList] = useState<Precon[] | null>(null);
   const [error, setError] = useState("");
   useEffect(() => {
+    let active = true;
     const timer = window.setTimeout(() => {
-      request<Precon[]>(`/api/precons?q=${encodeURIComponent(term.trim())}`).then(setList).catch((reason: unknown) => setError(reason instanceof Error ? reason.message : "Could not load the precons."));
+      request<Precon[]>(`/api/precons?q=${encodeURIComponent(term.trim())}`).then((result) => {
+        if (active) { setList(result); setError(""); }
+      }).catch((reason: unknown) => {
+        if (active) { setList(null); setError(reason instanceof Error ? reason.message : "Could not load the precons."); }
+      });
     }, 150);
-    return () => window.clearTimeout(timer);
+    return () => { active = false; window.clearTimeout(timer); };
   }, [term]);
   return (
     <div className="preconlist">

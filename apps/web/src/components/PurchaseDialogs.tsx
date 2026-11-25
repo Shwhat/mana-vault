@@ -4,7 +4,7 @@ import { pickFile, request, sendFile } from "../api";
 import { isApp, native } from "../android/platform";
 import type { FoundCard } from "../card-search";
 import {
-  type Entry, type EntryKind, type EntryLine, KIND_LABELS, type Place, type PlaceKind, PLACE_KINDS, type Product, type PurchaseList, type ReceiptFields, type ReceiptLine, reloadOpening, type SealedChoice, setActiveOpening,
+  type Entry, type EntryKind, type EntryLine, type EntryOpening, KIND_LABELS, type Place, type PlaceKind, PLACE_KINDS, type Product, type PurchaseList, type ReceiptFields, type ReceiptLine, reloadOpening, type SealedChoice, setActiveOpening,
 } from "../purchase-state";
 import { finishCode, type ScanCard, type ScanItem } from "../scan-state";
 import { type Store, useApp } from "../store";
@@ -16,6 +16,7 @@ import { type Choice, choices, Picker } from "./Picker";
 import { finishesOf, type Printing, PrintingList } from "./PrintingDialog";
 import { Suggest } from "./Suggest";
 import { CollectionPicker } from "./CollectionPicker";
+import { PreconList, type Precon } from "./Precons";
 
 const today = () => new Date().toISOString().slice(0, 10);
 const num = (text: string) => {
@@ -949,17 +950,21 @@ function OpenEditor({ store, entry, line, close, onDone }: { store: Store; entry
   const [count, setCount] = useState(packs ? "1" : String(line.sealed));
   const [collectionId, setCollectionId] = useState(store.prefs.targetCollection && owned.some((item) => item.id === store.prefs.targetCollection) ? store.prefs.targetCollection : owned[0]?.id ?? "");
   const [error, setError] = useState("");
-  // a named deck with a decklist adds its cards in one step (0.20.0)
-  const deckList = !packs && line.hasDeck;
+  const [busy, setBusy] = useState(false);
+  const [precon, setPrecon] = useState<Precon | null>(null);
+  const [choosingPrecon, setChoosingPrecon] = useState(false);
+  const deckList = !packs && (line.hasDeck || !!precon);
   const [useDeck, setUseDeck] = useState(true);
   const open = async () => {
+    if (busy) return;
     setError("");
+    setBusy(true);
     try {
       const opening = await request<{
         id: string; name: string; collectionId: string; entryId: string; packs: Array<{ id: string; name: string }>;
         deck: { name: string; cards: number; missing: number } | null; deckError?: string;
       }>(`/api/purchases/${entry.id}/lines/${line.id}/open`, {
-        method: "POST", body: JSON.stringify({ count: Number(count), collectionId, decklist: deckList && useDeck }),
+        method: "POST", body: JSON.stringify({ count: Number(count), collectionId, decklist: deckList && useDeck, ...(precon && useDeck ? { precon: { code: precon.code, name: precon.name } } : {}) }),
       });
       // a collection made with New collection... is not yet in the list the window was opened with
       const where = owned.find((item) => item.id === collectionId)?.name
@@ -979,16 +984,28 @@ function OpenEditor({ store, entry, line, close, onDone }: { store: Store; entry
       close();
       onDone();
       if (opening.deck) {
-        await store.refreshAfterChange();
         store.flash(`${opening.deck.cards} cards of ${opening.deck.name} added to ${where} and tied to ${opening.name}${opening.deck.missing ? `. ${opening.deck.missing} are not in the card database` : ""}`);
+        try {
+          await store.refreshAfterChange();
+        } catch (reason) {
+          store.fail(reason, "The deck was opened, but the collection could not be refreshed.");
+        }
         return;
       }
       if (opening.deckError) store.flash(`${opening.deckError}. Cards added to ${where} are tied to ${opening.name}`, "err");
       else store.flash(`Opening ${opening.packs.length > 1 ? `Pack 1 of ${opening.packs.length}, ` : ""}${opening.name}: cards added to ${where} are tied to it`);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Could not open the product.");
+    } finally {
+      setBusy(false);
     }
   };
+  if (choosingPrecon) return (
+    <div className="purchaseedit">
+      <button type="button" className="btn small" onClick={() => setChoosingPrecon(false)}>Back to opening</button>
+      <PreconList onPick={(choice) => { setPrecon(choice); setUseDeck(true); setChoosingPrecon(false); }} />
+    </div>
+  );
   return (
     <div className="purchaseedit">
       {error && <p className="note err">{error}</p>}
@@ -996,12 +1013,16 @@ function OpenEditor({ store, entry, line, close, onDone }: { store: Store; entry
         <input id="op-count" type="number" min={1} max={left} className="num" autoFocus value={count} onChange={(event) => setCount(event.target.value)} />
         <span className="sub">{packs ? `of ${left} ${left === 1 ? "pack" : "packs"} left${line.quantity * line.packs > 1 ? ` in the ${line.productLabel.toLowerCase()}${line.quantity > 1 ? "es" : ""}` : ""}` : `of ${line.sealed} sealed`}</span></div>
       {packs && Number(count) > 1 && <p className="note">Each pack is its own opening. Cards go to Pack 1 first; Next pack moves on to the next one.</p>}
-      {deckList && <label className="ck"><input type="checkbox" checked={useDeck} onChange={(event) => setUseDeck(event.target.checked)} /> Add the decklist of {line.name}</label>}
+      {line.product === "commander_deck" && !packs && <div className="btnrow">
+        <button type="button" className="btn small" onClick={() => setChoosingPrecon(true)}>{precon ? "Choose another decklist..." : "Choose a decklist..."}</button>
+        {precon && <button type="button" className="btn small" onClick={() => setPrecon(null)}>Clear selection</button>}
+      </div>}
+      {deckList && <label className="ck"><input type="checkbox" checked={useDeck} onChange={(event) => setUseDeck(event.target.checked)} /> Add the decklist of {precon?.name ?? line.name}</label>}
       {deckList && useDeck && <p className="note">The deck's cards are added to the collection and tied to the opening. Printings and finishes can be changed afterward.</p>}
       <div className="prow"><label htmlFor="op-coll">Pulled cards go to</label>
         <CollectionPicker store={store} id="op-coll" label="Collection" value={collectionId} list={owned} onChange={setCollectionId} suggest={newCollectionName(line)} /></div>
       <div className="btnrow end">
-        <button type="button" className="btn primary" disabled={!collectionId} onClick={() => void open()}>Open</button>
+        <button type="button" className="btn primary" disabled={!collectionId || busy} onClick={() => void open()}>Open</button>
       </div>
     </div>
   );
@@ -1009,6 +1030,58 @@ function OpenEditor({ store, entry, line, close, onDone }: { store: Store; entry
 
 export const openDialog = (store: Store, entry: Entry, line: EntryLine, onDone: () => void) =>
   customDialog(`Open ${line.product !== "other" && line.name ? line.name : line.productLabel}${line.setCode ? `, ${line.setCode.toUpperCase()}` : ""}`, (close) => <OpenEditor store={store} entry={entry} line={line} close={close} onDone={onDone} />, 520, "Cancel");
+
+function PreconToOpening({ store, opening, close, onDone }: { store: Store; opening: EntryOpening; close: () => void; onDone: () => void }) {
+  const [precon, setPrecon] = useState<Precon | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const add = async () => {
+    if (!precon || busy) return;
+    setBusy(true);
+    setError("");
+    const url = `/api/purchases/openings/${encodeURIComponent(opening.id)}/precon`;
+    const body = JSON.stringify({ precon: { code: precon.code, name: precon.name } });
+    try {
+      const requestDeck = () => request<{ ids: number[]; name: string; cards: number; missing: number }>(url, { method: "POST", body });
+      const result = await requestDeck();
+      let ids = result.ids;
+      store.pushUndo({
+        label: `Add ${result.name} to ${opening.name}`,
+        undo: async () => {
+          await request(`${url}/undo`, { method: "POST", body: JSON.stringify({ ids }) });
+          onDone();
+        },
+        redo: async () => {
+          ids = (await requestDeck()).ids;
+          onDone();
+        },
+      });
+      close();
+      onDone();
+      store.flash(`${result.cards} cards of ${result.name} added to ${opening.collectionId ? store.collectionName(opening.collectionId) : "the collection"} and tied to ${opening.name}${result.missing ? `. ${result.missing} are not in the card database` : ""}`);
+      try {
+        await store.refreshAfterChange();
+      } catch (reason) {
+        store.fail(reason, "The decklist was added, but the collection could not be refreshed.");
+      }
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Could not add the decklist.");
+      setBusy(false);
+    }
+  };
+  if (!precon) return <PreconList onPick={setPrecon} />;
+  return (
+    <div className="purchaseedit">
+      {error && <p className="note err">{error}</p>}
+      <p><b>{precon.name}</b> <span className="sub">{precon.setName}</span> <button type="button" className="btn small" disabled={busy} onClick={() => setPrecon(null)}>Choose another</button></p>
+      <p className="note">Add {opening.count} {opening.count === 1 ? "deck" : "decks"} to {opening.collectionId ? store.collectionName(opening.collectionId) : "the opening's collection"} and tie the cards to this opening.{opening.cards ? " This adds copies alongside the cards already on the opening." : ""}</p>
+      <div className="btnrow end"><button type="button" className="btn primary" disabled={!opening.collectionId || busy} onClick={() => void add()}>Add cards</button></div>
+    </div>
+  );
+}
+
+export const preconOpeningDialog = (store: Store, opening: EntryOpening, onDone: () => void) =>
+  customDialog("Add a decklist to the opening", (close) => <PreconToOpening store={store} opening={opening} close={close} onDone={onDone} />, 620, "Cancel");
 
 /** Set current value...: the value each of a sealed line is worth today. */
 function ValueEditor({ store, entry, line, close, onDone }: { store: Store; entry: Entry; line: EntryLine; close: () => void; onDone: () => void }) {
