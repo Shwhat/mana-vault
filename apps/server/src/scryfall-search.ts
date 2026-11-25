@@ -51,7 +51,7 @@ export function createScryfallSearch(fetcher: SearchFetcher = fetch) {
       const params = new URLSearchParams({ q: query, unique: rollup ?? "prints", page: String(number) });
       if (variations) params.set("include_variations", "true");
       const response = await fetcher(`https://api.scryfall.com/cards/search?${params}`, {
-        headers: { "User-Agent": "ManaVault/0.24.1", Accept: "application/json" },
+        headers: { "User-Agent": "ManaVault/0.24.3", Accept: "application/json" },
         signal: AbortSignal.any([signal, AbortSignal.timeout(30_000)]),
       });
       if (response.status === 429) {
