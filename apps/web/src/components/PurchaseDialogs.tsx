@@ -1125,7 +1125,7 @@ function ContentsToOpening({ store, opening, close, onDone }: { store: Store; op
     {error && <p className="note err">{error}</p>}
     {!preview && !error && <p className="note">Loading product contents...</p>}
     {preview && <>
-      <p><b>{preview.name}</b> — fixed contents for one product.</p>
+      <p><b>{preview.name}</b> - fixed contents for one product.</p>
       <p className="note">Cards will be added to {opening.collectionId ? store.collectionName(opening.collectionId) : "the opening's collection"} and tied to {opening.name}. Adding again creates more copies; check whether these cards were already added.</p>
       {preview.cards.length > 0 ? <ul>{preview.cards.map((card) => <li key={`${card.key.cardId}:${card.key.foil}`}>
         {card.quantity} × {card.name} ({card.setCode.toUpperCase()} {card.number}{card.key.foil ? `, ${finishLabel(card.key.foil)}` : ""})
