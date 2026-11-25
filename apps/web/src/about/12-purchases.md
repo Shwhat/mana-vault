@@ -59,7 +59,7 @@ A purchase has one line per product.
 | Set | A set from a searchable list, or No set | Each set shows its symbol, name, code in capitals and year. Type to find a set by name or code. Custom sets are included even before cards are added |
 | Quantity | Whole number from 1 to 10000 | A line cannot go below what is opened or sold |
 | Cost each, Total | Amounts | Typing either one fills the other |
-| Packs in it | Whole number from 0 to 1000 | Filled for common products: Booster box 36, Bundle 9, Prerelease kit 6, a booster 1; can be changed for boxes, bundles, kits, Secret Lairs and Other |
+| Packs in it | Whole number from 0 to 1000 | Filled for common products: Booster box 36, Bundle 9, Prerelease kit 6, a booster 1; can be changed for boxes, bundles, beginner boxes, starter collections, kits, Secret Lairs and Other |
 | Tax, Shipping | Amounts for the whole purchase | Spread over the lines by cost |
 
 A new purchase starts with no lines. **Add product** adds a product line.
@@ -159,6 +159,8 @@ The decklist is downloaded the first time the deck is opened and kept. When it c
 For a Commander deck not linked to a decklist, **Choose a decklist...** in Open... searches the precon catalog. Select a deck, then open it to add and tie its cards. This can also replace the linked decklist for that opening; it does not change the purchase line. If the selected decklist cannot be loaded, the product stays sealed so you can retry.
 
 An existing Commander deck opening has **Add decklist...** (also in its right-click menu). Choose a catalog precon and **Add cards** to add its commander and main-deck cards to the opening's collection and tie them to the opening. The list is added once for each deck in that opening, in addition to any cards already there. This can be undone and redone; the opening remains active or ended as it was.
+
+For any opening whose purchase line matches an MTGJSON product, **Product contents...** previews the known fixed cards for one product, including listed decklists and nested sealed products. **Add fixed cards** adds those cards to the opening's collection and ties them to that opening; undo and redo are available. For products with packs, choose the pack opening to attach them to. Random packs and variable contents are not guessed; unavailable cards and decklists are listed in the preview. The action can be repeated, so check whether the contents were already added. To match an unnamed product, edit the purchase line and choose it from the Product name list.
 
 A box counts as opened from its first pack: its State shows packs opened and packs left (such as "3 of 36 packs opened, 33 left"), and its packs not yet opened keep counting at the box's value divided by its packs. A waiting pack has **Start this pack**; an ended pack has **Continue opening**. Undo of Open... removes every pack opened at the same time, with their cards' ties.
 

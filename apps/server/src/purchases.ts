@@ -1,7 +1,7 @@
 // ---------- purchase history (0.16.0): purchases with product lines, openings that pulled cards are tied to, sealed
 // values, card and product sales, trades, imported purchase prices, and the figures Spent, Received, Value now and
 // Gain or loss ----------
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { DatabaseSync } from "node:sqlite";
 import { access } from "./library.js";
@@ -13,7 +13,7 @@ import { mergeHooks } from "./scryfall-extras.js";
 import { isAdmin } from "./admin.js";
 import { CONDITION_NOTE, conditionOf, finishOf, parseReceipt, pdfText, pictureText, setOf, specialFoilOf } from "./receipts.js";
 import { specialFoil } from "./foil-types.js";
-import { initializeSealed, matchSealed, preconDeckCards, sealedChoices, sealedDeckCards } from "./sealed.js";
+import { fixedSealedContents, initializeSealed, matchSealed, preconDeckCards, sealedChoices, sealedDeckCards } from "./sealed.js";
 import { activeSource, priceCols } from "./price-context.js";
 import { sourcePriceOn, storeOf } from "./mtgjson.js";
 
@@ -995,7 +995,7 @@ export function registerPurchaseRoutes(app: FastifyInstance, database: DatabaseS
     const ids: number[] = [];
     for (const card of deck.cards) {
       const quantity = card.quantity * multiplier;
-      if (heldQuantity(database, collectionId, card.key) + quantity > 10_000) throw new Error("Adding the deck would exceed 10,000 copies of a card");
+      if (heldQuantity(database, collectionId, card.key) + quantity > 10_000) throw new Error("Adding these cards would exceed 10,000 copies of a card");
       putCopies(database, collectionId, card.key, quantity);
       insertTie(database, userId, entryId, { lineId, openingId }, collectionId, card.key, quantity);
       ids.push(Number(database.prepare("SELECT last_insert_rowid() AS id").get()!.id));
@@ -1280,6 +1280,49 @@ export function registerPurchaseRoutes(app: FastifyInstance, database: DatabaseS
   const ownOpening = (request: FastifyRequest<{ Params: { openingId: string } }>) =>
     database.prepare("SELECT * FROM purchase_openings WHERE id = ? AND user_id = ?").get(request.params.openingId, userOf(request));
 
+  const contentsForOpening = async (openingId: string, userId: number) => {
+    const opening = database.prepare(`SELECT o.*, l.sealed_id FROM purchase_openings o
+      JOIN purchase_lines l ON l.id = o.line_id AND l.entry_id = o.entry_id WHERE o.id = ? AND o.user_id = ?`).get(openingId, userId);
+    if (!opening || Number(opening.waiting)) throw new Error("Choose an existing opened product or pack");
+    if (!opening.sealed_id) throw new Error("Match the purchase line to a catalog product first");
+    const contents = await fixedSealedContents(database, String(opening.sealed_id), fetcher);
+    if (!contents) throw new Error("The matched product is no longer in the catalog");
+    const fingerprint = createHash("sha256").update(JSON.stringify(contents)).digest("hex");
+    return { opening, contents, fingerprint };
+  };
+
+  app.get<{ Params: { openingId: string } }>("/api/purchases/openings/:openingId/contents", async (request, reply) => {
+    try {
+      const { contents, fingerprint } = await contentsForOpening(request.params.openingId, userOf(request));
+      return { ...contents, fingerprint };
+    } catch (error) {
+      return fail(reply, error, "Could not load product contents");
+    }
+  });
+
+  app.post<{ Params: { openingId: string }; Body: { fingerprint?: unknown } }>("/api/purchases/openings/:openingId/contents", async (request, reply) => {
+    try {
+      const userId = userOf(request);
+      const { opening, contents, fingerprint } = await contentsForOpening(request.params.openingId, userId);
+      if (request.body?.fingerprint !== fingerprint) throw new Error("Product contents changed. Reopen the preview before adding cards.");
+      if (!contents.cards.length) throw new Error("No fixed cards are available to add");
+      const current = ownOpening(request);
+      if (!current || current.line_id !== opening.line_id || current.collection_id !== opening.collection_id || Number(current.waiting)) {
+        throw new Error("The opening changed. Reopen the preview before adding cards.");
+      }
+      const currentLine = database.prepare("SELECT sealed_id FROM purchase_lines WHERE id = ? AND entry_id = ?").get(String(current.line_id), String(current.entry_id));
+      if (!currentLine || currentLine.sealed_id !== opening.sealed_id) throw new Error("The matched product changed. Reopen the preview before adding cards.");
+      if (!ownCollection(database, current.collection_id, userId)) throw new Error("Choose the collection the pulled cards go to");
+      const ids = transaction(database, () => addDeckCopies(
+        { name: contents.name, cards: contents.cards, missing: 0 }, 1, String(current.collection_id), userId,
+        String(current.entry_id), String(current.line_id), String(current.id),
+      ));
+      return reply.code(201).send({ ids, cards: contents.cards.reduce((sum, card) => sum + card.quantity, 0) });
+    } catch (error) {
+      return fail(reply, error, "Could not add product contents");
+    }
+  });
+
   app.post<{ Params: { openingId: string }; Body: { precon?: unknown } }>("/api/purchases/openings/:openingId/precon", async (request, reply) => {
     if (!ownOpening(request)) return reply.code(404).send({ error: "That opening is not in your purchase history" });
     if (!validPrecon(request.body?.precon)) return reply.code(400).send({ error: "Choose a Commander deck precon" });
@@ -1308,7 +1351,7 @@ export function registerPurchaseRoutes(app: FastifyInstance, database: DatabaseS
     }
   });
 
-  app.post<{ Params: { openingId: string }; Body: { ids?: unknown } }>("/api/purchases/openings/:openingId/precon/undo", async (request, reply) => {
+  const undoOpeningCards = async (request: FastifyRequest<{ Params: { openingId: string }; Body: { ids?: unknown } }>, reply: FastifyReply) => {
     const opening = ownOpening(request);
     if (!opening) return reply.code(404).send({ error: "That opening is not in your purchase history" });
     const ids = request.body?.ids;
@@ -1330,9 +1373,11 @@ export function registerPurchaseRoutes(app: FastifyInstance, database: DatabaseS
       });
       return { status: "undone" };
     } catch (error) {
-      return fail(reply, error, "Could not undo adding the decklist");
+      return fail(reply, error, "Could not undo adding the cards");
     }
-  });
+  };
+  app.post("/api/purchases/openings/:openingId/precon/undo", undoOpeningCards);
+  app.post("/api/purchases/openings/:openingId/contents/undo", undoOpeningCards);
 
   // Change collection... on a pack (0.21.0): where its cards go from now on, and optionally the pulls already added
   const movePulls = (userId: number, tieIds: number[] | null, openingIds: string[], to: string) => {

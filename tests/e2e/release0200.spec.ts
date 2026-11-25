@@ -113,6 +113,43 @@ test("choose a precon for an unmatched Commander deck, before or after opening",
   await expect(page.locator(".packrow").filter({ hasText: "Deck Landing Party" })).toHaveCount(2);
 });
 
+test("preview and add a bundle's fixed contents to an opening", async ({ page }) => {
+  await signUp(page, "bundlecontents");
+  const editor = await newPurchase(page);
+  await editor.getByRole("button", { name: "Add product" }).click();
+  await choose(page, editor.getByRole("button", { name: /^Product of line 1/ }), "bundle");
+  await choose(page, editor.getByRole("button", { name: /^Set of line 1/ }), "lea");
+  const name = editor.getByRole("combobox", { name: "Name of line 1" });
+  await name.fill("beam");
+  await page.locator("#pe-name-0-list .pkopt").first().click();
+  await editor.getByRole("button", { name: "Save purchase" }).click();
+  await page.locator(".purchaseentry tbody tr", { hasText: "Beam Me Up Bundle" }).getByRole("button", { name: "Open..." }).click();
+  await page.locator("dialog#dlg[open]").getByRole("button", { name: "Open", exact: true }).click();
+  const opening = page.locator(".packrow").filter({ hasText: "Beam Me Up Bundle" }).first();
+  await opening.getByRole("button", { name: "Product contents..." }).click();
+  const dialog = page.locator("dialog#dlg[open]");
+  await expect(dialog).toContainText("fixed contents for one product");
+  await expect(dialog).toContainText("Variable contents are not added");
+  await expect(dialog).toContainText("Serra Angel");
+  await dialog.getByRole("button", { name: "Add fixed cards" }).click();
+  await expect(opening).toContainText("8 cards");
+  await menu(page, "Edit", "Undo");
+  await expect(opening).toContainText("0 cards");
+  await menu(page, "Edit", "Redo");
+  await expect(opening).toContainText("8 cards");
+});
+
+test("a starter collection can record its included booster packs", async ({ page }) => {
+  await signUp(page, "starterpacks");
+  const editor = await newPurchase(page);
+  await editor.getByRole("button", { name: "Add product" }).click();
+  await choose(page, editor.getByRole("button", { name: /^Product of line 1/ }), "starter_collection");
+  await editor.getByRole("spinbutton", { name: "Packs in line 1" }).fill("3");
+  await editor.getByRole("button", { name: "Save purchase" }).click();
+  await page.locator(".purchaseentry tbody tr", { hasText: "Starter collection" }).getByRole("button", { name: "Open..." }).click();
+  await expect(page.locator("dialog#dlg[open]")).toContainText("of 3 packs left");
+});
+
 test("the product selector and name remain stacked at phone width", async ({ page }) => {
   await signUp(page, "buyproductphone");
   const editor = await newPurchase(page);

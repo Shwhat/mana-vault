@@ -90,6 +90,10 @@ const sealed = database.prepare("INSERT INTO sealed_products (id, set_code, name
 sealed.run("p-landing", "Alpha Commander Deck - Landing Party", "Landing Party", "deck", "commander", "commander_deck", 100, "Landing Party", "LEA");
 sealed.run("p-warp", "Alpha Commander Deck - Warp Speed", "Warp Speed", "deck", "commander", "commander_deck", 100, null, null);
 sealed.run("p-beam", "Alpha Beam Me Up Bundle", "Beam Me Up Bundle", "bundle", "default", "bundle", null, null, null);
+database.prepare("UPDATE sealed_products SET contents = ? WHERE id = 'p-beam'").run(JSON.stringify({
+  card: [{ name: "Serra Angel", set: "lea", number: "39", uuid: "fixture-serra", foil: true }],
+  deck: [{ name: "Landing Party", set: "lea" }], variable: [{ configs: [] }],
+}));
 database.prepare("INSERT INTO sealed_decks (code, name, file_name, type, cards) VALUES ('LEA', 'Landing Party', 'LandingParty_LEA', 'Commander Deck', ?)").run(JSON.stringify([
   { scryfallId: "serra", setCode: "lea", number: "39", count: 1, foil: true },
   { scryfallId: "llanowar", setCode: "lea", number: "210", count: 4, foil: false },

@@ -457,7 +457,7 @@ export const pickReceipt = () => pickFile(RECEIPT_TYPES);
 
 // ---------- the purchase window ----------
 
-const PACK_PRODUCTS = ["booster_box", "bundle", "prerelease_kit", "other", "other_booster", "jumpstart_booster", "secret_lair"];
+const PACK_PRODUCTS = ["booster_box", "bundle", "beginner_box", "starter_collection", "prerelease_kit", "other", "other_booster", "jumpstart_booster", "secret_lair"];
 
 /** The purchase window: one line per product, single cards picked by printing, with tax and shipping spread over the lines by cost. */
 function PurchaseEditor({ store, list, start, close, onSaved, reopen }: {
@@ -1082,6 +1082,63 @@ function PreconToOpening({ store, opening, close, onDone }: { store: Store; open
 
 export const preconOpeningDialog = (store: Store, opening: EntryOpening, onDone: () => void) =>
   customDialog("Add a decklist to the opening", (close) => <PreconToOpening store={store} opening={opening} close={close} onDone={onDone} />, 620, "Cancel");
+
+type ProductContents = {
+  name: string; fingerprint: string; missing: string[]; notices: string[];
+  cards: Array<{ key: { cardId: string; foil: FinishCode }; name: string; setCode: string; number: string; quantity: number }>;
+};
+
+function ContentsToOpening({ store, opening, close, onDone }: { store: Store; opening: EntryOpening; close: () => void; onDone: () => void }) {
+  const [preview, setPreview] = useState<ProductContents | null>(null);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const url = `/api/purchases/openings/${encodeURIComponent(opening.id)}/contents`;
+  useEffect(() => {
+    let active = true;
+    request<ProductContents>(url).then((value) => { if (active) setPreview(value); })
+      .catch((reason: unknown) => { if (active) setError(reason instanceof Error ? reason.message : "Could not load product contents."); });
+    return () => { active = false; };
+  }, [url]);
+  const add = async () => {
+    if (!preview || busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      const requestCards = () => request<{ ids: number[]; cards: number }>(url, { method: "POST", body: JSON.stringify({ fingerprint: preview.fingerprint }) });
+      const result = await requestCards();
+      let ids = result.ids;
+      store.pushUndo({
+        label: `Add contents of ${preview.name}`,
+        undo: async () => { await request(`${url}/undo`, { method: "POST", body: JSON.stringify({ ids }) }); await store.refreshAfterChange(); onDone(); },
+        redo: async () => { ids = (await requestCards()).ids; await store.refreshAfterChange(); onDone(); },
+      });
+      close();
+      onDone();
+      store.flash(`${result.cards} fixed cards added to ${opening.name}`);
+      try { await store.refreshAfterChange(); } catch (reason) { store.fail(reason, "Cards were added, but the collection could not be refreshed."); }
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Could not add product contents.");
+      setBusy(false);
+    }
+  };
+  return <div className="purchaseedit">
+    {error && <p className="note err">{error}</p>}
+    {!preview && !error && <p className="note">Loading product contents...</p>}
+    {preview && <>
+      <p><b>{preview.name}</b> — fixed contents for one product.</p>
+      <p className="note">Cards will be added to {opening.collectionId ? store.collectionName(opening.collectionId) : "the opening's collection"} and tied to {opening.name}. Adding again creates more copies; check whether these cards were already added.</p>
+      {preview.cards.length > 0 ? <ul>{preview.cards.map((card) => <li key={`${card.key.cardId}:${card.key.foil}`}>
+        {card.quantity} × {card.name} ({card.setCode.toUpperCase()} {card.number}{card.key.foil ? `, ${finishLabel(card.key.foil)}` : ""})
+      </li>)}</ul> : <p className="note">No fixed cards are available to add.</p>}
+      {preview.notices.map((notice) => <p className="note" key={notice}>{notice}</p>)}
+      {preview.missing.map((item, index) => <p className="note warn" key={`${index}:${item}`}>{item}</p>)}
+      <div className="btnrow end"><button type="button" className="btn primary" disabled={!preview.cards.length || !opening.collectionId || busy} onClick={() => void add()}>Add fixed cards</button></div>
+    </>}
+  </div>;
+}
+
+export const contentsOpeningDialog = (store: Store, opening: EntryOpening, onDone: () => void) =>
+  customDialog("Product contents", (close) => <ContentsToOpening store={store} opening={opening} close={close} onDone={onDone} />, 620, "Cancel");
 
 /** Set current value...: the value each of a sealed line is worth today. */
 function ValueEditor({ store, entry, line, close, onDone }: { store: Store; entry: Entry; line: EntryLine; close: () => void; onDone: () => void }) {

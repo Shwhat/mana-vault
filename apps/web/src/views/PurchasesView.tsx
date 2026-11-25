@@ -12,7 +12,7 @@ import { choiceDialog, confirmDialog } from "../components/Dialog";
 import { choices, Picker } from "../components/Picker";
 import {
   entryDialog, fromPricesDialog, keepReceipt, openDialog, pickReceipt, placesDialog, purchaseFromReceipt, removeReceipt, type SaleCopy, tieCopiesDialog, useProductOptions, valueDialog,
-  barcodeDialog, changeCollectionDialog, preconOpeningDialog, virtualPacksDialog,
+  barcodeDialog, changeCollectionDialog, contentsOpeningDialog, preconOpeningDialog, virtualPacksDialog,
 } from "../components/PurchaseDialogs";
 import {
   type ChartPoint, type Entry, type EntryKind, type EntryOpening, type EntryTie, type EntrySummary, KIND_LABELS, type PurchaseList, packLabel, reloadOpening, setActiveOpening, useActiveOpening,
@@ -521,6 +521,7 @@ function EntryPage({ id, list, onClose, onChanged, onMissing }: { id: string; li
                     {...rowMenu(store, opening.name, () => [
                       { label: "Change collection...", run: () => changeCollectionDialog(store, { id: opening.id, entryId: entry.id, name: opening.name }, changed) },
                       !opening.waiting && { label: "Add existing copies...", run: () => tieCopiesDialog(store, opening.id, changed, opening.collectionId) },
+                      !opening.waiting && !!line.sealedId && { label: "Product contents...", run: () => contentsOpeningDialog(store, opening, changed) },
                       !opening.waiting && line.product === "commander_deck" && line.packs === 0 && { label: "Add decklist...", run: () => preconOpeningDialog(store, opening, changed) },
                     ])}>
                     <span className="openinghead"><b>{opening.name}</b>
@@ -543,6 +544,7 @@ function EntryPage({ id, list, onClose, onChanged, onMissing }: { id: string; li
                         <button type="button" className="btn small" onClick={() => goAdd(opening, false)}>Add cards</button>
                         <button type="button" className="btn small" onClick={() => goAdd(opening, true)}>Scan</button>
                         <button type="button" className="btn small" onClick={() => tieCopiesDialog(store, opening.id, changed, opening.collectionId)}>Add existing copies...</button>
+                        {line.sealedId && <button type="button" className="btn small" onClick={() => contentsOpeningDialog(store, opening, changed)}>Product contents...</button>}
                         {line.product === "commander_deck" && line.packs === 0 && <button type="button" className="btn small" onClick={() => preconOpeningDialog(store, opening, changed)}>Add decklist...</button>}
                         <button type="button" className="btn small" onClick={() => changeCollectionDialog(store, { id: opening.id, entryId: entry.id, name: opening.name }, changed)}>Change collection...</button>
                         {packs.some((other) => other.groupId && other.groupId === opening.groupId && other.waiting) && (
@@ -553,6 +555,7 @@ function EntryPage({ id, list, onClose, onChanged, onMissing }: { id: string; li
                     ) : (
                       <span className="btnrow">
                         {!opening.waiting && <button type="button" className="btn small" onClick={() => tieCopiesDialog(store, opening.id, changed, opening.collectionId)}>Add existing copies...</button>}
+                        {!opening.waiting && line.sealedId && <button type="button" className="btn small" onClick={() => contentsOpeningDialog(store, opening, changed)}>Product contents...</button>}
                         {!opening.waiting && line.product === "commander_deck" && line.packs === 0 && <button type="button" className="btn small" onClick={() => preconOpeningDialog(store, opening, changed)}>Add decklist...</button>}
                         <button type="button" className="btn small" onClick={() => changeCollectionDialog(store, { id: opening.id, entryId: entry.id, name: opening.name }, changed)}>Change collection...</button>
                         <button type="button" className="btn small" onClick={() => void setOpening(opening.id, true)}>{opening.waiting ? "Start this pack" : "Continue opening"}</button>

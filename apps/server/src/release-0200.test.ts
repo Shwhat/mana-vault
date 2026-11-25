@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { buildApp } from "./app.js";
 import { cardExtrasStatement, cardInsertStatement } from "./database.js";
 import { parseReceipt, productNameOf } from "./receipts.js";
-import { DECK_LIST_URL, deckFileUrl, importSealedData, productOfSealed, SET_LIST_URL } from "./sealed.js";
+import { DECK_LIST_URL, deckFileUrl, importSealedData, productOfSealed, saveSealedProducts, SET_LIST_URL } from "./sealed.js";
 import { saveSets } from "./sets.js";
 
 const SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><path d="M0 0h10v10z"/></svg>';
@@ -33,6 +33,7 @@ const DECK_FILE = {
       { count: 10, identifiers: { scryfallId: "" }, setCode: "TRK", number: "3" },
       { count: 2, identifiers: { scryfallId: "unknown" }, setCode: "XXX", number: "9" },
     ],
+    sideBoard: [{ count: 2, identifiers: { scryfallId: "spock" }, setCode: "TRK", number: "2" }],
   },
 };
 
@@ -85,6 +86,9 @@ describe("product names", () => {
     expect(productOfSealed("booster_pack", "collector")).toBe("collector_booster");
     expect(productOfSealed("box_set", "secret_lair")).toBe("secret_lair");
     expect(productOfSealed("kit", "prerelease")).toBe("prerelease_kit");
+    expect(productOfSealed("box_set", "starter_deck", "Foundations Beginner Box")).toBe("beginner_box");
+    expect(productOfSealed("box_set", "starter_deck", "Foundations Starter Collection")).toBe("starter_collection");
+    expect(productOfSealed("box_set", "starter_deck", "Foundations Beginner Box Case")).toBe("other");
   });
 
   it("saves the sealed products and offers them by set and product", async () => {
@@ -93,6 +97,20 @@ describe("product names", () => {
     expect(decks.map((item: { name: string; hasDeck: boolean }) => [item.name, item.hasDeck])).toEqual([["Landing Party", true], ["Warp Speed", false]]);
     const bundles = (await call("GET", "/api/purchases/products?set=trk&product=bundle")).json();
     expect(bundles.map((item: { name: string }) => item.name)).toEqual(["Beam Me Up Bundle"]);
+  });
+
+  it("imports product contents from SetList and preserves older details when omitted", async () => {
+    const { database } = await setup();
+    const contents = { card: [{ name: "Spock", set: "trk", number: "2", uuid: "spock-uuid" }] };
+    const product = { uuid: "p-beam", name: "Star Trek Beam Me Up Bundle", category: "bundle", subtype: "default", contents, identifiers: { upc: "012345678905" } };
+    saveSealedProducts(database, { data: [{ code: "TRK", name: "Star Trek Commander", sealedProduct: [product] }] });
+    expect(database.prepare("SELECT contents, upc FROM sealed_products WHERE id = 'p-beam'").get()).toMatchObject({
+      contents: JSON.stringify(contents), upc: "012345678905",
+    });
+    saveSealedProducts(database, { data: [{ code: "TRK", name: "Star Trek Commander", sealedProduct: [{ uuid: "p-beam", name: product.name }] }] });
+    expect(database.prepare("SELECT contents, upc FROM sealed_products WHERE id = 'p-beam'").get()).toMatchObject({
+      contents: JSON.stringify(contents), upc: "012345678905",
+    });
   });
 
   it("matches a line's name to a sealed product and names the openings with it", async () => {
@@ -115,6 +133,65 @@ describe("product names", () => {
     const deck = (await call("POST", `/api/purchases/${entry.id}/lines/${entry.lines[1].id}/open`, { count: 1, collectionId: main })).json();
     expect(deck.name).toBe("Warp Speed, Star Trek Commander (Purchase of Nov 1)");
     expect(deck.deck).toBeNull();
+  });
+
+  it("previews fixed bundle contents, adds them to a chosen pack and undoes them", async () => {
+    const { call, database, signUp } = await setup();
+    database.prepare("INSERT INTO mtgjson_records (uuid, card_id, set_code, record) VALUES (?, ?, ?, ?)").run("u-kirk", "kirk", "trk", Buffer.from("record"));
+    database.prepare("UPDATE sealed_products SET contents = ? WHERE id = 'p-beam'").run(JSON.stringify({
+      card: [{ uuid: "u-kirk", name: "James T. Kirk", set: "trk", number: "1", foil: true }, { uuid: "missing", name: "Missing", set: "xxx", number: "9" }],
+      deck: [{ name: "Landing Party", set: "trk" }],
+      pack: [{ code: "play", set: "trk" }], variable: [{ configs: [{ card: [{ uuid: "random" }] }] }],
+    }));
+    const main = (await call("GET", "/api/collections")).json()[0].id;
+    const entry = (await call("POST", "/api/purchases", {
+      kind: "purchase", date: "2026-11-01", currency: "usd",
+      lines: [{ product: "bundle", name: "Beam Me Up Bundle", setCode: "trk", quantity: 1, packs: 9, cost: 60 }],
+    })).json();
+    const opened = (await call("POST", `/api/purchases/${entry.id}/lines/${entry.lines[0].id}/open`, { count: 2, collectionId: main })).json();
+    const url = `/api/purchases/openings/${opened.id}/contents`;
+    const preview = (await call("GET", url)).json();
+    expect(preview.cards).toEqual(expect.arrayContaining([
+      expect.objectContaining({ name: "James T. Kirk", quantity: 2, key: expect.objectContaining({ foil: 1 }) }),
+      expect.objectContaining({ name: "Island", quantity: 10 }),
+      expect.objectContaining({ name: "Spock", quantity: 3 }),
+    ]));
+    expect(preview.missing.join(" ")).toContain("Missing");
+    expect(preview.missing.join(" ")).toContain("2 cards not in the card database");
+    expect(preview.notices.join(" ")).toContain("Variable contents");
+    expect((await call("POST", url, { fingerprint: "stale" })).statusCode).toBe(400);
+    const added = await call("POST", url, { fingerprint: preview.fingerprint });
+    expect(added.statusCode).toBe(201);
+    expect(added.json().cards).toBe(15);
+    expect((await call("GET", `/api/purchases/${entry.id}`)).json().openings[0].cards).toBe(15);
+    const other = await signUp("bob");
+    expect((await other("GET", url)).statusCode).toBe(400);
+    expect((await other("POST", `${url}/undo`, { ids: added.json().ids })).statusCode).toBe(404);
+    expect((await call("POST", `${url}/undo`, { ids: added.json().ids })).statusCode).toBe(200);
+    expect((await call("GET", `/api/collections/${main}/cards`)).json()).toHaveLength(0);
+    expect((await call("GET", `/api/purchases/openings/${opened.packs[1].id}/contents`)).statusCode).toBe(400);
+  });
+
+  it("resolves nested fixed products but rejects cycles", async () => {
+    const { call, database } = await setup();
+    database.prepare("UPDATE sealed_products SET contents = ? WHERE id = 'p-beam'").run(JSON.stringify({
+      sealed: [{ uuid: "p-warp", name: "Nested", set: "trk", count: 2 }],
+    }));
+    database.prepare("UPDATE sealed_products SET contents = ? WHERE id = 'p-warp'").run(JSON.stringify({
+      card: [{ name: "Spock", set: "trk", number: "2", uuid: "unmatched", etched: true }],
+    }));
+    const main = (await call("GET", "/api/collections")).json()[0].id;
+    const entry = (await call("POST", "/api/purchases", {
+      kind: "purchase", date: "2026-11-01", currency: "usd",
+      lines: [{ product: "bundle", name: "Beam Me Up Bundle", setCode: "trk", quantity: 1, packs: 9, cost: 60 }],
+    })).json();
+    const opening = (await call("POST", `/api/purchases/${entry.id}/lines/${entry.lines[0].id}/open`, { count: 1, collectionId: main })).json();
+    const url = `/api/purchases/openings/${opening.id}/contents`;
+    expect((await call("GET", url)).json().cards[0]).toMatchObject({ name: "Spock", quantity: 2, key: { foil: 2 } });
+    database.prepare("UPDATE sealed_products SET contents = ? WHERE id = 'p-warp'").run(JSON.stringify({
+      sealed: [{ uuid: "p-beam", name: "Cycle", set: "trk", count: 1 }],
+    }));
+    expect((await call("GET", url)).json().error).toContain("cycle");
   });
 
   it("reads the product name from a receipt and matches the sealed product", async () => {

@@ -36,12 +36,19 @@ export function initializeSealed(database: DatabaseSync): void {
       PRIMARY KEY (code, name)
     );
   `);
+  const columns = new Set(database.prepare("PRAGMA table_info(sealed_products)").all().map((column) => String(column.name)));
+  for (const name of ["contents", "identifiers", "upc", "release_date"]) {
+    if (!columns.has(name)) database.exec(`ALTER TABLE sealed_products ADD COLUMN ${name} TEXT`);
+  }
+  database.exec("CREATE INDEX IF NOT EXISTS sealed_products_upc ON sealed_products(upc)");
 }
 
 /** The purchase line product of an MTGJSON sealed product, by its category and subtype. */
-export function productOfSealed(category: string, subtype: string): string {
+export function productOfSealed(category: string, subtype: string, name = ""): string {
   const kind = category.toLowerCase();
   const sub = subtype.toLowerCase();
+  if (/\bbeginner'?s? box\b/i.test(name)) return /\bcase\b/i.test(name) ? "other" : "beginner_box";
+  if (/\bstarter collection\b/i.test(name)) return /\bcase\b/i.test(name) ? "other" : "starter_collection";
   if (sub === "secret_lair" || sub.includes("secret")) return "secret_lair";
   if (kind === "booster_pack") {
     if (sub === "set") return "set_booster";
@@ -71,7 +78,7 @@ const norm = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, " ").
 
 type SetListEntry = {
   code?: unknown; name?: unknown;
-  sealedProduct?: Array<{ uuid?: unknown; name?: unknown; category?: unknown; subtype?: unknown; cardCount?: unknown; contents?: { deck?: Array<{ name?: unknown; set?: unknown }> } }>;
+  sealedProduct?: Array<{ uuid?: unknown; name?: unknown; category?: unknown; subtype?: unknown; cardCount?: unknown; identifiers?: unknown; releaseDate?: unknown; contents?: { deck?: Array<{ name?: unknown; set?: unknown }> } }>;
   decks?: Array<{ name?: unknown; code?: unknown; sealedProductUuids?: unknown }>;
 };
 
@@ -80,6 +87,7 @@ export function saveSealedProducts(database: DatabaseSync, setList: unknown): nu
   const data = (setList as { data?: unknown })?.data;
   if (!Array.isArray(data)) throw new Error("MTGJSON set list has no data");
   const rows: Array<[string, string, string, string, string, string, string, number | null, string | null, string | null]> = [];
+  const details = new Map<string, { contents: string | null; identifiers: string | null; upc: string | null; releaseDate: string | null }>();
   for (const set of data as SetListEntry[]) {
     if (typeof set?.code !== "string" || !Array.isArray(set.sealedProduct)) continue;
     const code = set.code.toLowerCase();
@@ -97,18 +105,34 @@ export function saveSealedProducts(database: DatabaseSync, setList: unknown): nu
       const listed = product.contents?.deck?.length === 1 && typeof product.contents.deck[0]!.name === "string"
         ? { name: String(product.contents.deck[0]!.name), code: String(product.contents.deck[0]!.set ?? set.code).toUpperCase() } : null;
       const deck = deckOf.get(product.uuid) ?? listed;
-      rows.push([product.uuid, code, product.name.slice(0, 200), productNameOf(product.name, [setName]), category, subtype, productOfSealed(category, subtype),
+      const identifiers = product.identifiers && typeof product.identifiers === "object" ? product.identifiers as Record<string, unknown> : null;
+      const upcKey = identifiers ? Object.keys(identifiers).find((key) => /upc|gtin|ean|barcode/i.test(key)) : undefined;
+      details.set(product.uuid, {
+        contents: product.contents ? JSON.stringify(product.contents) : null,
+        identifiers: identifiers ? JSON.stringify(identifiers) : null,
+        upc: upcKey && identifiers ? String(identifiers[upcKey]).replace(/\D/g, "") || null : null,
+        releaseDate: typeof product.releaseDate === "string" ? product.releaseDate : null,
+      });
+      rows.push([product.uuid, code, product.name.slice(0, 200), productNameOf(product.name, [setName]), category, subtype, productOfSealed(category, subtype, product.name),
         Number.isInteger(product.cardCount) ? Number(product.cardCount) : null, deck?.name ?? null, deck?.code ?? null]);
     }
   }
   if (!rows.length) throw new Error("MTGJSON set list has no sealed products");
   database.exec("BEGIN");
   try {
+    const previous = new Map(database.prepare("SELECT id, contents, identifiers, upc, release_date FROM sealed_products").all().map((row) => [String(row.id), row]));
     database.exec("DELETE FROM sealed_products");
     const insert = database.prepare(
       "INSERT OR REPLACE INTO sealed_products (id, set_code, name, short_name, category, subtype, product, card_count, deck_name, deck_code) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     );
-    for (const row of rows) insert.run(...row);
+    const updateDetails = database.prepare("UPDATE sealed_products SET contents = ?, identifiers = ?, upc = ?, release_date = ? WHERE id = ?");
+    for (const row of rows) {
+      insert.run(...row);
+      const detail = details.get(row[0])!;
+      const old = previous.get(row[0]);
+      updateDetails.run(detail.contents ?? old?.contents ?? null, detail.identifiers ?? old?.identifiers ?? null,
+        detail.upc ?? old?.upc ?? null, detail.releaseDate ?? old?.release_date ?? null, row[0]);
+    }
     database.exec("COMMIT");
   } catch (error) {
     database.exec("ROLLBACK");
@@ -286,4 +310,91 @@ export async function preconDeckCards(database: DatabaseSync, code: string, name
     else merged.set(id, { key: card.key, quantity: card.quantity });
   }
   return { name: deck.name, cards: [...merged.values()], missing };
+}
+
+/** Resolves only fixed contents; random packs and variable configurations are never guessed. */
+export async function fixedSealedContents(database: DatabaseSync, sealedId: string, fetcher: Fetcher = fetch): Promise<{
+  name: string; cards: Array<DeckCard & { name: string; setCode: string; number: string }>; missing: string[]; notices: string[];
+} | null> {
+  const product = database.prepare("SELECT * FROM sealed_products WHERE id = ?").get(sealedId);
+  if (!product) return null;
+  const cards = new Map<string, DeckCard & { name: string; setCode: string; number: string }>();
+  const missing: string[] = [];
+  const notices = new Set<string>();
+  const add = (key: CopyKey, quantity: number) => {
+    const row = database.prepare("SELECT name, set_code, collector_number FROM cards WHERE id = ?").get(key.cardId);
+    if (!row) throw new Error("A product card is no longer in the card database");
+    const id = `${key.cardId}:${key.foil}`;
+    const existing = cards.get(id);
+    const total = (existing?.quantity ?? 0) + quantity;
+    if (!Number.isSafeInteger(total) || total > 10_000) throw new Error("Product contents exceed 10,000 copies of a card");
+    if (existing) existing.quantity = total;
+    else {
+      if (cards.size >= 1000) throw new Error("Product contents have more than 1,000 different card finishes");
+      cards.set(id, { key, quantity, name: String(row.name), setCode: String(row.set_code), number: String(row.collector_number) });
+    }
+  };
+  const readDeck = async (code: string, name: string, multiplier: number) => {
+    const normalized = code.toUpperCase();
+    if (!database.prepare("SELECT 1 FROM sealed_decks WHERE code = ? AND name = ?").get(normalized, name)) {
+      missing.push(`Decklist unavailable: ${name} (${normalized})`);
+      return;
+    }
+    const deck = await deckList(database, normalized, name, fetcher);
+    if (!deck) throw new Error(`Could not load decklist ${name}`);
+    const resolved = listedCopies(database, deck.list, ["commander", "main", "sideboard"]);
+    for (const card of resolved.cards) add(card.key, card.quantity * multiplier);
+    if (resolved.missing) missing.push(`${name}: ${resolved.missing * multiplier} cards not in the card database`);
+  };
+  const visit = async (row: Record<string, unknown>, multiplier: number, ancestors: Set<string>): Promise<void> => {
+    const id = String(row.id);
+    if (ancestors.has(id)) throw new Error("The sealed product contents contain a cycle");
+    const next = new Set(ancestors).add(id);
+    const contents: unknown = row.contents ? JSON.parse(String(row.contents)) : null;
+    if (!contents || typeof contents !== "object" || Array.isArray(contents)) {
+      if (row.deck_name) await readDeck(String(row.deck_code ?? ""), String(row.deck_name), multiplier);
+      else missing.push(`Contents unavailable: ${String(row.name)}`);
+      return;
+    }
+    const data = contents as Record<string, unknown>;
+    if (Array.isArray(data.card)) for (const value of data.card) {
+      if (!value || typeof value !== "object") throw new Error("Invalid sealed product card");
+      const card = value as Record<string, unknown>;
+      const uuid = typeof card.uuid === "string" ? card.uuid : "";
+      const set = typeof card.set === "string" ? card.set.toLowerCase() : "";
+      const number = typeof card.number === "string" ? card.number : "";
+      const found = (uuid ? database.prepare("SELECT c.id FROM mtgjson_records m JOIN cards c ON c.id = m.card_id WHERE m.uuid = ?").get(uuid) : undefined)
+        ?? (set && number ? database.prepare("SELECT id FROM cards WHERE set_code = ? AND collector_number = ? AND lang = 'en' AND custom = 0 LIMIT 1").get(set, number) : undefined);
+      if (!found) {
+        missing.push(`${String(card.name ?? uuid)} (${set.toUpperCase()} ${number}): ${multiplier} not in the card database`);
+        continue;
+      }
+      add({ cardId: String(found.id), foil: card.etched === true ? 2 : card.foil === true ? 1 : 0, condition: "NM", language: "en", proxy: false }, multiplier);
+    }
+    if (Array.isArray(data.deck)) for (const value of data.deck) {
+      if (!value || typeof value !== "object" || !("name" in value) || typeof value.name !== "string" || !("set" in value) || typeof value.set !== "string") {
+        throw new Error("Invalid sealed product deck");
+      }
+      await readDeck(value.set, value.name, multiplier);
+    }
+    if ((!Array.isArray(data.deck) || !data.deck.length) && row.deck_name) await readDeck(String(row.deck_code ?? ""), String(row.deck_name), multiplier);
+    if (Array.isArray(data.pack) && data.pack.length) notices.add("Random pack contents are not added.");
+    if (Array.isArray(data.variable) && data.variable.length) notices.add("Variable contents are not added.");
+    if (Array.isArray(data.other) && data.other.length) notices.add("Non-card accessories are not added.");
+    if (Array.isArray(data.sealed)) for (const value of data.sealed) {
+      if (!value || typeof value !== "object") throw new Error("Invalid nested sealed product");
+      const nested = value as Record<string, unknown>;
+      if (typeof nested.uuid !== "string" || !Number.isSafeInteger(nested.count) || Number(nested.count) < 1) throw new Error("Invalid nested sealed product");
+      const child = database.prepare("SELECT * FROM sealed_products WHERE id = ?").get(nested.uuid);
+      if (!child) {
+        missing.push(`Product contents unavailable: ${String(nested.name ?? nested.uuid)}`);
+        continue;
+      }
+      const count = multiplier * Number(nested.count);
+      if (!Number.isSafeInteger(count) || count > 10_000) throw new Error("Too many nested sealed products");
+      await visit(child, count, next);
+    }
+  };
+  await visit(product, 1, new Set());
+  return { name: String(product.name), cards: [...cards.values()], missing, notices: [...notices] };
 }

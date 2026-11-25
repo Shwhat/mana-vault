@@ -2,6 +2,11 @@
 
 The installed version is shown at the top of this guide.
 
+## 0.24.7 (2026-11-25): Sealed product contents
+
+- Preview and add known fixed cards and decklists from matched sealed products to a purchase opening; random contents are not guessed.
+- Recognize Foundations Beginner Boxes and Starter Collections, and allow their included pack count to be entered.
+
 ## 0.24.6 (2026-11-25): Scryfall rulings
 
 - Fixed rulings downloads for Scryfall's current compressed JSON Lines format. Update the card database to load rulings.

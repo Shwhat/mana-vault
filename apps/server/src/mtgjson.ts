@@ -165,11 +165,6 @@ export function initializeMtgjson(database: DatabaseSync): void {
   add("lead_commander", "INTEGER");
   add("lead_oathbreaker", "INTEGER");
   add("lead_brawl", "INTEGER");
-  const sealedColumns = new Set((database.prepare("PRAGMA table_info(sealed_products)").all() as Array<{ name: string }>).map((column) => column.name));
-  for (const [name, type] of [["contents", "TEXT"], ["identifiers", "TEXT"], ["upc", "TEXT"], ["release_date", "TEXT"]] as const) {
-    if (!sealedColumns.has(name)) database.exec(`ALTER TABLE sealed_products ADD COLUMN ${name} ${type}`);
-  }
-  database.exec("CREATE INDEX IF NOT EXISTS sealed_products_upc ON sealed_products(upc)");
 }
 
 // ---------- downloads and streaming ----------
@@ -361,7 +356,7 @@ export async function importAllPrintings(database: DatabaseSync, path: string): 
           const category = str(product.category);
           const subtype = str(product.subtype);
           insertSealed.run(uuid, setCode, str(product.name).slice(0, 200), productNameOf(str(product.name), [str(set.name)]), category, subtype,
-            productOfSealed(category, subtype), cardCount, contents, JSON.stringify(identifiers), upc, str(product.releaseDate) || null);
+            productOfSealed(category, subtype, str(product.name)), cardCount, contents, JSON.stringify(identifiers), upc, str(product.releaseDate) || null);
         }
         sealed += 1;
       }

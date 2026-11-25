@@ -23,7 +23,7 @@ type Fetcher = (url: string, init?: RequestInit) => Promise<Response>;
 const PRODUCT_LABELS: Record<string, string> = {
   play_booster: "Play booster", draft_booster: "Draft booster", set_booster: "Set booster", collector_booster: "Collector booster",
   jumpstart_booster: "Jumpstart booster", other_booster: "Other booster", booster_box: "Booster box", bundle: "Bundle",
-  commander_deck: "Commander deck", deck: "Starter or other deck", prerelease_kit: "Prerelease kit", secret_lair: "Secret Lair", other: "Other",
+  beginner_box: "Beginner box", starter_collection: "Starter collection", commander_deck: "Commander deck", deck: "Starter or other deck", prerelease_kit: "Prerelease kit", secret_lair: "Secret Lair", other: "Other",
 };
 
 export type MtgjsonRunner = { running: () => string | null; run: (what: "data" | "prices" | "history") => boolean; stop: () => void };
