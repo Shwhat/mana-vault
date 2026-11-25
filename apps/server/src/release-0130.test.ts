@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { buildApp } from "./app.js";
 import { plainWords, searchOrder } from "./card-search.js";
 import { cardExtrasStatement, cardInsertStatement, cardPricesStatement } from "./database.js";
+import { deckProfile } from "./deck-profile.js";
 
 const closers: Array<() => Promise<void>> = [];
 afterEach(async () => {
@@ -40,6 +41,42 @@ async function server() {
 
 const names = async (call: Awaited<ReturnType<typeof server>>["call"], query: string) =>
   ((await call("GET", `/api/cards?paged=1&${query}`)).json().cards as Array<{ name: string }>).map((card) => card.name);
+
+describe("deck color and theme signals", () => {
+  it("uses commander identity, detects distinct cards, and ignores sideboards and maybeboards", () => {
+    const cards = [
+      { oracle_id: "commander", zone: "commander", color_identity: "GU", oracle_text: "Landfall \u2014 Whenever a land enters, draw a card." },
+      { oracle_id: "second", zone: "main", color_identity: "R", oracle_text: "Landfall \u2014 Create a Food token." },
+      { oracle_id: "second", zone: "main", color_identity: "R", oracle_text: "Landfall \u2014 Create a Food token." },
+      { oracle_id: "third", zone: "main", color_identity: "G", oracle_text: "Create a Food token." },
+      { oracle_id: "side", zone: "sideboard", color_identity: "W", oracle_text: "Amass Orcs 1." },
+      { oracle_id: "maybe", zone: "maybeboard", color_identity: "B", oracle_text: "Amass Orcs 2." },
+    ];
+    expect(deckProfile(cards)).toEqual({ color_identity: "UG", themes: ["Landfall", "Tokens", "Food"] });
+    expect(deckProfile(cards.filter((card) => card.oracle_id === "second"))).toEqual({ color_identity: "R", themes: [] });
+    expect(deckProfile([{ oracle_id: "a", zone: "main", color_identity: "", oracle_text: "" }])).toEqual({ color_identity: "C", themes: [] });
+    expect(deckProfile([])).toEqual({ color_identity: "", themes: [] });
+    expect(deckProfile([
+      { oracle_id: "a", zone: "main", color_identity: "B", oracle_text: "Amass Orcs 1." },
+      { oracle_id: "b", zone: "main", color_identity: "U", oracle_text: "Amass Zombies 2." },
+      { oracle_id: "c", zone: "main", color_identity: "G", oracle_text: "Whenever one or more lands you control enter, draw a card." },
+      { oracle_id: "d", zone: "main", color_identity: "G", oracle_text: "Whenever a land you control enters, draw a card." },
+    ])).toEqual({ color_identity: "UBG", themes: ["Landfall", "Amass"] });
+  });
+
+  it("updates deck summaries and details when cards change", async () => {
+    const { call, deckId, database } = await server();
+    database.prepare("UPDATE cards SET color_identity = ?, oracle_text = ? WHERE id = ?").run("G", "Landfall \u2014 Create a Food token.", "a1");
+    database.prepare("UPDATE cards SET color_identity = ?, oracle_text = ? WHERE id = ?").run("R", "Landfall \u2014 Create a Food token.", "a2");
+    await call("POST", `/api/decks/${deckId}/cards`, { cardId: "a1", zone: "main" });
+    await call("POST", `/api/decks/${deckId}/cards`, { cardId: "a2", zone: "main" });
+    expect((await call("GET", "/api/decks")).json()[0]).toMatchObject({ color_identity: "RG", themes: ["Landfall", "Tokens", "Food"] });
+    const detail = (await call("GET", `/api/decks/${deckId}`)).json();
+    expect(detail).toMatchObject({ color_identity: "RG", themes: ["Landfall", "Tokens", "Food"] });
+    await call("DELETE", `/api/decks/${deckId}/cards/o-sol?zone=main&entryId=${detail.cards.find((card: { card_id: string }) => card.card_id === "a2").entry_id}`);
+    expect((await call("GET", "/api/decks")).json()[0]).toMatchObject({ color_identity: "G", themes: [] });
+  });
+});
 
 describe("card search sorting", () => {
   it("puts the exact name first by default, then names that start with the words, then the rest", async () => {

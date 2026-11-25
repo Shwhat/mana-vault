@@ -218,8 +218,9 @@ function beep() {
 }
 
 /** The printings a scan may become under the scanner's set and promo filters, newest first. */
-export function allowedPrintings(options: ScanCard[], sets: string[], ignorePromos: boolean): ScanCard[] {
-  return options.filter((card) => (!sets.length || sets.includes(card.set_code)) && (!ignorePromos || !card.promo));
+export function allowedPrintings(options: ScanCard[], sets: string[], ignorePromos: boolean, language?: string): ScanCard[] {
+  return options.filter((card) => (!sets.length || sets.includes(card.set_code)) && (!ignorePromos || !card.promo) &&
+    (!sets.length || !language || (card.lang || "en") === language));
 }
 
 export default function CardScanner({ phone = false, onClose }: { phone?: boolean; onClose: () => void }) {
@@ -280,24 +281,31 @@ export default function CardScanner({ phone = false, onClose }: { phone?: boolea
   /** A card was read: check it against the set filter, then add it, or ask which printing when more than one fits. */
   const resolve = useCallback(async (match: ScanMatch) => {
     const card = match.card!;
-    const { scanSets: sets, scanIgnorePromos: ignorePromos, scanQuick: quick } = live.current.store.prefs;
+    const { scanSets: sets, scanIgnorePromos: ignorePromos, scanQuick: quick, scanLanguage: language } = live.current.store.prefs;
     if (match.by === "printing") {
       if (sets.length && !sets.includes(card.set_code)) {
         setWarning(`Not in set: ${card.name} (${card.set_code.toUpperCase()})`);
         return;
       }
-      accept(card);
-      return;
+      if (!sets.length || (card.lang || "en") === language) {
+        accept(card);
+        return;
+      }
     }
-    let options: ScanCard[] = [card];
+    let options: ScanCard[];
     try {
       options = await request<ScanCard[]>(`/api/cards/${encodeURIComponent(card.id)}/printings`);
-    } catch {
-      options = [card];
+    } catch (reason) {
+      setWarning(`Could not load printings: ${message(reason)}`);
+      return;
     }
-    const allowed = allowedPrintings(options, sets, ignorePromos);
+    if (match.by === "printing") {
+      options = options.filter((option) => option.set_code === card.set_code && (match.exact === false || option.collector_number === card.collector_number));
+    }
+    const allowed = allowedPrintings(options, sets, ignorePromos, language);
     if (!allowed.length) {
-      setWarning(`Not in set: ${card.name}`);
+      const inSet = allowedPrintings(options, sets, ignorePromos);
+      setWarning(inSet.length && sets.length ? `No ${language.toUpperCase()} printing in selected set: ${card.name}` : `Not in set: ${card.name}`);
       return;
     }
     if (allowed.length === 1 || quick) accept(allowed[0]!);

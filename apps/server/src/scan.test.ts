@@ -67,7 +67,7 @@ describe("matchScan", () => {
   it("picks the printing in the set read from the info line when the number is unreadable", () => {
     const db = database();
     const result = matchScan(db, new NameMatcher(db), ["Lightning Bolt"], "LEA EN");
-    expect(result).toMatchObject({ by: "printing", card: { id: "bolt-lea" } });
+    expect(result).toMatchObject({ by: "printing", exact: false, card: { id: "bolt-lea" } });
   });
 
   it("ignores a set and number that disagree with a clearly read name", () => {

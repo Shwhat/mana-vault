@@ -1,4 +1,7 @@
 // ---------- shared data types ----------
+import { specialFoil } from "../../server/src/foil-types";
+export { SPECIAL_FOILS, specialFoil } from "../../server/src/foil-types";
+
 export type Card = {
   id: string;
   oracle_id?: string;
@@ -156,6 +159,9 @@ export type Deck = Partial<Sharing> & {
   format: string;
   mode: DeckMode;
   card_count?: number;
+  /** Color identity and possible themes inferred from the deck's cards. */
+  color_identity?: string;
+  themes?: string[];
   /** The value of the cards in the deck (not the maybeboard), each at its printing's price. */
   value?: { usd: number; eur: number };
   /** The collection that receives copies added straight to this deck, remembered per deck. */
@@ -301,24 +307,6 @@ export const LANGUAGES: Array<[string, string]> = [
   ["he", "Hebrew"], ["la", "Latin"], ["grc", "Ancient Greek"], ["ar", "Arabic"], ["sa", "Sanskrit"], ["ph", "Phyrexian"],
 ];
 export const FINISHES: Array<[FinishCode, string]> = [[0, "Regular"], [1, "Foil"], [2, "Etched"]];
-
-// Scryfall's promo types for special foils, with their names; any other promo type ending in "foil" is named from its word
-export const SPECIAL_FOILS: Record<string, string> = {
-  surgefoil: "Surge foil", galaxyfoil: "Galaxy foil", halofoil: "Halo foil", textured: "Textured foil", manafoil: "Mana foil",
-  raisedfoil: "Raised foil", rainbowfoil: "Rainbow foil", confettifoil: "Confetti foil", oilslick: "Oil slick foil", ripplefoil: "Ripple foil",
-  fracturefoil: "Fracture foil", doublerainbow: "Double rainbow foil", stepandcompleat: "Step-and-compleat foil", firstplacefoil: "First place foil",
-  neonink: "Neon ink foil", invisibleink: "Invisible ink foil", gilded: "Gilded foil", silverfoil: "Silver foil", dragonscalefoil: "Dragon scale foil",
-  singularityfoil: "Singularity foil", cosmicfoil: "Cosmic foil", ampersand: "Ampersand foil", embossed: "Embossed foil", headliner: "Headliner foil",
-};
-
-/** The special foil a printing is made in, such as "Surge foil", or null for a plain foil. */
-export function specialFoil(promoTypes: string | null | undefined): string | null {
-  for (const type of String(promoTypes ?? "").split(",").map((item) => item.trim()).filter(Boolean)) {
-    if (SPECIAL_FOILS[type]) return SPECIAL_FOILS[type]!;
-    if (type.endsWith("foil") && type.length > 4) return `${type[0]!.toUpperCase()}${type.slice(1, -4)} foil`;
-  }
-  return null;
-}
 
 /** A finish's name for a printing: Regular, Etched, Foil, or the special foil it is made in. */
 export const finishLabel = (finish: FinishCode | number | null | undefined, promoTypes?: string | null): string =>

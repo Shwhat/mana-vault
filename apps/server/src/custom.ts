@@ -83,7 +83,7 @@ type CardInput = {
   setCode: string; collectorNumber: string; rarity: string; artist: string; finishes: string[];
   front: Face; back: Face | null; colors: string[] | null; colorIdentity: string[] | null;
   legalities: Record<string, string>; price: { usd: number | null; eur: number | null }; tokens: Array<{ id: string; name: string }>;
-  flavorText: string;
+  flavorText: string; printingOf?: string | null;
 };
 
 const text = (value: unknown, limit: number) => (typeof value === "string" ? value.trim().slice(0, limit) : "");
@@ -121,6 +121,9 @@ export function readCardInput(body: unknown): CardInput | string {
   if (!setCode) return "Choose a custom set";
   const collectorNumber = text(raw.collectorNumber, 10);
   if (!/^[A-Za-z0-9-]{1,10}$/.test(collectorNumber)) return "The collector number can have up to 10 letters, digits and dashes";
+  if (raw.printingOf !== undefined && raw.printingOf !== null && (typeof raw.printingOf !== "string" || !raw.printingOf.trim() || raw.printingOf.length > 100)) {
+    return "Choose an existing card to link, or remove the link";
+  }
   const rarity = (RARITIES as readonly string[]).includes(String(raw.rarity)) ? String(raw.rarity) : "common";
   const finishes = Array.isArray(raw.finishes) ? FINISHES.filter((finish) => (raw.finishes as unknown[]).includes(finish)) : ["nonfoil"];
   if (!finishes.length) return "Choose at least one finish";
@@ -139,6 +142,7 @@ export function readCardInput(body: unknown): CardInput | string {
     setCode, collectorNumber, rarity, artist: text(raw.artist, 100), finishes, front, back,
     colors: readColors(raw.colors), colorIdentity: readColors(raw.colorIdentity), legalities,
     price: { usd: readPrice(prices.usd), eur: readPrice(prices.eur) }, tokens, flavorText: text(raw.flavorText, 1000),
+    ...(raw.printingOf !== undefined ? { printingOf: raw.printingOf as string | null } : {}),
   };
 }
 
@@ -179,7 +183,7 @@ function writeCardRow(database: DatabaseSync, id: string, oracleId: string, inpu
     `INSERT INTO cards (id, oracle_id, name, mana_cost, mana_value, type_line, oracle_text, colors, color_identity, legalities, set_code, set_name,
        collector_number, rarity, image_url, released_at, artist, custom)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
-     ON CONFLICT(id) DO UPDATE SET name = excluded.name, mana_cost = excluded.mana_cost, mana_value = excluded.mana_value, type_line = excluded.type_line,
+     ON CONFLICT(id) DO UPDATE SET oracle_id = excluded.oracle_id, name = excluded.name, mana_cost = excluded.mana_cost, mana_value = excluded.mana_value, type_line = excluded.type_line,
        oracle_text = excluded.oracle_text, colors = excluded.colors, color_identity = excluded.color_identity, legalities = excluded.legalities,
        set_code = excluded.set_code, set_name = excluded.set_name, collector_number = excluded.collector_number, rarity = excluded.rarity,
        image_url = excluded.image_url, released_at = excluded.released_at, artist = excluded.artist, custom = 1`,
@@ -386,7 +390,7 @@ export function registerCustomRoutes(app: FastifyInstance, database: DatabaseSyn
 
   app.get<{ Params: { id: string } }>("/api/custom/cards/:id", async (request, reply) => {
     const row = database.prepare(
-      "SELECT cc.id, cc.owner_id, cc.design, cc.version, cc.art IS NOT NULL AS has_art, cc.back_art IS NOT NULL AS has_back_art FROM custom_cards cc WHERE cc.id = ?",
+      "SELECT cc.id, cc.owner_id, cc.design, cc.version, cc.art IS NOT NULL AS has_art, cc.back_art IS NOT NULL AS has_back_art, c.oracle_id FROM custom_cards cc JOIN cards c ON c.id = cc.id WHERE cc.id = ?",
     ).get(request.params.id);
     if (!row) return reply.code(404).send({ error: "Custom card not found" });
     let design: unknown = {};
@@ -395,8 +399,15 @@ export function registerCustomRoutes(app: FastifyInstance, database: DatabaseSyn
     } catch {
       design = {};
     }
+    const linked = database.prepare("SELECT id, name FROM cards WHERE oracle_id = ? AND custom = 0 ORDER BY removed, lang != 'en', released_at DESC LIMIT 1").get(String(row.oracle_id));
+    const savedLink = design && typeof design === "object" ? (design as Record<string, unknown>).printingOf : null;
+    const savedTarget = savedLink && typeof savedLink === "object" ? savedLink as Record<string, unknown> : null;
+    const unavailable = !String(row.oracle_id).startsWith("custom-oracle-")
+      ? { id: typeof savedTarget?.id === "string" ? savedTarget.id : "", name: typeof savedTarget?.name === "string" ? savedTarget.name : "Unavailable linked card" }
+      : null;
     return {
       id: String(row.id), ownerId: (row.owner_id as number | null) ?? null, ownerName: ownerName(database, row.owner_id), design, version: Number(row.version),
+      printingOf: linked ? { id: String(linked.id), name: String(linked.name) } : unavailable,
       artUrl: Number(row.has_art) === 1 ? `/api/custom/cards/${String(row.id)}/art?v=${Number(row.version)}` : null,
       backArtUrl: Number(row.has_back_art) === 1 ? `/api/custom/cards/${String(row.id)}/art?face=back&v=${Number(row.version)}` : null,
       use: customCardUse(database, String(row.id), userOf(request)),
@@ -424,6 +435,28 @@ export function registerCustomRoutes(app: FastifyInstance, database: DatabaseSyn
     return { input, picture, backPicture, art, backArt, design };
   };
 
+  const linkedOracle = (input: CardInput, current: string | null, design?: string): string | null => {
+    if (input.printingOf === undefined) return current ?? `custom-oracle-${randomUUID()}`;
+    if (input.printingOf === null) return current?.startsWith("custom-oracle-") ? current : `custom-oracle-${randomUUID()}`;
+    const card = database.prepare("SELECT oracle_id, removed FROM cards WHERE id = ? AND custom = 0").get(input.printingOf);
+    if (!card && current && !current.startsWith("custom-oracle-") && design) {
+      const saved = JSON.parse(design) as { printingOf?: { id?: unknown } | null };
+      if (saved.printingOf?.id === input.printingOf) return current;
+    }
+    if (!card || (Number(card.removed) !== 0 && card.oracle_id !== current)) return null;
+    return String(card.oracle_id);
+  };
+
+  const linkConflict = (id: string, oracle: string): boolean => !!database.prepare(
+    `SELECT 1 FROM deck_cards dc
+     WHERE (dc.printing_id = ? AND (
+       EXISTS (SELECT 1 FROM deck_links l JOIN cards c ON c.id = l.card_id WHERE l.deck_card_id = dc.id AND c.id != ? AND c.oracle_id != ?)
+       OR EXISTS (SELECT 1 FROM cards c WHERE c.id = dc.want_card_id AND c.id != ? AND c.oracle_id != ?)))
+       OR (dc.want_card_id = ? AND dc.printing_id IS NOT ? AND dc.oracle_id != ?)
+       OR EXISTS (SELECT 1 FROM deck_links l WHERE l.deck_card_id = dc.id AND l.card_id = ? AND dc.printing_id IS NOT ? AND dc.oracle_id != ?)
+     LIMIT 1`,
+  ).get(id, id, oracle, id, oracle, id, id, oracle, id, id, oracle);
+
   /** Art used on a card is also kept in the maker's art library (0.15.0); the same picture is kept once. */
   const keepArt = (userId: number, name: string, parts: { art?: Picture | null; backArt?: Picture | null }) => {
     if (parts.art) addToArtLibrary(database, userId, name, parts.art);
@@ -434,9 +467,11 @@ export function registerCustomRoutes(app: FastifyInstance, database: DatabaseSyn
     const parts = readSave(request.body, null);
     if (typeof parts === "string") return reply.code(400).send({ error: parts });
     if (!parts.picture) return reply.code(400).send({ error: "The card picture is missing" });
+    const oracleId = linkedOracle(parts.input, null);
+    if (!oracleId) return reply.code(400).send({ error: "Choose an existing official card to link" });
     const id = `custom-${randomUUID()}`;
     transaction(database, () => {
-      writeCardRow(database, id, `custom-oracle-${randomUUID()}`, parts.input, 1);
+      writeCardRow(database, id, oracleId, parts.input, 1);
       database.prepare(
         `INSERT INTO custom_cards (id, owner_id, design, picture, picture_type, back_picture, back_picture_type, art, art_type, back_art, back_art_type)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -450,15 +485,21 @@ export function registerCustomRoutes(app: FastifyInstance, database: DatabaseSyn
 
   app.put<{ Params: { id: string }; Body: Record<string, unknown> }>("/api/custom/cards/:id", big, async (request, reply) => {
     const id = request.params.id;
-    const row = database.prepare("SELECT owner_id, version FROM custom_cards WHERE id = ?").get(id);
+    const row = database.prepare("SELECT owner_id, version, design FROM custom_cards WHERE id = ?").get(id);
     if (!row) return reply.code(404).send({ error: "Custom card not found" });
     if (row.owner_id !== userOf(request)) return reply.code(403).send({ error: "Only the account that made this card can change it" });
     const parts = readSave(request.body, id);
     if (typeof parts === "string") return reply.code(400).send({ error: parts });
     const version = Number(row.version) + 1;
-    const oracleId = String(database.prepare("SELECT oracle_id FROM cards WHERE id = ?").get(id)?.oracle_id ?? `custom-oracle-${randomUUID()}`);
+    const currentOracle = String(database.prepare("SELECT oracle_id FROM cards WHERE id = ?").get(id)!.oracle_id);
+    const oracleId = linkedOracle(parts.input, currentOracle, String(row.design));
+    if (!oracleId) return reply.code(400).send({ error: "Choose an existing official card to link" });
+    if (oracleId !== currentOracle && linkConflict(id, oracleId)) {
+      return reply.code(409).send({ error: "Remove incompatible linked copies or upgrade wishes from decks before changing this card's printing link" });
+    }
     transaction(database, () => {
       writeCardRow(database, id, oracleId, parts.input, version);
+      if (oracleId !== currentOracle) database.prepare("UPDATE deck_cards SET oracle_id = ? WHERE printing_id = ?").run(oracleId, id);
       database.prepare("UPDATE custom_cards SET design = ?, version = ?, updated_at = strftime('%Y-%m-%d %H:%M:%f', 'now') WHERE id = ?").run(parts.design, version, id);
       if (parts.picture) database.prepare("UPDATE custom_cards SET picture = ?, picture_type = ? WHERE id = ?").run(parts.picture.bytes, parts.picture.type, id);
       // a card without a back face loses its back picture

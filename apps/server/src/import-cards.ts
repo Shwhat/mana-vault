@@ -333,7 +333,6 @@ export async function importRulings(database: DatabaseSync, fetcher: typeof fetc
   if (!metadataResponse.ok) throw new Error(`Scryfall bulk-data request failed: ${metadataResponse.status}`);
   const metadata = await metadataResponse.json() as BulkMetadata;
   const entry = findBulk(metadata, (item) => /^rulings?$/i.test(String(item.type ?? "")) || /^rulings?$/i.test(String(item.name ?? "")));
-  // Scryfall now lists a gzipped JSON Lines file (jsonl_download_uri) and may leave out the older JSON array file
   const jsonlUri = optionalString(entry.jsonl_download_uri);
   const uri = jsonlUri ?? optionalString(entry.download_uri);
   if (!uri) throw new Error("Scryfall rulings metadata has no download URL");
@@ -347,18 +346,27 @@ export async function importRulings(database: DatabaseSync, fetcher: typeof fetc
   const response = await fetcher(url, { headers: { "User-Agent": userAgent } });
   if (!response.ok || !response.body) throw new Error(`Scryfall rulings download failed: ${response.status}`);
   const isGzip = jsonlUri !== null || url.pathname.toLowerCase().endsWith(".gz");
-  const text = Readable.from(responseChunks(response.body)).pipe(isGzip ? createGunzip() : new PassThrough());
-  const source = jsonlUri !== null ? jsonLines(text) : chain([text, parser(), streamArray()]);
+  const source = chain([Readable.from(responseChunks(response.body)), isGzip ? createGunzip() : new PassThrough()]);
   const insert = database.prepare("INSERT INTO rulings (oracle_id, published_at, source, comment) VALUES (?, ?, ?, ?)");
   let saved = 0;
+  const save = (value: unknown) => {
+    if (!value || typeof value !== "object") return;
+    const ruling = value as Record<string, unknown>;
+    if (typeof ruling.oracle_id !== "string" || typeof ruling.comment !== "string") return;
+    insert.run(ruling.oracle_id, typeof ruling.published_at === "string" ? ruling.published_at : "", typeof ruling.source === "string" ? ruling.source : "", ruling.comment);
+    saved += 1;
+  };
   database.exec("BEGIN");
   try {
     database.exec("DELETE FROM rulings");
-    for await (const item of source as AsyncIterable<{ value: unknown }>) {
-      const value = item.value as Record<string, unknown> | null;
-      if (!value || typeof value.oracle_id !== "string" || typeof value.comment !== "string") continue;
-      insert.run(value.oracle_id, typeof value.published_at === "string" ? value.published_at : "", typeof value.source === "string" ? value.source : "", value.comment);
-      saved += 1;
+    if (jsonlUri) {
+      for await (const line of createInterface({ input: source, crlfDelay: Infinity })) {
+        if (line.trim()) save(JSON.parse(line));
+      }
+    } else {
+      for await (const item of chain([source, parser(), streamArray()]) as AsyncIterable<{ value: unknown }>) {
+        save(item.value);
+      }
     }
     if (!saved) throw new Error("The rulings file held no rulings");
     database.prepare("INSERT INTO catalog_metadata (key, value) VALUES ('rulings_at', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value")
@@ -369,14 +377,6 @@ export async function importRulings(database: DatabaseSync, fetcher: typeof fetc
     throw error;
   }
   return saved;
-}
-
-/** Reads a JSON Lines stream, one object per line, in the shape stream-json's streamArray gives. */
-async function* jsonLines(input: NodeJS.ReadableStream): AsyncGenerator<{ value: unknown }> {
-  for await (const line of createInterface({ input, crlfDelay: Infinity })) {
-    const trimmed = line.trim();
-    if (trimmed) yield { value: JSON.parse(trimmed) };
-  }
 }
 
 function optionalString(value: unknown): string | null {

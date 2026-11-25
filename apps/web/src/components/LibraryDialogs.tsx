@@ -12,6 +12,7 @@ import {
 } from "../types";
 import { closeDialog, customDialog, dialog } from "./Dialog";
 import { chosenCollection, collectionFields } from "./CollectionPicker";
+import { preconDeckDialog } from "./Precons";
 
 /** Search box plus a checkable set list. The chosen codes are kept in `holder.sets` for the dialog's OK handler. */
 function SetPicker({ holder, initial }: { holder: { sets: string[] }; initial: Array<{ code: string; name: string }> }) {
@@ -156,7 +157,9 @@ export function newDeckDialog(store: Store) {
       store.fail(reason, "Could not create the deck.");
       return false;
     }
-  }, "Create deck");
+  }, "Create deck", (
+    <div className="btnrow"><button type="button" className="btn" onClick={() => preconDeckDialog(store)}>Choose a precon...</button></div>
+  ));
 }
 
 /** One free copy, as a line in a list. */

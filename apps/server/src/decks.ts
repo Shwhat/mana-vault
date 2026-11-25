@@ -1,5 +1,6 @@
 // ---------- decks: deck cards, their printings and the collection copies linked to them ----------
 import { randomUUID } from "node:crypto";
+import { deckProfile } from "./deck-profile.js";
 import type { FastifyInstance, FastifyReply } from "fastify";
 import type { DatabaseSync } from "node:sqlite";
 import { type CopyKey, readCopyKey } from "./copies.js";
@@ -266,7 +267,13 @@ export function registerDeckRoutes(app: FastifyInstance, database: DatabaseSync)
     const { value_usd: usd, value_eur: eur, ...rest } = deck;
     // the value of the cards in the deck (not the maybeboard), each at its printing's price
     const value = { usd: Math.round(Number(usd ?? 0) * 100) / 100, eur: Math.round(Number(eur ?? 0) * 100) / 100 };
-    return { ...rest, value, mode: "theme", collection_id: collectionId, name: sharing.displayName ?? deck.name, realName: deck.name, ...sharing };
+    const profileCards = database.prepare(
+      `SELECT dc.oracle_id, dc.zone, c.color_identity, c.oracle_text
+       FROM deck_cards dc JOIN cards c ON c.id = COALESCE(dc.printing_id,
+         (SELECT p.id FROM cards p WHERE p.oracle_id = dc.oracle_id ORDER BY p.removed, p.lang != 'en', p.released_at DESC LIMIT 1))
+       WHERE dc.deck_id = ? AND dc.zone IN ('main', 'commander')`,
+    ).all(id) as Array<{ oracle_id: string; zone: string; color_identity: string | null; oracle_text: string | null }>;
+    return { ...rest, ...deckProfile(profileCards), value, mode: "theme", collection_id: collectionId, name: sharing.displayName ?? deck.name, realName: deck.name, ...sharing };
   };
 
   app.get("/api/decks", async (request) => {

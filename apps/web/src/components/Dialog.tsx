@@ -104,7 +104,8 @@ export function DialogHost() {
     show = (next) => {
       setSpec(next);
       setBusy(false);
-      if (next?.kind === "form") setValues(Object.fromEntries(next.fields.map(([key, , value]) => [key, value])));
+      if (next?.kind === "form") setValues(Object.fromEntries(next.fields.flatMap(([key, , value]) =>
+        value === NEW_COLLECTION ? [[key, value], [`${key}:name`, suggested.get(key) ?? ""]] : [[key, value]])));
     };
     return () => { show = null; };
   }, []);

@@ -34,10 +34,14 @@ const SETS = [{ code: "hob", name: "The Hobbit" }, { code: "trk", name: "Star Tr
 function seedPrecious(database: DatabaseSync) {
   const insert = cardInsertStatement(database);
   const extras = cardExtrasStatement(database);
-  for (const [id, number, effects] of [["mp1", "176", ""], ["mp2", "301", "showcase"]] as const) {
-    insert.run(id, "o-precious", "My Precious", "{2}", 2, "Legendary Artifact", "", "", "", "{}", "hob", "The Hobbit", number, "rare", `https://img/${id}.jpg`, "2026-08-14", "Artist");
-    extras.run("nonfoil,foil", 0, 0, id);
-    database.prepare("UPDATE cards SET frame_effects = ? WHERE id = ?").run(effects, id);
+  for (const [id, number, effects, finishes, promo] of [
+    ["mp1", "176", "", "nonfoil,foil", "universesbeyond"],
+    ["mp-surge", "271", "showcase", "foil", "surgefoil,universesbeyond"],
+    ["mp2", "235", "showcase", "nonfoil,foil", "universesbeyond"],
+  ] as const) {
+    insert.run(id, "o-precious", "My Precious // Allure of Power", "{2}", 2, "Legendary Artifact", "", "", "", "{}", "hob", "The Hobbit", number, "rare", `https://img/${id}.jpg`, "2026-08-14", "Artist");
+    extras.run(finishes, 0, 0, id);
+    database.prepare("UPDATE cards SET frame_effects = ?, promo_types = ? WHERE id = ?").run(effects, promo, id);
   }
   saveSets(database, { data: [{ code: "hob", name: "The Hobbit", set_type: "expansion", released_at: "2026-08-14" }, { code: "trk", name: "Star Trek", set_type: "expansion", released_at: "2026-11-14" }] });
 }
@@ -96,11 +100,35 @@ Total USD $78.69`;
     const fields = (await call("POST", "/api/purchases/receipts/parse", { text: ORDER })).json().fields;
     const [deck, showcase, plain] = fields.lines;
     expect(deck.cardLike).toBe(false);
-    expect(showcase).toMatchObject({ cardLike: true, card: { cardId: "mp2", setCode: "hob", finish: 1, condition: "NM" } });
+    expect(showcase).toMatchObject({ cardLike: true, card: { cardId: "mp2", setCode: "hob", collectorNumber: "235", finish: 1, condition: "NM" } });
     expect(plain).toMatchObject({ cardLike: true, card: { cardId: "mp1", finish: 1 } });
     // a card-like line with no card found still goes to Match cards
     const unknown = (await call("POST", "/api/purchases/receipts/parse", { text: "Nonexistent Card Name Lightly Played $2.00" })).json().fields;
     expect(unknown.lines[0]).toMatchObject({ cardLike: true, card: null });
+  });
+
+  it("uses a named special foil instead of treating it as an ordinary foil", async () => {
+    const { call, database } = await server();
+    seedPrecious(database);
+    for (const text of [
+      "My Precious (Showcase) [The Hobbit] $4.55\nNear Mint Surge Foil",
+      "My Precious (Showcase) [The Hobbit] Near Mint Surgefoil $4.55",
+      "My Precious [The Hobbit] $4.55\nNear Mint Surge Foil",
+    ]) {
+      const fields = (await call("POST", "/api/purchases/receipts/parse", { text })).json().fields;
+      expect(fields.lines[0]).toMatchObject({ note: expect.stringMatching(/surge\s*foil/i), card: { cardId: "mp-surge", finish: 1, condition: "NM" } });
+    }
+  });
+
+  it("warns when the guessed foil type does not match the receipt", async () => {
+    const { call, database } = await server();
+    seedPrecious(database);
+    database.prepare("DELETE FROM cards WHERE id = ?").run("mp2");
+    const fields = (await call("POST", "/api/purchases/receipts/parse", { text: ORDER })).json().fields;
+    expect(fields.lines[1].card).toMatchObject({ cardId: "mp-surge", warning: expect.stringContaining("foil type") });
+    database.prepare("DELETE FROM cards WHERE id = ?").run("mp-surge");
+    const special = (await call("POST", "/api/purchases/receipts/parse", { text: "My Precious [The Hobbit] $4.55\nNear Mint Surge Foil" })).json().fields;
+    expect(special.lines[0].card).toMatchObject({ cardId: "mp1", warning: expect.stringContaining("foil type") });
   });
 });
 

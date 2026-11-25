@@ -1,7 +1,7 @@
 // ---------- card page: the card's art, text, versions with prices, rulings and what you own ----------
 import { LanguagePip, SetIcon } from "../components/CardMarks";
 import { SymbolText } from "../components/SymbolPicker";
-import { addMenuItems } from "../components/AddButtons";
+import { addCardToWishlist, addMenuItems } from "../components/AddButtons";
 import { PriceHistory } from "./PriceHistory";
 import { useEffect, useState } from "react";
 import type { Action } from "../actions";
@@ -60,7 +60,7 @@ export function CardPage({ actions }: { actions: Record<string, Action> }) {
   const fab: Array<[string, () => void]> = [
     ...addMenuItems(store, card).map((item): [string, () => void] => [item.label, item.run]),
     ["Add as proxy", () => void store.addToCollection(card.id, card.name, undefined, undefined, true)],
-    ["Add to wishlist", () => void store.addToWishlist([{ cardId: card.id, foil: store.prefs.foil ? 1 : 0, condition: "NM", language: "en", proxy: false, quantity: 1 }], card.name)],
+    ["Add to wishlist", () => void addCardToWishlist(store, card)],
   ];
   return (
     <div className="view cardpage" id="view-card">

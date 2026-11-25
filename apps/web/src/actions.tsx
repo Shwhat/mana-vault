@@ -1,5 +1,5 @@
 // ---------- actions: every command is defined once and called by name from menus, tabs, buttons and keys ----------
-import { addCard } from "./components/AddButtons";
+import { addCard, addCardToWishlist } from "./components/AddButtons";
 import { cardLayoutDialog } from "./components/CardFrame";
 import { useMemo } from "react";
 import { addFromDeckDialog } from "./views/ProxiesView";
@@ -304,7 +304,7 @@ export function useActions(store: Store): Record<string, Action> {
       "wishlist.add": {
         label: "Add to wishlist", short: "Wishlist", icon: "wish", key: "W", disabled: !selected,
         run: () => (selected
-          ? void store.addToWishlist([{ cardId: selected.id, foil: prefs.foil ? 1 : 0, condition: "NM", language: "en", proxy: false, quantity: 1 }], selected.name)
+          ? void addCardToWishlist(store, selected)
           : store.flash("Select a card first", "err")),
       },
       "wishlist.missing": {

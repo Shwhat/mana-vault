@@ -164,6 +164,82 @@ describe("product names", () => {
     expect(plain.deck).toBeNull();
     expect((await call("GET", `/api/purchases/${other.id}`)).json().openings[0].active).toBe(true);
   });
+
+  it("opens an unmatched Commander deck with a selected precon", async () => {
+    const { call } = await setup();
+    const main = (await call("GET", "/api/collections")).json()[0].id;
+    const entry = (await call("POST", "/api/purchases", {
+      kind: "purchase", date: "2026-11-01", currency: "usd",
+      lines: [{ product: "commander_deck", name: "Deck Landing Party", setCode: "trk", quantity: 2, cost: 130 }],
+    })).json();
+    const url = `/api/purchases/${entry.id}/lines/${entry.lines[0].id}/open`;
+    expect(entry.lines[0].hasDeck).toBe(false);
+    expect((await call("POST", url, { count: 2, collectionId: main, precon: { code: "BAD", name: "Landing Party" } })).statusCode).toBe(404);
+    expect((await call("GET", `/api/purchases/${entry.id}`)).json().openings).toHaveLength(0);
+    const opened = await call("POST", url, { count: 2, collectionId: main, precon: { code: "TRK", name: "Landing Party" } });
+    expect(opened.statusCode).toBe(201);
+    expect(opened.json().deck).toEqual({ name: "Landing Party", cards: 24, missing: 4 });
+    expect((await call("GET", `/api/collections/${main}/cards`)).json().find((card: { id: string }) => card.id === "island").quantity).toBe(20);
+    expect((await call("GET", `/api/purchases/${entry.id}`)).json().openings[0]).toMatchObject({ active: false, cards: 24 });
+    expect((await call("DELETE", `/api/purchases/openings/${opened.json().id}?copies=1`)).statusCode).toBe(200);
+    expect((await call("GET", `/api/collections/${main}/cards`)).json()).toHaveLength(0);
+  });
+
+  it("adds and undoes a selected precon on an existing opening without removing earlier copies", async () => {
+    const { call, signUp } = await setup();
+    const main = (await call("GET", "/api/collections")).json()[0].id;
+    const entry = (await call("POST", "/api/purchases", {
+      kind: "purchase", date: "2026-11-01", currency: "usd",
+      lines: [{ product: "commander_deck", name: "Unmatched", setCode: "trk", quantity: 2, cost: 130 }],
+    })).json();
+    const opening = (await call("POST", `/api/purchases/${entry.id}/lines/${entry.lines[0].id}/open`, { count: 2, collectionId: main })).json();
+    const url = `/api/purchases/openings/${opening.id}/precon`;
+    const precon = { code: "TRK", name: "Landing Party" };
+    const first = await call("POST", url, { precon });
+    expect(first.statusCode).toBe(201);
+    expect(first.json()).toMatchObject({ name: "Landing Party", cards: 24, missing: 4 });
+    const second = await call("POST", url, { precon });
+    expect(second.statusCode).toBe(201);
+    expect((await call("GET", `/api/purchases/${entry.id}`)).json().openings[0].cards).toBe(48);
+    const bob = await signUp("bob");
+    expect((await bob("POST", url, { precon })).statusCode).toBe(404);
+    expect((await call("POST", `${url}/undo`, { ids: [second.json().ids[0], 999999] })).statusCode).toBe(404);
+    expect((await call("POST", `${url}/undo`, { ids: second.json().ids })).statusCode).toBe(200);
+    expect((await call("GET", `/api/purchases/${entry.id}`)).json().openings[0].cards).toBe(24);
+    expect((await call("GET", `/api/collections/${main}/cards`)).json().find((card: { id: string }) => card.id === "island").quantity).toBe(20);
+  });
+
+  it("rejects unavailable decklists and rolls back additions that exceed the copy limit", async () => {
+    const { call, database } = await setup();
+    const main = (await call("GET", "/api/collections")).json()[0].id;
+    const entry = (await call("POST", "/api/purchases", {
+      kind: "purchase", date: "2026-11-01", currency: "usd",
+      lines: [{ product: "commander_deck", name: "Unmatched", setCode: "trk", quantity: 2, cost: 130 }],
+    })).json();
+    const open = `/api/purchases/${entry.id}/lines/${entry.lines[0].id}/open`;
+    const precon = { code: "TRK", name: "Landing Party" };
+
+    database.prepare("UPDATE sealed_decks SET file_name = ? WHERE code = ? AND name = ?").run("unavailable", precon.code, precon.name);
+    expect((await call("POST", open, { count: 1, collectionId: main, precon })).statusCode).toBe(502);
+    database.prepare("UPDATE sealed_decks SET cards = ? WHERE code = ? AND name = ?").run(
+      JSON.stringify([{ scryfallId: "unknown", setCode: "xxx", number: "9", count: 1, foil: false, zone: "main" }]), precon.code, precon.name,
+    );
+    expect((await call("POST", open, { count: 1, collectionId: main, precon })).statusCode).toBe(400);
+    expect((await call("GET", `/api/purchases/${entry.id}`)).json().openings).toHaveLength(0);
+
+    database.prepare("UPDATE sealed_decks SET file_name = ?, cards = NULL WHERE code = ? AND name = ?").run("LandingParty_TRK", precon.code, precon.name);
+    database.prepare("INSERT INTO collection_cards (collection_id, card_id, quantity) VALUES (?, ?, ?)").run(main, "island", 9995);
+    expect((await call("POST", open, { count: 1, collectionId: main, precon })).statusCode).toBe(400);
+    expect((await call("GET", `/api/purchases/${entry.id}`)).json().openings).toHaveLength(0);
+    const opening = (await call("POST", open, { count: 1, collectionId: main })).json();
+    const result = await call("POST", `/api/purchases/openings/${opening.id}/precon`, { precon });
+    expect(result.statusCode).toBe(400);
+    expect(result.json().error).toContain("10,000");
+    const after = (await call("GET", `/api/purchases/${entry.id}`)).json();
+    expect(after.openings[0].cards).toBe(0);
+    expect(after.ties).toHaveLength(0);
+    expect((await call("GET", `/api/collections/${main}/cards`)).json().map((card: { id: string; quantity: number }) => [card.id, card.quantity])).toEqual([["island", 9995]]);
+  });
 });
 
 describe("rarity set symbols", () => {

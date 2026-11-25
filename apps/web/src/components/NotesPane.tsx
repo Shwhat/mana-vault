@@ -16,6 +16,7 @@ import { Icon } from "../icons";
 import { choiceDialog, closeDialog, confirmDialog, customDialog, dialog } from "./Dialog";
 import { rowMenu } from "./ContextMenu";
 import { NoteEditor } from "./NoteEditor";
+import { WikiGuide } from "./About";
 
 export type NotesScope = { kind: NoteKind; itemId: string; name: string } | null;
 type Status = "saved" | "saving" | "waiting" | "error";
@@ -379,13 +380,13 @@ function pageMenu(store: Store, page: PageMeta, open: (id: string) => void) {
     { label: "New child page...", run: () => newPageDialog(store, { parentId: page.id }, (made) => open(made.id)) },
     !page.top && { label: "Rename...", run: () => renameDialog(store, page) },
     { label: page.pinned ? "Unpin" : "Pin", run: () => void pinPage(page.id, !page.pinned).catch((reason) => store.fail(reason, "Could not pin the page.")) },
-    { label: "Save as template...", run: () => void readPage(page.id).then((detail) => saveTemplateDialog(store, detail)) },
+    page.builtin !== "about" && { label: "Save as template...", run: () => void readPage(page.id).then((detail) => saveTemplateDialog(store, detail)) },
     !page.top && { label: "Move to...", run: () => moveToDialog(store, page) },
     { label: "Export...", run: () => exportDialog(store, page) },
     { label: "New child page from web address...", run: () => newPageFromWeb(store, { parentId: page.id }, (made) => open(made.id)) },
     { label: "Import pages here...", run: () => void importPages(store, { parentId: page.id }) },
-    { label: "History...", run: () => void readPage(page.id).then((detail) => historyDialog(detail, () => void reloadNotes())) },
-    !page.top && { label: "Delete...", run: () => void askDelete(store, page) },
+    page.builtin !== "about" && { label: "History...", run: () => void readPage(page.id).then((detail) => historyDialog(detail, () => void reloadNotes())) },
+    !page.top && page.builtin !== "about" && { label: "Delete...", run: () => void askDelete(store, page) },
   ]);
 }
 
@@ -773,6 +774,20 @@ function PageView({ id, open, onGone }: { id: string; open: (id: string) => void
 
 // ---------- the pane ----------
 
+function GuidePage({ page, open }: { page: PageMeta; open: (id: string) => void }) {
+  const store = useApp();
+  useEffect(() => { pageOpened(page.id); }, [page.id]);
+  return (
+    <div className="nmain nguide">
+      <div className="nhead">
+        <h2 className="ntitle">{page.title}</h2>
+        <button type="button" className="btn small" aria-label="More" onClick={(event) => pageMenu(store, page, open).onContextMenu(event)}>More...</button>
+      </div>
+      <WikiGuide />
+    </div>
+  );
+}
+
 /** Opens a page in the Wiki tab. */
 export function openWikiPage(id: string) {
   setKept("wiki:open", id);
@@ -799,6 +814,7 @@ export function NotesPane({ scope, view }: { scope: NotesScope; view: string }) 
   }, [scope?.kind, scope?.itemId, openId, setOpenId, store]);
   // a page that was deleted or moved away is closed
   const known = openId && tree?.pages.some((page) => page.id === openId);
+  const selected = tree?.pages.find((page) => page.id === openId);
   useEffect(() => {
     if (tree && openId && !known && !scope) setOpenId(null);
   }, [tree, openId, known, scope, setOpenId]);
@@ -819,7 +835,7 @@ export function NotesPane({ scope, view }: { scope: NotesScope; view: string }) 
       {(!phone || !showTree) && (
         <div className="nmain">
           {phone && <div className="btnrow nphonebar"><button type="button" className="btn small" onClick={() => setShowTree(true)}>Pages</button></div>}
-          {openId ? <PageView key={openId} id={openId} open={open} onGone={() => setOpenId(null)} /> : (
+          {openId && selected?.builtin === "about" ? <GuidePage key={openId} page={selected} open={open} /> : openId ? <PageView key={openId} id={openId} open={open} onGone={() => setOpenId(null)} /> : (
             <div className="empty">
               <Icon name="notes" />
               <b>{scope ? "Loading the notes" : "Open a page from the list, or make one"}</b>

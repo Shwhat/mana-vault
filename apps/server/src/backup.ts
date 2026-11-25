@@ -186,6 +186,17 @@ export function restoreBackup(database: DatabaseSync, source: string, userId: nu
   const insertCard = cardInsertStatement(database);
   const knownSets = new Set(database.prepare("SELECT DISTINCT set_code FROM cards").all().map((row) => String(row.set_code)));
   const customIds = new Set(backup.customCards.map((card) => card.id));
+  const usedInDeck = new Set([
+    ...backup.deckCards.flatMap((card) => [card.printing_id, card.want_card_id].filter((id): id is string => typeof id === "string")),
+    ...backup.deckLinks.map((link) => link.card_id),
+  ]);
+  for (const card of backup.cards) {
+    if (!customIds.has(String(card.id)) || !usedInDeck.has(String(card.id))) continue;
+    const existing = database.prepare("SELECT c.oracle_id FROM cards c JOIN custom_cards cc ON cc.id = c.id WHERE c.id = ?").get(String(card.id));
+    if (existing && existing.oracle_id !== card.oracle_id) {
+      throw new Error(`The printing link of ${String(card.name)} has changed since this backup. Restore its previous link before restoring the backup.`);
+    }
+  }
   const bytes = (value: string | null) => (value ? new Uint8Array(Buffer.from(value, "base64")) : null);
   database.exec("BEGIN");
   try {

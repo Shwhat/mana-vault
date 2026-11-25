@@ -93,3 +93,15 @@ test("an import with purchase prices asks how to record them", async ({ page }) 
   const list = await (await page.request.get("/api/purchases")).json() as { entries: Array<{ date: string; out: number }> };
   expect(list.entries.map((entry) => [entry.date, entry.out])).toEqual([["2026-03-01", 6]]);
 });
+
+test("purchase history scrolls horizontally in a narrow pane", async ({ page }) => {
+  await signUp(page, "buyscroll");
+  await modeTab(page, "Purchases");
+  await page.getByRole("tab", { name: "History" }).click();
+  const history = page.locator(".purchasehistory");
+  await history.evaluate((element) => { element.style.width = "280px"; });
+  const wrapper = history.locator(".gridwrapper");
+  await expect.poll(() => wrapper.evaluate((element) => element.scrollWidth - element.clientWidth)).toBeGreaterThan(0);
+  await wrapper.evaluate((element) => { element.scrollLeft = element.scrollWidth; });
+  await expect.poll(() => wrapper.evaluate((element) => element.scrollLeft)).toBeGreaterThan(0);
+});

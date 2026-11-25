@@ -32,10 +32,14 @@ The **All**, **Commander**, **Main**, **Sideboard** and **Maybe** buttons above 
 - **The deck switcher**: the button with the deck's name at the left of the deck view header (on a phone, at the top of the Decks tab). It opens a list of every deck with its cover card, commander, format and card count. Type to find a deck by name, commander or format; Up and Down move through the list, Enter opens the highlighted deck and Esc closes the list. One click on a deck makes it where new cards go and keeps the list open; a double click opens it. In the Android app one tap opens the deck, and the open deck is where new cards go; browsers work as described here. **Sort** orders the list by Recently opened, Name, Date created, Card count, Format or Commander; the choice is kept for your account. **New deck...** is at the bottom of the list.
 - **Decks panel**: decks are grouped by format, each with its card count and value. One click on a deck makes it where new cards go without leaving the view you are in (see [Collections](/about/collections)); a double click opens it in the deck view. The deck shows **Adding here** while it is where cards go. Right-click or long press a deck for its menu: Open, Rename..., Deck format..., Send to print list..., Send..., Export..., Delete or Leave. **Send to print list...** asks each time what to send: **The whole deck (not the maybeboard)**, **Missing cards only**, or **Chosen zones** (Commander, Main deck, Sideboard, Maybeboard). Each card goes in its deck printing and count, as one step that can be undone.
 - **Open deck...** (Ctrl+O) lists every deck with its format and card count.
-- **New deck...** (File menu, Decks panel, deck switcher) asks for the name and format. **Create deck** creates it and opens it.
+- **New deck...** (File menu, Decks panel, deck switcher) asks for the name and format. **Create deck** creates it and opens it; **Choose a precon...** opens the preconstructed deck list instead.
 - **Add to...** in the scanner offers **New deck...** too (see [Scanning cards](/about/scanning-cards)).
 
 Opening a deck closes the About guide. The last deck you opened opens again the next time you sign in.
+
+The Decks panel, deck switcher and Deck list header show color-identity symbols and possible theme labels. When a deck has commanders, the symbols show their combined color identity; otherwise they show the main deck's combined identity. A nonempty colorless deck shows the colorless symbol.
+
+Theme labels are suggestions from repeated card text, not definitive archetypes: at least two different cards in the main deck or commander zone must match a mechanic's text signal (for example, Tokens looks for creating tokens). The supported signals are Landfall, Tokens, Food, Amass, Treasure, Clues, Counters, Sacrifice, Graveyard, Lifegain, Mill, Cycling and Proliferate. Sideboard and maybeboard cards do not affect the symbols or themes. The deck search in the panel and switcher can find these labels.
 
 ### Add precon as deck...
 
@@ -307,7 +311,7 @@ Adding cards (by search, Quick add or the scanner), changing counts, moving betw
 **Add deck to collection...** puts the deck's cards into a collection as copies, for example after building a deck with Edit as text from cards you have in hand. It is beside Edit as text on the Add tab (**To collection**), and in a deck's right-click menu in the Decks panel and the deck switcher.
 
 1. Choose **Add deck to collection...**.
-2. Pick the **Collection** (the deck's own collection or the target collection first). Wishlists are not offered.
+2. Pick the **Collection** (the deck's own collection or the target collection first). Wishlists are not offered. If you have no collections, **New collection...** is selected with the deck's name suggested; enter a name to create one.
 3. Pick **Cards to add**: **Missing cards only, linked to the deck** adds a copy for every card the deck is missing; **Every card as new copies** adds a copy for every card in the deck, even cards already filled by copies you own.
 4. Choose **Add cards**.
 

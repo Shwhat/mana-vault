@@ -29,6 +29,64 @@ function fetchResponses(metadata: unknown, download: Response): typeof fetch {
   }) as unknown as typeof fetch;
 }
 
+describe("Scryfall rulings import", () => {
+  it("imports current compressed JSONL rulings and records the update", async () => {
+    const database = new DatabaseSync(":memory:");
+    initializeDatabase(database);
+    try {
+      const ruling = { oracle_id: "oracle-1", published_at: "2026-01-01", source: "wotc", comment: "A ruling" };
+      const fetcher = fetchResponses({ data: [{ type: "rulings", jsonl_download_uri: "https://data.scryfall.io/rulings.jsonl.gz" }] },
+        new Response(gzipSync(`${JSON.stringify(ruling)}\n\n`)));
+      expect(await importRulings(database, fetcher)).toBe(1);
+      expect(database.prepare("SELECT oracle_id, published_at, source, comment FROM rulings").get()).toMatchObject(ruling);
+      expect(database.prepare("SELECT value FROM catalog_metadata WHERE key = 'rulings_at'").get()?.value).toBeTruthy();
+    } finally {
+      database.close();
+    }
+  });
+
+  it("continues to import legacy JSON arrays", async () => {
+    const database = new DatabaseSync(":memory:");
+    initializeDatabase(database);
+    try {
+      const fetcher = fetchResponses({ data: [{ type: "rulings", download_uri: "https://data.scryfall.io/rulings.json" }] },
+        Response.json([{ oracle_id: "legacy", comment: "Legacy ruling" }]));
+      expect(await importRulings(database, fetcher)).toBe(1);
+      expect(database.prepare("SELECT comment FROM rulings WHERE oracle_id = 'legacy'").get()?.comment).toBe("Legacy ruling");
+    } finally {
+      database.close();
+    }
+  });
+
+  it("keeps existing rulings and update time when a JSONL import fails", async () => {
+    const database = new DatabaseSync(":memory:");
+    initializeDatabase(database);
+    try {
+      database.prepare("INSERT INTO rulings (oracle_id, published_at, source, comment) VALUES (?, ?, ?, ?)").run("old", "", "", "Old ruling");
+      database.prepare("INSERT INTO catalog_metadata (key, value) VALUES ('rulings_at', 'old-date')").run();
+      const fetcher = fetchResponses({ data: [{ type: "rulings", jsonl_download_uri: "https://data.scryfall.io/rulings.jsonl.gz" }] },
+        new Response(gzipSync('{"oracle_id":"new","comment":"New"}\ninvalid\n')));
+      await expect(importRulings(database, fetcher)).rejects.toThrow();
+      expect(database.prepare("SELECT oracle_id, comment FROM rulings").all()).toMatchObject([{ oracle_id: "old", comment: "Old ruling" }]);
+      expect(database.prepare("SELECT value FROM catalog_metadata WHERE key = 'rulings_at'").get()?.value).toBe("old-date");
+    } finally {
+      database.close();
+    }
+  });
+
+  it("reports a corrupt compressed rulings download", async () => {
+    const database = new DatabaseSync(":memory:");
+    initializeDatabase(database);
+    try {
+      const fetcher = fetchResponses({ data: [{ type: "rulings", jsonl_download_uri: "https://data.scryfall.io/rulings.jsonl.gz" }] },
+        new Response("not gzip"));
+      await expect(importRulings(database, fetcher)).rejects.toThrow();
+    } finally {
+      database.close();
+    }
+  });
+});
+
 describe("Scryfall bulk-data downloader", () => {
   it("uses the current JSONL URL, decompresses gzip, and reports download progress", async () => {
     const path = await outputPath();
@@ -152,6 +210,21 @@ describe("importRulings", () => {
       new Response(JSON.stringify(rulings)),
     );
     expect(await importRulings(database, fetcher)).toBe(2);
+  });
+
+  it("finds rulings by name when the type is unavailable", async () => {
+    const database = new DatabaseSync(":memory:");
+    initializeDatabase(database);
+    try {
+      const fetcher = fetchResponses(
+        { data: [{ name: "Rulings", download_uri: "https://data.scryfall.io/rulings.json" }] },
+        Response.json(rulings),
+      );
+      expect(await importRulings(database, fetcher)).toBe(2);
+      expect(stored(database)).toEqual(["o-1: First.", "o-2: Second."]);
+    } finally {
+      database.close();
+    }
   });
 
   it("keeps the previous rulings when there is no download URL", async () => {

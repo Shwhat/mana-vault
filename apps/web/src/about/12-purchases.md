@@ -43,7 +43,7 @@ Each kind shows as a badge in the history, so the history can be filtered by it.
 | Field | Type | Required | Default | Notes |
 |---|---|---|---|---|
 | Date | Calendar date | Yes | Today | Orders the history and places the entry on the chart |
-| Bought from, Sold to or on, Traded with | A place, up to 120 characters | No | Empty | Places on the server are offered while typing. A name that is not in the list is added as a new place when the entry is saved (shown as **New place** beside the field) |
+| Bought from, Sold to or on, Traded with | A place, up to 120 characters | No | Empty | Places on the server are offered while typing. A name that is not in the list is added as a new place when the entry is saved (shown as **New place** under the field) |
 | Note | Text, up to 1000 characters | No | Empty | Shown in the history and found by the find box |
 
 Amounts are what you type; Mana Vault does not change them. Every amount is 0 or more.
@@ -56,7 +56,7 @@ A purchase has one line per product.
 |---|---|---|
 | Product | Play booster, Draft booster, Set booster, Collector booster, Jumpstart booster, Other booster, Booster box, Bundle, Commander deck, Starter or other deck, Prerelease kit, Secret Lair, Single cards, Other | |
 | Product name | Text, up to 120 characters | Required for Other, optional for the rest. The name of a named product, such as a Commander deck ("Landing Party") or a bundle ("Beam Me Up Bundle"). The list under the field holds the named products of the line's set and product; any other name can be typed |
-| Set | A set from a searchable list, or No set | Each set shows its symbol, name, code in capitals and year. Type to find a set by name or code |
+| Set | A set from a searchable list, or No set | Each set shows its symbol, name, code in capitals and year. Type to find a set by name or code. Custom sets are included even before cards are added |
 | Quantity | Whole number from 1 to 10000 | A line cannot go below what is opened or sold |
 | Cost each, Total | Amounts | Typing either one fills the other |
 | Packs in it | Whole number from 0 to 1000 | Filled for common products: Booster box 36, Bundle 9, Prerelease kit 6, a booster 1; can be changed for boxes, bundles, kits, Secret Lairs and Other |
@@ -68,7 +68,7 @@ A new purchase starts with no lines. **Add product** adds a product line.
 
 The named products of each set (Commander decks, bundles, boxes and other sealed products, with their decklists for preconstructed decks) are downloaded with every card database update. The Product name list shows the products of the line's set, its parent set and its companion sets, of the line's product (every product for Other), with each product's full name and "decklist" when it has one.
 
-A name picked from the list, or typed exactly as a listed product's name (case and punctuation ignored), links the line to that product; beside the field, **Listed product** or **Listed product, with decklist** shows the link. Changing the set, the product or the name checks the link again when the purchase is saved. A name that is not listed is kept as typed.
+A name picked from the list, or typed exactly as a listed product's name (case and punctuation ignored), links the line to that product; under the field, **Listed product** or **Listed product, with decklist** shows the link. Changing the set, the product or the name checks the link again when the purchase is saved. A name that is not listed is kept as typed.
 
 The product name shows beside the product in the entry's product table, in the opening list, in the history description and in the names of the line's openings.
 
@@ -108,6 +108,8 @@ When lines look like single cards, a **Match cards** step comes first. A line lo
 
 Each line shows the receipt text, the quantity and the price, and the best guess: the card's picture, name, set, collector number, condition and finish. The set comes from a bracketed set name or code, a version word (Showcase, Borderless, Extended Art, Full art) picks the matching printing, Foil or Etched the finish, and the condition word the condition (Near Mint when none).
 
+For a plain Foil note, the guess prefers an ordinary foil over a special foil when the other printing details match. A named special foil, such as Surge foil, is preferred when the receipt specifies it. If the guessed foil type differs from the receipt, a warning asks you to check the printing.
+
 | Button | What it does |
 |---|---|
 | OK | Keeps the guess |
@@ -135,7 +137,7 @@ Example: 6 Play boosters for 30.00 and a Bundle for 10.00, with 3.00 tax and 1.0
 A product line is sealed until it is opened.
 
 1. On the entry page, **Open...** on a line asks the collection the pulled cards go to and, for a product with packs in it (Packs in it above 0, such as a booster, a booster box or a bundle), **Open how many packs?** out of the packs left (for example 3 of 36 left in the box). A product with no packs in it (a Commander deck) asks how many of it to open. Once packs are opened the button reads **Open more packs...**.
-2. Each pack opened is its own **opening**, named with its number in the product, like "Pack 1 of 36, Booster box, Foundations (Purchase of Nov 20)". The first is where pulled cards are tied; the other packs opened at the same time wait in order. **Next pack** (on the entry page, NEXT PACK in the status bar, beside the opening chip in the Purchases header, and on the scanner) ends the current pack and moves to the next one; the last pack has **Done opening**. The status bar shows OPENING: name (1 of 3). A product with no packs makes one opening, named like "1 Commander deck, Star Trek (Purchase of Nov 20)". A line with a product name uses it instead of the product: "Landing Party, Star Trek Commander (Purchase of Nov 20)", "Pack 1 of 9, Beam Me Up Bundle, Star Trek Commander (Purchase of Nov 20)".
+2. Each pack opened is its own **opening**, named with its number in the product, like "Pack 1 of 36, Booster box, Foundations (Purchase of Nov 20)". The first is where pulled cards are tied; the other packs opened at the same time wait in order. **Next pack** (on the entry page, NEXT PACK in the status bar, beside the opening chip in the Purchases header, and on the scanner) ends the current pack and moves to the next one. **Done opening** on the entry page ends the current opening even when packs are waiting. The status bar shows OPENING: name (1 of 3). A product with no packs makes one opening, named like "1 Commander deck, Star Trek (Purchase of Nov 20)". A line with a product name uses it instead of the product: "Landing Party, Star Trek Commander (Purchase of Nov 20)", "Pack 1 of 9, Beam Me Up Bundle, Star Trek Commander (Purchase of Nov 20)".
 3. While the opening is active, every card added to that collection is tied to it: from card search, Quick add, the scanner, pasted lists, imports and count changes. The status bar shows **OPENING: name**, and ADDING TO names the opening. A pulled card stays on its pack for good: removing it from the collection, moving it, changing its printing, selling it or trading it never takes it off the pack. Only **Remove from pack...** on the entry page does, and an undo of adding the card (the card was added by mistake).
 4. The opening on the entry page has buttons to fill it:
 
@@ -146,13 +148,17 @@ A product line is sealed until it is opened.
 | Add existing copies... | Copies already in collections, with a find box and a count; the copies chosen are tied to the opening |
 | Done opening | Ends the opening |
 
-5. A click on **OPENING** in the status bar, or on the opening chip in the Purchases header, opens the entry. **Continue opening** makes an ended opening active again, so a box of 36 packs can be recorded over several days.
+5. A click on **OPENING** in the status bar, or on the opening chip in the Purchases header, opens the entry. After **Done opening**, return to the purchase entry and use **Continue opening** on the ended pack or **Start this pack** on a waiting pack. Waiting packs remain available, so a box of 36 packs can be recorded over several days.
 
 ### Opening a named deck with a decklist
 
 Open... on a line linked to a named deck with a decklist (such as a Commander deck) has **Add the decklist of name**, on to start with. Opening then adds every card of the decklist (the commander and the main deck) to the chosen collection, once for each deck opened, in the printing the decklist names and foil where the decklist says so, in Near Mint and English. Each card is tied to the opening with its value when pulled, and the opening is ended at once. The status bar says "N cards of name added to collection and tied to opening", and how many cards of the decklist are not in the card database.
 
 The decklist is downloaded the first time the deck is opened and kept. When it cannot be downloaded, the deck opens as a product with no decklist and the status bar says so. Printings and finishes can be changed afterward in the collection; the cards stay on the opening. With the box cleared, the deck opens as any product with no packs.
+
+For a Commander deck not linked to a decklist, **Choose a decklist...** in Open... searches the precon catalog. Select a deck, then open it to add and tie its cards. This can also replace the linked decklist for that opening; it does not change the purchase line. If the selected decklist cannot be loaded, the product stays sealed so you can retry.
+
+An existing Commander deck opening has **Add decklist...** (also in its right-click menu). Choose a catalog precon and **Add cards** to add its commander and main-deck cards to the opening's collection and tie them to the opening. The list is added once for each deck in that opening, in addition to any cards already there. This can be undone and redone; the opening remains active or ended as it was.
 
 A box counts as opened from its first pack: its State shows packs opened and packs left (such as "3 of 36 packs opened, 33 left"), and its packs not yet opened keep counting at the box's value divided by its packs. A waiting pack has **Start this pack**; an ended pack has **Continue opening**. Undo of Open... removes every pack opened at the same time, with their cards' ties.
 

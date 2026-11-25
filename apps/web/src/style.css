@@ -439,6 +439,9 @@ dialog::backdrop{background:rgba(20,28,40,.35)}
 .colline .meter{flex:1}
 .colline.sub{margin:0}
 .colline .cnt{margin-left:0}
+.deckprofile{display:flex;align-items:center;flex-wrap:wrap;gap:3px;white-space:normal}
+.deckcolors{display:inline-flex;align-items:center;gap:2px}
+.decktheme{font-size:10px}
 .setpick{margin-top:8px}
 .chips{display:flex;flex-wrap:wrap;gap:4px;margin:6px 0}
 .chip{display:inline-flex;align-items:center;gap:4px;padding:1px 4px 1px 8px;border-radius:8px;background:var(--accent-soft);color:var(--on-text);font-size:11.5px}
@@ -1234,6 +1237,7 @@ ul.skipped{max-height:40vh;overflow:auto;margin:6px 0 0;padding-left:18px;font-s
 
 /* ---------- 0.16.0: purchase history ---------- */
 #view-purchases .purchasewrap{padding:10px 12px;overflow:auto}
+#view-purchases #pagetabs{max-height:45%;overflow:auto}
 .purchasetiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;margin:8px 0 12px}
 .stvalue.gain.up,.numcell.gain.up,.pfig .gain.up{color:#1f7a32}
 .stvalue.gain.down,.numcell.gain.down,.pfig .gain.down{color:var(--err)}
@@ -1274,6 +1278,9 @@ input.setcode{width:60px}
 .pfig b{font-size:16px;font-variant-numeric:tabular-nums}
 .purchaseedit .pelines{width:100%;margin:8px 0}
 .purchaseedit .pelines input{padding:3px 6px;border:1px solid var(--line);border-radius:3px;background:var(--panel2);color:var(--text)}
+.peproduct{display:flex;flex-direction:column;align-items:stretch;gap:4px;min-width:200px}
+.peproduct .picker{width:100%}
+.peproduct .combo{display:block;flex:none;min-width:0}
 .purchaseedit input.num{width:80px;text-align:right}
 .pesingle td{background:var(--panel)}
 .pesingle .suggestwrap{width:220px}
@@ -1287,7 +1294,7 @@ input.setcode{width:60px}
 .combo{position:relative;display:inline-block;flex:1;min-width:200px}
 .combo input{width:100%}
 .combolist{position:absolute;left:0;right:0;top:100%;z-index:40;margin-top:2px;max-height:240px;overflow:auto;background:var(--panel2);border:1px solid var(--line);border-radius:4px;box-shadow:0 6px 18px rgba(0,0,0,.18)}
-.comboadd{position:absolute;right:8px;top:50%;transform:translateY(-50%);pointer-events:none;font-size:11px}
+.comboadd{display:block;pointer-events:none;font-size:11px}
 .setpick{min-width:170px;max-width:240px}
 .setpick .pkval,.pktext .ss{white-space:nowrap}
 .singlefind{border:1px solid var(--line2);border-radius:4px;padding:8px;margin:6px 0;background:var(--panel)}
@@ -1532,6 +1539,8 @@ input.setcode{width:60px}
 .tfold:disabled{cursor:default}
 .tpin{color:var(--warn);font-weight:700}
 .nmain{display:flex;flex-direction:column;min-height:0;min-width:0;overflow:hidden}
+.nguide{flex:1}
+.nguide .nhead{padding:8px 14px}
 .notespane.phone .nmain{flex:1}
 .nphonebar{padding:6px 8px 0}
 .npage{flex:1;display:flex;flex-direction:column;min-height:0;min-width:0;padding:8px 14px 0}

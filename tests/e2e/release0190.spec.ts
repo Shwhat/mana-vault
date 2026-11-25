@@ -149,6 +149,31 @@ test("a read receipt sends card lines to Match cards, and they become single car
   await expect(editor.locator("#pe-note, input[aria-label='Note']").first()).toHaveValue("Order #A-1234");
 });
 
+test("receipt matching warns when the suggested foil type may be wrong", async ({ page }) => {
+  await signUp(page, "receiptfoilwarning");
+  await page.route("**/api/purchases/receipts/read", async (route) => {
+    const response = await route.fetch();
+    const body = await response.json();
+    const card = body.fields.lines[0].card;
+    card.promoTypes = "surgefoil";
+    card.warning = "The guessed printing's foil type may not match the receipt. Check the printing.";
+    await route.fulfill({ response, json: body });
+  });
+  const pdf = await PDFDocument.create();
+  const sheet = pdf.addPage([400, 400]);
+  const font = await pdf.embedFont(StandardFonts.Helvetica);
+  ["Lightning Bolt [Magic 2010] $12.00", "Near Mint Foil"].forEach((text, index) => sheet.drawText(text, { x: 20, y: 370 - index * 24, size: 12, font }));
+  await modeTab(page, "Purchases");
+  const chooser = page.waitForEvent("filechooser");
+  await page.locator("#view-purchases").getByRole("button", { name: "Read receipt..." }).click();
+  await (await chooser).setFiles({ name: "order.pdf", mimeType: "application/pdf", buffer: Buffer.from(await pdf.save()) });
+  const bolt = page.locator("dialog#dlg[open] .matchrow", { hasText: "Lightning Bolt" });
+  await expect(bolt.locator(".badge.foil")).toHaveText("SURGE FOIL");
+  await expect(bolt.locator(".note.err")).toContainText("foil type may not match");
+  await bolt.getByRole("button", { name: "OK" }).click();
+  await expect(bolt.locator(".note.err")).toHaveCount(0);
+});
+
 test("opening packs one at a time: Next pack, figures per pack and Move to pack", async ({ page }) => {
   await signUp(page, "v19packs");
   const main = await mainCollection(page);
@@ -176,4 +201,52 @@ test("opening packs one at a time: Next pack, figures per pack and Move to pack"
   await page.locator("dialog#dlg[open]").getByRole("button", { name: /^Pack 2 of 36/ }).click();
   await expect(status(page)).toContainText("Serra Angel moved to Pack 2 of 36");
   await expect(page.locator(".purchaseentry tbody tr", { hasText: "Serra Angel" })).toContainText("Pack 2");
+});
+
+test("multiple packs can be paused and resumed later", async ({ page }) => {
+  await signUp(page, "v19pausepacks");
+  const main = await mainCollection(page);
+  const entry = await (await page.request.post("/api/purchases", { headers, data: {
+    kind: "purchase", date: "2026-11-06", place: "Shop", currency: "usd", tax: 0, shipping: 0, lines: [{ product: "booster_box", setCode: "lea", quantity: 1, cost: 72, packs: 36 }],
+  } })).json() as { id: string };
+  await page.reload();
+  await page.waitForSelector("#titlebar");
+  await openEntry(page, entry.id);
+  await page.locator(".purchaseentry tbody tr", { hasText: "Booster box" }).getByRole("button", { name: "Open..." }).click();
+  await page.locator("#op-count").fill("3");
+  await page.locator("dialog#dlg[open]").getByRole("button", { name: "Open", exact: true }).click();
+  const first = page.locator(".packrow", { hasText: "Pack 1 of 36" });
+  await expect(first.getByRole("button", { name: "Next pack" })).toBeVisible();
+  expect((await page.request.post(`/api/collections/${main}/cards/add`, { headers, data: { items: [copy("serra")] } })).ok()).toBeTruthy();
+  await first.getByRole("button", { name: "Done opening" }).click();
+  await expect(status(page)).toHaveText("Done opening");
+  await expect(page.locator("#st-opening")).toHaveCount(0);
+  expect((await page.request.post(`/api/collections/${main}/cards/add`, { headers, data: { items: [copy("swords")] } })).ok()).toBeTruthy();
+
+  await page.reload();
+  await page.waitForSelector("#titlebar");
+  await openEntry(page, entry.id);
+  await expect(first.getByRole("button", { name: "Continue opening" })).toBeVisible();
+  await expect(page.locator(".packrow.waiting")).toHaveCount(2);
+  await first.getByRole("button", { name: "Continue opening" }).click();
+  await expect(page.locator("#st-opening")).toContainText("PACK 1 OF 36");
+  expect((await page.request.post(`/api/collections/${main}/cards/add`, { headers, data: { items: [copy("llanowar")] } })).ok()).toBeTruthy();
+  await first.getByRole("button", { name: "Next pack" }).click();
+  const second = page.locator(".packrow", { hasText: "Pack 2 of 36" });
+  await expect(page.locator("#st-opening")).toContainText("PACK 2 OF 36");
+  await second.getByRole("button", { name: "Done opening" }).click();
+  await expect(page.locator("#st-opening")).toHaveCount(0);
+  const third = page.locator(".packrow", { hasText: "Pack 3 of 36" });
+  await third.getByRole("button", { name: "Start this pack" }).click();
+  await expect(page.locator("#st-opening")).toContainText("PACK 3 OF 36");
+
+  const full = await (await page.request.get(`/api/purchases/${entry.id}`)).json() as {
+    openings: Array<{ id: string; packNumber: number; active: boolean; waiting: boolean }>;
+    ties: Array<{ cardId: string; openingId: string }>;
+  };
+  expect(full.openings.map(({ packNumber, active, waiting }) => [packNumber, active, waiting])).toEqual([[1, false, false], [2, false, false], [3, true, false]]);
+  expect(full.ties.map(({ cardId, openingId }) => [cardId, openingId])).toEqual(expect.arrayContaining([
+    ["serra", full.openings[0]!.id], ["llanowar", full.openings[0]!.id],
+  ]));
+  expect(full.ties.some(({ cardId }) => cardId === "swords")).toBe(false);
 });

@@ -2,9 +2,27 @@
 
 The installed version is shown at the top of this guide.
 
-## 0.24.2 (2026-11-23): Rulings download
+## 0.24.6 (2026-11-25): Scryfall rulings
 
-- Fixed: rulings never downloaded ("Scryfall rulings metadata has no download URL"). Scryfall now lists rulings as a compressed JSON Lines file, which the card database update now reads, with the older file still accepted.
+- Fixed rulings downloads for Scryfall's current compressed JSON Lines format. Update the card database to load rulings.
+
+## 0.24.5 (2026-11-25): Commander deck openings
+
+- Select a catalog precon and add its decklist when opening an unmatched Commander deck or to an existing opening.
+
+## 0.24.4 (2026-11-24): Custom cards and purchase fixes
+
+- Custom card fields and saved previews open while their artwork loads.
+- Receipt matching recognizes named special foils, prefers ordinary foils for plain foil notes, and warns about mismatches.
+- Purchase product selectors and names stay stacked and aligned.
+
+## 0.24.3 (2026-11-24): Library, purchases and scanner improvements
+
+- Custom cards can be linked to an official card and appear among its printings.
+- Decks show color identity and possible themes, can be created from a precon, and can create a collection when adding a deck.
+- Pack openings can be paused and resumed. The built-in About guide is also available as a movable Wiki page.
+- Purchase fields no longer have status text over the input, custom set symbols appear in the set picker, and purchase history scrolls in narrow panes.
+- Adding a card to a wishlist offers its printings and finishes. With a set filter, the scanner matches the selected language and warns when it is unavailable.
 
 ## 0.24.1 (2026-11-23): Scryfall online search
 

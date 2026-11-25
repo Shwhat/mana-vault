@@ -27,6 +27,54 @@ const body = async (page: Page, title: string) => {
   return ((await (await page.request.get(`/api/notes/pages/${found.id}`)).json()) as { body: string }).body;
 };
 
+test("the built-in About guide opens in the Wiki and can be moved", async ({ page }) => {
+  await signUp(page, "v22aboutwiki");
+  await modeTab(page, "Wiki");
+  await newWikiPage(page, "My notes");
+  const myPages = page.getByRole("tree", { name: "My pages" });
+  await expect(myPages.locator('[role="treeitem"] .ttitle')).toHaveText(["My notes", "About Mana Vault"]);
+  const guide = myPages.getByRole("treeitem", { name: /About Mana Vault/ });
+  await guide.click();
+  await expect(page.locator("#view-wiki .abpage h1")).toHaveText("Overview");
+  await page.locator("#view-wiki .abtoc").getByRole("link", { name: "Decks", exact: true }).click();
+  await expect(page.locator("#view-wiki .abpage h1")).toHaveText("Decks");
+  await page.locator("#view-wiki .abpage").getByRole("link", { name: /Previous:/ }).click();
+  await expect(page.locator("#view-wiki .abpage h1")).not.toHaveText("Decks");
+  await guide.click({ button: "right" });
+  await page.locator("#ctxmenu [role=menuitem]", { hasText: "Move to..." }).click();
+  const move = page.locator("dialog#dlg[open]");
+  await move.getByRole("button", { name: /^Move to/ }).click();
+  await page.locator(".pkpop .pkopt", { hasText: "Under My notes" }).click();
+  await move.getByRole("button", { name: "Move", exact: true }).click();
+  await expect(status(page)).toHaveText("About Mana Vault moved");
+  await expect(guide).toHaveAttribute("aria-level", "2");
+  await page.reload();
+  await modeTab(page, "Wiki");
+  await expect(guide).toHaveAttribute("aria-level", "2");
+  await guide.click();
+  await expect(page.locator("#view-wiki .abpage h1")).toHaveText("Overview");
+});
+
+test("the built-in guide works in the phone Wiki", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await signUp(page, "v22aboutphone");
+  expect((await page.request.post("/api/notes/pages", { headers: guard, data: { title: "Phone notes" } })).ok()).toBeTruthy();
+  await page.reload();
+  await page.getByRole("button", { name: "Wiki", exact: true }).click();
+  await page.getByRole("treeitem", { name: /About Mana Vault/ }).click();
+  await expect(page.locator("#view-wiki .abpage h1")).toHaveText("Overview");
+  await choose(page, page.locator("#view-wiki .abselect"), "decks");
+  await expect(page.locator("#view-wiki .abpage h1")).toHaveText("Decks");
+  await page.locator("#view-wiki").getByRole("button", { name: "More" }).click();
+  await page.locator("#ctxmenu [role=menuitem]", { hasText: "Move to..." }).click();
+  const move = page.locator("dialog#dlg[open]");
+  await choose(page, move.getByRole("button", { name: /^Move to/ }), { label: "Under Phone notes" });
+  await move.getByRole("button", { name: "Move", exact: true }).click();
+  await expect(move).toHaveCount(0);
+  await page.locator("#view-wiki").getByRole("button", { name: "Pages", exact: true }).click();
+  await expect(page.getByRole("treeitem", { name: /About Mana Vault/ })).toHaveAttribute("aria-level", "2");
+});
+
 test("the Wiki makes pages with rich text, links, child pages, search and pins", async ({ page }) => {
   await signUp(page, "v22wiki");
   await modeTab(page, "Wiki");
@@ -215,10 +263,10 @@ test("collection notes, Move to..., drag and drop, delete with undo, and picture
   await page.locator("#ctxmenu [role=menuitem]", { hasText: "Delete..." }).first().click();
   await page.locator("dialog#dlg[open]").getByRole("button", { name: "Delete with child pages" }).click();
   await expect(status(page)).toHaveText("Binder plan deleted");
-  expect((await notes(page)).pages.map((item) => item.title)).toEqual(["Main collection"]);
+  expect((await notes(page)).pages.map((item) => item.title).sort()).toEqual(["About Mana Vault", "Main collection"]);
   await page.keyboard.press("Control+z");
   await expect(status(page)).toHaveText("Undone: Delete Binder plan");
-  expect((await notes(page)).pages.map((item) => item.title).sort()).toEqual(["Binder plan", "Loose idea", "Main collection"]);
+  expect((await notes(page)).pages.map((item) => item.title).sort()).toEqual(["About Mana Vault", "Binder plan", "Loose idea", "Main collection"]);
 });
 
 test("markdown import of a folder zip, export as a zip, and templates", async ({ page }) => {
@@ -244,7 +292,7 @@ test("markdown import of a folder zip, export as a zip, and templates", async ({
   await page.locator("dialog#dlg[open]").getByRole("button", { name: "The whole Wiki" }).click();
   const files = unzipSync(readFileSync(await (await download).path()));
   const names = Object.keys(files).sort();
-  expect(names.filter((name) => name.endsWith(".md"))).toEqual(["Vault.md", "Vault/Decks.md", "Vault/Decks/Elves.md"]);
+  expect(names.filter((name) => name.endsWith(".md"))).toEqual(["About Mana Vault.md", "Vault.md", "Vault/Decks.md", "Vault/Decks/Elves.md"]);
   expect(names.some((name) => /^attachments\/[0-9a-f-]{36}\.png$/.test(name))).toBe(true);
   expect(strFromU8(files["Vault/Decks/Elves.md"]!)).toMatch(/!\[elf\.png\]\(\.\.\/\.\.\/attachments\/[0-9a-f-]{36}\.png\)/);
   // import under a chosen page

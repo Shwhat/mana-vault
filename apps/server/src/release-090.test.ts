@@ -2,6 +2,7 @@ import { APP_VERSION } from "./backup.js";
 // Tests for 0.9.0: finish marks in deck lists, card database updates that skip bad records, change printing,
 // custom cards and sets, and the print list.
 import { DatabaseSync } from "node:sqlite";
+import { gunzipSync } from "node:zlib";
 import { afterEach, describe, expect, it } from "vitest";
 import { buildApp } from "./app.js";
 import { cardExtrasStatement, cardInsertStatement, cardPricesStatement } from "./database.js";
@@ -185,6 +186,94 @@ describe("custom cards and sets", () => {
     legalities: { commander: "legal" }, price: { usd: 3.5 }, ...extra,
   });
 
+  it("links and unlinks custom printings, keeping existing deck entries consistent", async () => {
+    const { call, database } = await server();
+    await call("POST", "/api/custom/sets", { code: "xxx", name: "My Set" });
+    const input = card({ front: { ...front, name: "Sauron, the Dark Lord" } });
+    const id = (await call("POST", "/api/custom/cards", { card: input, picture: PNG })).json().id as string;
+    const deck = (await call("POST", "/api/decks", { name: "Custom printing", format: "commander" })).json() as { id: string };
+    const entry = (await call("POST", `/api/decks/${deck.id}/cards`, { cardId: id, quantity: 1, zone: "main" })).json() as { entryId: number };
+    const backup = (await call("GET", "/api/backup")).body;
+    expect((await call("GET", "/api/cards/sa1/printings")).json().map((item: { id: string }) => item.id)).not.toContain(id);
+    expect((await call("PUT", `/api/custom/cards/${id}`, { card: { ...input, printingOf: "sa1" } })).statusCode).toBe(200);
+    for (const printing of ["sa1", "sa2", id]) {
+      expect((await call("GET", `/api/cards/${printing}/printings`)).json().map((item: { id: string }) => item.id)).toEqual(expect.arrayContaining(["sa1", "sa2", id]));
+    }
+    expect((await call("GET", `/api/custom/cards/${id}`)).json().printingOf).toMatchObject({ name: "Sauron, the Dark Lord" });
+    const compact = JSON.parse(gunzipSync((await call("GET", "/api/catalog/compact")).rawPayload).toString()) as { fields: string[]; rows: unknown[][] };
+    const idIndex = compact.fields.indexOf("id");
+    const oracleIndex = compact.fields.indexOf("oracle_id");
+    expect(compact.rows.find((row) => row[idIndex] === id)?.[oracleIndex]).toBe("o-sauron");
+    expect(database.prepare("SELECT oracle_id FROM deck_cards WHERE id = ?").get(entry.entryId)?.oracle_id).toBe("o-sauron");
+    const restore = await call("POST", "/api/backup/restore", backup);
+    expect(restore.statusCode).toBe(400);
+    expect(restore.json().error).toContain("printing link");
+    expect(database.prepare("SELECT oracle_id FROM deck_cards WHERE id = ?").get(entry.entryId)?.oracle_id).toBe("o-sauron");
+    expect((await call("PUT", `/api/decks/${deck.id}/entries/${entry.entryId}/printing`, { cardId: "sa1" })).statusCode).toBe(200);
+    expect((await call("PUT", `/api/decks/${deck.id}/entries/${entry.entryId}/printing`, { cardId: id })).statusCode).toBe(200);
+    // Older clients that omit the new field do not remove the link.
+    expect((await call("PUT", `/api/custom/cards/${id}`, { card: input })).statusCode).toBe(200);
+    expect(database.prepare("SELECT oracle_id FROM cards WHERE id = ?").get(id)?.oracle_id).toBe("o-sauron");
+    expect((await call("PUT", `/api/custom/cards/${id}`, { card: { ...input, printingOf: null } })).statusCode).toBe(200);
+    const oracle = String(database.prepare("SELECT oracle_id FROM cards WHERE id = ?").get(id)?.oracle_id);
+    expect(oracle).toMatch(/^custom-oracle-/);
+    expect(database.prepare("SELECT oracle_id FROM deck_cards WHERE id = ?").get(entry.entryId)?.oracle_id).toBe(oracle);
+    expect((await call("GET", `/api/cards/${id}/printings`)).json().map((item: { id: string }) => item.id)).toEqual([id]);
+    expect((await call("PUT", `/api/custom/cards/${id}`, { card: { ...input, printingOf: id } })).statusCode).toBe(400);
+    expect((await call("PUT", `/api/custom/cards/${id}`, { card: { ...input, printingOf: "missing" } })).statusCode).toBe(400);
+  });
+
+  it("prevents a link change that would invalidate deck copy links or upgrade wishes", async () => {
+    const { call } = await server();
+    await call("POST", "/api/custom/sets", { code: "xxx", name: "My Set" });
+    const input = card({ printingOf: "sa1" });
+    const id = (await call("POST", "/api/custom/cards", { card: input, picture: PNG })).json().id as string;
+    const deck = (await call("POST", "/api/decks", { name: "Linked", format: "commander" })).json() as { id: string };
+    const entry = (await call("POST", `/api/decks/${deck.id}/cards`, { cardId: "sa1", quantity: 1, zone: "main" })).json() as { entryId: number };
+    expect((await call("PUT", `/api/decks/${deck.id}/entries/${entry.entryId}/upgrade`, { cardId: id })).statusCode).toBe(200);
+    const result = await call("PUT", `/api/custom/cards/${id}`, { card: { ...input, printingOf: null } });
+    expect(result.statusCode).toBe(409);
+    expect(result.json().error).toContain("upgrade wishes");
+    expect((await call("GET", `/api/cards/${id}/printings`)).json().map((item: { id: string }) => item.id)).toContain("sa1");
+  });
+
+  it("keeps a saved link when its official printing is temporarily missing from the catalog", async () => {
+    const { call, database } = await server();
+    await call("POST", "/api/custom/sets", { code: "xxx", name: "My Set" });
+    const printingOf = { id: "sa1", name: "Sauron, the Dark Lord" };
+    const input = card({ printingOf: printingOf.id });
+    const id = (await call("POST", "/api/custom/cards", { card: input, design: { printingOf }, picture: PNG })).json().id as string;
+    database.prepare("DELETE FROM cards WHERE oracle_id = ? AND custom = 0").run("o-sauron");
+    expect((await call("GET", `/api/custom/cards/${id}`)).json().printingOf).toEqual(printingOf);
+    expect((await call("PUT", `/api/custom/cards/${id}`, { card: input, design: { printingOf } })).statusCode).toBe(200);
+    expect(database.prepare("SELECT oracle_id FROM cards WHERE id = ?").get(id)?.oracle_id).toBe("o-sauron");
+    expect((await call("PUT", `/api/custom/cards/${id}`, { card: { ...input, printingOf: "unknown" } })).statusCode).toBe(400);
+  });
+
+  it("preserves linked deck copies when a custom printing is in use", async () => {
+    const { call } = await server();
+    await call("POST", "/api/custom/sets", { code: "xxx", name: "My Set" });
+    const input = card({ printingOf: "sa1" });
+    const id = (await call("POST", "/api/custom/cards", { card: input, picture: PNG })).json().id as string;
+    const collection = (await call("GET", "/api/collections")).json()[0].id as string;
+    await call("POST", `/api/collections/${collection}/cards/add`, { items: [{ cardId: id, foil: 0, condition: "NM", language: "en", quantity: 1 }] });
+    const deck = (await call("POST", "/api/decks", { name: "Linked copies", format: "commander" })).json() as { id: string };
+    const added = await call("POST", `/api/decks/${deck.id}/cards`, {
+      cardId: id, quantity: 1, zone: "main",
+      links: [{ collectionId: collection, cardId: id, foil: 0, condition: "NM", language: "en", quantity: 1 }],
+    });
+    expect(added.statusCode).toBe(201);
+    expect(added.json().linked).toBe(1);
+    expect((await call("PUT", `/api/custom/cards/${id}`, { card: { ...input, printingOf: null } })).statusCode).toBe(200);
+    const backup = (await call("GET", "/api/backup")).body;
+    expect((await call("POST", "/api/backup/restore", backup)).statusCode).toBe(200);
+    const restoredDeck = (await call("GET", "/api/decks")).json()[0].id as string;
+    const restored = (await call("GET", `/api/decks/${restoredDeck}`)).json().cards[0];
+    expect(restored).toMatchObject({ card_id: id, missing: 0 });
+    expect(restored.oracle_id).toMatch(/^custom-oracle-/);
+    expect(restored.links).toHaveLength(1);
+  });
+
   it("makes custom sets with codes no other set uses", async () => {
     const { call } = await server();
     expect((await call("POST", "/api/custom/sets", { code: "XXX", name: "My Set", releasedAt: "2026-11-01", symbol: PNG })).statusCode).toBe(201);
@@ -194,6 +283,9 @@ describe("custom cards and sets", () => {
     const sets = (await call("GET", "/api/custom/sets")).json();
     expect(sets).toEqual([expect.objectContaining({ code: "xxx", name: "My Set", ownerName: "ann", hasSymbol: true, cardCount: 0 })]);
     expect((await call("GET", "/api/sets?q=My")).json()).toEqual([]);
+    expect((await call("GET", "/api/sets?q=My&includeCustom=1")).json()).toEqual([
+      expect.objectContaining({ code: "xxx", name: "My Set", printings: 0, symbolUrl: expect.stringContaining("/api/custom/sets/xxx/symbol") }),
+    ]);
   });
 
   it("saves a custom card as a card in the card database for every account", async () => {

@@ -104,6 +104,8 @@ The card maker makes custom cards with a live preview. A saved custom card is a 
 
 The list on the left shows every custom card under a heading for its custom set, with its number, type and maker, and a search box. A right-click (long press) on a set heading opens the custom set menu: **Edit set...**, **Show its cards**, **New card in this set** and **Delete...**. The card maker opens on the card opened last; with no card made yet, it starts a new one. **New card** starts an empty card in the set chosen last with the next free collector number. **Custom sets...** opens the Custom sets tab on the card's set (on a new set when no set is chosen), and **Edit set...** in a set heading's menu opens it on that set. Clicking a card opens it. Leaving a card with changes that are not saved asks first. The card being made stays while other views are used.
 
+The card's fields and saved preview open while its art loads. If you edit before the art loads, the live preview appears without it until loading finishes. Saving, duplicating, exporting and changing art wait until it has loaded; if loading fails, use **Retry loading art**.
+
 Custom sets are reached from the **Custom sets** tab beside Print and Card maker; the card maker's list has no Custom sets... button. **Edit set...** on a set heading's right-click menu opens the Custom sets tab with that set chosen.
 
 ### Buttons
@@ -123,6 +125,7 @@ Custom sets are reached from the **Custom sets** tab beside Print and Card maker
 | Field | Notes |
 |---|---|
 | Custom set | The custom set the card belongs to; required |
+| Printing of | Optionally choose an existing official card, such as Sol Ring, to show this custom card in its printing chooser and Versions tab. The custom card keeps its own design and card data. Remove the link to make it independent again; save to apply either change |
 | Collector number | Up to 10 letters, digits and dashes, unique in the set |
 | Rarity | Common, Uncommon, Rare, Mythic rare or Special. Picks the set's symbol for that rarity when it has one, and colors the main symbol when the set uses rarity colors |
 | Artist | Shown on the card's information line as "Illus." |
@@ -271,6 +274,8 @@ SVG symbols are cleaned when they are saved: scripts, event handlers, links to o
 
 - Custom cards and custom sets are shared by every account on the server. Each shows who made it, and only that account can change or delete it.
 - Custom cards work like every other card: card search (also `is:custom` and `set:XXX`), collections, decks with format checks by the chosen legality, deck import and Quick add by name or set and number, trades, statistics, exports and the print list. They show a Custom badge. The scanner does not match them.
+- Linked custom printings share the existing card's identity for owned-card counts and deck matching. Changing or removing a link is blocked if it would make a deck's linked copies or upgrade wishes incompatible; remove those links or wishes first.
+- If an older backup contains a deck using a custom card whose printing link has since changed, restore the card's previous link before restoring that backup.
 - Card database updates never change or remove custom cards.
 - A custom card that is in another account's collection, deck or trade cannot be deleted. Deleting one that is only in your own collections and decks removes those copies and deck cards too.
 - Backups include the custom sets and custom cards you made or use, with their pictures and art.

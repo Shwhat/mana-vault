@@ -2,6 +2,7 @@
 import { SetIcon } from "../components/CardMarks";
 import { Suggest } from "../components/Suggest";
 import { SymbolText } from "../components/SymbolPicker";
+import { DeckProfile } from "../components/DeckProfile";
 import { useEffect, useState } from "react";
 import { request } from "../api";
 import type { Action } from "../actions";
@@ -193,7 +194,7 @@ export function DecksPanel({ actions }: { actions: Record<string, Action> }) {
   const oneClick = opensOnClick(store);
   const [term, setTerm] = useState("");
   const words = term.trim().toLowerCase();
-  const shown = store.decks.filter((deck) => `${deck.name} ${deck.commander ?? ""}`.toLowerCase().includes(words));
+  const shown = store.decks.filter((deck) => `${deck.name} ${deck.commander ?? ""} ${(deck.themes ?? []).join(" ")}`.toLowerCase().includes(words));
   return (
     <div className="pbody flush">
       <div className="navbar">
@@ -219,6 +220,7 @@ export function DecksPanel({ actions }: { actions: Record<string, Action> }) {
                 <span className="colline sub">
                   <span className="cnt">{deck.card_count ?? 0} cards, {money(deck.value?.[store.prefs.currency] ?? 0, store.prefs.currency)}</span>
                 </span>
+                <DeckProfile deck={deck} />
               </div>
             );
           })}
@@ -300,6 +302,7 @@ export function DeckListPanel({ actions }: { actions: Record<string, Action> }) 
       <div className="dlhead">
         <div className="ident">{deck.name}</div>
         <div className="sub">{formatName(deck.format)}, {total} cards</div>
+        <DeckProfile deck={deck} />
         <ZoneButtons actions={actions} />
       </div>
       {deck.cards.length === 0 && <p className="note pad">This deck is empty</p>}

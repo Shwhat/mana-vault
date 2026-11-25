@@ -35,10 +35,12 @@ Light text on dark title bars (borderless and showcase frames) is read as well. 
 
 | The card was read by | What happens |
 |---|---|
-| Set code and collector number | That printing is added. With a set filter, a printing from another set is not added: the message shows "Not in set: card name (SET)" in red |
-| Name only | The printings that fit are the card's printings in the filter sets (all sets without a filter), without promos when Ignore promos is on. None: "Not in set: card name". One: it is added. More than one: with **Quick mode** on, the newest is added; with Quick mode off, the printing picker opens |
+| Set code and collector number | That printing is added. With a set filter, a printing from another set is not added: the message shows "Not in set: card name (SET)" in red. If the language differs from the strip, the matching set and collector number in the selected language is used instead |
+| Name only | The printings that fit are the card's printings in the filter sets and selected language (all sets and languages without a set filter), without promos when Ignore promos is on. None: a warning is shown. One: it is added. More than one: with **Quick mode** on, the newest is added; with Quick mode off, the printing picker opens |
 
 The **printing picker** opens over the lower half of the camera. It shows a **Filter sets** box and a row of card pictures that scrolls sideways, each with its set name, set code and collector number. Tapping a picture adds that printing. **Skip** closes the picker without adding the card. Scanning pauses while the picker is open.
+
+With a set filter, if the selected language is unavailable in the matching printings, the scanner warns and does not add the card. The database must include the language's printings.
 
 ## Camera controls
 

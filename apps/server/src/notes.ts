@@ -59,6 +59,7 @@ export function initializeNotes(database: DatabaseSync): void {
       created_at TEXT NOT NULL DEFAULT (${now}),
       updated_at TEXT NOT NULL DEFAULT (${now}),
       updated_by INTEGER,
+      builtin TEXT,
       deleted_at TEXT
     );
     CREATE INDEX IF NOT EXISTS note_pages_item ON note_pages(kind, item_id);
@@ -115,6 +116,8 @@ export function initializeNotes(database: DatabaseSync): void {
       DELETE FROM note_files WHERE page_id = OLD.id;
     END;
   `);
+  const columns = new Set(database.prepare("PRAGMA table_info(note_pages)").all().map((row) => String(row.name)));
+  if (!columns.has("builtin")) database.exec("ALTER TABLE note_pages ADD COLUMN builtin TEXT");
   // pages deleted more than a day ago are gone for good (undo works for an hour)
   database.prepare("DELETE FROM note_pages WHERE deleted_at IS NOT NULL AND deleted_at < strftime('%Y-%m-%d %H:%M:%f', 'now', '-1 day')").run();
   descriptionPages(database);
@@ -144,7 +147,7 @@ const READABLE = `p.deleted_at IS NULL AND (
 
 type Page = {
   id: string; owner_id: number; kind: NoteKind | null; item_id: string | null; parent_id: string | null; title: string; body: string;
-  position: number; version: number; created_at: string; updated_at: string; updated_by: number | null;
+  position: number; version: number; created_at: string; updated_at: string; updated_by: number | null; builtin: string | null;
 };
 
 function pageOf(database: DatabaseSync, id: string, userId: number): Page | null {
@@ -156,6 +159,7 @@ const toPage = (row: Row): Page => ({
   id: String(row.id), owner_id: Number(row.owner_id), kind: (row.kind as NoteKind | null) ?? null, item_id: (row.item_id as string | null) ?? null,
   parent_id: (row.parent_id as string | null) ?? null, title: String(row.title), body: String(row.body), position: Number(row.position),
   version: Number(row.version), created_at: String(row.created_at), updated_at: String(row.updated_at), updated_by: row.updated_by === null ? null : Number(row.updated_by),
+  builtin: typeof row.builtin === "string" ? row.builtin : null,
 });
 
 function itemName(database: DatabaseSync, kind: NoteKind, id: string): string | null {
@@ -315,12 +319,17 @@ function snippet(text: string, words: string[]): string {
 
 type PageMeta = {
   id: string; title: string; kind: NoteKind | null; itemId: string | null; parentId: string | null; position: number;
-  updatedAt: string; updatedBy: string; version: number; pinned: boolean; empty: boolean; top: boolean;
+  updatedAt: string; updatedBy: string; version: number; pinned: boolean; empty: boolean; top: boolean; builtin: string | null;
 };
 
 export function notesTree(database: DatabaseSync, userId: number) {
+  if (!database.prepare("SELECT 1 FROM note_pages WHERE owner_id = ? AND builtin = 'about' AND deleted_at IS NULL").get(userId)) {
+    const position = Number(database.prepare("SELECT COALESCE(MAX(position), 0) + 1 AS position FROM note_pages WHERE owner_id = ? AND parent_id IS NULL AND item_id IS NULL AND deleted_at IS NULL").get(userId)!.position);
+    database.prepare("INSERT INTO note_pages (id, owner_id, title, body, position, updated_by, builtin) VALUES (?, ?, ?, ?, ?, ?, 'about')")
+      .run(randomUUID(), userId, "About Mana Vault", "[Open the About Mana Vault guide](/about)\n", position, userId);
+  }
   const rows = database.prepare(
-    `SELECT p.id, p.title, p.kind, p.item_id, p.parent_id, p.position, p.updated_at, p.version, p.body = '' AS empty, u.name AS by_name,
+    `SELECT p.id, p.title, p.kind, p.item_id, p.parent_id, p.position, p.updated_at, p.version, p.builtin, p.body = '' AS empty, u.name AS by_name,
             EXISTS(SELECT 1 FROM note_pins n WHERE n.user_id = :me AND n.page_id = p.id) AS pinned
      FROM note_pages p LEFT JOIN users u ON u.id = p.updated_by WHERE ${READABLE} ORDER BY p.position, p.created_at`,
   ).all({ me: userId });
@@ -338,7 +347,7 @@ export function notesTree(database: DatabaseSync, userId: number) {
     return {
       id: String(row.id), title: top && kind && itemId ? nameOf(kind, itemId) ?? String(row.title) : String(row.title), kind, itemId, parentId,
       position: Number(row.position), updatedAt: String(row.updated_at), updatedBy: String(row.by_name ?? ""), version: Number(row.version),
-      pinned: Number(row.pinned) === 1, empty: Number(row.empty) === 1, top,
+      pinned: Number(row.pinned) === 1, empty: Number(row.empty) === 1, top, builtin: typeof row.builtin === "string" ? row.builtin : null,
     };
   });
   const items = [...new Set(pages.filter((page) => page.kind && page.itemId).map((page) => `${page.kind}:${page.itemId}`))].map((key) => {
@@ -367,7 +376,7 @@ function pageDetail(database: DatabaseSync, page: Page, userId: number) {
   return {
     id: page.id, title, body: page.body, kind: page.kind, itemId: page.item_id, parentId: page.parent_id, position: page.position, version: page.version,
     updatedAt: page.updated_at, updatedBy: userName(database, page.updated_by), createdAt: page.created_at, top, backlinks,
-    pinned: !!database.prepare("SELECT 1 FROM note_pins WHERE user_id = ? AND page_id = ?").get(userId, page.id),
+    pinned: !!database.prepare("SELECT 1 FROM note_pins WHERE user_id = ? AND page_id = ?").get(userId, page.id), builtin: page.builtin,
   };
 }
 
@@ -431,7 +440,7 @@ function claimPictures(database: DatabaseSync, pageId: string, body: string, use
 // ---------- backups ----------
 
 export type NotesBackup = {
-  pages: Array<{ id: string; kind: NoteKind | null; item_id: string | null; parent_id: string | null; title: string; body: string; position: number; created_at: string; updated_at: string }>;
+  pages: Array<{ id: string; kind: NoteKind | null; item_id: string | null; parent_id: string | null; title: string; body: string; position: number; created_at: string; updated_at: string; builtin?: string | null }>;
   versions: Array<{ page_id: string; title: string; body: string; at: string }>;
   files: Array<{ id: string; page_id: string | null; name: string; type: string; bytes: string }>;
   pins: string[];
@@ -441,12 +450,13 @@ export type NotesBackup = {
 /** The account's pages: those on its own decks and collections and those not attached to anything, with their versions and pictures. */
 export function notesBackup(database: DatabaseSync, userId: number): NotesBackup {
   const pages = database.prepare(
-    `SELECT id, kind, item_id, parent_id, title, body, position, created_at, updated_at FROM note_pages p WHERE deleted_at IS NULL AND (
+    `SELECT id, kind, item_id, parent_id, title, body, position, created_at, updated_at, builtin FROM note_pages p WHERE deleted_at IS NULL AND (
        (item_id IS NULL AND owner_id = :me) OR (kind = 'deck' AND item_id IN (SELECT id FROM decks WHERE owner_id = :me))
        OR (kind = 'collection' AND item_id IN (SELECT id FROM collections WHERE owner_id = :me))) ORDER BY created_at`,
   ).all({ me: userId }).map((row) => ({
     id: String(row.id), kind: (row.kind as NoteKind | null) ?? null, item_id: (row.item_id as string | null) ?? null, parent_id: (row.parent_id as string | null) ?? null,
     title: String(row.title), body: String(row.body), position: Number(row.position), created_at: String(row.created_at), updated_at: String(row.updated_at),
+    builtin: typeof row.builtin === "string" ? row.builtin : null,
   }));
   const ids = new Set(pages.map((page) => page.id));
   const versions = database.prepare("SELECT page_id, title, body, at FROM note_versions ORDER BY at, id").all()
@@ -474,7 +484,7 @@ export function restoreNotes(database: DatabaseSync, userId: number, backup: Not
   const pageIds = new Map<string, string>();
   for (const page of backup.pages) pageIds.set(page.id, randomUUID());
   const insert = database.prepare(
-    "INSERT INTO note_pages (id, owner_id, kind, item_id, parent_id, title, body, position, created_at, updated_at, updated_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    "INSERT INTO note_pages (id, owner_id, kind, item_id, parent_id, title, body, position, created_at, updated_at, updated_by, builtin) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
   );
   for (const page of backup.pages) {
     const itemId = page.kind && page.item_id ? mapItem(page.kind, page.item_id) : null;
@@ -482,7 +492,8 @@ export function restoreNotes(database: DatabaseSync, userId: number, backup: Not
     // a deck or collection keeps one top page: the one from the backup replaces one made since
     if (page.kind && itemId && !page.parent_id) database.prepare("DELETE FROM note_pages WHERE kind = ? AND item_id = ? AND parent_id IS NULL").run(page.kind, itemId);
     insert.run(pageIds.get(page.id)!, userId, itemId ? page.kind : null, itemId, page.parent_id ? pageIds.get(page.parent_id) ?? null : null,
-      String(page.title).slice(0, TITLE_LIMIT), String(page.body).slice(0, BODY_LIMIT), Number(page.position) || 0, page.created_at, page.updated_at, userId);
+      String(page.title).slice(0, TITLE_LIMIT), String(page.body).slice(0, BODY_LIMIT), Number(page.position) || 0, page.created_at, page.updated_at, userId,
+      page.builtin === "about" ? "about" : null);
   }
   const exists = (id: string) => !!database.prepare("SELECT 1 FROM note_pages WHERE id = ?").get(id);
   for (const version of backup.versions ?? []) {
@@ -591,7 +602,12 @@ export function registerNoteRoutes(app: FastifyInstance, database: DatabaseSync)
     transaction(database, () => {
       database.prepare("INSERT INTO note_pages (id, owner_id, kind, item_id, parent_id, title, body, updated_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
         .run(id, userId, kind, itemId, parentId, title, text, userId);
-      placePage(database, id, parentId, kind, itemId, userId, typeof body.before === "string" ? body.before : null);
+      let before = typeof body.before === "string" ? body.before : null;
+      if (!parentId && !before) {
+        const last = database.prepare("SELECT id, builtin FROM note_pages WHERE owner_id = ? AND parent_id IS NULL AND item_id IS NULL AND deleted_at IS NULL AND id != ? ORDER BY position DESC, created_at DESC LIMIT 1").get(userId, id);
+        if (last?.builtin === "about") before = String(last.id);
+      }
+      placePage(database, id, parentId, kind, itemId, userId, before);
       if (text) addVersion(database, id, title, text, userId, clientOf(request));
       claimPictures(database, id, text, userId);
     });
@@ -672,6 +688,11 @@ export function registerNoteRoutes(app: FastifyInstance, database: DatabaseSync)
     if (!page) return missing(reply);
     if (isTop(page)) return reply.code(400).send({ error: "The top page of a deck or collection cannot be deleted. Clear its text instead." });
     const lift = request.query.children === "lift";
+    if (page.builtin === "about") return reply.code(400).send({ error: "The built-in About Mana Vault page cannot be deleted." });
+    const removing = lift ? [page.id] : [page.id, ...descendants(database, page.id)];
+    if (removing.some((id) => database.prepare("SELECT 1 FROM note_pages WHERE id = ? AND builtin = 'about'").get(id))) {
+      return reply.code(400).send({ error: "Move the About Mana Vault page elsewhere before deleting its parent." });
+    }
     const deleted: string[] = [page.id];
     const lifted: Array<{ id: string; parentId: string | null; position: number }> = [];
     transaction(database, () => {
@@ -902,10 +923,13 @@ export function registerNoteRoutes(app: FastifyInstance, database: DatabaseSync)
       }
       // pages put at the top of My pages follow the ones already there
       if (!rootParent) {
-        const last = Number(database.prepare("SELECT MAX(position) AS top FROM note_pages WHERE parent_id IS NULL AND item_id IS NULL AND owner_id = ? AND id NOT IN (SELECT value FROM json_each(?))")
-          .get(userId, JSON.stringify(created))?.top ?? 0);
+        const existing = database.prepare("SELECT id, builtin, position FROM note_pages WHERE parent_id IS NULL AND item_id IS NULL AND owner_id = ? AND deleted_at IS NULL AND id NOT IN (SELECT value FROM json_each(?)) ORDER BY position DESC, created_at DESC")
+          .all(userId, JSON.stringify(created));
+        const guide = existing[0]?.builtin === "about" ? existing[0] : null;
+        const last = Number((guide ? existing[1] : existing[0])?.position ?? 0);
         const shift = database.prepare("UPDATE note_pages SET position = position + ? WHERE id = ? AND parent_id IS NULL");
         for (const id of created) shift.run(last, id);
+        if (guide) database.prepare("UPDATE note_pages SET position = ? WHERE id = ?").run(last + created.length + 1, String(guide.id));
       }
     });
     return reply.code(201).send({ created: created.length, ids: created });
