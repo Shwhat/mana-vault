@@ -180,3 +180,59 @@ describe("Scryfall bulk-data downloader", () => {
     expect(fetcher).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("importRulings", () => {
+  const rulings = [
+    { object: "ruling", oracle_id: "o-1", source: "wotc", published_at: "2020-01-01", comment: "First." },
+    { object: "ruling", oracle_id: "o-2", source: "scryfall", published_at: "2021-02-02", comment: "Second." },
+  ];
+  const stored = (database: DatabaseSync) => database.prepare("SELECT oracle_id, comment FROM rulings ORDER BY oracle_id").all()
+    .map((row) => `${String(row.oracle_id)}: ${String(row.comment)}`);
+
+  it("reads the gzipped JSON Lines file when Scryfall lists only that", async () => {
+    const database = new DatabaseSync(":memory:");
+    initializeDatabase(database);
+    const lines = gzipSync(rulings.map((ruling) => JSON.stringify(ruling)).join("\n") + "\n");
+    const fetcher = fetchResponses(
+      { data: [{ type: "rulings", jsonl_download_uri: "https://data.scryfall.io/rulings/rulings.jsonl.gz" }] },
+      new Response(lines),
+    );
+    expect(await importRulings(database, fetcher)).toBe(2);
+    expect(stored(database)).toEqual(["o-1: First.", "o-2: Second."]);
+    expect(database.prepare("SELECT value FROM catalog_metadata WHERE key = 'rulings_at'").get()?.value).toBeTruthy();
+  });
+
+  it("still reads the older JSON array file", async () => {
+    const database = new DatabaseSync(":memory:");
+    initializeDatabase(database);
+    const fetcher = fetchResponses(
+      { data: [{ type: "rulings", download_uri: "https://data.scryfall.io/rulings/rulings.json" }] },
+      new Response(JSON.stringify(rulings)),
+    );
+    expect(await importRulings(database, fetcher)).toBe(2);
+  });
+
+  it("finds rulings by name when the type is unavailable", async () => {
+    const database = new DatabaseSync(":memory:");
+    initializeDatabase(database);
+    try {
+      const fetcher = fetchResponses(
+        { data: [{ name: "Rulings", download_uri: "https://data.scryfall.io/rulings.json" }] },
+        Response.json(rulings),
+      );
+      expect(await importRulings(database, fetcher)).toBe(2);
+      expect(stored(database)).toEqual(["o-1: First.", "o-2: Second."]);
+    } finally {
+      database.close();
+    }
+  });
+
+  it("keeps the previous rulings when there is no download URL", async () => {
+    const database = new DatabaseSync(":memory:");
+    initializeDatabase(database);
+    database.prepare("INSERT INTO rulings (oracle_id, published_at, source, comment) VALUES ('o-0', '', '', 'Kept.')").run();
+    const fetcher = fetchResponses({ data: [{ type: "rulings" }] }, new Response(""));
+    await expect(importRulings(database, fetcher)).rejects.toThrow("no download URL");
+    expect(stored(database)).toEqual(["o-0: Kept."]);
+  });
+});

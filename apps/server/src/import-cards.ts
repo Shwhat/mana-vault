@@ -332,11 +332,9 @@ export async function importRulings(database: DatabaseSync, fetcher: typeof fetc
   const metadataResponse = await fetcher(metadataUrl, { headers: { "User-Agent": userAgent } });
   if (!metadataResponse.ok) throw new Error(`Scryfall bulk-data request failed: ${metadataResponse.status}`);
   const metadata = await metadataResponse.json() as BulkMetadata;
-  const entry = Array.isArray(metadata.data)
-    ? metadata.data.find((item): item is Record<string, unknown> => typeof item === "object" && item !== null && (item as { type?: unknown }).type === "rulings")
-    : undefined;
-  const jsonlUri = typeof entry?.jsonl_download_uri === "string" && entry.jsonl_download_uri ? entry.jsonl_download_uri : null;
-  const uri = jsonlUri ?? (typeof entry?.download_uri === "string" ? entry.download_uri : null);
+  const entry = findBulk(metadata, (item) => /^rulings?$/i.test(String(item.type ?? "")) || /^rulings?$/i.test(String(item.name ?? "")));
+  const jsonlUri = optionalString(entry.jsonl_download_uri);
+  const uri = jsonlUri ?? optionalString(entry.download_uri);
   if (!uri) throw new Error("Scryfall rulings metadata has no download URL");
   let url: URL;
   try {
