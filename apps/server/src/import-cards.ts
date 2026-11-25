@@ -335,22 +335,40 @@ export async function importRulings(database: DatabaseSync, fetcher: typeof fetc
   const entry = Array.isArray(metadata.data)
     ? metadata.data.find((item): item is Record<string, unknown> => typeof item === "object" && item !== null && (item as { type?: unknown }).type === "rulings")
     : undefined;
-  const uri = typeof entry?.download_uri === "string" ? entry.download_uri : null;
-  if (!uri || !uri.startsWith("https://")) throw new Error("Scryfall rulings metadata has no download URL");
-  const response = await fetcher(uri, { headers: { "User-Agent": userAgent } });
+  const jsonlUri = typeof entry?.jsonl_download_uri === "string" && entry.jsonl_download_uri ? entry.jsonl_download_uri : null;
+  const uri = jsonlUri ?? (typeof entry?.download_uri === "string" ? entry.download_uri : null);
+  if (!uri) throw new Error("Scryfall rulings metadata has no download URL");
+  let url: URL;
+  try {
+    url = new URL(uri);
+  } catch {
+    throw new Error("Scryfall rulings metadata contains an invalid download URL");
+  }
+  if (url.protocol !== "https:") throw new Error("Scryfall rulings download URL must use HTTPS");
+  const response = await fetcher(url, { headers: { "User-Agent": userAgent } });
   if (!response.ok || !response.body) throw new Error(`Scryfall rulings download failed: ${response.status}`);
-  const isGzip = new URL(uri).pathname.toLowerCase().endsWith(".gz");
-  const source = chain([Readable.from(responseChunks(response.body)), isGzip ? createGunzip() : new PassThrough(), parser(), streamArray()]);
+  const isGzip = jsonlUri !== null || url.pathname.toLowerCase().endsWith(".gz");
+  const source = chain([Readable.from(responseChunks(response.body)), isGzip ? createGunzip() : new PassThrough()]);
   const insert = database.prepare("INSERT INTO rulings (oracle_id, published_at, source, comment) VALUES (?, ?, ?, ?)");
   let saved = 0;
+  const save = (value: unknown) => {
+    if (!value || typeof value !== "object") return;
+    const ruling = value as Record<string, unknown>;
+    if (typeof ruling.oracle_id !== "string" || typeof ruling.comment !== "string") return;
+    insert.run(ruling.oracle_id, typeof ruling.published_at === "string" ? ruling.published_at : "", typeof ruling.source === "string" ? ruling.source : "", ruling.comment);
+    saved += 1;
+  };
   database.exec("BEGIN");
   try {
     database.exec("DELETE FROM rulings");
-    for await (const item of source as AsyncIterable<{ value: unknown }>) {
-      const value = item.value as Record<string, unknown> | null;
-      if (!value || typeof value.oracle_id !== "string" || typeof value.comment !== "string") continue;
-      insert.run(value.oracle_id, typeof value.published_at === "string" ? value.published_at : "", typeof value.source === "string" ? value.source : "", value.comment);
-      saved += 1;
+    if (jsonlUri) {
+      for await (const line of createInterface({ input: source, crlfDelay: Infinity })) {
+        if (line.trim()) save(JSON.parse(line));
+      }
+    } else {
+      for await (const item of chain([source, parser(), streamArray()]) as AsyncIterable<{ value: unknown }>) {
+        save(item.value);
+      }
     }
     if (!saved) throw new Error("The rulings file held no rulings");
     database.prepare("INSERT INTO catalog_metadata (key, value) VALUES ('rulings_at', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value")

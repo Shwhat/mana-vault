@@ -2,6 +2,14 @@
 
 The installed version is shown at the top of this guide.
 
+## 0.24.6 (2026-11-25): Scryfall rulings
+
+- Fixed rulings downloads for Scryfall's current compressed JSON Lines format. Update the card database to load rulings.
+
+## 0.24.5 (2026-11-25): Commander deck openings
+
+- Select a catalog precon and add its decklist when opening an unmatched Commander deck or to an existing opening.
+
 ## 0.24.4 (2026-11-24): Custom cards and purchase fixes
 
 - Custom card fields and saved previews open while their artwork loads.
