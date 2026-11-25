@@ -108,6 +108,8 @@ When lines look like single cards, a **Match cards** step comes first. A line lo
 
 Each line shows the receipt text, the quantity and the price, and the best guess: the card's picture, name, set, collector number, condition and finish. The set comes from a bracketed set name or code, a version word (Showcase, Borderless, Extended Art, Full art) picks the matching printing, Foil or Etched the finish, and the condition word the condition (Near Mint when none).
 
+For a plain Foil note, the guess prefers an ordinary foil over a special foil when the other printing details match. A named special foil, such as Surge foil, is preferred when the receipt specifies it. If the guessed foil type differs from the receipt, a warning asks you to check the printing.
+
 | Button | What it does |
 |---|---|
 | OK | Keeps the guess |

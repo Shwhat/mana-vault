@@ -35,6 +35,8 @@ type Draft = {
 };
 /** The art of a face: the picture shown, its data to upload, and whether it changed since the last save. */
 type Art = { image: HTMLImageElement | null; data: string | null; changed: boolean };
+type ArtSources = { front: string | null; back: string | null };
+type ArtStatus = "ready" | "loading" | "error";
 
 const KIND_CHOICES: Choice[] = choices([["normal", "Normal"], ["creature", "Creature"], ["planeswalker", "Planeswalker"], ["saga", "Saga"], ["token", "Token"], ["split", "Split card"]]);
 const AUTO_CHOICES: Choice[] = choices([["auto", "Automatic"], ["on", "On"], ["off", "Off"]]);
@@ -193,7 +195,7 @@ function TokenPicker({ value, onChange, disabled }: { value: Draft["tokens"]; on
 }
 
 /** The card being made stays while other views are used, saved or not. */
-let memory: { id: string | null; ownerId: number | null; draft: Draft; arts: { front: Art; back: Art }; face: "front" | "back"; dirty: boolean } | null = null;
+let memory: { id: string | null; ownerId: number | null; draft: Draft; arts: { front: Art; back: Art }; artSources: ArtSources | null; artStatus: ArtStatus; face: "front" | "back"; dirty: boolean } | null = null;
 
 // ---------- the editor ----------
 export function CardMaker() {
@@ -205,12 +207,14 @@ export function CardMaker() {
   const [ownerId, setOwnerId] = useState<number | null>(memory?.ownerId ?? null);
   const [draft, setDraft] = useState<Draft>(memory?.draft ?? newDraft());
   const [arts, setArts] = useState<{ front: Art; back: Art }>(memory?.arts ?? { front: noArt(), back: noArt() });
+  const [artSources, setArtSources] = useState<ArtSources | null>(memory?.artSources ?? null);
+  const [artStatus, setArtStatus] = useState<ArtStatus>(memory?.artStatus ?? "ready");
   const [face, setFace] = useState<"front" | "back">(memory?.face ?? "front");
   const [symbols, setSymbols] = useState<Map<string, HTMLImageElement | null>>(new Map());
   const [setSymbol, setSetSymbol] = useState<HTMLImageElement | null>(null);
   const [busy, setBusy] = useState(false);
   const [dirty, setDirty] = useState(memory?.dirty ?? false);
-  useEffect(() => { memory = { id, ownerId, draft, arts, face, dirty }; }, [id, ownerId, draft, arts, face, dirty]);
+  useEffect(() => { memory = { id, ownerId, draft, arts, artSources, artStatus, face, dirty }; }, [id, ownerId, draft, arts, artSources, artStatus, face, dirty]);
   // the first time the card maker opens, it shows the card worked on last instead of a blank card
   const fresh = useRef(memory === null);
   const lastKey = `mana-vault.makerLast.${store.user.id}`;
@@ -228,6 +232,31 @@ export function CardMaker() {
   const current = face === "back" && draft.back ? draft.back : draft.front;
 
   const openRef = useRef<((summary: CustomCardSummary, quiet?: boolean) => Promise<void>) | null>(null);
+  const openSequence = useRef(0);
+  useEffect(() => () => { openSequence.current += 1; }, []);
+  useEffect(() => {
+    if (artStatus !== "loading" || !artSources) return;
+    let active = true;
+    const artOf = async (url: string | null): Promise<Art> => {
+      if (!url) return noArt();
+      const response = await fetchFile(url);
+      if (!response.ok) throw new Error(`The server could not load card art (${response.status}).`);
+      const blob = await response.blob();
+      const [image, data] = await Promise.all([loadPicture(blob), blobToData(blob)]);
+      if (!image) throw new Error("The card art could not be decoded.");
+      return { image, data, changed: false };
+    };
+    void Promise.all([artOf(artSources.front), artOf(artSources.back)]).then(([front, back]) => {
+      if (!active) return;
+      setArts({ front, back });
+      setArtStatus("ready");
+    }).catch((reason: unknown) => {
+      if (!active) return;
+      setArtStatus("error");
+      store.fail(reason, "Could not load the card art.");
+    });
+    return () => { active = false; };
+  }, [artSources, artStatus]);
   const loadLists = useCallback(async () => {
     try {
       const [cardList, setList] = await Promise.all([request<CustomCardSummary[]>("/api/custom/cards"), request<CustomSet[]>("/api/custom/sets")]);
@@ -336,47 +365,47 @@ export function CardMaker() {
 
   const startNew = async () => {
     if (!(await confirmLeave())) return;
+    openSequence.current += 1;
     const code = draft.setCode || sets[0]?.code || "";
     setId(null); setOwnerId(store.user.id); setFace("front");
     setDraft({ ...newDraft(code), collectorNumber: nextNumber(code, null) });
     setArts({ front: noArt(), back: noArt() });
+    setArtSources(null); setArtStatus("ready");
     setDirty(false);
   };
 
   /** A new card in a chosen custom set, numbered after its last card. */
   const newInSet = async (code: string) => {
     if (!(await confirmLeave())) return;
+    openSequence.current += 1;
     setId(null); setOwnerId(store.user.id); setFace("front");
     setDraft({ ...newDraft(code), collectorNumber: nextNumber(code, null) });
     setArts({ front: noArt(), back: noArt() });
+    setArtSources(null); setArtStatus("ready");
     setDirty(false);
   };
 
   const open = async (summary: CustomCardSummary, quiet = false) => {
     if (!quiet && !(await confirmLeave())) return;
+    const sequence = ++openSequence.current;
     try {
       const detail = await request<CustomCardDetail>(`/api/custom/cards/${encodeURIComponent(summary.id)}`);
+      if (sequence !== openSequence.current) return;
       const base = newDraft(summary.setCode);
       const design = detail.design ?? {};
       const loaded: Draft = {
         ...base, ...design, setCode: summary.setCode, collectorNumber: summary.collectorNumber, printingOf: detail.printingOf,
         front: { ...blankFace(), ...(design.front ?? {}) }, back: design.back ? { ...blankFace(), ...design.back } : null,
       };
-      const artOf = async (url: string | null): Promise<Art> => {
-        if (!url) return noArt();
-        const response = await fetchFile(url);
-        if (!response.ok) return noArt();
-        const blob = await response.blob();
-        return { image: await loadPicture(blob), data: await blobToData(blob), changed: false };
-      };
-      const [front, back] = await Promise.all([artOf(detail.artUrl), artOf(detail.backArtUrl)]);
       setId(detail.id); setOwnerId(detail.ownerId); setFace("front");
       remember(detail.id);
       setDraft(loaded);
-      setArts({ front, back });
+      setArts({ front: noArt(), back: noArt() });
+      setArtSources({ front: detail.artUrl, back: detail.backArtUrl });
+      setArtStatus(detail.artUrl || detail.backArtUrl ? "loading" : "ready");
       setDirty(false);
     } catch (reason) {
-      store.fail(reason, "Could not open the custom card.");
+      if (sequence === openSequence.current) store.fail(reason, "Could not open the custom card.");
     }
   };
   openRef.current = open;
@@ -434,8 +463,10 @@ export function CardMaker() {
       await request(`/api/custom/cards/${encodeURIComponent(id)}`, { method: "DELETE" });
       store.flash(`${draft.front.name} deleted`);
       setId(null); setOwnerId(null);
+      openSequence.current += 1;
       setDraft(newDraft(draft.setCode));
       setArts({ front: noArt(), back: noArt() });
+      setArtSources(null); setArtStatus("ready");
       setDirty(false);
       await loadLists();
       await store.refreshAfterChange();
@@ -527,12 +558,13 @@ export function CardMaker() {
     tap.current = null;
   };
   const showFull = () => {
-    if (store.phone && !moved.current && canvas.current) setFull(canvas.current.toDataURL("image/jpeg", 0.92));
+    if (store.phone && artStatus === "ready" && !moved.current && canvas.current) setFull(canvas.current.toDataURL("image/jpeg", 0.92));
     moved.current = false;
   };
 
   const words = term.trim().toLowerCase();
   const shown = (cards ?? []).filter((card) => `${card.name} ${card.setCode} ${card.typeLine}`.toLowerCase().includes(words));
+  const savedPreview = artStatus !== "ready" && !dirty ? cards?.find((card) => card.id === id)?.imageUrl : null;
   const textField = (key: "name" | "manaCost" | "typeLine" | "power" | "toughness" | "loyalty", label: string, placeholder = "") => (
     <div className="prow"><label htmlFor={`cm-${key}`}>{label}</label>
       <input id={`cm-${key}`} data-field={key} value={current[key]} placeholder={placeholder} disabled={!mine}
@@ -579,13 +611,15 @@ export function CardMaker() {
       <section className="makerform" aria-label="Card fields">
         {!mine && <p className="note">Made by {cards?.find((card) => card.id === id)?.ownerName ?? "another account"}. Only its maker can change it.</p>}
         <div className="btnrow">
-          <button type="button" className="btn primary" disabled={!mine || busy} onClick={() => void save()}>{id ? "Save" : "Save to card database"}</button>
-          <button type="button" className="btn small" disabled={!id} onClick={duplicate}>Duplicate</button>
-          <button type="button" className="btn small" onClick={exportPng}>Export PNG</button>
+          <button type="button" className="btn primary" disabled={!mine || busy || artStatus !== "ready"} onClick={() => void save()}>{id ? "Save" : "Save to card database"}</button>
+          <button type="button" className="btn small" disabled={!id || artStatus !== "ready"} onClick={duplicate}>Duplicate</button>
+          <button type="button" className="btn small" disabled={artStatus !== "ready"} onClick={exportPng}>Export PNG</button>
           <button type="button" className="btn small" disabled={!id || dirty}
             onClick={() => id && void store.addToPrintList([{ card: { id, name: draft.back ? `${draft.front.name} // ${draft.back.name}` : draft.front.name, set_code: draft.setCode, collector_number: draft.collectorNumber, custom: true, hasBack: !!draft.back }, count: 1, faces: draft.back ? "both" : "front" }], draft.front.name)}>Add to print list</button>
           <button type="button" className="btn small" disabled={!id || !mine} onClick={() => void remove()}>Delete...</button>
         </div>
+        {artStatus === "loading" && <p className="note" role="status">Loading card art...</p>}
+        {artStatus === "error" && <p className="note" role="alert">Card art could not be loaded. <button type="button" className="btn small" onClick={() => setArtStatus("loading")}>Retry loading art</button></p>}
         {dirty && <p className="note">Not saved yet</p>}
 
         <h4>Card</h4>
@@ -686,10 +720,10 @@ export function CardMaker() {
           </div>
         )}
         <div className="btnrow">
-          <button type="button" className="btn small" disabled={!mine} onClick={() => void uploadArt()}>Upload art...</button>
-          <button type="button" className="btn small" disabled={!mine} onClick={artFromLibrary}>Art library...</button>
-          <button type="button" className="btn small" disabled={!mine} onClick={artFromCard}>Art of a card...</button>
-          <button type="button" className="btn small" disabled={!mine || !arts[artWhich].image} onClick={() => setArt(artWhich, null, null)}>Remove art</button>
+          <button type="button" className="btn small" disabled={!mine || artStatus !== "ready"} onClick={() => void uploadArt()}>Upload art...</button>
+          <button type="button" className="btn small" disabled={!mine || artStatus !== "ready"} onClick={artFromLibrary}>Art library...</button>
+          <button type="button" className="btn small" disabled={!mine || artStatus !== "ready"} onClick={artFromCard}>Art of a card...</button>
+          <button type="button" className="btn small" disabled={!mine || artStatus !== "ready" || !arts[artWhich].image} onClick={() => setArt(artWhich, null, null)}>Remove art</button>
         </div>
         <div className="prow"><label htmlFor="cm-zoom">Zoom</label>
           <span className="numfield"><input id="cm-zoom" type="range" min={50} max={300} value={Math.round(artPlace.zoom * 100)} disabled={!mine || !arts[artWhich].image}
@@ -717,8 +751,12 @@ export function CardMaker() {
       </section>
 
       <section className="makerpreview" aria-label="Card preview">
-        <canvas ref={canvas} className="cardcanvas" width={WIDTH * SCALE} height={HEIGHT * SCALE} aria-label={`Preview of ${current.name || "the card"}`} role="img"
-          onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerUp} onPointerCancel={() => { drag.current = null; tap.current = null; }} onClick={showFull} />
+        {savedPreview ? (
+          <img className="cardcanvas" src={face === "back" ? `${savedPreview}&face=back` : savedPreview} alt={`Saved preview of ${current.name || "the card"}`} />
+        ) : (
+          <canvas ref={canvas} className="cardcanvas" width={WIDTH * SCALE} height={HEIGHT * SCALE} aria-label={`Preview of ${current.name || "the card"}`} role="img"
+            onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerUp} onPointerCancel={() => { drag.current = null; tap.current = null; }} onClick={showFull} />
+        )}
       </section>
       {symbolsOpen && <SymbolWindow phone={store.phone} disabled={!mine} onPick={insertSymbol} onClose={() => setSymbolsOpen(false)}
         target={symbolTarget === "rulesText" ? "the rules text" : "the mana cost"} />}

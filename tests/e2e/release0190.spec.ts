@@ -149,6 +149,31 @@ test("a read receipt sends card lines to Match cards, and they become single car
   await expect(editor.locator("#pe-note, input[aria-label='Note']").first()).toHaveValue("Order #A-1234");
 });
 
+test("receipt matching warns when the suggested foil type may be wrong", async ({ page }) => {
+  await signUp(page, "receiptfoilwarning");
+  await page.route("**/api/purchases/receipts/read", async (route) => {
+    const response = await route.fetch();
+    const body = await response.json();
+    const card = body.fields.lines[0].card;
+    card.promoTypes = "surgefoil";
+    card.warning = "The guessed printing's foil type may not match the receipt. Check the printing.";
+    await route.fulfill({ response, json: body });
+  });
+  const pdf = await PDFDocument.create();
+  const sheet = pdf.addPage([400, 400]);
+  const font = await pdf.embedFont(StandardFonts.Helvetica);
+  ["Lightning Bolt [Magic 2010] $12.00", "Near Mint Foil"].forEach((text, index) => sheet.drawText(text, { x: 20, y: 370 - index * 24, size: 12, font }));
+  await modeTab(page, "Purchases");
+  const chooser = page.waitForEvent("filechooser");
+  await page.locator("#view-purchases").getByRole("button", { name: "Read receipt..." }).click();
+  await (await chooser).setFiles({ name: "order.pdf", mimeType: "application/pdf", buffer: Buffer.from(await pdf.save()) });
+  const bolt = page.locator("dialog#dlg[open] .matchrow", { hasText: "Lightning Bolt" });
+  await expect(bolt.locator(".badge.foil")).toHaveText("SURGE FOIL");
+  await expect(bolt.locator(".note.err")).toContainText("foil type may not match");
+  await bolt.getByRole("button", { name: "OK" }).click();
+  await expect(bolt.locator(".note.err")).toHaveCount(0);
+});
+
 test("opening packs one at a time: Next pack, figures per pack and Move to pack", async ({ page }) => {
   await signUp(page, "v19packs");
   const main = await mainCollection(page);

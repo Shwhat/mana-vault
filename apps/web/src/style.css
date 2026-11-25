@@ -1278,6 +1278,9 @@ input.setcode{width:60px}
 .pfig b{font-size:16px;font-variant-numeric:tabular-nums}
 .purchaseedit .pelines{width:100%;margin:8px 0}
 .purchaseedit .pelines input{padding:3px 6px;border:1px solid var(--line);border-radius:3px;background:var(--panel2);color:var(--text)}
+.peproduct{display:flex;flex-direction:column;align-items:stretch;gap:4px;min-width:200px}
+.peproduct .picker{width:100%}
+.peproduct .combo{display:block;flex:none;min-width:0}
 .purchaseedit input.num{width:80px;text-align:right}
 .pesingle td{background:var(--panel)}
 .pesingle .suggestwrap{width:220px}

@@ -11,7 +11,8 @@ import { linkedCount, moveLinks, relinkRemoved, trimLinks } from "./links.js";
 import { BOOSTER_PRODUCTS, lineBooster, lineValue, pullsAllowed, boosterLabel } from "./boosters.js";
 import { mergeHooks } from "./scryfall-extras.js";
 import { isAdmin } from "./admin.js";
-import { CONDITION_NOTE, conditionOf, finishOf, parseReceipt, pdfText, pictureText, setOf } from "./receipts.js";
+import { CONDITION_NOTE, conditionOf, finishOf, parseReceipt, pdfText, pictureText, setOf, specialFoilOf } from "./receipts.js";
+import { specialFoil } from "./foil-types.js";
 import { initializeSealed, matchSealed, sealedChoices, sealedDeckCards } from "./sealed.js";
 import { activeSource, priceCols } from "./price-context.js";
 import { sourcePriceOn, storeOf } from "./mtgjson.js";
@@ -1748,6 +1749,7 @@ export function matchReceiptCards(database: DatabaseSync, fields: ReturnType<typ
     const setCode = bracket.map((text) => setOf(text, sets) ?? sets.find((set) => set.code.toLowerCase() === text.trim().toLowerCase())?.code ?? null).find(Boolean) ?? line.setCode;
     const version = VERSION_WORDS.find(([pattern]) => pattern.test(all))?.[1] ?? null;
     const finish = finishOf(all);
+    const requestedSpecial = specialFoilOf(all);
     const score = (row: Record<string, unknown>) => {
       let points = 0;
       if (setCode && row.set_code === setCode) points += 100;
@@ -1758,16 +1760,26 @@ export function matchReceiptCards(database: DatabaseSync, fields: ReturnType<typ
       else if (version === "extendedart" && effects.includes("extendedart")) points += 20;
       else if (version === "fullart" && Number(row.full_art) === 1) points += 20;
       else if (!version && !special) points += 10;
-      const finishes = String(row.finishes ?? "");
-      if (finish === 1 && finishes.includes("foil")) points += 5;
+      const finishes = String(row.finishes ?? "").split(",");
+      const promoTypes = String(row.promo_types ?? "");
+      if (finish === 1 && finishes.includes("foil")) {
+        points += 5;
+        if (requestedSpecial && promoTypes.split(",").includes(requestedSpecial)) points += 15;
+        else if (!requestedSpecial && !specialFoil(promoTypes)) points += 1;
+      }
       if (finish === 2 && finishes.includes("etched")) points += 5;
       if (finish === 0 && finishes.includes("nonfoil")) points += 5;
       return points;
     };
     const best = [...printings].sort((a, b) => score(b) - score(a))[0]!;
+    const bestPromo = String(best.promo_types ?? "");
+    const warning = finish === 1 && (requestedSpecial ? !bestPromo.split(",").includes(requestedSpecial) : !!specialFoil(bestPromo))
+      ? "The guessed printing's foil type may not match the receipt. Check the printing."
+      : undefined;
     line.card = {
       cardId: String(best.id), name: String(best.name), setCode: String(best.set_code), setName: String(best.set_name), collectorNumber: String(best.collector_number),
-      imageUrl: best.image_url ? String(best.image_url) : null, finish, condition: conditionOf(all), promoTypes: String(best.promo_types ?? ""), finishes: String(best.finishes ?? ""),
+      imageUrl: best.image_url ? String(best.image_url) : null, finish, condition: conditionOf(all), promoTypes: bestPromo, finishes: String(best.finishes ?? ""),
+      ...(warning ? { warning } : {}),
     };
     line.setCode = String(best.set_code);
   }

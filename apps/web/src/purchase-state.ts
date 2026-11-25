@@ -18,6 +18,7 @@ export type Place = { id: string; name: string; kind: PlaceKind; note: string; c
 /** The card a receipt line was matched to (0.19.0). */
 export type ReceiptCard = {
   cardId: string; name: string; setCode: string; setName: string; collectorNumber: string; imageUrl: string | null; finish: number; condition: string; promoTypes: string; finishes: string;
+  warning?: string;
 };
 /** `productName` is the name of a named product such as "Landing Party" (0.20.0), `sealedId` the product it matched. */
 export type ReceiptLine = {
