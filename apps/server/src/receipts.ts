@@ -3,6 +3,7 @@
 // /ocr folder of the built interface, so reading works without the internet. ----------
 import { existsSync } from "node:fs";
 import { join } from "node:path";
+import { SPECIAL_FOILS } from "./foil-types.js";
 
 /**
  * One line read from a receipt. `note` holds a condition or finish written on the line or the row under it (such as
@@ -10,6 +11,7 @@ import { join } from "node:path";
  */
 export type ReceiptCard = {
   cardId: string; name: string; setCode: string; setName: string; collectorNumber: string; imageUrl: string | null; finish: number; condition: string; promoTypes: string; finishes: string;
+  warning?: string;
 };
 /** `productName` is the name of a named product (0.20.0), such as "Landing Party"; `sealedId` the MTGJSON product it matched. */
 export type ReceiptLine = {
@@ -103,7 +105,15 @@ const SKIP = /\b(sub\s?-?total|total|tax(es)?|sales\s+tax|vat|gst|shipping|deliv
 /** Buttons, links and status text of order pages (0.19.0): never products, places or notes. */
 const IGNORED = /\b(buy\s+again|track\s+(all\s+)?(your\s+)?orders?|view\s+(order|details|receipt)|re-?order|order\s+again|picked\s+up|ready\s+for\s+pickup|confirmed|shipped|delivered|out\s+for\s+delivery|write\s+a\s+review|return\s+items?|contact\s+(us|store|seller)|need\s+help|continue\s+shopping|sign\s+in|log\s+in|shop\s+now|\bat\s+\d{1,2}:\d{2})\b/i;
 /** A condition or finish note, such as "Near Mint Foil", "NM", "Lightly Played Etched". */
-export const CONDITION_NOTE = /\b(near\s+mint|lightly\s+played|moderately\s+played|heavily\s+played|damaged|mint|nm|lp|mp|hp|dmg)\b|\b(foil|etched|non-?foil)\b/i;
+const conditionWords = "near\\s+mint|lightly\\s+played|moderately\\s+played|heavily\\s+played|damaged|mint|nm|lp|mp|hp|dmg";
+const foilPatterns = Object.entries(SPECIAL_FOILS).map(([type, label]) => ({
+  type, pattern: label.replace(/[ -]+/g, "[\\s-]*"),
+}));
+const finishWords = `${foilPatterns.map(({ pattern }) => pattern).join("|")}|non-?foil|foil|etched`;
+export const CONDITION_NOTE = new RegExp(`\\b(?:${conditionWords}|${finishWords})\\b`, "i");
+const noteAtEnd = new RegExp(`(?:\\b(?:${conditionWords})\\b\\s*)?(?:\\b(?:${finishWords})\\b)?\\s*$`, "i");
+export const specialFoilOf = (text: string): string | null =>
+  foilPatterns.find(({ pattern }) => new RegExp(`\\b${pattern}\\b`, "i").test(text))?.type ?? null;
 const CONDITIONS: Array<[RegExp, string]> = [
   [/\bnear\s+mint\b|\bnm\b/i, "NM"], [/\blightly\s+played\b|\blp\b/i, "LP"], [/\bmoderately\s+played\b|\bmp\b/i, "MP"],
   [/\bheavily\s+played\b|\bhp\b/i, "HP"], [/\bdamaged\b|\bdmg\b/i, "DMG"], [/\bmint\b/i, "M"],
@@ -111,7 +121,7 @@ const CONDITIONS: Array<[RegExp, string]> = [
 /** The condition written on a receipt line, NM when none. */
 export const conditionOf = (text: string) => CONDITIONS.find(([pattern]) => pattern.test(text))?.[1] ?? "NM";
 /** The finish written on a receipt line: 2 etched, 1 foil, 0 regular. */
-export const finishOf = (text: string) => (/\betched\b/i.test(text) ? 2 : /\bfoil\b/i.test(text) && !/\bnon-?foil\b/i.test(text) ? 1 : 0);
+export const finishOf = (text: string) => (/\betched\b/i.test(text) ? 2 : (specialFoilOf(text) || /\bfoil\b/i.test(text)) && !/\bnon-?foil\b/i.test(text) ? 1 : 0);
 
 /** The product a line is, by its words. */
 export function productOf(text: string): string {
@@ -222,7 +232,7 @@ export function parseReceipt(text: string, sets: Array<{ code: string; name: str
       name = name.replace(quantityMatch[0], " ").replace(/\s+/g, " ").trim();
     }
     name = name.replace(/^[-*#:.|\s]+|[-*#:.|\s]+$/g, "").slice(0, 120);
-    const note = CONDITION_NOTE.test(name) && productOf(name) === "other" ? (name.match(/(near\s+mint|lightly\s+played|moderately\s+played|heavily\s+played|damaged)?\s*(foil|etched|non-?foil)?\s*$/i)?.[0] ?? "").trim() : "";
+    const note = CONDITION_NOTE.test(name) && productOf(name) === "other" ? (name.match(noteAtEnd)?.[0] ?? "").trim() : "";
     if (note) name = name.slice(0, name.length - note.length).trim();
     lines.push({ text: row, product: productOf(name), name, setCode: setOf(name, sets), quantity, cost: money(cost), note, cardLike: false, card: null, productName: "", sealedId: null });
   }

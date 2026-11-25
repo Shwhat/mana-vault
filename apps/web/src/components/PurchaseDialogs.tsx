@@ -297,7 +297,8 @@ function MatchCards({ rows: start, onContinue, onCancel }: { rows: MatchRow[]; o
               {row.card.image_url ? <img className="thumb-img" src={row.card.image_url} alt="" /> : <span className="thumb-img none">MV</span>}
               <span className="matchcard"><b>{row.card.name}</b>
                 <span className="sub"><SetIcon code={row.card.set_code} />({row.card.set_code.toUpperCase()}) {row.card.collector_number}{row.card.set_name ? `, ${row.card.set_name}` : ""}, {row.condition}</span>
-                <FinishBadge finish={row.finish} promoTypes={row.card.promo_types} /></span>
+                <FinishBadge finish={row.finish} promoTypes={row.card.promo_types} />
+                {!row.ok && row.card.id === row.line.card?.cardId && row.line.card.warning && <span className="note err">{row.line.card.warning}</span>}</span>
               <span className="btnrow">
                 <button type="button" className={row.ok ? "btn small primary" : "btn small"} aria-pressed={row.ok} onClick={() => set(row.key, { ok: true, mode: "" })}>OK</button>
                 <button type="button" className="btn small" onClick={() => set(row.key, { mode: row.mode === "printing" ? "" : "printing" })}>Choose printing...</button>
@@ -625,10 +626,12 @@ function PurchaseEditor({ store, list, start, close, onSaved, reopen }: {
           {lines.map((line, index) => (
             <tr key={`l${index}`}>
               <td>
-                <Picker label={`Product of line ${index + 1}`} value={line.product} options={productOptions}
-                  onChange={(product) => setLine(index, { product, packs: String(list.products.find((item) => item.id === product)?.packs ?? 0) })} />
-                <ProductNameField id={`pe-name-${index}`} label={`Name of line ${index + 1}`} setCode={line.setCode} product={line.product} value={line.name}
-                  placeholder={line.product === "other" ? "Product name" : "Product name (optional)"} onValue={(name) => setLine(index, { name })} />
+                <div className="peproduct">
+                  <Picker label={`Product of line ${index + 1}`} value={line.product} options={productOptions}
+                    onChange={(product) => setLine(index, { product, packs: String(list.products.find((item) => item.id === product)?.packs ?? 0) })} />
+                  <ProductNameField id={`pe-name-${index}`} label={`Name of line ${index + 1}`} setCode={line.setCode} product={line.product} value={line.name}
+                    placeholder={line.product === "other" ? "Product name" : "Product name (optional)"} onValue={(name) => setLine(index, { name })} />
+                </div>
               </td>
               <td><SetPicker label={`Set of line ${index + 1}`} value={line.setCode} onChange={(setCode) => setLine(index, { setCode })} /></td>
               <td><input aria-label={`Quantity of line ${index + 1}`} type="number" min={Math.max(1, line.locked)} value={line.quantity} className="num"

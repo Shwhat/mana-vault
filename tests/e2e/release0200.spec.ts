@@ -40,6 +40,10 @@ test("a named Commander deck is picked from the set's products and opens with it
   expect(await name.evaluate((input) => input.matches(":placeholder-shown"))).toBe(false);
   const inputBox = await name.boundingBox();
   const statusBox = await editor.locator(".pelines tbody tr").first().locator(".comboadd").boundingBox();
+  const productBox = await editor.getByRole("button", { name: /^Product of line 1/ }).boundingBox();
+  expect(productBox!.y + productBox!.height).toBeLessThanOrEqual(inputBox!.y);
+  expect(Math.abs(productBox!.x - inputBox!.x)).toBeLessThan(1);
+  expect(Math.abs(productBox!.width - inputBox!.width)).toBeLessThan(1);
   expect(statusBox!.y).toBeGreaterThanOrEqual(inputBox!.y + inputBox!.height);
   await editor.getByRole("textbox", { name: "Total of line 1" }).fill("60");
   await editor.getByRole("button", { name: "Save purchase" }).click();
@@ -63,6 +67,18 @@ test("a named Commander deck is picked from the set's products and opens with it
   await expect(status(page)).toHaveText("Undone: Open Landing Party, Limited Edition Alpha (Purchase of Nov 1)");
   const after = await (await page.request.get(`/api/collections/${main}/cards`)).json() as Array<{ id: string }>;
   expect(after.find((card) => card.id === "llanowar")).toBeUndefined();
+});
+
+test("the product selector and name remain stacked at phone width", async ({ page }) => {
+  await signUp(page, "buyproductphone");
+  const editor = await newPurchase(page);
+  await editor.getByRole("button", { name: "Add product" }).click();
+  await page.setViewportSize({ width: 390, height: 844 });
+  const picker = await editor.getByRole("button", { name: /^Product of line 1/ }).boundingBox();
+  const input = await editor.getByRole("combobox", { name: "Name of line 1" }).boundingBox();
+  expect(picker!.y + picker!.height).toBeLessThanOrEqual(input!.y);
+  expect(Math.abs(picker!.x - input!.x)).toBeLessThan(1);
+  expect(Math.abs(picker!.width - input!.width)).toBeLessThan(1);
 });
 
 test("the purchase set picker shows a newly created empty custom set and its symbol", async ({ page }) => {

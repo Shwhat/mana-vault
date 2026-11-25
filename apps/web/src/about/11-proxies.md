@@ -104,6 +104,8 @@ The card maker makes custom cards with a live preview. A saved custom card is a 
 
 The list on the left shows every custom card under a heading for its custom set, with its number, type and maker, and a search box. A right-click (long press) on a set heading opens the custom set menu: **Edit set...**, **Show its cards**, **New card in this set** and **Delete...**. The card maker opens on the card opened last; with no card made yet, it starts a new one. **New card** starts an empty card in the set chosen last with the next free collector number. **Custom sets...** opens the Custom sets tab on the card's set (on a new set when no set is chosen), and **Edit set...** in a set heading's menu opens it on that set. Clicking a card opens it. Leaving a card with changes that are not saved asks first. The card being made stays while other views are used.
 
+The card's fields and saved preview open while its art loads. If you edit before the art loads, the live preview appears without it until loading finishes. Saving, duplicating, exporting and changing art wait until it has loaded; if loading fails, use **Retry loading art**.
+
 Custom sets are reached from the **Custom sets** tab beside Print and Card maker; the card maker's list has no Custom sets... button. **Edit set...** on a set heading's right-click menu opens the Custom sets tab with that set chosen.
 
 ### Buttons

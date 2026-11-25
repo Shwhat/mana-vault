@@ -2,6 +2,12 @@
 
 The installed version is shown at the top of this guide.
 
+## 0.24.4 (2026-11-24): Custom cards and purchase fixes
+
+- Custom card fields and saved previews open while their artwork loads.
+- Receipt matching recognizes named special foils, prefers ordinary foils for plain foil notes, and warns about mismatches.
+- Purchase product selectors and names stay stacked and aligned.
+
 ## 0.24.3 (2026-11-24): Library, purchases and scanner improvements
 
 - Custom cards can be linked to an official card and appear among its printings.
