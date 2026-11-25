@@ -2,6 +2,14 @@
 
 The installed version is shown at the top of this guide.
 
+## 0.24.3 (2026-11-24): Library, purchases and scanner improvements
+
+- Custom cards can be linked to an official card and appear among its printings.
+- Decks show color identity and possible themes, can be created from a precon, and can create a collection when adding a deck.
+- Pack openings can be paused and resumed. The built-in About guide is also available as a movable Wiki page.
+- Purchase fields no longer have status text over the input, custom set symbols appear in the set picker, and purchase history scrolls in narrow panes.
+- Adding a card to a wishlist offers its printings and finishes. With a set filter, the scanner matches the selected language and warns when it is unavailable.
+
 ## 0.24.1 (2026-11-23): Scryfall online search
 
 - Search syntax in the Filters panel can use Scryfall online, with the other Mana Vault filters applied locally. Scryfall's grouping, ordering, printing preferences and display options are supported; see Card search for API and offline limitations.
