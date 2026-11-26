@@ -71,7 +71,8 @@ describe("About guide", () => {
 
 describe("source rules", () => {
   it("keeps the version equal everywhere", () => {
-    for (const path of ["apps/web/package.json", "apps/server/package.json", "apps/android/package.json"]) {
+    for (const path of ["apps/web/package.json", "apps/server/package.json", "apps/android/package.json",
+      "packages/play-core/package.json", "packages/playmat-protocol/package.json"]) {
       expect((JSON.parse(readFileSync(join(root, path), "utf8")) as { version: string }).version).toBe(version);
     }
     const lock = JSON.parse(readFileSync(join(root, "package-lock.json"), "utf8")) as { version: string; packages: Record<string, { version?: string }> };
@@ -80,10 +81,12 @@ describe("source rules", () => {
     expect(lock.packages["apps/web"]?.version).toBe(version);
     expect(lock.packages["apps/server"]?.version).toBe(version);
     expect(lock.packages["apps/android"]?.version).toBe(version);
+    expect(lock.packages["packages/play-core"]?.version).toBe(version);
+    expect(lock.packages["packages/playmat-protocol"]?.version).toBe(version);
   });
 
   it("uses no em dashes in source, guide or documentation", () => {
-    const paths = [...walk(join(root, "apps")), ...walk(join(root, "docs")), ...walk(join(root, "tests")),
+    const paths = [...walk(join(root, "apps")), ...walk(join(root, "packages")), ...walk(join(root, "docs")), ...walk(join(root, "tests")),
       join(root, "README.md"), join(root, "docker-compose.yml"), join(root, ".env.example")]
       .filter((path) => /\.(ts|tsx|md|css|html|js|mjs|yml|json|example|java|xml|gradle)$/.test(path) || path.endsWith(".env.example"));
     const offenders = paths.filter((path) => readFileSync(path, "utf8").includes(String.fromCharCode(0x2014)));

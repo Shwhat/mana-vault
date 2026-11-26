@@ -1,9 +1,16 @@
 # Mana Vault handoff
 
+## 0.26.0 (2026-11-25): Play table foundations
+
+- Added player-view and engine-capability contracts and a transport-independent Playmat discovery request and message parser, with tests. The architecture assessment and roadmap record the candidate source revision and security risks.
+- This is foundation work only: no game transport, identity bridge, engine or playable table was added. The play table specification is included for the remaining phases.
+- Validation: `PW_CHANNEL=chrome npm run test:all` passed (6 new package tests, 401 server, 60 web, 3 wiki and 122 browser tests). Built workspace exports were imported successfully. A session-local JDK and Maven built the candidate engine; a test-only loopback modification was healthy, passed discovery using the workspace parser, and passed the upstream sample-deck AI game test. The temporary engine was stopped. Docker, secure identity, a Mana Vault deck and phase 1 gameplay remain unverified; see the architecture assessment.
+- At this handoff, PR, server and Android delivery verification and the external handoff copy are pending.
+
 ## 0.25.0 (2026-11-25): Trades and dashboard
 
 - Added source and destination selection for account trades, browsing other accounts' trade binders, compact deck picture statuses, a fuller Home screen and readable light-theme menus.
-- Validation: `PW_CHANNEL=chrome npm run test:all` passed, including 122 browser tests. PR, merge, server and Android delivery verification are pending.
+- Validation: `PW_CHANNEL=chrome npm run test:all` passed, including 122 browser tests. PR #47 merged at `097fad2d1d125a4f7206fa3e80c5badcf0282578`; container and Android workflows and the matching debug APK were verified.
 
 ## 0.24.8 (2026-11-25): GitHub guide
 
@@ -11,7 +18,7 @@
 - Validation: `PW_CHANNEL=chrome npm run test:all` passed, including 119 browser tests. `git diff --check` passed.
 - At handoff, version 0.24.8 and automatic synchronization are pending delivery. Verify the workflow, container, Android build and debug APK for the merged commit.
 
-Last updated: 2026-11-25, version 0.25.0 pending.
+Last updated: 2026-11-25, version 0.26.0 foundations pending delivery.
 
 ## Project
 

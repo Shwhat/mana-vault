@@ -2,6 +2,10 @@
 
 The installed version is shown at the top of the in-app guide.
 
+## 0.26.0 (2026-11-25): Play table foundations
+
+- Add shared play-table contracts and initial Playmat protocol parsing, with an architecture assessment and roadmap. Gameplay and engine integration have not yet been added.
+
 ## 0.25.0 (2026-11-25): Trades and dashboard
 
 - Choose the source collection for cards you give and save your destination before countering an account trade.

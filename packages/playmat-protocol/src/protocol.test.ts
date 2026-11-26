@@ -1,0 +1,33 @@
+import { describe, expect, it } from "vitest";
+import { parseServerMessage, ProtocolError, request } from "./index.js";
+
+describe("Playmat discovery requests", () => {
+  it("encodes positional requests without exposing arbitrary methods", () => {
+    expect(JSON.parse(request(5, "ping", "", "hello"))).toEqual({ jsonrpc: "2.0", id: 5, method: "ping", params: ["", "hello"] });
+    expect(JSON.parse(request("id", "getDeckTypes"))).toEqual({ jsonrpc: "2.0", id: "id", method: "getDeckTypes", params: [] });
+    expect(() => request(1, "connectAdmin" as "ping")).toThrow("Unsupported RPC method");
+  });
+});
+
+describe("Playmat messages", () => {
+  it("separates results, RPC errors and asynchronous events", () => {
+    expect(parseServerMessage('{"jsonrpc":"2.0","id":1,"result":true}')).toEqual({ kind: "result", id: 1, result: true });
+    expect(parseServerMessage('{"jsonrpc":"2.0","id":1,"error":{"code":-32001,"message":"Denied","data":{"reason":"signedInElsewhere"}}}'))
+      .toEqual({ kind: "error", id: 1, error: { code: -32001, message: "Denied", data: { reason: "signedInElsewhere" } } });
+    expect(parseServerMessage('{"method":"GAME_UPDATE","objectId":"game","messageId":12,"data":{"turn":1}}'))
+      .toEqual({ kind: "event", method: "GAME_UPDATE", objectId: "game", messageId: 12, data: { turn: 1 } });
+    expect(parseServerMessage('{"method":"GAME_INIT","messageId":0,"state":{"seq":1},"data":{"turn":1}}').kind).toBe("event");
+  });
+
+  it("surfaces unknown events and rejects malformed messages and patches", () => {
+    expect(parseServerMessage('{"method":"FUTURE_EVENT","messageId":0}')).toEqual({
+      kind: "unknown-event", method: "FUTURE_EVENT", objectId: null, messageId: 0, data: undefined,
+    });
+    for (const text of [
+      "{", "[]", '{"jsonrpc":"2.0","id":1,"result":true,"error":{}}',
+      '{"jsonrpc":"2.0","id":1,"error":{"code":"bad","message":"no"}}',
+      '{"method":"GAME_UPDATE","messageId":-1}', '{"method":"GAME_UPDATE","messageId":1,"state":null}',
+      '{"method":"GAME_UPDATE","messageId":1,"state":{"seq":2,"base":1,"patch":{}}}',
+    ]) expect(() => parseServerMessage(text)).toThrow(ProtocolError);
+  });
+});
