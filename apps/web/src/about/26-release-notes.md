@@ -2,6 +2,13 @@
 
 The installed version is shown at the top of the in-app guide.
 
+## 0.25.0 (2026-11-25): Trades and dashboard
+
+- Choose the source collection for cards you give and save your destination before countering an account trade.
+- Browse other accounts' marked-for-trade cards and add them to a trade.
+- Group multiple deck picture statuses into a compact hover, focus or tap control.
+- Show recent collections and decks and trade activity on Home, and fix light-theme menu text contrast.
+
 ## 0.24.8 (2026-11-25): GitHub guide
 
 - Publish the in-app About guide to the GitHub wiki, with updates synchronized from the guide on main.

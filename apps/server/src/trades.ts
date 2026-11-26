@@ -9,7 +9,7 @@ import { trimLinks } from "./links.js";
 import { priceColumns, priceSourceOf } from "./mtgjson.js";
 
 export type Side = "give" | "get";
-export type TradeLineInput = CopyKey & { side: Side; quantity: number; price: number | null; collectionId: string | null };
+export type TradeLineInput = CopyKey & { id?: number; side: Side; quantity: number; price: number | null; collectionId: string | null };
 type Change = { collectionId: string; key: CopyKey; quantity: number };
 /** What completing a trade changed, kept so the change can be undone. */
 type Record = { removed: Change[]; added: Change[] };
@@ -81,12 +81,13 @@ export function readLines(value: unknown): TradeLineInput[] | string {
     const price = raw.price ?? null;
     if ((raw.side !== "give" && raw.side !== "get") || typeof raw.cardId !== "string" || !raw.cardId || foil === null || !condition || !language ||
       typeof quantity !== "number" || !Number.isInteger(quantity) || quantity < 1 || quantity > 999 ||
+      (raw.id !== undefined && (typeof raw.id !== "number" || !Number.isSafeInteger(raw.id) || raw.id < 1)) ||
       (price !== null && (typeof price !== "number" || !Number.isFinite(price) || price < 0 || price > 1_000_000)) ||
       (raw.collectionId !== undefined && raw.collectionId !== null && typeof raw.collectionId !== "string")) {
       return "Each line needs a side, a card, a finish, a condition, a language, a count from 1 to 999 and a price of 0 or more";
     }
     lines.push({
-      side: raw.side, cardId: raw.cardId, foil, condition, language, proxy: false, quantity, price: price as number | null,
+      ...(typeof raw.id === "number" ? { id: raw.id } : {}), side: raw.side, cardId: raw.cardId, foil, condition, language, proxy: false, quantity, price: price as number | null,
       collectionId: typeof raw.collectionId === "string" && raw.collectionId ? raw.collectionId : null,
     });
   }
@@ -207,17 +208,18 @@ export function registerTradeRoutes(app: FastifyInstance, database: DatabaseSync
       }
       transaction(database, () => {
         // each account keeps the sources of its own given cards; the other account's lines keep theirs
-        const keep = new Map(database.prepare("SELECT * FROM trade_lines WHERE trade_id = ?").all(String(row.id))
-          .filter((line) => (mine ? line.side === "get" : line.side === "give"))
-          .map((line) => [`${line.card_id}:${line.foil}:${line.condition}:${line.language}`, line.collection_id]));
+        const keep = database.prepare("SELECT * FROM trade_lines WHERE trade_id = ?").all(String(row.id))
+          .filter((line) => (mine ? line.side === "get" : line.side === "give"));
         database.prepare("DELETE FROM trade_lines WHERE trade_id = ?").run(String(row.id));
         const insert = database.prepare(
           "INSERT INTO trade_lines (trade_id, side, card_id, foil, condition, language, quantity, price, collection_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
         );
         for (const line of list) {
           const side = mine ? line.side : flip(line.side);
-          const source = line.side === "give" ? line.collectionId
-            : keep.get(`${line.cardId}:${line.foil}:${line.condition}:${line.language}`) ?? null;
+          const index = line.side === "get" ? keep.findIndex((previous) =>
+            (line.id === undefined || Number(previous.id) === line.id) && previous.card_id === line.cardId &&
+            Number(previous.foil) === line.foil && previous.condition === line.condition && previous.language === line.language) : -1;
+          const source = line.side === "give" ? line.collectionId : index >= 0 ? keep.splice(index, 1)[0]!.collection_id : null;
           insert.run(String(row.id), side, line.cardId, line.foil, line.condition, line.language, line.quantity, line.price, source as string | null);
         }
         const partner = row.partner_id === null ? null : Number(row.partner_id);
@@ -367,10 +369,26 @@ export function registerTradeRoutes(app: FastifyInstance, database: DatabaseSync
     const userId = userOf(request);
     const row = tradeRow(request.params.tradeId, userId);
     if (!row) return notFound(reply);
+    if (row.partner_id === null || row.status !== "open") return reply.code(409).send({ error: "There is no open proposal" });
     const target = ownedCollection(database, request.body?.collectionId, userId);
     if (!target) return reply.code(404).send({ error: "Collection not found" });
     database.prepare(`UPDATE trades SET ${Number(row.owner_id) === userId ? "owner_collection" : "partner_collection"} = ? WHERE id = ?`).run(target, String(row.id));
     return { status: "saved" };
+  });
+
+  // Choosing the source does not change the offer or whose turn it is.
+  app.post<{ Params: { tradeId: string; lineId: string }; Body: { collectionId?: unknown } }>("/api/trades/:tradeId/lines/:lineId/source", async (request, reply) => {
+    const userId = userOf(request);
+    const row = tradeRow(request.params.tradeId, userId);
+    if (!row) return notFound(reply);
+    if (row.status !== "open") return reply.code(409).send({ error: "Only an open trade can change" });
+    const source = ownedCollection(database, request.body?.collectionId, userId);
+    if (!source) return reply.code(404).send({ error: "Collection not found" });
+    const side = Number(row.owner_id) === userId ? "give" : "get";
+    const result = database.prepare("UPDATE trade_lines SET collection_id = ? WHERE id = ? AND trade_id = ? AND side = ?")
+      .run(source, request.params.lineId, String(row.id), side);
+    if (!result.changes) return reply.code(404).send({ error: "Trade line not found" });
+    return present(database.prepare("SELECT * FROM trades WHERE id = ?").get(String(row.id))!, userId);
   });
 
   app.post<{ Params: { tradeId: string } }>("/api/trades/:tradeId/decline", async (request, reply) => {
@@ -405,6 +423,28 @@ export function registerTradeRoutes(app: FastifyInstance, database: DatabaseSync
       price_usd: row.price_usd, price_usd_foil: row.price_usd_foil, price_usd_etched: row.price_usd_etched, price_eur: row.price_eur, price_eur_foil: row.price_eur_foil, buy_usd: row.buy_usd ?? null, buy_usd_foil: row.buy_usd_foil ?? null, buy_usd_etched: row.buy_usd_etched ?? null,
     }));
     return { theyHave: rows("me"), theyWant: rows("them") };
+  });
+
+  app.get<{ Params: { userId: string } }>("/api/trades/binder/:userId", async (request, reply) => {
+    const id = Number(request.params.userId);
+    if (!Number.isInteger(id) || id === userOf(request) || !database.prepare("SELECT 1 FROM users WHERE id = ?").get(id)) {
+      return reply.code(404).send({ error: "Account not found" });
+    }
+    return database.prepare(
+      `SELECT c.id AS card_id, c.name, c.set_code, c.set_name, c.collector_number, c.image_url, ${priceColumnList()},
+              i.foil, i.condition, i.language, SUM(i.trade) AS quantity
+       FROM collection_cards i JOIN collections col ON col.id = i.collection_id AND col.kind = 'collection'
+       JOIN cards c ON c.id = i.card_id
+       WHERE col.owner_id = ? AND i.trade > 0 AND i.proxy = 0
+       GROUP BY i.card_id, i.foil, i.condition, i.language ORDER BY c.name, c.set_code`,
+    ).all(id).map((row) => ({
+      cardId: String(row.card_id), name: String(row.name), set_code: String(row.set_code), set_name: String(row.set_name),
+      collector_number: String(row.collector_number), image_url: row.image_url, foil: Number(row.foil),
+      condition: String(row.condition), language: String(row.language), quantity: Number(row.quantity),
+      price_usd: row.price_usd, price_usd_foil: row.price_usd_foil, price_usd_etched: row.price_usd_etched,
+      price_eur: row.price_eur, price_eur_foil: row.price_eur_foil, buy_usd: row.buy_usd,
+      buy_usd_foil: row.buy_usd_foil, buy_usd_etched: row.buy_usd_etched,
+    }));
   });
 
   // the link to your trade binder: read it, make a new one, or turn it off

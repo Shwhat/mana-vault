@@ -13,6 +13,9 @@ export function HomeView({ actions }: { actions: Record<string, Action> }) {
   const value = owned.reduce((sum, item) => sum + item.value[currency], 0);
   const recent = store.scanItems.slice(0, 6);
   const offers = store.offers.inbox;
+  const recentCollections = [...owned].sort((a, b) => (b.updatedAt ?? "").localeCompare(a.updatedAt ?? "")).slice(0, 4);
+  const recentDecks = [...store.decks].sort((a, b) => (b.updated_at ?? "").localeCompare(a.updated_at ?? "")).slice(0, 4);
+  const waiting = (store.trades ?? []).filter((trade) => trade.status === "open" && trade.turn === "me");
   const tile = (label: string, text: string, onClick?: () => void) => (
     <button type="button" className="stattile hometile" onClick={onClick} disabled={!onClick}>
       <span className="stlabel">{label}</span><span className="stvalue">{text}</span>
@@ -27,6 +30,8 @@ export function HomeView({ actions }: { actions: Record<string, Action> }) {
           {tile("Value", money(value, currency), () => store.setView("collection"))}
           {tile("Collections", String(owned.length), () => store.setView("collection"))}
           {tile("Decks", String(store.decks.length), () => store.setView("deck"))}
+          {tile("Cards for trade", owned.reduce((sum, item) => sum + item.tradeCount, 0).toLocaleString(), () => store.setView("trade"))}
+          {tile("Trades awaiting you", String(waiting.length), () => store.setView("trade"))}
         </div>
         <div className="btnrow homeacts">
           <button type="button" className="btn primary" onClick={actions.scan?.run}><Icon name="scan" /> Scan cards</button>
@@ -46,6 +51,22 @@ export function HomeView({ actions }: { actions: Record<string, Action> }) {
             ))}
           </section>
         )}
+        {waiting.length > 0 && <section className="homesec"><h4>Trades awaiting your answer</h4>
+          {waiting.map((trade) => <div className="wsrow" key={trade.id}><span><b>{trade.name}</b> <span className="sub">with {trade.with?.name}</span></span>
+            <button type="button" className="btn small" onClick={() => { store.chooseTrade(trade.id); store.setView("trade"); }}>Open trade</button></div>)}
+        </section>}
+        <div className="homecolumns">
+          <section className="homesec"><h4>Recent collections</h4>
+            {!recentCollections.length && <p className="note">No collections yet</p>}
+            {recentCollections.map((item) => <div className="wsrow" key={item.id}><span><b>{item.name}</b> <span className="sub">{item.cardCount.toLocaleString()} cards</span></span>
+              <button type="button" className="btn small" onClick={() => { store.openCollection(item.id); store.setView("collection"); }}>Open</button></div>)}
+          </section>
+          <section className="homesec"><h4>Recent decks</h4>
+            {!recentDecks.length && <p className="note">No decks yet</p>}
+            {recentDecks.map((deck) => <div className="wsrow" key={deck.id}><span><b>{deck.name}</b> <span className="sub">{deck.card_count ?? 0} cards</span></span>
+              <button type="button" className="btn small" onClick={() => void store.openDeck(deck.id).then(() => store.setView("deck"))}>Open</button></div>)}
+          </section>
+        </div>
         <section className="homesec">
           <h4>Recent scans</h4>
           {!recent.length && <p className="note">No scans yet</p>}

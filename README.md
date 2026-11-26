@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/assets/banner.png" alt="Mana Vault — Your cards. Your decks. Your server." width="100%">
+  <img src="docs/assets/banner.png" alt="Mana Vault - Your cards. Your decks. Your server." width="100%">
 </p>
 
 <h1 align="center">Mana Vault</h1>
@@ -37,7 +37,7 @@ The server maintains a local card catalog, collection and deck data in SQLite, w
 | **Advanced card search** | Search with Scryfall-style syntax, art and Oracle tags, prices, card text and ownership filters. Browse grid, binder or list layouts. |
 | **Deck builder** | Build decks, link owned copies, identify missing cards, check format rules, view statistics and playtest opening hands. |
 | **Card scanning** | Use your desktop or phone camera to recognize cards, select printings and add them to a collection or deck. |
-| **Trading** | Maintain a trade binder, compare offers, make counteroffers, match wishlists and complete trades. |
+| **Trading** | Browse other accounts' trade binders, select source and destination collections, compare offers, make counteroffers and complete trades. |
 | **Purchase and price tracking** | Record singles, sealed products, sales, receipts and pack openings. Compare market prices and track historical values. |
 | **Proxy printing** | Prepare customizable print sheets, print double-sided cards and export PDF or MakePlayingCards assets. |
 | **Custom card creator** | Create cards and sets using built-in frames, uploaded artwork, custom symbols and PNG export. |
@@ -51,6 +51,7 @@ The server maintains a local card catalog, collection and deck data in SQLite, w
 - Local SQLite database and configurable card-image storage.
 - Multiple accounts, shareable collections and decks, and per-account preferences.
 - Desktop workspace with dockable panels, keyboard shortcuts and light/dark themes.
+- Home dashboard with recent collections and decks, trade activity, scans and Inbox offers.
 - Import and export support for Mana Vault, Moxfield, ManaBox, Archidekt, Deckbox, TCGplayer and plain text, with supported formats depending on the data type.
 
 ## Screenshots
@@ -67,8 +68,8 @@ Search using local card syntax or the dockable Filters panel. Refine results by 
     <td width="50%" align="center" valign="top"><a href="docs/assets/screenshots/android-mobile-search.png"><img src="docs/assets/screenshots/android-mobile-search.png" alt="Android card search with price sorting" width="260"></a></td>
   </tr>
   <tr>
-    <td><strong>Desktop filters</strong> — refine your search by card properties and printing details.</td>
-    <td><strong>Mobile search</strong> — browse cards and add them to collections or wishlists.</td>
+    <td><strong>Desktop filters</strong> - refine your search by card properties and printing details.</td>
+    <td><strong>Mobile search</strong> - browse cards and add them to collections or wishlists.</td>
   </tr>
 </table>
 
@@ -82,8 +83,8 @@ Switch between a card grid, a nine-card binder and a list. Group, sort and filte
     <td width="50%" valign="top"><a href="docs/assets/screenshots/collection-binder.png"><img src="docs/assets/screenshots/collection-binder.png" alt="Nine-card binder view with collection options" width="100%"></a></td>
   </tr>
   <tr>
-    <td><strong>Grid view</strong> — browse large card images.</td>
-    <td><strong>Binder view</strong> — browse nine-card pages.</td>
+    <td><strong>Grid view</strong> - browse large card images.</td>
+    <td><strong>Binder view</strong> - browse nine-card pages.</td>
   </tr>
 </table>
 
@@ -121,8 +122,8 @@ Scan physical cards, review detected printings, adjust finish, condition and lan
     <td width="50%" align="center" valign="top"><a href="docs/assets/screenshots/android-scan-results.png"><img src="docs/assets/screenshots/android-scan-results.png" alt="Scanned cards list with clear and add-to actions" width="300"></a></td>
   </tr>
   <tr>
-    <td><strong>Live scanning</strong> — recognize cards and review prices as you scan.</td>
-    <td><strong>Scan sessions</strong> — review, correct and add scanned cards in a batch.</td>
+    <td><strong>Live scanning</strong> - recognize cards and review prices as you scan.</td>
+    <td><strong>Scan sessions</strong> - review, correct and add scanned cards in a batch.</td>
   </tr>
 </table>
 
@@ -196,12 +197,12 @@ Set environment values from [`.env.example`](.env.example), deploy, and open the
 
 | Environment variable | Default / purpose |
 | --- | --- |
-| `MANAVAULT_PORT` | `3417` — published host port |
+| `MANAVAULT_PORT` | `3417` - published host port |
 | `MANAVAULT_DATA_DIR` | `/opt/mana-vault/data` |
 | `MANAVAULT_PICTURES_HOST` | `/opt/mana-vault/pictures` |
-| `MANAVAULT_SIGNUP` | Empty — managed in Administration (`open`, `invite`, `closed`) |
-| `MANAVAULT_SECURE_COOKIE` | Empty (`auto`) — HTTPS-aware session cookies |
-| `MANAVAULT_CARD_UPDATE_INTERVAL_HOURS` | Empty — managed in Administration |
+| `MANAVAULT_SIGNUP` | Empty - managed in Administration (`open`, `invite`, `closed`) |
+| `MANAVAULT_SECURE_COOKIE` | Empty (`auto`) - HTTPS-aware session cookies |
+| `MANAVAULT_CARD_UPDATE_INTERVAL_HOURS` | Empty - managed in Administration |
 | `TZ` | `America/Los_Angeles` |
 
 See [the full deployment and technical reference](https://github.com/Shwhat/mana-vault/blob/4be2a97f0609f66beec7a928f69c5109c0ce16/README.md) for additional configuration and migration instructions.

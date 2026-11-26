@@ -11,7 +11,7 @@ export type TradeSide = "give" | "get";
 export type TradeStatus = "open" | "done" | "cancelled";
 /** One line of a trade: a printing in a finish, condition and language, a count, and a price when it was changed by hand. */
 export type TradeLine = PriceFields & {
-  side: TradeSide; cardId: string; foil: FinishCode; condition: Condition; language: string; quantity: number; price: number | null;
+  id?: number; side: TradeSide; cardId: string; foil: FinishCode; condition: Condition; language: string; quantity: number; price: number | null;
   collectionId: string | null; collectionName?: string | null; name: string; set_code: string; set_name: string; collector_number: string;
   image_url: string | null; rarity?: string;
 };
@@ -102,7 +102,7 @@ export function useTradeState(deps: TradeDeps) {
   const patch = useCallback(async (trade: Trade, body: { name?: string; status?: TradeStatus; lines?: TradeLine[] }, message?: string) => {
     try {
       const payload = body.lines
-        ? { ...body, lines: body.lines.map((line) => ({ side: line.side, cardId: line.cardId, foil: line.foil, condition: line.condition, language: line.language,
+        ? { ...body, lines: body.lines.map((line) => ({ id: line.id, side: line.side, cardId: line.cardId, foil: line.foil, condition: line.condition, language: line.language,
           quantity: line.quantity, price: line.price, collectionId: line.collectionId })) }
         : body;
       const next = await request<Trade>(`/api/trades/${encodeURIComponent(trade.id)}`, { method: "PATCH", body: JSON.stringify(payload) });
@@ -259,6 +259,17 @@ export function useTradeState(deps: TradeDeps) {
     }
   }, [fail]);
 
+  const setTradeSource = useCallback(async (trade: Trade, line: TradeLine, collectionId: string) => {
+    if (line.id === undefined) return fail(new Error("Trade line has no ID"), "Could not choose the source collection.");
+    try {
+      replace(await request<Trade>(`/api/trades/${encodeURIComponent(trade.id)}/lines/${line.id}/source`, {
+        method: "POST", body: JSON.stringify({ collectionId }),
+      }));
+    } catch (reason) {
+      fail(reason, "Could not choose the source collection.");
+    }
+  }, [fail]);
+
   /** The trade as text: both sides with prices, then the balance. */
   const tradeText = useCallback((trade: Trade) => {
     const currency = live.current.prefs.currency;
@@ -323,7 +334,7 @@ export function useTradeState(deps: TradeDeps) {
 
   return {
     trades, reloadTrades, openTrade, openTradeId, chooseTrade, waitingTrades: waiting, newTrade, renameTrade, cancelTrade, deleteTrade,
-    addLine, changeLine, setLines, giveEntry, getCard, completeTrade, sendTrade, acceptTrade, setTradeCollection, copyTrade, exportTrade, tradeText,
+    addLine, changeLine, setLines, giveEntry, getCard, completeTrade, sendTrade, acceptTrade, setTradeCollection, setTradeSource, copyTrade, exportTrade, tradeText,
     matches, reloadMatches, shareToken, loadShare, makeShare, stopShare,
   };
 }

@@ -140,8 +140,57 @@ describe("trades", () => {
     expect((await call("bob", "DELETE", `/api/trades/${trade.id}`)).statusCode).toBe(403);
   });
 
+  it("lets each account set its own source without changing the turn and accept the proposal", async () => {
+    const { call, signUp, ids } = await server();
+    const annMain = await signUp("ann");
+    const bobMain = await signUp("bob");
+    const eveMain = await signUp("eve");
+    await call("ann", "POST", `/api/collections/${annMain}/cards`, { cardId: "c1", quantity: 1, foil: false });
+    await call("bob", "POST", `/api/collections/${bobMain}/cards`, { cardId: "c9", quantity: 1, foil: false });
+    const trade = (await call("ann", "POST", "/api/trades", { name: "Proposal" })).json();
+    await call("ann", "PATCH", `/api/trades/${trade.id}`, { lines: [
+      { side: "give", cardId: "c1", ...copy, quantity: 1, price: null, collectionId: annMain },
+      { side: "get", cardId: "c9", ...copy, quantity: 1, price: null },
+    ] });
+    await call("ann", "POST", `/api/trades/${trade.id}/send`, { userId: ids.bob, collectionId: annMain });
+    const seen = (await call("bob", "GET", "/api/trades")).json()[0];
+    const given = seen.lines.find((line: { side: string }) => line.side === "give");
+    const received = seen.lines.find((line: { side: string }) => line.side === "get");
+    expect((await call("bob", "POST", `/api/trades/${trade.id}/lines/${given.id}/source`, { collectionId: eveMain })).statusCode).toBe(404);
+    expect((await call("bob", "POST", `/api/trades/${trade.id}/lines/${received.id}/source`, { collectionId: bobMain })).statusCode).toBe(404);
+    expect((await call("eve", "POST", `/api/trades/${trade.id}/lines/${given.id}/source`, { collectionId: eveMain })).statusCode).toBe(404);
+    const saved = (await call("bob", "POST", `/api/trades/${trade.id}/lines/${given.id}/source`, { collectionId: bobMain })).json();
+    expect(saved.turn).toBe("me");
+    expect(saved.lines.find((line: { id: number }) => line.id === given.id).collectionId).toBe(bobMain);
+    expect((await call("bob", "POST", `/api/trades/${trade.id}/accept`, { collectionId: bobMain })).json()).toEqual({ status: "done" });
+    expect((await call("bob", "POST", `/api/trades/${trade.id}/lines/${given.id}/source`, { collectionId: bobMain })).statusCode).toBe(409);
+    expect((await call("ann", "GET", `/api/collections/${annMain}/cards`)).json().map((row: { id: string }) => row.id)).toEqual(["c9"]);
+    expect((await call("bob", "GET", `/api/collections/${bobMain}/cards`)).json().map((row: { id: string }) => row.id)).toEqual(["c1"]);
+  });
+
+  it("preserves separate sources for identical lines when the other account changes the offer", async () => {
+    const { call, signUp, ids } = await server();
+    const annMain = await signUp("ann");
+    const bobMain = await signUp("bob");
+    const bobBox = (await call("bob", "POST", "/api/collections", { name: "Box", kind: "collection", completion: "none", finish: "any", sets: [] })).json().id;
+    await call("bob", "POST", `/api/collections/${bobMain}/cards`, { cardId: "c9", quantity: 1, foil: false });
+    await call("bob", "POST", `/api/collections/${bobBox}/cards`, { cardId: "c9", quantity: 1, foil: false });
+    const trade = (await call("bob", "POST", "/api/trades", { name: "Two sources" })).json();
+    await call("bob", "PATCH", `/api/trades/${trade.id}`, { lines: [
+      { side: "give", cardId: "c9", ...copy, quantity: 1, price: null, collectionId: bobMain },
+      { side: "give", cardId: "c9", ...copy, quantity: 1, price: null, collectionId: bobBox },
+    ] });
+    await call("bob", "POST", `/api/trades/${trade.id}/send`, { userId: ids.ann, collectionId: bobMain });
+    const ann = (await call("ann", "GET", "/api/trades")).json()[0];
+    const changed = (await call("ann", "PATCH", `/api/trades/${trade.id}`, { lines: [...ann.lines].reverse() })).json();
+    expect(changed.lines.map((line: { collectionId: string }) => line.collectionId)).toEqual([bobBox, bobMain]);
+    await call("ann", "POST", `/api/trades/${trade.id}/collection`, { collectionId: annMain });
+    expect((await call("bob", "POST", `/api/trades/${trade.id}/accept`, { collectionId: bobMain })).json()).toEqual({ status: "done" });
+    expect((await call("ann", "GET", `/api/collections/${annMain}/cards`)).json()[0].quantity).toBe(2);
+  });
+
   it("finds wishlist matches both ways, and shares the trade binder by a link that can be turned off", async () => {
-    const { app, call, signUp } = await server();
+    const { app, call, signUp, ids } = await server();
     const annMain = await signUp("ann");
     const bobMain = await signUp("bob");
     const annWants = (await call("ann", "POST", "/api/collections", { name: "Wants", description: "", completion: "none", finish: "any", kind: "wishlist", sets: [] })).json().id;
@@ -154,6 +203,13 @@ describe("trades", () => {
     expect(matches.theyHave[0]).toMatchObject({ user: { name: "bob" }, cardId: "c7", quantity: 1 });
     expect(matches.theyWant).toEqual([]);
     expect((await call("bob", "GET", "/api/trades/matches")).json().theyWant[0]).toMatchObject({ user: { name: "ann" }, cardId: "c7", collectionId: bobMain });
+    const binder = await call("ann", "GET", `/api/trades/binder/${ids.bob}`);
+    expect(binder.statusCode).toBe(200);
+    expect(binder.json()).toHaveLength(1);
+    expect(binder.json()[0]).toMatchObject({ cardId: "c7", quantity: 2 });
+    expect(binder.json()[0]).not.toHaveProperty("collectionId");
+    expect((await call("ann", "GET", `/api/trades/binder/${ids.ann}`)).statusCode).toBe(404);
+    expect((await call("ann", "GET", "/api/trades/binder/99999")).statusCode).toBe(404);
 
     const { token } = (await call("bob", "POST", "/api/trade-share")).json();
     const page = await app.inject({ method: "GET", url: `/share/${token}` });

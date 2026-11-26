@@ -87,11 +87,11 @@ The work area in the middle shows one of the views, chosen with the mode tabs or
 
 | View | Shows |
 |---|---|
-| Home | Totals for your collections (cards owned, value, collections, decks), Scan cards, Search, Import, Purchases and Wiki buttons, offers waiting in your Inbox, and your recent scans |
+| Home | Totals for your collections, cards for trade and trades awaiting you; recent collections, decks and scans; Inbox offers and shortcuts |
 | Card search | Search results as a grid of card pictures, binder pages or a list, with prices and owned counts; see [Card search](/about/card-search) |
 | Collection | The open collection, in five tabs: Cards (a grid of card pictures, binder pages or a list), Completion, Missing, Statistics and Notes; see [Collections](/about/collections), [Set completion](/about/set-completion) and [Prices and statistics](/about/prices-and-statistics) |
 | Deck | The open deck, in seven tabs: Cards (the format check and the cards by zone and group as a list, text, stacks or grid), Add (Quick add and a card search), Ownership, Statistics, Playtest, Notes and History; see [Decks](/about/decks) |
-| Trade | Saved trades: You give and You get with their searches, the balance bar and wishlist matches; see [Wishlists and trading](/about/wishlists-and-trading) |
+| Trade | Saved trades: You give and You get with their searches, the balance bar, wishlist matches and other accounts' trade binders; see [Wishlists and trading](/about/wishlists-and-trading) |
 | Proxies | The print list with sheet settings, preview and exports (Print tab), the card maker (Card maker tab) and custom sets with their symbols (Custom sets tab); see [Proxies and the card maker](/about/proxies) |
 | Wiki | The tree of notes pages (search, Pinned, Recent, Decks, Collections, My pages) and the open page; see [Notes and the Wiki](/about/notes-and-the-wiki) |
 

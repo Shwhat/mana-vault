@@ -60,7 +60,8 @@ This page lists what Mana Vault does in the current version, followed by what is
 - Build a trade in two columns, each with its own search: You give searches your cards for trade (or every card), You get searches the card database. Each line has its own count, finish, condition and a price that can be changed by hand.
 - See the balance of both sides in a bar with the difference.
 - Complete a trade in one step that can be undone: given cards leave their collections, cards you get are added and wishlist wants go down, with a warning for cards used in decks.
-- Send a trade to another account; changes go back as counter-offers until one side accepts, which completes it for both.
+- Send a trade to another account; each side chooses its own sources and destination, and changes go back as counter-offers until one side accepts.
+- Browse other accounts' marked-for-trade cards and add them to what you get, without revealing their collection names.
 - See wishlist matches both ways: cards others have for trade that you want, and your trade cards others want.
 - Copy or export the trade list, and share a public link to your trade binder that can be replaced or turned off.
 
@@ -79,6 +80,7 @@ This page lists what Mana Vault does in the current version, followed by what is
 - Keep a finish for every deck card (regular, foil or etched), shown as FOIL or ETCHED in every deck view, the Deck list panel and the Card panel, used for its price, set by `*F*` and `*E*` marks, Add as foil, Add as, linked copies and Change printing. A regular and a foil card of the same printing are separate deck cards.
 - Link lines of Edit as text and decklist imports that name a set and number to free copies of exactly that printing and finish; lines without them stay missing until linked. Link owned copies fills every missing card from exact copies.
 - Show on a missing deck card when you own it (Owned, link), another version of it (Other version owned, with Switch), or a copy that fills another deck (In Deck name, with Move to this deck).
+- Group multiple deck picture statuses into a compact control that opens on hover, focus or tap.
 - Mark a deck card Upgrade wanted with the version you want; it stays owned and is listed in the Ownership tab.
 - Right-click or long press a deck (panel or switcher) to open, rename, change the format, send it to the print list (whole deck, missing cards or chosen zones), send, export, delete or leave it, and a card in the Deck list panel for the deck card menu.
 - The Decks panel groups decks by format with each deck's card count and value.
@@ -162,7 +164,7 @@ This page lists what Mana Vault does in the current version, followed by what is
 - Desktop layout with a title bar holding the File, Edit, View and Help menus, mode tabs (Home, Search, Collection, Decks, Trade, Proxies) that switch the program, dockable panels, workspaces and a status bar. Commands for one collection, deck, card or trade are where it is shown (right-click menus, headers, Options).
 - Right-click menus on cards, rows, collections and decks; a long press opens them on a phone.
 - Card page with art, rules text, power and toughness, every version with market prices, rulings, and where you own the card.
-- Home view with totals, recent scans and the Inbox.
+- Home view with totals, recent collections and decks, trades awaiting an answer, recent scans and the Inbox.
 - Phone layout with Home, Search, Collection, Decks, Trade, Proxies and Scan tabs, a nested menu at the top right, full-screen sheets and an installable home screen app.
 - The app's own choice lists everywhere, with a search box for long lists and a sheet on phones.
 - A built-in About guide (this guide).
