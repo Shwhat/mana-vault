@@ -1,149 +1,156 @@
-# Mana Vault
+<p align="center">
+  <img src="docs/assets/banner.png" alt="Mana Vault — Your cards. Your decks. Your server." width="100%">
+</p>
 
-A self-hosted Magic: The Gathering collection and deck manager.
+<h1 align="center">Mana Vault</h1>
+<p align="center"><strong>A self-hosted Magic: The Gathering management platform.</strong></p>
 
-Mana Vault runs on your own server as one Docker container and is used from a desktop browser, a phone browser (installable as a home screen app) or the Android app. It keeps a local copy of the Scryfall card catalog, your collection and your decks in one SQLite database, behind a sign-in.
+<p align="center">
+  <a href="https://github.com/Shwhat/mana-vault/releases"><img alt="GitHub releases" src="https://img.shields.io/badge/Android-APK-3DDC84?logo=android&amp;logoColor=white"></a>
+  <a href="https://github.com/Shwhat/mana-vault/pkgs/container/mana-vault"><img alt="Docker container" src="https://img.shields.io/badge/Docker-amd64%20%7C%20arm64-2496ED?logo=docker&amp;logoColor=white"></a>
+  <a href="https://github.com/Shwhat/mana-vault/wiki"><img alt="Documentation" src="https://img.shields.io/badge/Documentation-Wiki-2867C7?logo=gitbook&amp;logoColor=white"></a>
+  <a href="https://github.com/Shwhat/mana-vault/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/Shwhat/mana-vault?style=flat&amp;logo=github"></a>
+</p>
 
-The full user guide is available in the [GitHub wiki](https://github.com/Shwhat/mana-vault/wiki) and in the app under Help, **About Mana Vault**. The in-app guide pages in `apps/web/src/about` are the source for the wiki.
+<p align="center">
+  <a href="#quick-start">Quick start</a> ·
+  <a href="#features">Features</a> ·
+  <a href="#screenshots">Screenshots</a> ·
+  <a href="#android-app">Android</a> ·
+  <a href="https://github.com/Shwhat/mana-vault/wiki">User guide</a> ·
+  <a href="https://github.com/Shwhat/mana-vault/issues">Report an issue</a>
+</p>
+
+## What is Mana Vault?
+
+Mana Vault brings your Magic collection, decks, trades, purchases, card creation and proxy printing into one application that runs on your own server. Manage your cards from a desktop browser, a mobile browser or the Android app without relying on a third-party collection-hosting account.
+
+The server maintains a local card catalog, collection and deck data in SQLite, with card information from Scryfall and MTGJSON. Your library lives on infrastructure you control.
+
+<img src="docs/assets/feature-overview.png" alt="Collect, build, scan, trade, create and host your Magic collection" width="100%">
 
 ## Features
 
-- Card search with one spot per card name (the newest regular printing, an N printings badge and one OWNED count), or every printing with Show every printing in Options. Filter syntax (`t:dragon c:red mv>=4`, `o:draw`, `set:lea`, `r:rare`, `id:wubg`, `legal:commander`, `usd<1`, `is:custom`, `is:surgefoil`, `is:owned`, `art:cat`, `role:ramp`, `pow>=3`, `tou<2`, `year>=2020`, `a:` artist, `kw:` keyword, `frame:`, `border:`, `lang:`, negation with `-`), flavor name matching and a Filters panel. Results show as a grid of card pictures (the default), binder pages or a list, with owned counts (prices in the list), and load as you scroll with the total in the count line. A Sort menu orders them by Best match (exact names first), name, date, price, mana value, rarity, color, set or owned copies, kept separately for card search, the deck's Add tab and both trade searches.
-- Filters for what the art shows (Scryfall Art Tags such as cat, dog or bird) and a card's role (Oracle Tags such as ramp or removal), name, card text, creature type, keyword, artist, power, toughness and price ranges, finishes made in, foil type, frame, release years and owned or not owned.
-- Special foils (SURGE FOIL, GALAXY FOIL, TEXTURED FOIL and others) named on every card mark and in the printing chooser.
-- Printing chooser in Grid (the default), List or Binder with a card size, finish buttons with prices under each picture, kept per account.
-- Undo and Redo arrow buttons in the top bar (desktop and phone), with the change in the tooltip.
-- Card layout (View menu): drag the count, printings, finish, status marks, finish lines, price and buttons to the corners of a card picture, the row under it, a second line or the bottom, or hide them; one layout for every section or one per section.
-- Live updates: open pages show changes made in the app, on another device or by someone sharing a collection or deck within a second or two (server-sent events), and coming back to card search keeps the search, results and scroll position.
-- Collection Grid and Binder show one picture per printing with a pip bar under it for the count, FOIL, ETCHED, Missing, Proxy, condition, language and copies for trade, and no prices; a line per kind of copy under the picture when there is more than one. The same in All collections, deck Grid and Stacks and search pictures.
-- Price history: each card database update keeps the day's prices; the card page has a Price history chart and table.
-- The Filters panel filters whatever is open: card search, a collection, a deck or a search inside them, each with its own filters that stay when you switch collections or decks.
-- All collections: one list of every row in every collection, with each row's collection (wishlists optional).
-- The app's own choice lists on every screen, the same on desktop and phone.
-- Prices from Scryfall in US dollars (regular, foil, etched) stored with each card database update, with collection and deck values and sorting by price.
-- Statistics for collections and decks: stat tiles and bar charts for mana curve, color, type, rarity, finish and top sets; clicking a collection bar filters the list.
-- Copy details per collection entry: finish (regular, foil, etched), condition, language, proxy, the number for trade, purchase price, date added, misprint, altered and signed.
-- Proxy copies: marked everywhere, worth nothing, left out of completion, value and statistics, and able to fill a deck slot.
-- Filter tags (click a set code or rarity), and three collection layouts: a grid of card pictures that loads more while scrolling (Small, Medium, Large), binder pages of nine cards sized to the window with a page box, or a list. Grid is the default; desktop and phone remember their own layout.
-- One switcher for collections and decks: a searchable list with sorting (recently opened, name, date created, card count, value, format, commander), details per row and keyboard control. An Options button holds sort, layout, card size, filters and Select.
-- Wishlists: collections whose cards are wanted, not owned; add a card, a set's missing cards or a deck's missing cards in one step.
-- Deck ownership check: which cards you own across your collections, where they are, and the cost of the missing cards; export the missing cards as text.
-- Saved trades (Open, Done, Cancelled): You give searches your cards for trade, You get searches the card database, each line with its own count, finish, condition and an editable price, and a balance bar. Complete a trade in one undoable step (deck cards are flagged, wishlist wants go down), or send it to another account with counter-offers until one side accepts. Wishlist matches both ways, copy or CSV export, and a public trade binder link that needs no sign-in.
-- Any number of collections per account (binders, boxes, sets being completed), each copy in one place. In the Collection and Decks tabs one click in the switcher or the panels opens a collection or deck; elsewhere one click in a panel makes it where new cards go, so a search stays open, and a true double click opens it (C cycles the collections). Every owned card is in a collection.
-- Change printing for collection copies and deck cards from the right-click menu, including switching to the foil or etched version, for all copies or only some (How many to change, its own first step starting at 1); deck cards link free copies of the new printing in that finish. Collection copies that fill a deck ask whether the deck changes too or keeps its version.
-- Deck cards keep a finish (regular, foil, etched), shown as FOIL or ETCHED in every deck view, the Deck list panel, the Card panel and trade lines, and used for prices, set by `*F*` and `*E*` marks, Add as foil, Add as, linked copies or Change printing. A regular and a foil card of one printing are separate deck cards.
-- Exact-printing links: Edit as text and decklist imports link lines that name a set and number to free copies of exactly that printing and finish; Link owned copies fills every missing card the same way. Missing cards show Owned, link or Other version owned with Switch.
-- Upgrade wanted: mark a deck card with the version you want; it stays owned and is listed in the Ownership tab until a copy of that version is linked.
-- Remove asks how many copies to remove, with Reduce to 1 and Remove all; Reduce to 1 also works on picked cards.
-- One Add to name button follows the selected collection or deck and opens the printing chooser with the shown printing selected (Enter takes it); a card with one printing skips the printing chooser (one finish adds it at once, more ask only for the finish). An Adding here mark in the panels and ADDING TO in the status bar show where cards go.
-- Right-click (long press) menus on collections and decks in the panels and switchers: open, rename, settings or format, Send to print list... (whole deck, missing cards or chosen zones), send, export, delete or leave. The Decks panel groups decks by format with card counts and values.
-- Proxies: a print list kept on the server (a deck, its missing cards, a collection, picked rows, a pasted list, tokens, any card), with printing, count and faces per line, sorted eight ways and shown as a list, grid or binder; pictures fetched a few at a time with a retry and a smaller-size fallback, and missing pictures listed before export; Letter, A4, Legal or custom paper, margins, card size, scale, gap, bleed, cut lines or corner marks and background, with a page preview; card backs (standard or uploaded) on mirrored back pages; exports as a 300 DPI PDF, MakePlayingCards pictures with bleed, and an MPC Autofill card list. Printed cards can be added as proxies to a collection or deck.
-- Card maker: custom cards with a live preview (one scrolling page on phones), opening on the card opened last, a card list grouped under custom set headings, one floating Symbols window that inserts at the cursor of the mana cost or rules text with Scryfall's full symbol list, suggestions for names, types and keywords, one art library for the server (several uploads at once; the uploader or an admin renames or deletes), Mana Vault's own frames in six styles (Classic, Borderless, Full art, Showcase, Nickname, Showcase Nickname) and every color (hybrids in every style, gold, artifact, colorless, land, vehicle), a frame picker with previews, an automatic legendary crown and power and toughness box, open-licensed card fonts, creature, planeswalker, saga, token, split and double-faced cards, uploaded or card art with move and zoom, and PNG export. Custom cards join the card database for every account, in custom sets with their own codes and symbols (SVG, a Scryfall set symbol or a picture, drawn in rarity colors, with a symbol of its own for any rarity), made and edited in the Custom sets tab with a sample card and undo, and work like any other card.
-- Set completion (off by default for new collections): link a collection to any number of sets; count by main set, every printing or each card name once, and by any finish, regular only, foil only or one of each; Completion and Missing tabs with filters, add-from-list and text or CSV export of the missing list.
-- Bulk editing: pick cards with Ctrl+click, Shift+click, Ctrl+A or Select mode; remove, reduce to one copy or move them between collections in one undoable step.
-- Collection tracking per printing, regular and foil, with plus, minus, move and remove controls.
-- Deck import, Edit as text and Quick add read `*F*` and `*E*` finish marks, and find cards by set and number when the name does not match.
-- Decks keep the exact printing, with commander, main deck, sideboard and maybeboard zones; All, Commander, Main, Sideboard and Maybe buttons show one zone (or all) and set where Add puts cards; rename and delete.
-- Add deck to collection: the deck's missing cards, or every card as new copies, go into a chosen collection in the deck's printings and finishes, linked to the deck, in one undoable step.
-- Deck builder in the Moxfield style, with a header like the collection's (switcher, tabs, filter box, Options, count line) and an Add tab with a card search and + Main, + Side, + Maybe and + Commander buttons that show the count already in the deck: Quick add ("2 Sol Ring"), Edit as text with a check before applying, List, Text, Stacks and Grid views grouped and sorted like every list view, tags on deck cards, In Deck marks with Move to this deck, hover previews and the tokens the deck makes.
-- Format checks for 21 formats: deck and sideboard size, copies, banned and not legal cards, and commander color identity.
-- Deck tabs for Playtest (opening hand, mulligan, draw, play), Description with a cover card, and History of every change; mana symbols against mana sources in deck statistics.
-- Linked deck cards: each deck card is linked to a copy in a collection (one deck per copy). Collection entries show their deck, deck cards show their collection, links follow moves, and unlinked cards show as missing with a + Wishlist button. Cards added straight to a deck go into the deck's own collection or a chosen one.
-- Wishlist want counts go down as copies are added, asking which wishlist when a card is on more than one.
-- List views in decks, collections, All collections, card search and the print list: group by type, subtype, type and tag, rarity, color, color identity, mana value, set or artist, sort by name, mana value, price, rarity or color, mana symbols, columns on wide screens, folding headings and a menu button per row.
-- Collections and decks belong to their account. Send them to another account as a copy, a share (both edit) or a transfer; the receiver accepts from an Inbox as a new item or, for collections, merged into one of theirs.
-- Undo and redo for collection and deck edits (150 steps).
-- Import window: Mana Vault, Moxfield, ManaBox, Archidekt, Deckbox, TCGplayer or plain text, detected from the file and changeable, into a chosen or new collection, and decklist import (text or CSV), each with a preview and an Import review panel for skipped rows.
-- Export window: the whole collection, filtered cards, selected cards, missing cards or a deck, in any of the import formats.
-- JSON backup and restore of the signed-in account's own collections and decks, the card records they use, the custom cards and sets made or used, the art library, the uploaded card back and the purchase history. Each backup is marked with the Mana Vault version that made it, and a server refuses backups from a newer version.
-- Card database updates from Scryfall on demand or on a schedule, including the set list (printed sizes, symbols, blocks), each printing's finishes, power and toughness, back face pictures, rulings, Art and Oracle tags, the symbol list, name and keyword lists for suggestions, the card back, Scryfall's printing changes (merges move every copy; removed printings are marked), the full Scryfall record of every card, and the card languages chosen in Administration (English and unofficial by default, or any official translations), all kept offline.
-- Card pictures kept on the server: choose the sizes (small, normal, large, PNG, art crop, border crop) with an estimated download size each; downloads run in the background after each update, only for new or changed pictures, with pause and resume, a minimum free space and a picture folder that can be moved. The phone app uses the server's pictures. A card whose record fails a check is skipped and listed instead of stopping the update.
-- Card page: art, rules text, power and toughness, every version with its market price, and rulings (offline in the app too), with a card actions button.
-- Live camera card scanner: scans continuously, finds the exact printing from the set code and collector number (or the card name, with tolerance for reading mistakes), collects cards in a scanned list with edit, +1 and finish controls, and adds the list to a collection or deck as one undo step. Text recognition runs in the browser with files served by Mana Vault, so it works offline. Settings for quick mode, sounds, camera, proxies, a set filter (any number of sets, with chips on the camera screen and a Not in set warning), ignoring promos, preferring foil, total value and copies owned. A printing picker when more than one printing fits, a strip for finish, condition and language, and an Add to window that can create a new collection or deck. Phone Scan tab; desktop scanner window.
-- Sign-in with accounts, password changes, sessions and protection against password guessing. Sign-up is open, by one-time invite code, or closed.
-- Administration for admins: first-run Setup, Accounts (create, reset password, turn off, make admin, sign out everywhere, delete or move collections to another account), Sign-up and invite codes, Card database, Pictures, Storage and backups (scheduled whole-server backups, download, restore), Devices, Security, Server (version, update check, uptime, Scryfall check, server name, log) and Activity. Environment variables lock their settings.
-- Desktop interface in the OpenSchem style: a title bar with the File, Edit, View and Help menus, mode tabs (Home, Search, Collection, Decks, Trade, Proxies) that switch the program, right-click menus on rows, dockable and floating panels (Filters, Collections, Decks, Card, Deck list, Import review) that dock and snap together, panel tabs that wrap, saved workspaces in the account menu, status bar and light, dark or system theme.
-- Phone layout with a Home screen, bottom tabs (Home, Search, Collection, Decks, Trade, Proxies, Scan), a nested top-right menu, long-press menus on rows, full-screen sheets and 44 pixel touch targets.
-- Prices on pictures (View menu, off by default): a price pip on every card picture.
-- Suggestions while typing in card search (names, `t:`, `kw:`, `a:`), Quick add, the scanner and the Filters panel, also offline in the app. Android app: in Search one tap picks a collection or deck and a double tap opens it.
-- Preferences (theme, foil, target zone, where new cards go and the open collection, proxy sheet settings, collection sort and list grouping, layout and card size, switcher sorting and recently opened items, deck view, groups and sort, print list sort and layout, prices on pictures, panels, workspaces, last deck) saved per account on the server.
-- Android app (Android 8.0 or newer, APK on the GitHub releases page): every phone feature, sign-in per phone with a device list, offline use of collections, decks, card search and scanning (including new collections and decks) with full search syntax offline, background sync as soon as the phone is online and a Sync now button, https only, sharing lists in to import and pictures or PDFs to read as receipts, update checks against your own server, the phone's own text recognition for scanning, notifications for new Inbox offers, and an opening started on the web page offered for scanning (in the open app, and as an Opening started notification with Start scanning).
-- Purchase history (Purchases tab): purchases of products (with a Product name picked from MTGJSON's named products of the set, such as a Commander deck or a bundle, and named Commander decks opened with their decklist) and single cards (found with pictures and every printing, scanned in, or taken from the scanned list) with tax and shipping spread over the lines, receipts read from a photo, PDF or screenshot and kept with the entry, places shared on the server, who paid shipping on each sale, trade entries with Gave, Got, Net and Original cost, packs opened one at a time (Open how many packs?, Next pack, Move to pack..., cost and values per pack) that tie pulled cards (they stay on the pack until Remove from pack..., with Value when pulled, Pulled value and Value now), grid tables with picking several rows (Delete picked..., Remove picked from pack...), Add existing copies... by collection, receipts read with a Match cards step for single cards, sealed values over time, card and product sales, trades recorded when completed, imported purchase prices, and Spent, Received, Value now and Gain or loss with a chart and CSV export.
-- MTGJSON data kept on the server (0.21.0): every printing's MTGJSON record, prices from TCGplayer, Card Kingdom, CardSphere, Cardmarket and Cardhoarder (retail and buylist, each finish) with an optional 90-day history fill and a daily update, booster contents, sealed product contents and barcodes, TCGplayer SKUs and the keyword and card type lists, each with its status and buttons in Administration.
-- A main price source per account (TCGplayer, Card Kingdom, CardSphere or Scryfall, with fallbacks) used by every price and value; a Prices table, an Oracle and Printed switch, the formats a card can lead and Found in on the card page; a price chart with one line per store; buylist prices in trades and, optionally, in lists.
-- Add precon as deck... and Add precon to collection...; Scan barcode... for a product in Purchases; expected value of booster packs, Open virtual packs... and a warning on a pulled card its pack cannot hold; Change collection... on a pack; New collection... in every list where cards go.
-- Search syntax `is:reprint`, `is:starter`, `can:commander`, `can:oathbreaker`, `can:brawl`, `store:`, `buylist` and `in:`; imports matched by TCGplayer, Card Kingdom and CardSphere ids and TCGplayer SKUs.
-- Every tab opens where it was left (its card page, filters, entry and scroll position); pressing the tab already shown goes back to its first screen.
-- Notes and the Wiki (0.22.0): a Notes tab on every deck (its top page is the deck's description) and collection, with child pages to any depth; a rich text editor with a toolbar (headings, lists, checklists, tables, quotes, code, links, `[[Page]]` links, card links with the card's picture, and pictures) saved as markdown; a Wiki tab with search, Pinned, Recent, Decks, Collections and My pages for pages not attached to anything, and drag and drop; built-in and own templates; page history with Restore and a choice of text when two people save the same page; notes that follow sharing; markdown import (files or an Obsidian-style zip) and zip export with pictures; offline notes in the Android app.
-- Web pages into notes (0.23.0): paste from a browser with pictures copied to the server, Import pages... with .html files and saved web pages, and New page from web address... keeping the main article, simplified, with a Source line; the server never fetches addresses on its own network.
-- Built-in About guide with release notes.
+| Feature | What you can do |
+| --- | --- |
+| **Collection management** | Organize binders, boxes and wishlists; track exact printings, finishes, conditions, languages, proxies and set completion. |
+| **Advanced card search** | Search with Scryfall-style syntax, art and Oracle tags, prices, card text and ownership filters. Browse grid, binder or list layouts. |
+| **Deck builder** | Build decks, link owned copies, identify missing cards, check format rules, view statistics and playtest opening hands. |
+| **Card scanning** | Use your desktop or phone camera to recognize cards, select printings and add them to a collection or deck. |
+| **Trading** | Maintain a trade binder, compare offers, make counteroffers, match wishlists and complete trades. |
+| **Purchase and price tracking** | Record singles, sealed products, sales, receipts and pack openings. Compare market prices and track historical values. |
+| **Proxy printing** | Prepare customizable print sheets, print double-sided cards and export PDF or MakePlayingCards assets. |
+| **Custom card creator** | Create cards and sets using built-in frames, uploaded artwork, custom symbols and PNG export. |
+| **Notes and wiki** | Write linked notes for decks and collections, organize a personal wiki and import or export Markdown pages. |
+| **Mobile and offline** | Install the web app or use the Android app for offline card search, scanning and library edits that sync when connected. |
+| **Server administration** | Manage accounts, invitations, storage, device sessions, scheduled data updates and whole-server backups. |
 
-## Keyboard shortcuts
+### Built for collectors who self-host
 
-| Key | Action |
-|---|---|
-| / | Find card |
-| 1, 2, 3, 4, 5, 6, 7 | Card search, collection, deck, trade, proxies, purchases, wiki view |
-| Up, Down | Previous or next row |
-| Enter | Add the selected card to the collection or deck selected last |
-| Shift+Enter | Add the selected card to the open deck |
-| F | Switch Add as foil |
-| Z | Cycle the zone shown and the target zone (All, Commander, Main, Sideboard, Maybe) |
-| C | Cycle the target collection |
-| W | Add the selected card to the wishlist |
-| E | Copy details of the selected collection row |
-| B | Switch the collection between binder and grid |
-| Page Up, Page Down | Previous or next binder page |
-| Ctrl+A | Pick every card the collection filter shows |
-| Ctrl+click, Shift+click | Pick more rows, or a range |
-| Delete | Remove the picked collection rows |
-| Ctrl+Z, Ctrl+Y (or Ctrl+Shift+Z) | Undo, redo (in a notes page: undo and redo typing) |
-| Ctrl+B, Ctrl+I, Ctrl+K | Bold, italic and link in a notes page |
-| Ctrl+O | Open deck |
-| Q | Go to Quick add in the open deck |
-| Esc | Close the window, menu, About guide or Administration, or clear the selection |
+- Single Docker container, published for `amd64` and `arm64`.
+- Local SQLite database and configurable card-image storage.
+- Multiple accounts, shareable collections and decks, and per-account preferences.
+- Desktop workspace with dockable panels, keyboard shortcuts and light/dark themes.
+- Import and export support for Mana Vault, Moxfield, ManaBox, Archidekt, Deckbox, TCGplayer and plain text, with supported formats depending on the data type.
 
-## Install with Dockhand
+## Screenshots
 
-Mana Vault is published as `ghcr.io/shwhat/mana-vault:latest` (amd64 and arm64) by GitHub Actions on every push to `main`. The GitHub package must be public, or Dockhand needs registry credentials for ghcr.io.
+A look at the actual Mana Vault interface across desktop and Android. Select any screenshot to open the full-resolution image.
 
-**1. On the Docker host**, check the port is free (no output means free), then create the data and picture folders for the container's user (UID 65532). The picture folder can be on another drive; set `MANAVAULT_PICTURES_HOST` to it.
+### Advanced card search and filters
 
-```bash
-sudo ss -ltnp | grep ':3417 '
-sudo mkdir -p /opt/mana-vault/data /opt/mana-vault/pictures
-sudo chown -R 65532:65532 /opt/mana-vault/data /opt/mana-vault/pictures
-```
+Search using local card syntax or the dockable Filters panel. Refine results by card type, set, color, legality, artist, artwork tags, role, power, toughness, finish, release year, ownership, price and mana value.
 
-**2. In Dockhand**, add a Git stack:
+<table>
+  <tr>
+    <td width="50%" align="center" valign="top"><a href="docs/assets/screenshots/advanced-filters.png"><img src="docs/assets/screenshots/advanced-filters.png" alt="Advanced desktop search filters" width="260"></a></td>
+    <td width="50%" align="center" valign="top"><a href="docs/assets/screenshots/android-mobile-search.png"><img src="docs/assets/screenshots/android-mobile-search.png" alt="Android card search with price sorting" width="260"></a></td>
+  </tr>
+  <tr>
+    <td><strong>Desktop filters</strong> — refine your search by card properties and printing details.</td>
+    <td><strong>Mobile search</strong> — browse cards and add them to collections or wishlists.</td>
+  </tr>
+</table>
 
-- Repository: `https://github.com/Shwhat/mana-vault`
-- Compose path: `docker-compose.yml`
-- Environment variables: the ones in `.env.example` (see Configuration below). Change `MANAVAULT_PORT` if 3417 is taken.
+### Collection management
 
-Deploy the stack and check its logs for `Server listening`.
+Switch between a card grid, a nine-card binder and a list. Group, sort and filter cards, adjust their size and display prices or finish details.
 
-**3. On the Docker host**, confirm it answers locally:
+<table>
+  <tr>
+    <td width="50%" valign="top"><a href="docs/assets/screenshots/collection-grid.png"><img src="docs/assets/screenshots/collection-grid.png" alt="Collection grid view with sorting and layout options" width="100%"></a></td>
+    <td width="50%" valign="top"><a href="docs/assets/screenshots/collection-binder.png"><img src="docs/assets/screenshots/collection-binder.png" alt="Nine-card binder view with collection options" width="100%"></a></td>
+  </tr>
+  <tr>
+    <td><strong>Grid view</strong> — browse large card images.</td>
+    <td><strong>Binder view</strong> — browse nine-card pages.</td>
+  </tr>
+</table>
 
-```bash
-curl -I http://127.0.0.1:3417
-```
+<details>
+<summary>Card layout customization</summary>
 
-A `302` redirect to `/login` means it is running.
+Choose where prices, counts, printings and other card details appear.
 
-**4. In the Cloudflare Tunnel** (on its own LXC), add a public hostname that points to `http://SERVER_IP:3417`. No `cloudflared` or reverse proxy is needed in this stack. The session cookie is marked secure automatically for HTTPS requests through the tunnel.
+<p align="center"><a href="docs/assets/screenshots/card-layout.png"><img src="docs/assets/screenshots/card-layout.png" alt="Drag-and-drop card layout customization dialog" width="420"></a></p>
 
-**5. In the browser**, open the address and choose **Create account**. The first account is the admin, and Mana Vault opens Setup: download the card database, choose the picture sizes to keep and the picture folder. Every step can be skipped and changed later in **Administration** (account menu). Sign-up (open, invite codes or closed) is set in Administration, Sign-up.
+</details>
 
-When updating from 0.11.0 or earlier: the oldest account becomes the admin, and Setup opens once for it. Remove `MANAVAULT_SIGNUP` and `MANAVAULT_CARD_UPDATE_INTERVAL_HOURS` from the stack's environment to manage them in Administration (a value set there locks the setting). Create the pictures folder above before redeploying. Run Update card database once so tags, special foils and price history are filled in.
+### Deck builder
 
-## Automatic updates
+Build and organize decks with card stacks, format validation, advanced filters, ownership status and a dockable card information panel.
 
-In Dockhand, turn on automatic image updates for the `app` container with a schedule (for example weekly). Dockhand pulls each new image published by GitHub Actions and recreates the container; the data folder is kept. Optionally turn on Git auto sync or a webhook for the stack so changes to `docker-compose.yml` redeploy it.
+[![Mana Vault Commander deck builder with filters, card stacks and card details](docs/assets/screenshots/deck-builder.png)](docs/assets/screenshots/deck-builder.png)
 
-## Install from the command line
+<details>
+<summary>Preconstructed deck imports</summary>
 
-**On the Docker host:**
+Find a preconstructed deck and add its decklist.
+
+<p align="center"><a href="docs/assets/screenshots/preconstructed-decks.png"><img src="docs/assets/screenshots/preconstructed-decks.png" alt="Searchable preconstructed deck picker" width="420"></a></p>
+
+</details>
+
+### Android app and live card scanning
+
+Scan physical cards, review detected printings, adjust finish, condition and language, and add the batch to a collection or deck. The Android app supports offline card search and scanning, with synchronization when you reconnect.
+
+<table>
+  <tr>
+    <td width="50%" align="center" valign="top"><a href="docs/assets/screenshots/android-scan-camera.png"><img src="docs/assets/screenshots/android-scan-camera.png" alt="Live camera scanning with detected card and add controls" width="300"></a></td>
+    <td width="50%" align="center" valign="top"><a href="docs/assets/screenshots/android-scan-results.png"><img src="docs/assets/screenshots/android-scan-results.png" alt="Scanned cards list with clear and add-to actions" width="300"></a></td>
+  </tr>
+  <tr>
+    <td><strong>Live scanning</strong> — recognize cards and review prices as you scan.</td>
+    <td><strong>Scan sessions</strong> — review, correct and add scanned cards in a batch.</td>
+  </tr>
+</table>
+
+### Custom card maker
+
+Design cards with custom artwork, frames, mana costs, rules text and flavor text. Preview your work and add it to a print list or export it as a PNG.
+
+[![Mana Vault custom card editor showing a Woodlands Arcane Signet](docs/assets/screenshots/card-maker.png)](docs/assets/screenshots/card-maker.png)
+
+### Custom sets
+
+Organize your designs into sets with custom codes, collector numbers, rarity-specific symbols and live card previews.
+
+[![Woodlands custom set editor with set symbols and card list](docs/assets/screenshots/custom-sets.png)](docs/assets/screenshots/custom-sets.png)
+
+### Integrated wiki and notes
+
+Keep deck guides, collection notes and personal reference pages in a searchable wiki. Create and organize pages, import existing documents, capture web pages and use templates. The built-in About Mana Vault guide is available directly in the app.
+
+[![Integrated Mana Vault wiki showing searchable notes and the built-in user guide](docs/assets/screenshots/integrated-wiki.png)](docs/assets/screenshots/integrated-wiki.png)
+
+## Quick start
+
+### Docker Compose
+
+**Requirements:** Docker Engine with the Compose plugin, storage for your database and selected card image sizes, and internet access for the initial card catalog download. The default host port is `3417`.
+
+On your Docker host:
 
 ```bash
 sudo mkdir -p /opt/mana-vault/data /opt/mana-vault/pictures
@@ -157,151 +164,114 @@ sudo chown -R 65532:65532 /opt/mana-vault/data /opt/mana-vault/pictures
 sudo docker compose config -q
 sudo docker compose pull
 sudo docker compose up -d
+```
+
+Open `http://SERVER_IP:3417` in your browser. Create the first account (it becomes the administrator), then follow the setup wizard to download the card database and configure picture storage.
+
+Check the running service:
+
+```bash
 sudo docker compose ps
 sudo docker compose logs --tail=100
 curl -I http://127.0.0.1:3417
 ```
 
-## Manual update
+A `302` redirect to `/login` indicates the service is responding. If image pulls require authentication, configure credentials for GitHub Container Registry.
 
-**In Dockhand:** pull and redeploy the stack, then check its logs.
+### Dockhand
 
-**On the Docker host (command line install):**
+Create the data and picture folders with ownership `65532:65532` as shown above. Add a **Git stack** with these settings:
+
+| Setting | Value |
+| --- | --- |
+| Repository | `https://github.com/Shwhat/mana-vault` |
+| Branch | `main` |
+| Compose path | `docker-compose.yml` |
+| Container image | `ghcr.io/shwhat/mana-vault:latest` |
+| Host port | `3417` (configurable) |
+
+Set environment values from [`.env.example`](.env.example), deploy, and open the application. For internet access, use an HTTPS reverse proxy or tunnel; the Android app requires HTTPS. Configure sign-up and invitations in **Administration**.
+
+### Configuration
+
+| Environment variable | Default / purpose |
+| --- | --- |
+| `MANAVAULT_PORT` | `3417` — published host port |
+| `MANAVAULT_DATA_DIR` | `/opt/mana-vault/data` |
+| `MANAVAULT_PICTURES_HOST` | `/opt/mana-vault/pictures` |
+| `MANAVAULT_SIGNUP` | Empty — managed in Administration (`open`, `invite`, `closed`) |
+| `MANAVAULT_SECURE_COOKIE` | Empty (`auto`) — HTTPS-aware session cookies |
+| `MANAVAULT_CARD_UPDATE_INTERVAL_HOURS` | Empty — managed in Administration |
+| `TZ` | `America/Los_Angeles` |
+
+See [the full deployment and technical reference](https://github.com/Shwhat/mana-vault/blob/4be2a97f0609f66beec7a928f69c5109c0ce16/README.md) for additional configuration and migration instructions.
+
+## Android app
+
+Use Mana Vault on Android 8.0 or newer with your own HTTPS-enabled server. Download the available APK from [GitHub Releases](https://github.com/Shwhat/mana-vault/releases). If only a debug pre-release is listed, it is a development build rather than a stable release.
+
+The Android app supports offline collections, decks, card search and scanning, with synchronization after reconnecting. It also supports receiving trade and sharing offers, importing shared files and launching directly into the scan workflow shown in the screenshots above.
+
+## Updates and backups
+
+Back up your server data before updating. For a command-line installation:
 
 ```bash
 cd /opt/mana-vault
-sudo cp docker-compose.yml docker-compose.yml.backup-$(date +%Y%m%d-%H%M%S)
-sudo cp .env .env.backup-$(date +%Y%m%d-%H%M%S)
 sudo docker compose pull
 sudo docker compose up -d
 sudo docker compose logs --tail=100
 ```
 
-Never remove the stack together with its volumes and never run `docker compose down -v`. An update never requires deleting or recreating the data folder.
+For Dockhand, pull and redeploy the stack or configure automatic image updates. Preserve the data folder; do not delete it or run `docker compose down -v` as part of an update.
 
-## Moving from the earlier mana-vault-data volume
+Use **Administration → Storage and backups** to schedule and restore server backups. Keep a separate copy of your backups and configuration off the Docker host. The standard scheduled server backup excludes downloadable card pictures. You can also export an account-level JSON backup from the app.
 
-Versions before 0.1.0 kept the database in a Docker volume named `mana-vault-data`, ran as a different user, and were reachable only on localhost. **On the Docker host**, with the old stack stopped, copy the data into the new folder and set its owner:
+## Documentation
 
-```bash
-sudo mkdir -p /opt/mana-vault/data
-sudo docker run --rm -v mana-vault-data:/from -v /opt/mana-vault/data:/to alpine sh -c 'cp -a /from/. /to/'
-sudo chown -R 65532:65532 /opt/mana-vault/data
-```
+| Resource | Description |
+| --- | --- |
+| [User guide](https://github.com/Shwhat/mana-vault/wiki) | Features, workflows and everyday use |
+| [Technical reference](https://github.com/Shwhat/mana-vault/blob/4be2a97f0609f66beec7a928f69c5109c0ce16/README.md) | Detailed features, shortcuts, deployment, configuration and Android builds |
+| [Releases](https://github.com/Shwhat/mana-vault/releases) | Available Android APKs |
+| [Issues](https://github.com/Shwhat/mana-vault/issues) | Bug reports and feature requests |
+| [Project handoff](docs/HANDOFF.md) | Code map and development information |
 
-Then deploy as above. Rename `CARD_UPDATE_INTERVAL_HOURS` to `MANAVAULT_CARD_UPDATE_INTERVAL_HOURS` (the old name still works). Keep the old volume until the new install is confirmed working.
-
-## Backup
-
-Back up, and keep one copy off the Docker host:
-
-- `/opt/mana-vault/data` (the database, including all accounts, collections, decks and shares). For a consistent copy, stop the stack first, or copy while the app is idle.
-- The stack's environment values (in Dockhand, or `/opt/mana-vault/.env`).
-- `docker-compose.yml`.
-
-**On the Docker host:**
-
-```bash
-sudo tar -czf ~/mana-vault-backup-$(date +%Y%m%d).tar.gz -C /opt/mana-vault data
-```
-
-**Administration, Storage and backups** writes whole-server backups (every account, collection, deck, setting and the card database) on a schedule into `/opt/mana-vault/data/backups`, and restores them. Pictures are not included; they can be downloaded again.
-
-The in-app **Download backup** (File menu) saves the signed-in account's own collections and decks as JSON and can be restored from the app; it does not include other accounts or the full card catalog. A Docker volume is not a backup.
-
-To restore a server backup: stop the stack, extract the archive into `/opt/mana-vault`, run `sudo chown -R 65532:65532 /opt/mana-vault/data`, and start the stack.
-
-## Configuration
-
-| Variable | Default | Meaning |
-|---|---|---|
-| `MANAVAULT_PORT` | `3417` | Host port the app is published on |
-| `MANAVAULT_DATA_DIR` | `/opt/mana-vault/data` | Host folder for the database, owned by 65532:65532 |
-| `MANAVAULT_PICTURES_HOST` | `/opt/mana-vault/pictures` | Host folder for downloaded card pictures, owned by 65532:65532 |
-| `MANAVAULT_PICTURES_DIR` | `/pictures` in Docker | Picture folder inside the container. Set by the compose file; it locks the folder in Administration |
-| `MANAVAULT_BACKUP_DIR` | empty (`backups` in the data folder) | Folder for whole-server backups; locks it in Administration |
-| `MANAVAULT_SIGNUP` | empty | `open`, `invite` or `closed` (`on` and `off` also work). Empty means it is set in Administration |
-| `MANAVAULT_SECURE_COOKIE` | empty (`auto`) | `auto` marks the session cookie secure for HTTPS requests, including through a proxy; `always` or `never` force it |
-| `MANAVAULT_CARD_UPDATE_INTERVAL_HOURS` | empty (168 in Administration) | Hours between automatic Scryfall updates, 1 to 8760; `0` turns them off. Empty means it is set in Administration |
-| `TZ` | `America/Los_Angeles` | Time zone for logs |
-
-The image sets `HOST`, `PORT` (3000 inside the container), `DATABASE_PATH`, `SCRYFALL_DATA_PATH` and `WEB_DIST_PATH`.
+The full guide is also available inside the application under **Help → About Mana Vault**.
 
 ## Development
 
-Requirements: Node.js 22.5 or newer.
+Requires Node.js 22.5 or newer.
 
 ```bash
 npm install
-npm run dev:server     # API on 127.0.0.1:3000
-npm run dev:web        # interface on http://localhost:5173
-npm run update:cards   # load the Scryfall catalog into data/mana-vault.sqlite
+npm run dev:server    # API at 127.0.0.1:3000
+npm run dev:web       # Web interface at localhost:5173
+npm run update:cards  # Import the Scryfall catalog
 ```
 
-### Checks
+Run the checks before submitting changes:
 
 ```bash
 npm run typecheck
-npm test               # server tests and static checks (About guide, versions, banned characters)
-npm run test:e2e       # builds, then runs the Playwright browser suite against a sample database
-npm run test:all       # all of the above
+npm test
+npx playwright install chromium
+npm run test:e2e
 ```
 
-The browser suite uses Playwright's Chromium (`npx playwright install chromium` once). Set `PW_CHANNEL=chrome` to use an installed Chrome instead.
+| Component | Technology |
+| --- | --- |
+| Web interface | React, TypeScript |
+| Server | Fastify, Node.js |
+| Database | SQLite |
+| Android | Capacitor, Java |
+| Deployment | Docker, GitHub Actions |
+| Card data | Scryfall, MTGJSON |
 
-### Project layout
+## Support and feedback
 
-| Path | Contents |
-|---|---|
-| `apps/server/src` | Fastify server: API, sign-in (`auth.ts`), collections, set completion and sending (`library.ts`), decks (`decks.ts`), notes pages (`notes.ts`), deck card links (`links.ts`), set list (`sets.ts`), search, imports, backups, catalog updates |
-| `apps/web/src` | React interface: `store.tsx` (state), `library-state.tsx` (collections, picking rows, decks admin, offers), `actions.tsx` (every command), `menus.ts` (the menu bar, mode tabs and account menu as data), `formats.ts` (export formats), `dock.ts` (panel layout model), `components/`, `panels/`, `views/`, `about/` (guide pages), `style.css` |
-| `apps/web/public` | Sign-in page, icons, manifest and service worker |
-| `apps/android` | Android app: Capacitor project (`android/`), native plugin, icons |
-| `apps/web/src/android` | The app's side of the interface: platform layer, device sign-in, offline copy and sync (`offline.ts`), card list (`catalog.ts`), app screens |
-| `apps/server/src/mobile.ts` | Device sign-in, cross-origin access for the app, `/api/sync`, `/api/sync/state`, `/api/catalog/compact`, `/api/rulings/compact` |
-| `tests/e2e` | Playwright browser tests (including the Android app with a stand-in for its native plugin) and the sample-data test server |
-| `docs/HANDOFF.md` | Project handoff: rules, code map, open items |
+If Mana Vault is useful to you, consider starring the repository. Report bugs or suggest improvements through [GitHub Issues](https://github.com/Shwhat/mana-vault/issues). Include the application version, steps to reproduce and relevant logs when reporting a problem; remove credentials and private data before posting.
 
-## Android app
+## Acknowledgments
 
-The app lives in `apps/android`: a Capacitor project that carries the built interface (`apps/web/dist`) and a Java plugin (`ManaVaultPlugin.java`, `Settings.java`, `InboxWorker.java`) for text recognition, encrypted settings, the background Inbox check, file sharing and the Back button. Its version comes from the root `package.json`.
-
-### Building on a computer
-
-Requirements: Node.js 22.5 or newer, Java 21 and the Android SDK (platform 36, build tools 36). Point `ANDROID_HOME` at the SDK, or put `sdk.dir=...` in `apps/android/android/local.properties`.
-
-```bash
-npm install
-npm run build -w @mana-vault/web
-npm run apk:debug -w @mana-vault/android   # apps/android/android/app/build/outputs/apk/debug/app-debug.apk
-```
-
-### Releases
-
-The `Android app` workflow builds a debug app for every pull request that changes the interface or the app, and for every push to main, and keeps it with the run as `mana-vault-X.Y.Z-debug` (Actions, the run, Artifacts). After each push to main the APK is also on the **Debug build** pre-release on the releases page (tag `debug`), which the app's update check ignores. Debug builds are signed with the shared debug key in `apps/android/android/app/debug-shared.p12`, so each one installs over the one before it; the release app uses its own key and needs the debug app uninstalled first. For a version tag (`vX.Y.Z`) it builds the release app, signs it and attaches `mana-vault-X.Y.Z.apk` to the GitHub release.
-
-Signing needs a release key, made once on any computer with Java (keep the file and passwords safe and out of Git; an app signed with another key cannot update the installed app):
-
-```bash
-keytool -genkeypair -v -keystore mana-vault-release.jks -alias manavault -keyalg RSA -keysize 4096 -validity 10000
-base64 -w0 mana-vault-release.jks
-```
-
-Then in GitHub, Settings, Secrets and variables, Actions, add these repository secrets:
-
-| Secret | Value |
-|---|---|
-| `ANDROID_KEYSTORE_BASE64` | The base64 text of the key file |
-| `ANDROID_KEYSTORE_PASSWORD` | The key store password |
-| `ANDROID_KEY_ALIAS` | `manavault` (the alias used above) |
-| `ANDROID_KEY_PASSWORD` | The key password |
-
-To publish a version: merge to main, then tag it, for example `git tag v0.5.0 && git push origin v0.5.0`.
-
-The server needs no change for the app: it accepts the app's requests at the same address used in a browser. When it is reached through Cloudflare Tunnel, the app uses the same https address.
-
-## Data and secrets
-
-Collection data and card database files stay outside Git. Do not commit `.env` files, credentials, backups, collection exports or Android signing keys (`*.jks`, `*.keystore`).
-
-Mana Vault is not produced by or endorsed by Scryfall or Wizards of the Coast.
+Mana Vault uses card information from [Scryfall](https://scryfall.com/) and [MTGJSON](https://mtgjson.com/). Magic: The Gathering and associated names and artwork belong to their respective rights holders. Mana Vault is an independent project and is not produced by or endorsed by Wizards of the Coast or Scryfall.
