@@ -10,6 +10,9 @@ on:
     paths:
       - "apps/web/**"
       - "apps/android/**"
+      - "packages/**"
+      - "package.json"
+      - "package-lock.json"
       - "apps/server/src/scan-core.ts"
       - ".github/workflows/android.yml"
   push:

@@ -1,8 +1,9 @@
 {
   "name": "mana-vault",
   "private": true,
-  "version": "0.25.0",
+  "version": "0.26.0",
   "workspaces": [
+    "packages/*",
     "apps/*"
   ],
   "engines": {
