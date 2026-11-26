@@ -8,7 +8,7 @@
 <p align="center">
   <a href="https://github.com/Shwhat/mana-vault/releases"><img alt="GitHub releases" src="https://img.shields.io/badge/Android-APK-3DDC84?logo=android&amp;logoColor=white"></a>
   <a href="https://github.com/Shwhat/mana-vault/pkgs/container/mana-vault"><img alt="Docker container" src="https://img.shields.io/badge/Docker-amd64%20%7C%20arm64-2496ED?logo=docker&amp;logoColor=white"></a>
-  <a href="https://github.com/Shwhat/mana-vault/wiki"><img alt="Documentation" src="https://img.shields.io/badge/Documentation-Wiki-2867C7?logo=gitbook&amp;logoColor=white"></a>
+  <a href="https://github.com/Shwhat/mana-vault/wiki"><img alt="Mana Vault Wiki and User Guide" src="https://img.shields.io/badge/Documentation-Wiki-2867C7?logo=gitbook&amp;logoColor=white"></a>
   <a href="https://github.com/Shwhat/mana-vault/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/Shwhat/mana-vault?style=flat&amp;logo=github"></a>
 </p>
 
@@ -17,7 +17,7 @@
   <a href="#features">Features</a> ·
   <a href="#screenshots">Screenshots</a> ·
   <a href="#android-app">Android</a> ·
-  <a href="https://github.com/Shwhat/mana-vault/wiki">User guide</a> ·
+  <a href="https://github.com/Shwhat/mana-vault/wiki"><strong>Wiki / User Guide</strong></a> ·
   <a href="https://github.com/Shwhat/mana-vault/issues">Report an issue</a>
 </p>
 
@@ -231,7 +231,7 @@ Use **Administration → Storage and backups** to schedule and restore server ba
 
 | Resource | Description |
 | --- | --- |
-| [User guide](https://github.com/Shwhat/mana-vault/wiki) | Features, workflows and everyday use |
+| [Mana Vault Wiki / User Guide](https://github.com/Shwhat/mana-vault/wiki) | Getting started, features, workflows and everyday use |
 | [Technical reference](https://github.com/Shwhat/mana-vault/blob/4be2a97f0609f66beec7a928f69c5109c0ce16/README.md) | Detailed features, shortcuts, deployment, configuration and Android builds |
 | [Releases](https://github.com/Shwhat/mana-vault/releases) | Available Android APKs |
 | [Issues](https://github.com/Shwhat/mana-vault/issues) | Bug reports and feature requests |
