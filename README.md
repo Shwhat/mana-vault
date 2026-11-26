@@ -1,10 +1,10 @@
 # Mana Vault
 
-A self-hosted Magic: The Gathering collection and deck manager. Version 0.8.0.
+A self-hosted Magic: The Gathering collection and deck manager.
 
 Mana Vault runs on your own server as one Docker container and is used from a desktop browser, a phone browser (installable as a home screen app) or the Android app. It keeps a local copy of the Scryfall card catalog, your collection and your decks in one SQLite database, behind a sign-in.
 
-The full user guide is built into the app: Help tab, **About Mana Vault**. The pages are in `apps/web/src/about`.
+The full user guide is available in the [GitHub wiki](https://github.com/Shwhat/mana-vault/wiki) and in the app under Help, **About Mana Vault**. The in-app guide pages in `apps/web/src/about` are the source for the wiki.
 
 ## Features
 
