@@ -82,6 +82,7 @@ Each line shows the picture, name (with FOIL or ETCHED for those finishes), set,
 | Control | Use |
 |---|---|
 | Count | Minus and plus; minus at 1 removes the line |
+| Source collection | Choose where your given card comes from; selecting a source does not send a counter-offer |
 | Finish | Regular, Foil or Etched |
 | Condition | Mint to Damaged |
 | Price each | Empty uses the card database price for the finish; typing a price replaces it, and the line shows **EDITED**. **Use card price** goes back to the database price |
@@ -116,6 +117,7 @@ Each line shows its buylist (the highest price a store pays, for its finish and 
 **Send to another account...** sends the open trade to an account on this server, with the collection your cards go to.
 
 - The other account sees it in the trade list and in the **Inbox** under Trades waiting for your answer, with **Open trade**. Their view shows the sides turned around: what you give is what they get.
+- Choose **Cards you get go to** before changing a proposal, and choose a source collection for each card you give. These choices do not send a counter-offer; each account chooses its own collections.
 - Either side can change the lines. A change goes back to the other account as a counter-offer, and their status shows Your turn.
 - The account whose turn it is can **Accept trade...** (choosing the collection their cards go to). Accepting completes the trade for both accounts: each side's given cards move to the other side's collection, and wishlist wants go down.
 - **Decline** (or **Cancel trade** for the sender) ends the proposal for both sides.
@@ -127,6 +129,8 @@ Each line shows its buylist (the highest price a store pays, for its finish and 
 | Only the account that started a trade can delete it. Decline it instead. | Delete on a trade sent to you |
 
 ## Wishlist matches
+
+**Browse trade binders** lists the cards marked for trade by a selected account on this server, including their available counts and copy details. **+ Get** adds one to the current trade. Accounts can see cards marked for trade without a public share link; collection names and unmarked cards are not shown.
 
 **Wishlist matches** under the trade lists:
 

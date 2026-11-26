@@ -1,12 +1,17 @@
 # Mana Vault handoff
 
+## 0.25.0 (2026-11-25): Trades and dashboard
+
+- Added source and destination selection for account trades, browsing other accounts' trade binders, compact deck picture statuses, a fuller Home screen and readable light-theme menus.
+- Validation: `PW_CHANNEL=chrome npm run test:all` passed, including 122 browser tests. PR, merge, server and Android delivery verification are pending.
+
 ## 0.24.8 (2026-11-25): GitHub guide
 
 - The public GitHub wiki was initialized with the 0.24.7 About guide. The publishing workflow updates managed pages on pushes to main and preserves unrelated wiki pages.
 - Validation: `PW_CHANNEL=chrome npm run test:all` passed, including 119 browser tests. `git diff --check` passed.
 - At handoff, version 0.24.8 and automatic synchronization are pending delivery. Verify the workflow, container, Android build and debug APK for the merged commit.
 
-Last updated: 2026-11-25, version 0.24.8 pending.
+Last updated: 2026-11-25, version 0.25.0 pending.
 
 ## Project
 

@@ -177,6 +177,40 @@ function byPrinting(cards: DeckCard[]): DeckCard[][] {
   return [...groups.values()];
 }
 
+function PictureMarks({ cards, missing, total }: { cards: DeckCard[]; missing: number; total: number }) {
+  const store = useApp();
+  const [open, setOpen] = useState(false);
+  const marks: ReactNode[] = [];
+  let count = 0;
+  for (const item of cards) {
+    if (item.want_card_id) { marks.push(<UpgradeBadge key={`upgrade${item.entry_id}`} card={item} compact />); count++; }
+  }
+  if (missing > 0) { marks.push(<span key="missing" className="badge miss">{missing < total ? `MISSING ${missing}` : "MISSING"}</span>); count++; }
+  const removed = cards.find((item) => item.removed);
+  if (removed) {
+    marks.push(<RemovedPip key="removed" onChange={() => choosePrinting(removed.name, removed.card_id, removed.card_id, { finish: removed.finish ?? 0, currency: store.prefs.currency, quantity: removed.quantity },
+      (printing, finish, quantity) => void store.changeDeckPrinting(removed, printing, finish, undefined, quantity))} />);
+    count++;
+  }
+  for (const item of cards) {
+    if ((item.missing ?? 0) <= 0 || item.zone === "maybeboard") continue;
+    const { exact, other } = ownedVersions(item);
+    if (exact.length || other.length) {
+      marks.push(<OwnedMarks key={`owned${item.entry_id}`} store={store} card={item} compact />);
+      count++;
+    } else if (item.inDecks?.length) {
+      marks.push(<InDeckMarks key={`deck${item.entry_id}`} store={store} card={item} compact />);
+      count += new Set(item.inDecks.map((deck) => deck.deckName)).size;
+    }
+  }
+  if (count < 2) return <>{marks}</>;
+  return <div className={`markgroup${open ? " open" : ""}`}>
+    <button type="button" className="badge marktoggle" aria-expanded={open} aria-label={`${count} card statuses`}
+      onClick={(event) => { event.stopPropagation(); setOpen(!open); }}>{count} STATUSES</button>
+    <div className="markpopup">{marks}</div>
+  </div>;
+}
+
 /**
  * One picture for a printing in the deck, with pips on it: the count, the finish, Missing and the owned marks. In Grid
  * (`lines`) a printing held in more than one finish also gets a line for each finish under it, to pick one.
@@ -210,16 +244,7 @@ function Picture({ cards, flag, lines = false }: { cards: DeckCard[]; flag?: str
     <CardFrame section="deck" above={!lines} className={lines ? "stackcell dstack" : "dstack"} picture={picture} pieces={{
       count: <CountPip count={total} />,
       finish: cards.map((item) => <FinishBadge key={item.entry_id} finish={item.finish} promoTypes={item.promo_types} />),
-      marks: (
-        <>
-          {cards.map((item) => <UpgradeBadge key={item.entry_id} card={item} compact />)}
-          {missing > 0 && <span className="badge miss">{missing < total ? `MISSING ${missing}` : "MISSING"}</span>}
-          {cards.filter((item) => item.removed).slice(0, 1).map((item) => <RemovedPip key="removed" onChange={() => choosePrinting(item.name, item.card_id, item.card_id, { finish: item.finish ?? 0, currency: store.prefs.currency, quantity: item.quantity },
-            (printing, finish, count) => void store.changeDeckPrinting(item, printing, finish, undefined, count))} />)}
-          {cards.map((item) => <OwnedMarks key={item.entry_id} store={store} card={item} compact />)}
-          {cards.map((item) => <InDeckMarks key={`d${item.entry_id}`} store={store} card={item} compact />)}
-        </>
-      ),
+      marks: <PictureMarks cards={cards} missing={missing} total={total} />,
       price: <PricePip price={cardPrice(card, store.prefs.currency)} />,
       lines: split && (
       <div className="slines" role="group" aria-label={`${card.name} (${card.set_code.toUpperCase()}) ${card.collector_number}`}>

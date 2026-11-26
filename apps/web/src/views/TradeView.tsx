@@ -12,7 +12,7 @@ import { entryKey } from "../library-state";
 import { useApp } from "../store";
 import { FinishBadge } from "../components/CardMarks";
 import { lineEach, sideTotal, type Trade, type TradeLine, type TradeMatch, type TradeSide } from "../trade-state";
-import { CONDITIONS, type CollectionEntry, FINISHES, money, priceOf } from "../types";
+import { CONDITIONS, type CollectionEntry, FINISHES, money, priceOf, type Person } from "../types";
 import { Quantity, SearchOptions, Thumb } from "./Views";
 import { buylistOf } from "../types";
 
@@ -60,6 +60,8 @@ function LineRow({ trade, line, editable }: { trade: Trade; line: TradeLine; edi
   const currency = store.prefs.currency;
   const market = priceOf(line, line.foil, currency);
   const [price, setPrice] = useState(line.price === null ? "" : String(line.price));
+  const [savingSource, setSavingSource] = useState(false);
+  const canEdit = editable && !savingSource;
   useEffect(() => setPrice(line.price === null ? "" : String(line.price)), [line.price]);
   const change = (next: Partial<TradeLine>) => void store.changeLine(trade, line, next);
   const savePrice = () => {
@@ -75,22 +77,27 @@ function LineRow({ trade, line, editable }: { trade: Trade; line: TradeLine; edi
         <div className="rowmeta">{line.set_name} <span className="badge">{line.set_code.toUpperCase()}</span> {line.collector_number}
           {line.collectionName && <span className="sub"> from {line.collectionName}</span>}</div>
         <div className="tlctl">
-          <Quantity value={line.quantity} name={line.name} max={999} onChange={(quantity) => (editable ? change({ quantity: Math.max(0, quantity) }) : undefined)} />
-          <Picker label={`Finish of ${line.name}`} value={String(line.foil)} disabled={!editable} options={FINISH_CHOICES}
+          <Quantity value={line.quantity} name={line.name} max={999} onChange={(quantity) => (canEdit ? change({ quantity: Math.max(0, quantity) }) : undefined)} />
+          {trade.status === "open" && line.side === "give" && <Picker label={`Source collection for ${line.name}`} value={line.collectionId ?? ""}
+            disabled={savingSource}
+            options={[{ value: "", label: "Choose source collection", disabled: true }, ...(store.collections ?? []).filter((item) => item.kind === "collection")
+              .map((item) => ({ value: item.id, label: item.name }))]}
+            onChange={(collectionId) => { setSavingSource(true); void store.setTradeSource(trade, line, collectionId).finally(() => setSavingSource(false)); }} />}
+          <Picker label={`Finish of ${line.name}`} value={String(line.foil)} disabled={!canEdit} options={FINISH_CHOICES}
             onChange={(value) => change({ foil: Number(value) as TradeLine["foil"] })} />
-          <Picker label={`Condition of ${line.name}`} value={line.condition} disabled={!editable} options={CONDITION_CHOICES}
+          <Picker label={`Condition of ${line.name}`} value={line.condition} disabled={!canEdit} options={CONDITION_CHOICES}
             onChange={(value) => change({ condition: value as TradeLine["condition"] })} />
           <label className="tprice" title={line.price !== null ? `Price changed by hand. Card database price: ${money(market, currency)}` : "Price each from the card database"}>
-            <input inputMode="decimal" value={price} placeholder={market === null ? "No price" : market.toFixed(2)} disabled={!editable} aria-label={`Price each of ${line.name}`}
+            <input inputMode="decimal" value={price} placeholder={market === null ? "No price" : market.toFixed(2)} disabled={!canEdit} aria-label={`Price each of ${line.name}`}
               onChange={(event) => setPrice(event.target.value)} onBlur={savePrice} onKeyDown={(event) => { if (event.key === "Enter") (event.target as HTMLInputElement).blur(); }} />
             {line.price !== null && <span className="badge edited" title="Changed by hand">EDITED</span>}
           </label>
-          {editable && line.price !== null && <button type="button" className="lnk" onClick={() => change({ price: null })}>Use card price</button>}
+          {canEdit && line.price !== null && <button type="button" className="lnk" onClick={() => change({ price: null })}>Use card price</button>}
         </div>
       </div>
       <span className="price">{money((lineEach(line, currency) ?? 0) * line.quantity, currency)}
         {(() => { const buy = buylistOf(line, line.foil); return buy === null ? null : <span className="sub buyline" title="The highest buylist price of any store">Buylist {money(buy * line.quantity, currency)}</span>; })()}</span>
-      {editable && <button type="button" className="btn small icon-only" title={`Remove ${line.name}`} aria-label={`Remove ${line.name} from the trade`}
+      {canEdit && <button type="button" className="btn small icon-only" title={`Remove ${line.name}`} aria-label={`Remove ${line.name} from the trade`}
         onClick={() => change({ quantity: 0 })}><Icon name="del" /></button>}
     </div>
   );
@@ -217,7 +224,7 @@ function Matches() {
           <span className="sub"> {side === "get" ? `${match.user.name} has ${match.quantity}` : `${match.user.name} wants ${match.quantity}`}</span></div>
       </div>
       <span className="price">{money(priceOf(match, match.foil, currency), currency)}</span>
-      <button type="button" className="btn small" onClick={() => void store.addLine({
+      <button type="button" className="btn small" disabled={!!store.openTrade && (store.openTrade.status !== "open" || (!!store.openTrade.with && !store.openTrade.collectionId))} onClick={() => void store.addLine({
         side, cardId: match.cardId, foil: match.foil, condition: match.condition, language: match.language, quantity: 1, price: null,
         collectionId: side === "give" ? match.collectionId : null, collectionName: side === "give" && match.collectionId ? store.collectionName(match.collectionId) : null,
         name: match.name, set_code: match.set_code, set_name: match.set_name, collector_number: match.collector_number, image_url: match.image_url,
@@ -243,12 +250,58 @@ function Matches() {
   );
 }
 
+type BinderCard = Omit<TradeMatch, "user" | "collectionId">;
+
+function OtherBinder() {
+  const store = useApp();
+  const [open, setOpen] = useState(false);
+  const [people, setPeople] = useState<Person[]>([]);
+  const [userId, setUserId] = useState("");
+  const [cards, setCards] = useState<BinderCard[] | null>(null);
+  const [error, setError] = useState(false);
+  const { loadUsers, fail } = store;
+  useEffect(() => {
+    if (!open) return;
+    let active = true;
+    loadUsers().then((list) => { if (active) setPeople(list); }).catch((reason) => { if (active) fail(reason, "Could not load the account list."); });
+    return () => { active = false; };
+  }, [open, loadUsers, fail]);
+  useEffect(() => {
+    if (!open || !userId) return;
+    let active = true;
+    setCards(null);
+    setError(false);
+    request<BinderCard[]>(`/api/trades/binder/${encodeURIComponent(userId)}`).then((list) => { if (active) setCards(list); })
+      .catch((reason) => { if (active) { setError(true); fail(reason, "Could not load the trade binder."); } });
+    return () => { active = false; };
+  }, [open, userId, fail]);
+  return (
+    <section className="tmatches">
+      <button type="button" className="lnk" aria-expanded={open} onClick={() => setOpen(!open)}>Browse trade binders {open ? "▴" : "▾"}</button>
+      {open && <>
+        <Picker label="Account trade binder" value={userId} options={[{ value: "", label: "Choose an account", disabled: true },
+          ...people.map((person) => ({ value: String(person.id), label: person.name }))]} onChange={setUserId} />
+        {userId && !cards && <p className="note pad">{error ? "Could not load the trade binder" : "Loading trade binder"}</p>}
+        {userId && cards?.length === 0 && <p className="note pad">Nothing is marked for trade</p>}
+        {userId && cards?.map((card) => <div className="row" key={`${card.cardId}:${card.foil}:${card.condition}:${card.language}`}>
+          <Thumb url={card.image_url} />
+          <div className="rowmain"><div className="rowtitle"><b>{card.name}</b><FinishBadge finish={card.foil} /></div>
+            <div className="rowmeta">{card.set_name} ({card.set_code.toUpperCase()}) {card.collector_number}, {card.condition}, {card.language.toUpperCase()}, {card.quantity} available</div></div>
+          <span className="price">{money(priceOf(card, card.foil, store.prefs.currency), store.prefs.currency)}</span>
+          <button type="button" className="btn small" disabled={!!store.openTrade && (store.openTrade.status !== "open" || (!!store.openTrade.with && !store.openTrade.collectionId))}
+            onClick={() => void store.addLine({ ...card, side: "get", quantity: 1, price: null, collectionId: null })}>+ Get</button>
+        </div>)}
+      </>}
+    </section>
+  );
+}
+
 export function TradeView({ actions }: { actions: Record<string, Action> }) {
   const store = useApp();
   const trade = store.openTrade;
   const { reloadTrades } = store;
   useEffect(() => { void reloadTrades(); }, [reloadTrades]);
-  const editable = !!trade && trade.status === "open";
+  const editable = !!trade && trade.status === "open" && (!trade.with || !!trade.collectionId);
   const proposal = !!trade?.with && trade.status === "open";
   const lines = trade?.lines.reduce((sum, line) => sum + line.quantity, 0) ?? 0;
   return (
@@ -286,14 +339,20 @@ export function TradeView({ actions }: { actions: Record<string, Action> }) {
             <button type="button" className="btn" disabled={!trade.lines.length} onClick={() => void store.copyTrade(trade)}>Copy list</button>
             <button type="button" className="btn" disabled={!trade.lines.length} onClick={() => store.exportTrade(trade)}>Export...</button>
             <button type="button" className="btn" onClick={() => shareBinderDialog(store)}>Share trade binder...</button>
+            {proposal && <Picker label="Cards you get go to" value={trade.collectionId ?? ""}
+              options={[{ value: "", label: "Choose destination collection", disabled: true }, ...(store.collections ?? []).filter((item) => item.kind === "collection")
+                .map((item) => ({ value: item.id, label: item.name }))]}
+              onChange={(collectionId) => void store.setTradeCollection(trade, collectionId)} />}
           </div>
         )}
         {trade?.status === "done" && <p className="note pad">This trade is done{trade.doneAt ? ` (${new Date(`${String(trade.doneAt).replace(" ", "T")}${String(trade.doneAt).endsWith("Z") ? "" : "Z"}`).toLocaleString()})` : ""}.</p>}
+        {proposal && !trade.collectionId && <p className="note pad">Choose where the cards you get go before changing the offer.</p>}
         <div className="tradecols">
           <Column side="give" trade={trade} editable={editable} />
           <Column side="get" trade={trade} editable={editable} />
         </div>
         <Matches />
+        <OtherBinder />
       </div>
     </div>
   );

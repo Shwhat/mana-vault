@@ -263,6 +263,8 @@ The price of a missing card is the price of its printing in the regular finish (
 - **Add missing to wishlist** (or **Add missing deck cards to wishlist**) adds the missing copies to your wishlist in one step that can be undone; see [Wishlists and trading](/about/wishlists-and-trading).
 - **Link owned copies** links free copies of the exact printing and finish to every missing card.
 - **In Deck name**: a missing card whose copies all fill other decks shows a badge naming each deck (IN DECK NAME on pictures). A click on it lists those copies with **Move to this deck**, which unlinks the copy from the other deck (that deck then misses it) and links it here, as one step that can be undone. The message reads "Card moved from Deck to this deck. Deck now misses it".
+
+On deck pictures, multiple status marks are grouped under a count. Hover, focus or tap it to see the marks and use their actions.
 - **Export missing** (or **Export missing deck cards (text)**) downloads deck-name-missing.txt with one line per card, such as `2 Lightning Bolt (M10) 146`.
 
 | Message | Cause |
