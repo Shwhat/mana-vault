@@ -33,9 +33,11 @@ delivery after an authorized merge. No automated game is claimed by this slice.
 2. Implement and test the server-side identity bridge described in the
    architecture assessment, including spoofing, name collision, revocation,
    session isolation and takeover. No shared privileged player session.
-3. Add authorized immutable deck snapshots and engine lookup/validation.
-   Cover maybeboard exclusion, exact printing versus name fallback, unsupported
-   cards, commander/sideboard formats, and shared-deck access.
+3. Use the internal access-checked immutable deck snapshot for engine
+   lookup/validation and match persistence. Snapshot tests cover owners,
+   shared-deck access, printing details and missing entries. Still verify
+   maybeboard exclusion, exact printing versus name fallback, unsupported
+   cards and commander/sideboard formats against the engine.
 4. Build a minimal server-side harness to create a table, add a human and AI,
    start a match, receive player-specific views and prompts, and send valid
    responses. A real engine-reported terminal result is required; a mock or

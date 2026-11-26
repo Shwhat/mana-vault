@@ -1,5 +1,13 @@
 # Mana Vault handoff
 
+## 0.27.0 (2026-11-26): Play table deck snapshots
+
+- Added an internal, access-checked immutable deck snapshot with owner and shared-member tests. It retains all zones, selected printings and missing printing entries for later compatibility checks; it does not create games or persist match history.
+- A synthetic trusted-header test verified two connection identities, receipt of a restore token, rejection of a mismatched identity and rejection of a spoofed header from an untrusted peer. The test-only loopback engine was stopped. Loopback on a shared machine does not isolate trusted peers.
+- Phase 1 remains incomplete: a private engine deployment, secure Mana Vault sessions, deck conversion and validation, a real saved-deck game, hidden-information isolation and reconnect are not yet verified. Later phases remain gated by the specification.
+- Validation: `PW_CHANNEL=chrome npm run test:all` passed, including 122 browser tests.
+- Delivery verification and the external handoff copy are pending.
+
 ## 0.26.0 (2026-11-25): Play table foundations
 
 - Added player-view and engine-capability contracts and a transport-independent Playmat discovery request and message parser, with tests. The architecture assessment and roadmap record the candidate source revision and security risks.
@@ -18,7 +26,7 @@
 - Validation: `PW_CHANNEL=chrome npm run test:all` passed, including 119 browser tests. `git diff --check` passed.
 - At handoff, version 0.24.8 and automatic synchronization are pending delivery. Verify the workflow, container, Android build and debug APK for the merged commit.
 
-Last updated: 2026-11-25, version 0.26.0 foundations pending delivery.
+Last updated: 2026-11-26, version 0.27.0 deck snapshot work pending delivery.
 
 ## Project
 
