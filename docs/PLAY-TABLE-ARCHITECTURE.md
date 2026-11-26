@@ -135,6 +135,15 @@ reconnection. In particular, the unauthenticated local test does not meet the
 phase 1 game gate, and a shared host cannot safely treat every local process
 as a trusted identity proxy.
 
+A separate test-only engine used a fresh account database, authentication,
+synthetic identities and a trusted-header configuration. Two connections
+signed in under their respective header identities, a restore token was
+issued, a mismatched login was rejected, and a header from an untrusted
+loopback source was rejected. The server was then stopped. This verifies
+upstream behavior in that configuration, not private deployment or a Mana
+Vault identity bridge; another local process using the trusted peer address
+could still impersonate an identity.
+
 ## Licensing
 
 The pinned [Playmat license](https://github.com/arcanite24/playmat/blob/7bd086f7a390846cad7b397b762d8b5c84da332e/LICENSE.txt)

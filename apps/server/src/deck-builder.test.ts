@@ -8,6 +8,7 @@ import { buildApp } from "./app.js";
 import { readTags } from "./deck-builder.js";
 import { cardBuilderStatement, cardExtrasStatement, cardInsertStatement, cardPricesStatement, initializeDatabase } from "./database.js";
 import { importBulkFile } from "./import-bulk.js";
+import { DeckSnapshotError, snapshotDeck } from "./play/deck-snapshot.js";
 
 const closers: Array<() => Promise<void>> = [];
 afterEach(async () => {
@@ -50,6 +51,57 @@ async function server() {
 }
 
 describe("deck builder", () => {
+  it("captures an authorized immutable snapshot without changing the saved deck", async () => {
+    const { call, database, deckId } = await server();
+    await call("POST", `/api/decks/${deckId}/cards`, { cardId: "s1", quantity: 2, zone: "main" });
+    await call("POST", `/api/decks/${deckId}/cards`, { cardId: "g1", quantity: 1, zone: "maybeboard" });
+    const owner = Number(database.prepare("SELECT owner_id FROM decks WHERE id = ?").get(deckId)!.owner_id);
+    const snapshot = snapshotDeck(database, deckId, owner);
+    expect(snapshot).toMatchObject({
+      deckId, name: "Goblins", format: "commander",
+      cards: [
+        { oracleId: "o-ring", printingId: "s1", quantity: 2, zone: "main", printing: { id: "s1", name: "Sol Ring", setCode: "c21", imageUrl: "https://img/s1.jpg" } },
+        { oracleId: "o-gob", printingId: "g1", quantity: 1, zone: "maybeboard" },
+      ],
+    });
+    expect(Object.isFrozen(snapshot.cards[0]!.printing)).toBe(true);
+    expect(Object.isFrozen(snapshot.cards)).toBe(true);
+    database.prepare("UPDATE deck_cards SET quantity = 3 WHERE deck_id = ? AND printing_id = ?").run(deckId, "s1");
+    expect(snapshot.cards[0]!.quantity).toBe(2);
+    expect(snapshotDeck(database, deckId, owner).cards[0]!.quantity).toBe(3);
+  });
+
+  it("rejects unauthorized deck access but permits a shared deck member", async () => {
+    const { database, deckId } = await server();
+    const other = Number(database.prepare("INSERT INTO users (name, salt, hash, iterations) VALUES ('snapshot-user', 'x', 'x', 1) RETURNING id").get()!.id);
+    expect(() => snapshotDeck(database, deckId, other)).toThrow(DeckSnapshotError);
+    expect(() => snapshotDeck(database, "missing", other)).toThrow("Deck not found or access denied");
+    database.prepare("INSERT INTO members (kind, item_id, user_id) VALUES ('deck', ?, ?)").run(deckId, other);
+    expect(snapshotDeck(database, deckId, other).deckId).toBe(deckId);
+  });
+
+  it("can snapshot a deck inside an existing transaction", async () => {
+    const { database, deckId } = await server();
+    const owner = Number(database.prepare("SELECT owner_id FROM decks WHERE id = ?").get(deckId)!.owner_id);
+    database.exec("BEGIN");
+    try {
+      expect(snapshotDeck(database, deckId, owner).deckId).toBe(deckId);
+    } finally {
+      database.exec("ROLLBACK");
+    }
+  });
+
+  it("retains entries whose printing is missing so a later compatibility check can report them", async () => {
+    const { database, deckId } = await server();
+    const owner = Number(database.prepare("SELECT owner_id FROM decks WHERE id = ?").get(deckId)!.owner_id);
+    database.prepare("INSERT INTO deck_cards (deck_id, oracle_id, quantity, zone) VALUES (?, 'o-ring', 1, 'main')").run(deckId);
+    database.prepare("INSERT INTO deck_cards (deck_id, oracle_id, quantity, zone) VALUES (?, 'missing-oracle', 1, 'main')").run(deckId);
+    expect(snapshotDeck(database, deckId, owner).cards).toMatchObject([
+      { oracleId: "o-ring", printingId: null, printing: { id: "s1" } },
+      { oracleId: "missing-oracle", printingId: null, printing: null },
+    ]);
+  });
+
   it("reads tags: trimmed, without repeats, up to 12", () => {
     expect(readTags([" Ramp ", "ramp", "Card draw", ""])).toEqual(["Ramp", "Card draw"]);
     expect(readTags("ramp")).toBeNull();
