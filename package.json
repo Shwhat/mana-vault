@@ -1,7 +1,7 @@
 {
   "name": "mana-vault",
   "private": true,
-  "version": "0.24.7",
+  "version": "0.24.8",
   "workspaces": [
     "apps/*"
   ],
@@ -13,7 +13,8 @@
     "dev:web": "npm run dev -w @mana-vault/web",
     "update:cards": "npm run import:cards -w @mana-vault/server",
     "build": "npm run build --workspaces --if-present",
-    "test": "npm run test --workspaces --if-present",
+    "test": "npm run test:wiki && npm run test --workspaces --if-present",
+    "test:wiki": "node --test scripts/wiki-guide.test.mjs",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test:e2e": "npm run build && playwright test",
     "test:e2e:run": "playwright test",
