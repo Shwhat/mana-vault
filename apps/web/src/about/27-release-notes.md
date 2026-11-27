@@ -2,6 +2,11 @@
 
 The installed version is shown at the top of the in-app guide.
 
+## 0.38.0 (2026-11-27): Private multiplayer library search
+
+- Seated players can search their own library by name and move a selected card to hand in a manual multiplayer game. Results are sorted instead of revealing draw order; opponents and spectators cannot access them.
+- Update the live engine UI test to pass priority when it starts before a legal land-play opportunity. Real-engine verification remains pending.
+
 ## 0.37.0 (2026-11-27): Offline solo library search
 
 - Search a solo game's library by card name, move a selected card to hand and shuffle the remaining library without changing the saved deck.

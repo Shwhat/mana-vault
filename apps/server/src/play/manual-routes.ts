@@ -415,6 +415,22 @@ export function registerManualPlayRoutes(app: FastifyInstance, database: Databas
     return { table: projectTable(database, view.table, userId, view.spectator) };
   });
 
+  app.get<{ Params: { tableId: string } }>("/api/play/manual/tables/:tableId/library", async (request, reply) => {
+    reply.header("cache-control", "no-store");
+    const userId = signedIn(request, reply);
+    if (userId === null) return reply;
+    const table = tableForUser(database, request.params.tableId, userId);
+    if (!table) return reply.code(404).send({ error: "Table not found." });
+    if (table.status !== "active") return reply.code(409).send({ error: "This game is not active." });
+    const player = parseState(table.state_json).players.find((item) => item.userId === userId);
+    if (!player) return reply.code(404).send({ error: "Table seat not found." });
+    if (player.conceded) return reply.code(403).send({ error: "You have conceded this game." });
+    return {
+      revision: Number(table.revision),
+      cards: [...player.library].sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id)),
+    };
+  });
+
   app.post<{ Params: { tableId: string } }>("/api/play/manual/tables/:tableId/start", async (request, reply) => {
     const userId = signedIn(request, reply);
     if (userId === null) return reply;

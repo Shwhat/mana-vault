@@ -200,6 +200,10 @@ function ManualTable({ deckId }: { deckId: string }) {
   const [joinCode, setJoinCode] = useState("");
   const [watchCode, setWatchCode] = useState("");
   const [tokenName, setTokenName] = useState("");
+  const [showLibrary, setShowLibrary] = useState(false);
+  const [libraryQuery, setLibraryQuery] = useState("");
+  const [library, setLibrary] = useState<{ revision: number; cards: ManualCard[] } | null>(null);
+  const [libraryError, setLibraryError] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -232,6 +236,23 @@ function ManualTable({ deckId }: { deckId: string }) {
     timer = window.setTimeout(() => { void poll(); }, 1200);
     return () => { active = false; if (timer !== undefined) window.clearTimeout(timer); };
   }, [table?.id, table?.revision, table?.status]);
+
+  useEffect(() => {
+    setShowLibrary(false);
+    setLibraryQuery("");
+    setLibrary(null);
+  }, [table?.id]);
+
+  useEffect(() => {
+    if (!showLibrary || !table || table.status !== "active" || table.role !== "player"
+      || table.players.find((player) => player.hand !== undefined)?.conceded) return;
+    let active = true;
+    setLibraryError("");
+    void request<{ revision: number; cards: ManualCard[] }>(`/api/play/manual/tables/${encodeURIComponent(table.id)}/library`)
+      .then((result) => { if (active) setLibrary(result); })
+      .catch((reason) => { if (active) setLibraryError(reason instanceof Error ? reason.message : "Could not search your library."); });
+    return () => { active = false; };
+  }, [showLibrary, table?.id, table?.revision, table?.status, table?.role]);
 
   const create = async (playerLimit: 2 | 4) => {
     setBusy(true);
@@ -407,6 +428,7 @@ function ManualTable({ deckId }: { deckId: string }) {
           <div className="play-toolbar">
             <button type="button" className="btn small" disabled={!own.libraryCount} onClick={() => void act({ type: "draw" })}>Draw</button>
             <button type="button" className="btn small" onClick={() => void act({ type: "shuffle" })}>Shuffle</button>
+            <button type="button" className="btn small" onClick={() => setShowLibrary((current) => !current)}>{showLibrary ? "Hide library search" : "Search library"}</button>
             <button type="button" className="btn small" disabled={table.activeSeat !== own.seat} onClick={() => void act({ type: "turn" })}>End turn</button>
             <button type="button" className="btn small" onClick={() => void act({ type: "concede" })}>Concede</button>
           </div>
@@ -434,6 +456,15 @@ function ManualTable({ deckId }: { deckId: string }) {
           {zone("Hand", own.hand ?? [], (card) => <button type="button" className="btn small primary" onClick={() => move(card, "hand", "battlefield")}>Play</button>)}
           {zone("Graveyard", own.graveyard, (card) => <button type="button" className="btn small" onClick={() => move(card, "graveyard", "hand")}>Return to hand</button>)}
           {zone("Exile", own.exile, (card) => <button type="button" className="btn small" onClick={() => move(card, "exile", "hand")}>Return to hand</button>)}
+          {showLibrary && !own.conceded && <section className="play-zone">
+            <h3>Library search</h3>
+            <label>Filter library <input value={libraryQuery} onChange={(event) => setLibraryQuery(event.target.value)} /></label>
+            {libraryError ? <p className="note warn" role="alert">{libraryError} Close and reopen search to retry.</p> :
+              library?.revision !== table.revision ? <p className="note">Loading library search...</p> :
+              <div className="play-library-list">{library.cards.filter((card) => card.name.toLowerCase().includes(libraryQuery.trim().toLowerCase())).map((card) =>
+                <span key={card.id}>{card.name} <button type="button" className="btn small" aria-label={`Put ${card.name} into hand`}
+                  onClick={() => move(card, "library", "hand")}>To hand</button></span>)}</div>}
+          </section>}
           </>}
         </>}
         {table.status === "closed" && <p className="note">This table is closed. Your last saved view remains available.</p>}

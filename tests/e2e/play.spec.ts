@@ -10,7 +10,7 @@ async function createCommanderDeck(page: Page, name: string, mainCard: string): 
   const deckId = String((await created.json()).id);
   for (const [cardId, zone, quantity] of [
     ["atraxa", "commander", 1],
-    [mainCard, "main", 8],
+    [mainCard, "main", 9],
   ]) {
     const added = await page.request.post(`/api/decks/${deckId}/cards`, {
       headers: { "x-mana-vault": "1" },
@@ -78,8 +78,21 @@ test("private manual Commander table plays shared cards without exposing opponen
     await expect(spectatorPage.getByText("You are watching this table. Spectators cannot change the game.")).toBeVisible();
     await expect(spectatorPage.locator(".play-zone").filter({ has: spectatorPage.locator("h3", { hasText: "Hand" }) })).toHaveCount(0);
     await expect(spectatorPage.getByRole("button", { name: "Draw" })).toHaveCount(0);
+    await expect(spectatorPage.getByRole("button", { name: "Search library" })).toHaveCount(0);
     await expect(spectatorPage.locator("#view-play")).not.toContainText("Sol Ring");
     await expect(spectatorPage.locator("#view-play")).not.toContainText("Llanowar Elves");
+
+    await page.getByRole("button", { name: "Search library" }).click();
+    await page.getByLabel("Filter library").fill("no matching card");
+    await expect(page.getByRole("button", { name: "Put Sol Ring into hand" })).toHaveCount(0);
+    await page.getByLabel("Filter library").fill("Sol Ring");
+    await expect(page.getByRole("button", { name: "Put Sol Ring into hand" })).toHaveCount(2);
+    await page.getByRole("button", { name: "Put Sol Ring into hand" }).first().click();
+    await expect(hostHand.locator(".playcardname")).toHaveCount(8);
+    await expect(page.getByRole("button", { name: "Put Sol Ring into hand" })).toHaveCount(1);
+    await expect(otherPage.locator("#view-play")).not.toContainText("Sol Ring");
+    await expect(spectatorPage.locator("#view-play")).not.toContainText("Sol Ring");
+    await page.getByRole("button", { name: "Hide library search" }).click();
 
     await hostHand.getByRole("button", { name: "Play" }).first().click();
     await expect(page.locator(".play-zone").filter({ has: page.locator("h3", { hasText: "Battlefield" }) })).toContainText("Sol Ring");
@@ -94,7 +107,7 @@ test("private manual Commander table plays shared cards without exposing opponen
     await otherPage.getByRole("button", { name: "End turn" }).click();
     await expect(page.locator(".play-player-row .play-player").first()).toContainText("Active");
     await page.getByRole("button", { name: "Draw" }).click();
-    await expect(page.locator(".play-player-row .play-player").first()).toContainText("Hand 7");
+    await expect(page.locator(".play-player-row .play-player").first()).toContainText("Hand 8");
     await page.getByRole("button", { name: "Concede" }).click();
     await expect(page.locator("#view-play")).toContainText("Game ended");
     await expect(otherPage.locator("#view-play")).toContainText("Game ended");

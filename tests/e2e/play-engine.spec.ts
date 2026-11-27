@@ -298,6 +298,15 @@ test("plays a saved-deck engine game through the native Play UI", async ({ page 
     }
 
     const playMountain = page.getByRole("button", { name: "Play Mountain" }).first();
+    for (let attempt = 0; attempt < 12 && !(await playMountain.isVisible()); attempt += 1) {
+      const pass = prompt.getByRole("button", { name: "Pass priority until next main phase" });
+      if (!(await pass.isVisible())) break;
+      const messageId = await prompt.getAttribute("data-message-id");
+      if (!messageId) throw new Error("The priority prompt did not have a message ID.");
+      await pass.click();
+      await expect(prompt).not.toHaveAttribute("data-message-id", messageId, { timeout: 30_000 });
+      await expect(prompt).toBeVisible({ timeout: 30_000 });
+    }
     try {
       await expect(playMountain).toBeVisible({ timeout: 60_000 });
     } catch (reason) {

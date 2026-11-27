@@ -1,10 +1,17 @@
 # Mana Vault handoff
 
+## 0.38.0 (2026-11-27): Private multiplayer library search
+
+- Add private library search and selected-card movement to hand for seated manual-table players. The player-only endpoint returns a sorted list rather than draw order, and actions remain revision checked.
+- The live engine UI test now passes priority when waiting at an instants-only prompt before a legal land-play opportunity; this change still needs verification against the real engine.
+- Validation: focused server and multiplayer browser regressions passed. `PW_CHANNEL=chrome npm run test:all` passed before the live-test-only update: typechecks, 426 server tests (3 skipped), 65 web tests, 3 play-core tests, 3 Playmat protocol tests, 3 Wiki tests and 126 browser tests (1 live-engine test skipped locally). The mocked engine browser regression passed after that update; the revised live-only path remains unverified. Delivery is pending.
+- Manual table rules remain player-resolved; native engine gameplay and phase acceptance remain incomplete.
+
 ## 0.37.0 (2026-11-27): Offline solo library search
 
 - Add a searchable offline solo library, moving selected cards to hand and shuffling the remaining library without mutating the saved deck.
 - Validation: focused manual-play unit tests and the offline original-custom-card browser regression passed. `PW_CHANNEL=chrome npm run test:all` passed: typechecks, 426 server tests (3 skipped), 65 web tests, 3 play-core tests, 3 Playmat protocol tests, 3 Wiki tests and 126 browser tests (1 live-engine test skipped locally). Version and guide static checks passed.
-- Version 0.36.1 was pushed as `a5190f0` to draft PR #52; Android passed and produced `mana-vault-0.36.1-debug`, and its Play engine check is running. Version 0.36.0 also failed to find Play Mountain in its live UI check. Version 0.37.0 awaits commit, push and its own exact-head workflows.
+- Version 0.36.1 was pushed as `a5190f0` to draft PR #52; Android passed and produced `mana-vault-0.36.1-debug`. Its live UI check failed while waiting to play a Mountain at an instants-only priority prompt. Version 0.37.0 was pushed as `0274d97`; Android passed and produced `mana-vault-0.37.0-debug`, and its Play engine workflow is running.
 - Full native gameplay, real combat and targeting, production deployment/reconnect acceptance and phases 3 through 4 remain open.
 
 ## 0.36.1 (2026-11-27): Native engine startup test

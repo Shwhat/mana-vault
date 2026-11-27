@@ -232,7 +232,7 @@ describe("authenticated Playmat sessions", () => {
       cardExtrasStatement(database).run("nonfoil", 0, 0, id);
     }
 
-    const createDeck = async (cookie: string, name: string, commanderId: string, cardId: string) => {
+    const createDeck = async (cookie: string, name: string, commanderId: string, cardId: string, quantity = 8) => {
       const created = await app.inject({
         method: "POST",
         url: "/api/decks",
@@ -251,13 +251,13 @@ describe("authenticated Playmat sessions", () => {
         method: "POST",
         url: `/api/decks/${deckId}/cards`,
         headers: { ...guard, cookie },
-        payload: { cardId, quantity: 8, zone: "main" },
+        payload: { cardId, quantity, zone: "main" },
       });
       expect(commander.statusCode).toBe(201);
       expect(main.statusCode).toBe(201);
       return deckId;
     };
-    const redDeck = await createDeck(firstCookie, "Red test deck", "red-commander", "red-hidden");
+    const redDeck = await createDeck(firstCookie, "Red test deck", "red-commander", "red-hidden", 9);
     const blueDeck = await createDeck(secondCookie, "Blue test deck", "blue-commander", "blue-hidden");
     const greenDeck = await createDeck(thirdCookie, "Green test deck", "green-commander", "green-hidden");
     const yellowDeck = await createDeck(fourthCookie, "Yellow test deck", "yellow-commander", "yellow-hidden");
@@ -319,6 +319,19 @@ describe("authenticated Playmat sessions", () => {
     expect(watched.json().table.players[1]).not.toHaveProperty("hand");
     expect(JSON.stringify(watched.json().table)).not.toContain("Red Hidden Card");
     expect(JSON.stringify(watched.json().table)).not.toContain("Blue Hidden Card");
+    const libraryUrl = `/api/play/manual/tables/${waitingTable.id}/library`;
+    const redLibrary = await app.inject({ method: "GET", url: libraryUrl, headers: { cookie: firstCookie } });
+    const blueLibrary = await app.inject({ method: "GET", url: libraryUrl, headers: { cookie: secondCookie } });
+    expect(redLibrary.statusCode).toBe(200);
+    expect(redLibrary.headers["cache-control"]).toBe("no-store");
+    expect(redLibrary.json().cards).toHaveLength(2);
+    const redIds = redLibrary.json().cards.map((card: { id: string }) => card.id);
+    expect(redIds).toEqual([...redIds].sort());
+    expect(JSON.stringify(redLibrary.json())).not.toContain("Blue Hidden Card");
+    expect(blueLibrary.json().cards).toHaveLength(1);
+    expect(JSON.stringify(blueLibrary.json())).not.toContain("Red Hidden Card");
+    expect((await app.inject({ method: "GET", url: libraryUrl, headers: { cookie: thirdCookie } })).statusCode).toBe(404);
+    expect((await app.inject({ method: "GET", url: libraryUrl, headers: { cookie: fourthCookie } })).statusCode).toBe(404);
     const spectatorAction = await app.inject({
       method: "POST",
       url: `/api/play/manual/tables/${waitingTable.id}/actions`,
@@ -356,14 +369,23 @@ describe("authenticated Playmat sessions", () => {
       payload: { revision: currentView.revision, action: { type: "play", cardId: secondView.players[1].hand[0].id } },
     });
     expect(stolenCard.statusCode).toBe(400);
+    const searched = await app.inject({
+      method: "POST",
+      url: `/api/play/manual/tables/${waitingTable.id}/actions`,
+      headers: { ...guard, cookie: firstCookie },
+      payload: { revision: currentView.revision, action: { type: "move", cardId: redLibrary.json().cards[0].id, from: "library", to: "hand" } },
+    });
+    expect(searched.statusCode).toBe(200);
+    expect(searched.json().table.players[0].hand).toHaveLength(8);
+    expect(searched.json().table.players[0].libraryCount).toBe(1);
     const drew = await app.inject({
       method: "POST",
       url: `/api/play/manual/tables/${waitingTable.id}/actions`,
       headers: { ...guard, cookie: firstCookie },
-      payload: { revision: currentView.revision, action: { type: "draw" } },
+      payload: { revision: searched.json().table.revision, action: { type: "draw" } },
     });
     expect(drew.statusCode).toBe(200);
-    expect(drew.json().table.revision).toBe(currentView.revision + 1);
+    expect(drew.json().table.revision).toBe(currentView.revision + 2);
     const stale = await app.inject({
       method: "POST",
       url: `/api/play/manual/tables/${waitingTable.id}/actions`,
