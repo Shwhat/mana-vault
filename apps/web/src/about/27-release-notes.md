@@ -2,10 +2,17 @@
 
 The installed version is shown at the top of the in-app guide.
 
+## 0.34.0 (2026-11-27): Native Engine AI mana payment
+
+- Read playable object IDs from the pinned Playmat `canPlayObjects.objects` map and prefer the active prompt's current view over older game state. This fixes the hand-card action that was missing in private-engine CI.
+- During `GAME_PLAY_MANA`, show Tap for mana actions for battlefield objects the current engine view marks playable. Submit the selected object UUID against the active prompt.
+- Extend the UI regression to verify prompt-bound battlefield selection and mana-source responses.
+- Keep Phase 2 open: the mocked interaction does not establish a completed real game, all prompt support, targeting or combat.
+
 ## 0.33.0 (2026-11-27): Native Engine AI battlefield choices
 
-- Show a Choose action for battlefield cards listed in the engine's current `canPlayObjects` during `GAME_SELECT`, and submit the selected UUID against that prompt.
-- Add browser coverage proving only engine-approved objects are selectable and the UI sends the selected card ID.
+- Add the initial Choose action for battlefield cards listed in `canPlayObjects` during `GAME_SELECT`, and browser coverage for the prompt-bound UUID response.
+- The private-engine check found the ID map is nested under `canPlayObjects.objects`; the 0.34.0 update corrects the lookup before merge.
 - Keep Phase 2 open: this does not verify a non-concession win, all prompts, targeting or combat.
 
 ## 0.32.2 (2026-11-27): Native Engine AI priority control

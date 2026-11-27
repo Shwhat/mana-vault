@@ -1,6 +1,6 @@
 import { expect, signUp, test } from "./fixtures";
 
-test("offers engine-approved battlefield cards as native choices", async ({ page }) => {
+test("offers engine-approved battlefield choices and mana sources", async ({ page }) => {
   await signUp(page, "playboardselect");
   const created = await page.request.post("/api/decks", {
     headers: { "x-mana-vault": "1" },
@@ -18,7 +18,7 @@ test("offers engine-approved battlefield cards as native choices", async ({ page
     const gameId = "test-engine-game";
     const chosenCardId = "11111111-1111-4111-8111-111111111111";
     const unavailableCardId = "22222222-2222-4222-8222-222222222222";
-    let submittedAction: { expectedMessageId?: number; type?: string; data?: string } | null = null;
+    const submittedActions: { expectedMessageId?: number; type?: string; data?: string }[] = [];
     const events = [
       {
         id: 1,
@@ -35,12 +35,16 @@ test("offers engine-approved battlefield cards as native choices", async ({ page
                 handCount: 0,
                 libraryCount: 60,
                 battlefield: {
-                  [chosenCardId]: { id: chosenCardId, name: "Available Creature" },
+                  [chosenCardId]: { id: chosenCardId, name: "Available Sol Ring" },
                   [unavailableCardId]: { id: unavailableCardId, name: "Unavailable Creature" },
                 },
               }],
               myHand: {},
-              canPlayObjects: { [chosenCardId]: {} },
+              canPlayObjects: {
+                objects: {
+                  [chosenCardId]: { basicPlayAbilities: [{ id: "play", value: "Play" }] },
+                },
+              },
             },
           },
         },
@@ -52,6 +56,24 @@ test("offers engine-approved battlefield cards as native choices", async ({ page
           objectId: gameId,
           messageId: 2,
           data: { message: "Choose an object" },
+        },
+      },
+      {
+        id: 3,
+        event: {
+          method: "GAME_PLAY_MANA",
+          objectId: gameId,
+          messageId: 3,
+          data: {
+            message: "Pay mana",
+            gameView: {
+              canPlayObjects: {
+                objects: {
+                  [chosenCardId]: { basicManaAbilities: [{ id: "tap", value: "Tap for mana" }] },
+                },
+              },
+            },
+          },
         },
       },
     ];
@@ -69,9 +91,13 @@ test("offers engine-approved battlefield cards as native choices", async ({ page
       } else if (url.pathname === "/api/play/games" && request.method() === "POST") {
         await route.fulfill({ json: { tableId: "test-engine-table", gameId } });
       } else if (url.pathname === "/api/play/events" && request.method() === "GET") {
-        await route.fulfill({ json: { events: Number(url.searchParams.get("after")) === 0 ? events : [] } });
+        const after = Number(url.searchParams.get("after"));
+        const nextEvents = after === 0
+          ? events.slice(0, 2)
+          : after === 2 && submittedActions.length > 0 ? [events[2]] : [];
+        await route.fulfill({ json: { events: nextEvents } });
       } else if (url.pathname.endsWith("/actions") && request.method() === "POST") {
-        submittedAction = JSON.parse(request.postData() ?? "{}") as typeof submittedAction;
+        submittedActions.push(JSON.parse(request.postData() ?? "{}") as typeof submittedActions[number]);
         await route.fulfill({ json: {} });
       } else {
         await route.continue();
@@ -84,12 +110,22 @@ test("offers engine-approved battlefield cards as native choices", async ({ page
     await page.getByLabel("Game type").selectOption("Two Player Duel");
     await page.getByLabel("Deck format").selectOption("Constructed - Modern");
     await page.getByRole("button", { name: "Start against AI" }).click();
-    const chooseCard = page.getByRole("button", { name: "Choose Available Creature" });
+    const chooseCard = page.getByRole("button", { name: "Choose Available Sol Ring" });
     await expect(chooseCard).toBeVisible();
     await expect(page.getByRole("button", { name: "Choose Unavailable Creature" })).toHaveCount(0);
     await chooseCard.click();
-    await expect.poll(() => submittedAction).toMatchObject({
+    await expect.poll(() => submittedActions).toHaveLength(1);
+    await expect(submittedActions[0]).toMatchObject({
       expectedMessageId: 2,
+      type: "sendPlayerUUID",
+      data: chosenCardId,
+    });
+    const tapForMana = page.getByRole("button", { name: "Tap Available Sol Ring for mana" });
+    await expect(tapForMana).toBeVisible();
+    await tapForMana.click();
+    await expect.poll(() => submittedActions).toHaveLength(2);
+    await expect(submittedActions[1]).toMatchObject({
+      expectedMessageId: 3,
       type: "sendPlayerUUID",
       data: chosenCardId,
     });

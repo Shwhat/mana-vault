@@ -455,7 +455,8 @@ function AutomatedGame({ deckId, options, engineError }: { deckId: string; optio
   const prompt = [...events].reverse().find(({ event }) => event.objectId === game?.gameId && PROMPTS.has(event.method));
   const promptData = record(prompt?.event.data);
   const promptView = gameView(prompt);
-  const playableObjects = record(view?.canPlayObjects) ?? record(promptView?.canPlayObjects);
+  const playableObjects = record(record(promptView?.canPlayObjects)?.objects)
+    ?? record(record(view?.canPlayObjects)?.objects);
 
   useEffect(() => {
     if (!game) return;
@@ -520,7 +521,8 @@ function AutomatedGame({ deckId, options, engineError }: { deckId: string; optio
   const hand = cardsIn(view?.myHand);
   const stack = cardsIn(view?.stack);
   const over = events.some(({ event }) => event.objectId === game?.gameId && event.method === "GAME_OVER");
-  const canChooseObject = (id: string | null): id is string => prompt?.event.method === "GAME_SELECT"
+  const canChooseObject = (id: string | null): id is string =>
+    (prompt?.event.method === "GAME_SELECT" || prompt?.event.method === "GAME_PLAY_MANA")
     && id !== null
     && playableObjects !== null
     && Object.prototype.hasOwnProperty.call(playableObjects, id);
@@ -556,10 +558,12 @@ function AutomatedGame({ deckId, options, engineError }: { deckId: string; optio
               <div className="play-card-row">{playerZones(player).map((card, cardIndex) => {
                 const id = cardObjectId(card);
                 const name = cardName(card);
+                const payingMana = prompt?.event.method === "GAME_PLAY_MANA";
                 return <div className="engine-card" key={id ?? cardIndex}>
                   {name}
-                  {canChooseObject(id) && <button type="button" className="btn small" aria-label={`Choose ${name}`}
-                    onClick={() => void respond("sendPlayerUUID", id)}>Choose</button>}
+                  {canChooseObject(id) && <button type="button" className="btn small"
+                    aria-label={payingMana ? `Tap ${name} for mana` : `Choose ${name}`}
+                    onClick={() => void respond("sendPlayerUUID", id)}>{payingMana ? "Tap for mana" : "Choose"}</button>}
                 </div>;
               })}</div>
             </section>)}
@@ -568,7 +572,7 @@ function AutomatedGame({ deckId, options, engineError }: { deckId: string; optio
             <div className="play-card-row">{hand.map((card, index) => {
               const id = cardObjectId(card);
               const name = cardName(card);
-              const canPlay = canChooseObject(id);
+              const canPlay = prompt?.event.method === "GAME_SELECT" && canChooseObject(id);
               return <div className="engine-card" key={id ?? index}>
                 {name}
                 {canPlay && <button type="button" className="btn small primary" aria-label={`Play ${name}`}
