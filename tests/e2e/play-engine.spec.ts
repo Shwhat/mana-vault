@@ -1,6 +1,6 @@
 import { expect, signUp, test } from "./fixtures";
 
-test("offers engine-approved battlefield choices and mana sources", async ({ page }) => {
+test("offers engine-approved battlefield choices, mana sources and abilities", async ({ page }) => {
   await signUp(page, "playboardselect");
   const created = await page.request.post("/api/decks", {
     headers: { "x-mana-vault": "1" },
@@ -18,7 +18,8 @@ test("offers engine-approved battlefield choices and mana sources", async ({ pag
     const gameId = "test-engine-game";
     const chosenCardId = "11111111-1111-4111-8111-111111111111";
     const unavailableCardId = "22222222-2222-4222-8222-222222222222";
-    const submittedActions: { expectedMessageId?: number; type?: string; data?: string }[] = [];
+    const abilityId = "33333333-3333-4333-8333-333333333333";
+    const submittedActions: { expectedMessageId?: number; type?: string; data?: string | boolean }[] = [];
     const events = [
       {
         id: 1,
@@ -76,6 +77,24 @@ test("offers engine-approved battlefield choices and mana sources", async ({ pag
           },
         },
       },
+      {
+        id: 4,
+        event: {
+          method: "GAME_CHOOSE_ABILITY",
+          objectId: gameId,
+          messageId: 4,
+          data: { message: "Choose an ability", choices: { [abilityId]: "1. Add two mana" } },
+        },
+      },
+      {
+        id: 5,
+        event: {
+          method: "GAME_ASK",
+          objectId: gameId,
+          messageId: 5,
+          data: { message: "Keep this hand?", options: { "UI.left.btn.text": "Mulligan", "UI.right.btn.text": "Keep" } },
+        },
+      },
     ];
 
     await page.route("**/api/play/**", async (route) => {
@@ -94,7 +113,9 @@ test("offers engine-approved battlefield choices and mana sources", async ({ pag
         const after = Number(url.searchParams.get("after"));
         const nextEvents = after === 0
           ? events.slice(0, 2)
-          : after === 2 && submittedActions.length > 0 ? [events[2]] : [];
+          : after === 2 && submittedActions.length > 0 ? [events[2]]
+          : after === 3 && submittedActions.length > 1 ? [events[3]]
+          : after === 4 && submittedActions.length > 2 ? [events[4]] : [];
         await route.fulfill({ json: { events: nextEvents } });
       } else if (url.pathname.endsWith("/actions") && request.method() === "POST") {
         submittedActions.push(JSON.parse(request.postData() ?? "{}") as typeof submittedActions[number]);
@@ -128,6 +149,21 @@ test("offers engine-approved battlefield choices and mana sources", async ({ pag
       expectedMessageId: 3,
       type: "sendPlayerUUID",
       data: chosenCardId,
+    });
+    await page.getByRole("button", { name: "1. Add two mana" }).click();
+    await expect.poll(() => submittedActions).toHaveLength(3);
+    await expect(submittedActions[2]).toMatchObject({
+      expectedMessageId: 4,
+      type: "sendPlayerUUID",
+      data: abilityId,
+    });
+    await expect(page.getByRole("button", { name: "Mulligan" })).toBeVisible();
+    await page.getByRole("button", { name: "Keep" }).click();
+    await expect.poll(() => submittedActions).toHaveLength(4);
+    await expect(submittedActions[3]).toMatchObject({
+      expectedMessageId: 5,
+      type: "sendPlayerBoolean",
+      data: false,
     });
   } finally {
     const deleted = await page.request.delete(`/api/decks/${deckId}`, { headers: { "x-mana-vault": "1" } });
@@ -167,7 +203,7 @@ test("plays a saved-deck engine game through the native Play UI", async ({ page 
     const prompt = page.locator(".play-prompt");
     await expect(prompt).toBeVisible({ timeout: 60_000 });
     const firstMessage = await prompt.getAttribute("data-message-id");
-    const keepHand = page.getByRole("button", { name: "Yes" });
+    const keepHand = page.getByRole("button", { name: "Keep", exact: true });
     if (await keepHand.isVisible()) {
       await keepHand.click();
       await expect(prompt).not.toHaveAttribute("data-message-id", firstMessage ?? "");

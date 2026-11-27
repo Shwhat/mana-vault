@@ -2,6 +2,13 @@
 
 The installed version is shown at the top of the in-app guide.
 
+## 0.35.0 (2026-11-27): Engine ability choices and solo face-down cards
+
+- Show engine-provided ability choices and submit the selected ability ID against the current prompt.
+- Use the engine's labels for yes/no prompts so choices such as Mulligan and Keep retain their intended meaning.
+- Fix the offline solo battlefield controls so cards can be turned face down and revealed again.
+- Browser regressions cover ability selection and the face-down round trip with an original custom card while offline. Full native engine gameplay and multiplayer face-down controls remain incomplete.
+
 ## 0.34.0 (2026-11-27): Native Engine AI mana payment
 
 - Read playable object IDs from the pinned Playmat `canPlayObjects.objects` map and prefer the active prompt's current view over older game state. This fixes the hand-card action that was missing in private-engine CI.

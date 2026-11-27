@@ -176,7 +176,7 @@ function ManualSolo({ cards }: { cards: readonly DeckCard[] }) {
         <button type="button" className="btn small" onClick={() => setGame((current) => current ? changeManualCounter(current, card.id, "+1/+1", 1) : current)}>+1/+1</button>
         <button type="button" className="btn small" onClick={() => move(card, "battlefield", "graveyard")}>Graveyard</button>
         <button type="button" className="btn small" onClick={() => move(card, "battlefield", "exile")}>Exile</button>
-        <button type="button" className="btn small" onClick={() => moveManualCard(game, card.id, "battlefield", "battlefield", { faceDown: !card.faceDown })}>{card.faceDown ? "Reveal" : "Face down"}</button>
+        <button type="button" className="btn small" onClick={() => setGame((current) => current ? moveManualCard(current, card.id, "battlefield", "battlefield", { faceDown: !card.faceDown }) : current)}>{card.faceDown ? "Reveal" : "Face down"}</button>
         {Object.entries(card.counters).map(([name, count]) => <span className="badge" key={name}>{name}: {count}</span>)}
       </>)}
       {zone("Hand", game.hand, (card) => <button type="button" className="btn small primary" onClick={() => play(card)}>{game.bottom > 0 ? "Put on bottom" : "Play"}</button>)}
@@ -454,6 +454,7 @@ function AutomatedGame({ deckId, options, engineError }: { deckId: string; optio
   const view = gameView(lastState);
   const prompt = [...events].reverse().find(({ event }) => event.objectId === game?.gameId && PROMPTS.has(event.method));
   const promptData = record(prompt?.event.data);
+  const promptOptions = record(promptData?.options);
   const promptView = gameView(prompt);
   const playableObjects = record(record(promptView?.canPlayObjects)?.objects)
     ?? record(record(view?.canPlayObjects)?.objects);
@@ -515,6 +516,7 @@ function AutomatedGame({ deckId, options, engineError }: { deckId: string; optio
   };
 
   const choices = array(promptData?.targets ?? promptData?.choices ?? promptData?.options);
+  const abilities = prompt?.event.method === "GAME_CHOOSE_ABILITY" ? record(promptData?.choices) : null;
   const players = array(view?.players).map(record).filter((player): player is Record<string, unknown> => player !== null);
   const playerName = (player: Record<string, unknown>) => typeof player.name === "string" ? player.name : "Player";
   const playerZones = (player: Record<string, unknown>) => cardsIn(player.battlefield);
@@ -585,8 +587,8 @@ function AutomatedGame({ deckId, options, engineError }: { deckId: string; optio
         {prompt && !over && <section className="play-prompt" aria-live="polite" data-message-id={prompt.event.messageId}>
           <h3>{eventMessage(prompt)}</h3>
           {prompt.event.method === "GAME_ASK" && <>
-            <button type="button" className="btn primary" onClick={() => void respond("sendPlayerBoolean", true)}>Yes</button>
-            <button type="button" className="btn" onClick={() => void respond("sendPlayerBoolean", false)}>No</button>
+            <button type="button" className="btn primary" onClick={() => void respond("sendPlayerBoolean", true)}>{typeof promptOptions?.["UI.left.btn.text"] === "string" ? promptOptions["UI.left.btn.text"] : "Yes"}</button>
+            <button type="button" className="btn" onClick={() => void respond("sendPlayerBoolean", false)}>{typeof promptOptions?.["UI.right.btn.text"] === "string" ? promptOptions["UI.right.btn.text"] : "No"}</button>
           </>}
           {prompt.event.method === "GAME_SELECT" && <button type="button" className="btn"
             onClick={() => void respond("sendPlayerAction", "PASS_PRIORITY_UNTIL_NEXT_MAIN_PHASE")}>
@@ -597,6 +599,8 @@ function AutomatedGame({ deckId, options, engineError }: { deckId: string; optio
             <input type="number" min={0} max={10000} value={amount} onChange={(event) => setAmount(Number(event.target.value))} aria-label="Amount" />
             <button type="button" className="btn primary" onClick={() => void respond("sendPlayerInteger", amount)}>Submit</button>
           </>}
+          {abilities && Object.entries(abilities).map(([id, label]) => typeof label === "string" &&
+            <button type="button" className="btn" key={id} onClick={() => void respond("sendPlayerUUID", id)}>{label}</button>)}
           {choices.map((choice, index) => {
             const value = typeof choice === "string" ? choice : record(choice)?.id;
             const label = typeof choice === "string" ? choice : record(choice)?.name;
@@ -605,6 +609,7 @@ function AutomatedGame({ deckId, options, engineError }: { deckId: string; optio
             return <button type="button" className="btn" key={`${value}:${index}`} onClick={() => void respond(type, value)}>{typeof label === "string" ? label : value}</button>;
           })}
           {prompt.event.method !== "GAME_ASK" && prompt.event.method !== "GAME_GET_AMOUNT" && choices.length === 0
+            && (!abilities || Object.values(abilities).every((label) => typeof label !== "string"))
             && <p className="note">This prompt requires an engine response format not available in the workspace yet.</p>}
         </section>}
       </>}

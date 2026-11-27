@@ -1,5 +1,14 @@
 # Mana Vault handoff
 
+## 0.35.0 (2026-11-27): Engine ability choices and solo face-down cards
+
+- Render `GAME_CHOOSE_ABILITY` choices from the pinned Playmat UUID-to-label map and submit the chosen UUID to the active prompt.
+- Use the engine's supplied labels for boolean prompts, including the Mulligan and Keep buttons.
+- Fix manual solo battlefield face-down and reveal controls, including for original custom cards offline.
+- Validation: the two focused browser regressions passed. `PW_CHANNEL=chrome npm run test:all` passed: typechecks, 426 server tests (3 skipped), 64 web tests, 3 play-core tests, 3 Playmat protocol tests, 3 Wiki tests and 126 browser tests (1 live-engine test skipped locally). Version/lockfile static checks and `git diff --check` passed.
+- Delivery: the 0.34.0 checkpoint was committed and pushed as `e408b4a` to draft PR #52; its exact-head Android workflow passed and its Play engine workflow is running. Version 0.35.0 awaits commit, push and its own exact-head workflows.
+- Phase 1 production deployment/reconnect acceptance and Phase 2 real-game completion, broader prompts, targeting and combat remain open. Phases 3 and 4 also remain incomplete.
+
 ## 0.34.0 (2026-11-27): Native Engine AI mana payment
 
 - Read playable object IDs from the pinned Playmat `canPlayObjects.objects` map, prefer the active prompt's map over older game state, and expose approved battlefield objects as Tap for mana actions during `GAME_PLAY_MANA`.
