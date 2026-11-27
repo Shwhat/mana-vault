@@ -3,7 +3,7 @@ import { request } from "../api";
 import { Icon } from "../icons";
 import {
   addManualToken, changeManualCounter, changeManualTotal, drawManualCards, moveManualCard,
-  nextManualTurn, playManualCard, startManualGame, toggleManualTap, type ManualCard, type ManualGame,
+  nextManualTurn, playManualCard, shuffleManualLibrary, startManualGame, toggleManualTap, type ManualCard, type ManualGame, type ManualZone,
 } from "../manual-play";
 import { useApp } from "../store";
 import type { DeckCard } from "../types";
@@ -105,6 +105,7 @@ function ManualSolo({ cards }: { cards: readonly DeckCard[] }) {
   const [game, setGame] = useState<ManualGame | null>(null);
   const [tokenName, setTokenName] = useState("");
   const [showLibrary, setShowLibrary] = useState(false);
+  const [libraryQuery, setLibraryQuery] = useState("");
   const [roll, setRoll] = useState("");
 
   useEffect(() => {
@@ -113,7 +114,7 @@ function ManualSolo({ cards }: { cards: readonly DeckCard[] }) {
   }, [cards]);
 
   const newGame = (mulligans = 0) => setGame(startManualGame(cards, mulligans));
-  const move = (card: ManualCard, from: "hand" | "battlefield" | "graveyard" | "exile" | "command", to: "hand" | "battlefield" | "graveyard" | "exile" | "command") => {
+  const move = (card: ManualCard, from: ManualZone, to: Exclude<ManualZone, "library">) => {
     setGame((current) => current ? moveManualCard(current, card.id, from, to) : current);
   };
   const play = (card: ManualCard) => setGame((current) => current ? playManualCard(current, card.id) : current);
@@ -147,6 +148,7 @@ function ManualSolo({ cards }: { cards: readonly DeckCard[] }) {
         <button type="button" className="btn small primary" onClick={() => newGame()}>New game</button>
         <button type="button" className="btn small" onClick={() => newGame(game.mulligans + 1)}>Mulligan</button>
         <button type="button" className="btn small" disabled={!game.library.length} onClick={() => setGame((current) => current ? drawManualCards(current) : current)}>Draw</button>
+        <button type="button" className="btn small" disabled={game.library.length < 2} onClick={() => setGame((current) => current ? shuffleManualLibrary(current) : current)}>Shuffle library</button>
         <button type="button" className="btn small" onClick={() => setGame((current) => current ? nextManualTurn(current) : current)}>Next turn and untap</button>
         <button type="button" className="btn small" onClick={() => setShowLibrary((current) => !current)}>{showLibrary ? "Hide library" : "Show library"}</button>
         <span className="phpos">Turn {game.turn} · {game.library.length} in library · {game.mulligans} mulligans</span>
@@ -183,7 +185,10 @@ function ManualSolo({ cards }: { cards: readonly DeckCard[] }) {
       {zone("Graveyard", game.graveyard, (card) => <button type="button" className="btn small" onClick={() => move(card, "graveyard", "hand")}>Return to hand</button>)}
       {zone("Exile", game.exile, (card) => <button type="button" className="btn small" onClick={() => move(card, "exile", "hand")}>Return to hand</button>)}
       {showLibrary && <section className="play-zone"><h3>Library <span className="cnt">{game.library.length}</span></h3>
-        <div className="play-library-list">{game.library.map((card) => <span key={card.id}>{card.name}</span>)}</div>
+        <label>Search library <input value={libraryQuery} onChange={(event) => setLibraryQuery(event.target.value)} /></label>
+        <div className="play-library-list">{game.library.filter((card) => card.name.toLowerCase().includes(libraryQuery.trim().toLowerCase())).map((card) =>
+          <span key={card.id}>{card.name} <button type="button" className="btn small" aria-label={`Put ${card.name} into hand`}
+            onClick={() => move(card, "library", "hand")}>To hand</button></span>)}</div>
       </section>}
       <p className="note">Manual mode does not enforce Magic rules. It is local to this browser session; the engine and other players are not involved.</p>
     </div>

@@ -2,6 +2,11 @@
 
 The installed version is shown at the top of the in-app guide.
 
+## 0.37.0 (2026-11-27): Offline solo library search
+
+- Search a solo game's library by card name, move a selected card to hand and shuffle the remaining library without changing the saved deck.
+- Browser coverage exercises an original custom card while offline. Multiplayer library search remains unavailable.
+
 ## 0.36.1 (2026-11-27): Native engine startup test
 
 - Let the live browser test answer the engine's marked starting-player prompt before attempting to play a card.

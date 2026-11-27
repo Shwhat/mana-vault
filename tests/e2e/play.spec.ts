@@ -256,6 +256,13 @@ test("manual solo plays an original custom card from a saved deck", async ({ pag
     await expect(battlefield.getByRole("img", { name: customName })).toHaveCount(0);
     await battlefield.getByRole("button", { name: "Reveal" }).click();
     await expect(battlefield.getByRole("img", { name: customName })).toBeVisible();
+    await page.getByRole("button", { name: "Show library" }).click();
+    await page.getByLabel("Search library").fill("no matching card");
+    await expect(page.getByRole("button", { name: `Put ${customName} into hand` })).toHaveCount(0);
+    await page.getByLabel("Search library").fill(customName);
+    await page.getByRole("button", { name: `Put ${customName} into hand` }).click();
+    await expect(hand.locator(".play-card")).toHaveCount(7);
+    await expect(page.locator(".play-toolbar")).toContainText("0 in library");
     await battlefield.getByRole("button", { name: "Graveyard" }).first().click();
     const graveyard = page.locator(".play-zone").filter({ has: page.locator("h3", { hasText: "Graveyard" }) });
     await expect(graveyard.getByRole("img", { name: customName })).toBeVisible();

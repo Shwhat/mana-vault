@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   addManualToken, changeManualCounter, changeManualTotal, drawManualCards, moveManualCard,
-  nextManualTurn, playManualCard, startManualGame, toggleManualTap,
+  nextManualTurn, playManualCard, shuffleManualLibrary, startManualGame, toggleManualTap,
 } from "./manual-play";
 
 const cards = [
@@ -43,6 +43,20 @@ describe("offline manual play", () => {
     expect(played.hand).toHaveLength(0);
     expect(played.battlefield[0]).toMatchObject({ name: "Custom Bear", custom: true });
     expect(customDeck[0]?.quantity).toBe(1);
+  });
+
+  it("searches and shuffles the library without mutating the saved deck or prior state", () => {
+    const deck = [{ ...cards[0]!, quantity: 11 }];
+    const opening = startManualGame(deck, 0, () => 0.5);
+    const libraryBefore = opening.library.map((card) => card.id);
+    const selected = opening.library[2]!;
+    const searched = moveManualCard(opening, selected.id, "library", "hand");
+    expect(searched.hand.at(-1)?.id).toBe(selected.id);
+    expect(searched.library.map((card) => card.id)).not.toContain(selected.id);
+    const shuffled = shuffleManualLibrary(searched, () => 0);
+    expect(shuffled.library.map((card) => card.id)).toEqual([searched.library[1]!.id, searched.library[2]!.id, searched.library[0]!.id]);
+    expect(opening.library.map((card) => card.id)).toEqual(libraryBefore);
+    expect(deck[0]?.quantity).toBe(11);
   });
 
   it("moves public cards, tracks counters and totals, creates tokens, and untaps on the next turn", () => {

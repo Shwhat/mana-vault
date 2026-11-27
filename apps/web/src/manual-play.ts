@@ -83,6 +83,10 @@ export function drawManualCards(game: ManualGame, count = 1): ManualGame {
   return { ...game, library: game.library.slice(drawn.length), hand: [...game.hand, ...drawn] };
 }
 
+export function shuffleManualLibrary(game: ManualGame, random: () => number = Math.random): ManualGame {
+  return { ...game, library: shuffled(game.library, random) };
+}
+
 export function playManualCard(game: ManualGame, id: string): ManualGame {
   const card = game.hand.find((item) => item.id === id);
   if (!card) return game;
@@ -104,7 +108,7 @@ export function playManualCard(game: ManualGame, id: string): ManualGame {
 export function moveManualCard(
   game: ManualGame,
   id: string,
-  from: Exclude<ManualZone, "library">,
+  from: ManualZone,
   to: Exclude<ManualZone, "library">,
   options: MoveOptions = {},
 ): ManualGame {
