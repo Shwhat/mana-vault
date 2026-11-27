@@ -56,6 +56,7 @@ async function engine(takeOverOnFirstDeckQuery = false, eventDelayMs = 0, reject
         roomLeaveTableOrTournament: true,
         matchQuit: true,
         sendPlayerBoolean: true,
+        sendPlayerString: true,
         sendPlayerAction: true,
       };
       const result = message.method === "connectUser" && rejectLogin()
@@ -812,6 +813,32 @@ describe("authenticated Playmat sessions", () => {
       payload: { expectedMessageId: 3, type: "sendPlayerBoolean", data: false },
     });
     expect(stale.statusCode).toBe(409);
+    const engineSocket = [...engineServer.identities.values()][0];
+    if (!engineSocket) throw new Error("Missing engine connection");
+    engineSocket.send(JSON.stringify({
+      method: "GAME_CHOOSE_CHOICE", objectId: "game-test", messageId: 7,
+      data: { choice: { required: false, choices: ["A"] } },
+    }));
+    await expect.poll(async () => {
+      const currentEvents = await app.inject({ method: "GET", url: "/api/play/events", headers: { cookie } });
+      return currentEvents.json().events.some(({ event }: { event: { messageId: number } }) => event.messageId === 7);
+    }).toBe(true);
+    const invalidChoice = await app.inject({
+      method: "POST",
+      url: "/api/play/games/game-test/actions",
+      headers: { ...guard, cookie },
+      payload: { expectedMessageId: 7, type: "sendPlayerString" },
+    });
+    expect(invalidChoice.statusCode).toBe(400);
+    const cancelChoice = await app.inject({
+      method: "POST",
+      url: "/api/play/games/game-test/actions",
+      headers: { ...guard, cookie },
+      payload: { expectedMessageId: 7, type: "sendPlayerString", data: "" },
+    });
+    expect(cancelChoice.statusCode).toBe(200);
+    expect(engineServer.calls.some(({ method, params }) => method === "sendPlayerString"
+      && params[0] === "game-test" && params[2] === "")).toBe(true);
 
     const otherSignup = await app.inject({
       method: "POST",

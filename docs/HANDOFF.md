@@ -1,5 +1,13 @@
 # Mana Vault handoff
 
+## 0.41.0 (2026-11-27): Engine choices and distributions
+
+- Display both engine-provided piles and submit the selected pile. Support searchable string and keyed list choices, optional cancellation and engine-provided special choices with an item selected. The pinned bridge rejects null string responses; normal optional-choice cancellation uses an empty string, while special choices without an item remain unavailable.
+- Support engine amount distributions with per-entry and total validation, optional engine-provided cancellation, a 500-entry limit and a 1000-character response limit.
+- The 0.40.0 private-engine workflow passed saved-deck and hidden-state tests, native land play ending by concession, and the trusted-identity spoof rejection. Exact-head validation for 0.41.0 remains pending.
+- Focused prompt and server tests and `PW_CHANNEL=chrome npm run test:all` passed: 426 server tests (3 skipped), 66 web tests, 3 play-core tests, 3 protocol tests, 3 Wiki tests and 126 browser tests (1 live-engine test skipped locally). Version and guide static checks passed.
+- Delivery is pending. Full native gameplay and phase acceptance remain incomplete.
+
 ## 0.40.0 (2026-11-27): Manual battlefield attachments
 
 - Manual solo and multiplayer cards can attach to battlefield cards, including opponents' cards. The server rejects cycles and unauthorized source cards, clears attachments when either card leaves and preserves face-down privacy.

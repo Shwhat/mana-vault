@@ -506,6 +506,9 @@ function AutomatedGame({ deckId, options, engineError }: { deckId: string; optio
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [amountInput, setAmountInput] = useState<{ promptId: number; value: string } | null>(null);
+  const [specialChoice, setSpecialChoice] = useState<number | null>(null);
+  const [choiceSearch, setChoiceSearch] = useState<{ promptId: number; value: string } | null>(null);
+  const [multiInput, setMultiInput] = useState<{ promptId: number; values: string[] } | null>(null);
   const gameTypes = useMemo(() => namedOptions(options?.gameTypes ?? []), [options]);
   const deckTypes = useMemo(() => namedOptions(options?.deckTypes ?? []), [options]);
   const lastState = [...events].reverse().find(({ event }) => event.objectId === game?.gameId && STATE_EVENTS.has(event.method));
@@ -520,6 +523,25 @@ function AutomatedGame({ deckId, options, engineError }: { deckId: string; optio
   const amount = amountValue.trim() === "" ? NaN : Number(amountValue);
   const amountValid = amountRangeValid && Number.isSafeInteger(amount) && amount >= supportedMin && amount <= supportedMax;
   const promptOptions = record(promptData?.options);
+  const multiMessages = array(promptData?.messages).map(record);
+  const int32 = (value: unknown): value is number =>
+    typeof value === "number" && Number.isInteger(value) && value >= -2_147_483_648 && value <= 2_147_483_647;
+  const multiValidRange = prompt?.event.method === "GAME_GET_MULTI_AMOUNT" && multiMessages.length <= 500
+    && Array.isArray(promptData?.messages) && int32(promptData?.min) && int32(promptData?.max)
+    && promptData.min <= promptData.max
+    && multiMessages.every((item) => item !== null && typeof item.message === "string"
+      && int32(item.min) && int32(item.max) && item.min <= item.max && int32(item.defaultValue)
+      && item.defaultValue >= item.min && item.defaultValue <= item.max);
+  const multiValues = multiInput && multiInput.promptId === prompt?.id
+    ? multiInput.values : multiMessages.map((item) => String(item?.defaultValue ?? ""));
+  const multiNumbers = multiValues.map((value) => value.trim() ? Number(value) : NaN);
+  const multiTotal = multiNumbers.reduce((sum, value) => sum + value, 0);
+  const multiResponse = multiNumbers.join(" ");
+  const multiValid = multiValidRange && multiNumbers.every((value, index) => {
+    const item = multiMessages[index];
+    return int32(value) && int32(item?.min) && int32(item?.max) && value >= item.min && value <= item.max;
+  }) && int32(multiTotal) && int32(promptData?.min) && int32(promptData?.max)
+    && multiTotal >= promptData.min && multiTotal <= promptData.max && multiResponse.length <= 1000;
   const promptView = gameView(prompt);
   const stateView = gameView(lastState);
   const view = promptView && Array.isArray(promptView.players) && (prompt?.id ?? 0) > (lastState?.id ?? 0)
@@ -557,6 +579,9 @@ function AutomatedGame({ deckId, options, engineError }: { deckId: string; optio
     setEvents([]);
     setCursor(0);
     setAmountInput(null);
+    setSpecialChoice(null);
+    setChoiceSearch(null);
+    setMultiInput(null);
     try {
       const started = await request<EngineResponse>("/api/play/games", {
         method: "POST",
@@ -590,6 +615,18 @@ function AutomatedGame({ deckId, options, engineError }: { deckId: string; optio
     ? targets.length ? targets : possibleTargets.length ? possibleTargets : Object.keys(record(promptData?.cardsView1) ?? {})
     : array(promptData?.choices ?? promptData?.options);
   const abilities = prompt?.event.method === "GAME_CHOOSE_ABILITY" ? record(promptData?.choices) : null;
+  const engineChoice = prompt?.event.method === "GAME_CHOOSE_CHOICE" ? record(promptData?.choice) : null;
+  const keyedChoices = record(engineChoice?.keyChoices);
+  const engineChoices = keyedChoices && Object.keys(keyedChoices).length
+    ? Object.entries(keyedChoices).flatMap(([value, label]) => typeof label === "string" ? [{ value, label }] : [])
+    : array(engineChoice?.choices).flatMap((value) => typeof value === "string" ? [{ value, label: value }] : []);
+  const choiceSupported = !!engineChoice && (engineChoices.length > 0 || engineChoice.required === false);
+  const choiceQuery = choiceSearch && choiceSearch.promptId === prompt?.id ? choiceSearch.value
+    : engineChoice?.searchEnabled !== false && typeof engineChoice?.searchText === "string" ? engineChoice.searchText : "";
+  const filteredChoices = engineChoices.filter(({ label }) => label.toLowerCase().includes(choiceQuery.toLowerCase()));
+  const piles = prompt?.event.method === "GAME_CHOOSE_PILE"
+    && record(promptData?.cardsView1) && record(promptData?.cardsView2)
+    ? [cardsIn(promptData?.cardsView1), cardsIn(promptData?.cardsView2)] : null;
   const players = array(view?.players).map(record).filter((player): player is Record<string, unknown> => player !== null);
   const playerName = (player: Record<string, unknown>) => typeof player.name === "string" ? player.name : "Player";
   const playerZones = (player: Record<string, unknown>) => cardsIn(player.battlefield);
@@ -706,6 +743,47 @@ function AutomatedGame({ deckId, options, engineError }: { deckId: string; optio
             </> : <p className="note warn">This engine amount range is invalid or outside the workspace limit of -10000 to 10000.</p>}
             <button type="button" className="btn" onClick={() => void respond("sendPlayerBoolean", false)}>Cancel</button>
           </>}
+          {prompt.event.method === "GAME_GET_MULTI_AMOUNT" && <>
+            {typeof promptOptions?.header === "string" && <p>{promptOptions.header}</p>}
+            {multiValidRange ? <>
+              {multiMessages.map((item, index) => <label key={index}>{String(item?.message)}
+                <input type="number" step={1} min={Number(item?.min)} max={Number(item?.max)} value={multiValues[index] ?? ""}
+                  onChange={(event) => {
+                    const values = [...multiValues];
+                    values[index] = event.target.value;
+                    setMultiInput({ promptId: prompt.id, values });
+                  }} />
+              </label>)}
+              <p>Total: {Number.isFinite(multiTotal) ? multiTotal : "invalid"} (allowed {String(promptData?.min)} to {String(promptData?.max)})</p>
+              {multiResponse.length > 1000 && <p className="note warn">The amount response exceeds the workspace limit of 1000 characters.</p>}
+              <button type="button" className="btn primary" disabled={!multiValid}
+                onClick={() => void respond("sendPlayerString", multiResponse)}>Submit amounts</button>
+            </> : <p className="note warn">This engine amount distribution is invalid or exceeds workspace limits.</p>}
+            {promptOptions?.canCancel === true && <button type="button" className="btn"
+              onClick={() => void respond("sendPlayerBoolean", false)}>Cancel</button>}
+          </>}
+          {piles && piles.map((pile, index) => <section className="play-zone" key={index}>
+            <h4>Pile {index + 1}</h4>
+            {pile.length ? <ul>{pile.map((card, cardIndex) => <li key={cardObjectId(card) ?? cardIndex}>{cardName(card)}</li>)}</ul> : <p>Empty pile</p>}
+            <button type="button" className="btn" onClick={() => void respond("sendPlayerBoolean", index === 0)}>Choose pile {index + 1}</button>
+          </section>)}
+          {engineChoice && <>
+            {typeof engineChoice.message === "string" && <p>{engineChoice.message}</p>}
+            {typeof engineChoice.subMessage === "string" && <p>{engineChoice.subMessage}</p>}
+            {engineChoice.specialEnabled === true && <label><input type="checkbox" checked={specialChoice === prompt.id}
+              onChange={(event) => setSpecialChoice(event.target.checked ? prompt.id : null)} />{typeof engineChoice.specialText === "string" && engineChoice.specialText || "Special choice"}</label>}
+            {(engineChoice.searchEnabled !== false || engineChoices.length > 100) && <label>Search choices <input value={choiceQuery}
+              onChange={(event) => setChoiceSearch({ promptId: prompt.id, value: event.target.value })} /></label>}
+            {filteredChoices.slice(0, 100).map(({ value, label }, index) => <button type="button" className="btn" key={`${value}:${index}`}
+              disabled={value.length + (specialChoice === prompt.id ? 1 : 0) > 1000}
+              onClick={() => void respond("sendPlayerString", `${specialChoice === prompt.id ? "#" : ""}${value}`)}>{label}</button>)}
+            {filteredChoices.length > 100 && <p className="note">Showing the first 100 choices. Search to narrow the list.</p>}
+            {engineChoices.some(({ value }) => value.length + (specialChoice === prompt.id ? 1 : 0) > 1000)
+              && <p className="note warn">Choices longer than 1000 characters are not supported.</p>}
+            {engineChoice.specialEnabled === true && engineChoice.specialCanBeEmpty === true
+              && <p className="note warn">A special choice with no selected item is not available in the workspace.</p>}
+            {engineChoice.required === false && <button type="button" className="btn" onClick={() => void respond("sendPlayerString", "")}>Cancel</button>}
+          </>}
           {abilities && Object.entries(abilities).map(([id, label]) => typeof label === "string" &&
             <button type="button" className="btn" key={id} onClick={() => void respond("sendPlayerUUID", id)}>{label}</button>)}
           {choices.map((choice, index) => {
@@ -717,7 +795,8 @@ function AutomatedGame({ deckId, options, engineError }: { deckId: string; optio
             const type = prompt.event.method === "GAME_TARGET" ? "sendPlayerUUID" : /^[0-9a-f-]{36}$/i.test(value) ? "sendPlayerUUID" : "sendPlayerString";
             return <button type="button" className="btn" key={`${value}:${index}`} onClick={() => void respond(type, value)}>{typeof label === "string" ? label : prompt.event.method === "GAME_TARGET" ? targetName(value) : value}</button>;
           })}
-          {prompt.event.method !== "GAME_ASK" && prompt.event.method !== "GAME_GET_AMOUNT" && choices.length === 0
+          {prompt.event.method !== "GAME_ASK" && prompt.event.method !== "GAME_GET_AMOUNT" && prompt.event.method !== "GAME_GET_MULTI_AMOUNT"
+            && !piles && !choiceSupported && choices.length === 0
             && !combatKind
             && (!abilities || Object.values(abilities).every((label) => typeof label !== "string"))
             && <p className="note">{prompt.event.method === "GAME_SELECT"

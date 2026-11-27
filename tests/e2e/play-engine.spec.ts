@@ -169,6 +169,59 @@ test("offers engine-approved actions, combat choices and named targets", async (
         id: 17,
         event: { method: "GAME_GET_AMOUNT", objectId: gameId, messageId: 17, data: { message: "Choose a large amount", min: -20000, max: 20000 } },
       },
+      {
+        id: 18,
+        event: { method: "GAME_CHOOSE_PILE", objectId: gameId, messageId: 18,
+          data: { message: "Choose a pile", cardsView1: { [chosenCardId]: { id: chosenCardId, name: "Sol Ring" } }, cardsView2: {} } },
+      },
+      {
+        id: 19,
+        event: { method: "GAME_CHOOSE_PILE", objectId: gameId, messageId: 19,
+          data: { message: "Choose another pile", cardsView1: {}, cardsView2: { [libraryCardId]: { id: libraryCardId, name: "Library Card" } } } },
+      },
+      {
+        id: 20,
+        event: { method: "GAME_CHOOSE_CHOICE", objectId: gameId, messageId: 20,
+          data: { choice: { message: "Choose a mode", required: true, keyChoices: { [abilityId]: "Draw cards" }, choices: [] } } },
+      },
+      {
+        id: 21,
+        event: { method: "GAME_CHOOSE_CHOICE", objectId: gameId, messageId: 21,
+          data: { choice: { message: "Choose a color", required: true, choices: ["Red", "Blue"], keyChoices: {}, specialEnabled: true, specialText: "Remember choice" } } },
+      },
+      {
+        id: 22,
+        event: { method: "GAME_CHOOSE_CHOICE", objectId: gameId, messageId: 22,
+          data: { choice: { message: "Optional choice", required: false, choices: ["White"], keyChoices: {}, specialEnabled: true, specialText: "Remember choice" } } },
+      },
+      {
+        id: 23,
+        event: { method: "GAME_CHOOSE_CHOICE", objectId: gameId, messageId: 23,
+          data: { choice: { message: "Optional special", required: false, choices: [], keyChoices: {}, specialEnabled: true, specialCanBeEmpty: true, specialText: "Special mode" } } },
+      },
+      {
+        id: 24,
+        event: { method: "GAME_CHOOSE_CHOICE", objectId: gameId, messageId: 24,
+          data: { choice: { message: "Search options", required: true, choices: Array.from({ length: 101 }, (_, index) => `Option ${index + 1}`), keyChoices: {} } } },
+      },
+      {
+        id: 25,
+        event: { method: "GAME_GET_MULTI_AMOUNT", objectId: gameId, messageId: 25, data: {
+          min: 3, max: 3, options: { header: "Distribute mana", canCancel: false },
+          messages: [{ message: "Red", min: 0, max: 3, defaultValue: 3 }, { message: "Blue", min: 0, max: 3, defaultValue: 0 }],
+        } },
+      },
+      {
+        id: 26,
+        event: { method: "GAME_GET_MULTI_AMOUNT", objectId: gameId, messageId: 26, data: {
+          min: 0, max: 4, options: { canCancel: true },
+          messages: [{ message: "Green", min: 0, max: 4, defaultValue: 1 }],
+        } },
+      },
+      {
+        id: 27,
+        event: { method: "GAME_CHOOSE_PILE", objectId: gameId, messageId: 27, data: { message: "Incomplete pile", cardsView1: {} } },
+      },
     ];
 
     await page.route("**/api/play/**", async (route) => {
@@ -293,6 +346,63 @@ test("offers engine-approved actions, combat choices and named targets", async (
     await submit.click();
     await expect.poll(() => submittedActions).toHaveLength(16);
     await expect(submittedActions[15]).toMatchObject({ expectedMessageId: 17, type: "sendPlayerInteger", data: 10000 });
+    const prompt = page.locator(".play-prompt");
+    await expect(prompt).toContainText("Sol Ring");
+    await expect(prompt).toContainText("Empty pile");
+    await expect(prompt).not.toContainText("response format not available");
+    await prompt.getByRole("button", { name: "Choose pile 1" }).click();
+    await expect.poll(() => submittedActions).toHaveLength(17);
+    await expect(submittedActions[16]).toMatchObject({ expectedMessageId: 18, type: "sendPlayerBoolean", data: true });
+    await expect(prompt).toContainText("Library Card");
+    await prompt.getByRole("button", { name: "Choose pile 2" }).click();
+    await expect.poll(() => submittedActions).toHaveLength(18);
+    await expect(submittedActions[17]).toMatchObject({ expectedMessageId: 19, type: "sendPlayerBoolean", data: false });
+    await expect(prompt).toContainText("Choose a mode");
+    await expect(prompt.getByRole("button", { name: "Cancel", exact: true })).toHaveCount(0);
+    await prompt.getByRole("button", { name: "Draw cards" }).click();
+    await expect.poll(() => submittedActions).toHaveLength(19);
+    await expect(submittedActions[18]).toMatchObject({ expectedMessageId: 20, type: "sendPlayerString", data: abilityId });
+    await prompt.getByLabel("Remember choice").check();
+    await prompt.getByRole("button", { name: "Blue", exact: true }).click();
+    await expect.poll(() => submittedActions).toHaveLength(20);
+    await expect(submittedActions[19]).toMatchObject({ expectedMessageId: 21, type: "sendPlayerString", data: "#Blue" });
+    await expect(prompt.getByLabel("Remember choice")).not.toBeChecked();
+    await prompt.getByRole("button", { name: "Cancel", exact: true }).click();
+    await expect.poll(() => submittedActions).toHaveLength(21);
+    await expect(submittedActions[20]).toMatchObject({ expectedMessageId: 22, type: "sendPlayerString", data: "" });
+    await expect(prompt).toContainText("A special choice with no selected item is not available in the workspace.");
+    await prompt.getByRole("button", { name: "Cancel", exact: true }).click();
+    await expect.poll(() => submittedActions).toHaveLength(22);
+    await expect(submittedActions[21]).toMatchObject({ expectedMessageId: 23, type: "sendPlayerString", data: "" });
+    await expect(prompt).toContainText("Showing the first 100 choices.");
+    await expect(prompt.getByRole("button", { name: "Option 101", exact: true })).toHaveCount(0);
+    await prompt.getByLabel("Search choices").fill("Option 101");
+    await prompt.getByRole("button", { name: "Option 101", exact: true }).click();
+    await expect.poll(() => submittedActions).toHaveLength(23);
+    await expect(submittedActions[22]).toMatchObject({ expectedMessageId: 24, type: "sendPlayerString", data: "Option 101" });
+    const red = prompt.getByLabel("Red", { exact: true });
+    const blue = prompt.getByLabel("Blue", { exact: true });
+    const submitAmounts = prompt.getByRole("button", { name: "Submit amounts" });
+    await expect(red).toHaveValue("3");
+    await expect(prompt.getByRole("button", { name: "Cancel", exact: true })).toHaveCount(0);
+    await red.fill("2.5");
+    await expect(submitAmounts).toBeDisabled();
+    await red.fill("");
+    await expect(submitAmounts).toBeDisabled();
+    await red.fill("2");
+    await expect(submitAmounts).toBeDisabled();
+    await blue.fill("2");
+    await expect(submitAmounts).toBeDisabled();
+    await blue.fill("1");
+    await submitAmounts.click();
+    await expect.poll(() => submittedActions).toHaveLength(24);
+    await expect(submittedActions[23]).toMatchObject({ expectedMessageId: 25, type: "sendPlayerString", data: "2 1" });
+    await expect(prompt.getByLabel("Green", { exact: true })).toHaveValue("1");
+    await prompt.getByRole("button", { name: "Cancel", exact: true }).click();
+    await expect.poll(() => submittedActions).toHaveLength(25);
+    await expect(submittedActions[24]).toMatchObject({ expectedMessageId: 26, type: "sendPlayerBoolean", data: false });
+    await expect(prompt).toContainText("This prompt requires an engine response format not available in the workspace yet.");
+    await expect(prompt.getByRole("button", { name: /Choose pile/ })).toHaveCount(0);
   } finally {
     const deleted = await page.request.delete(`/api/decks/${deckId}`, { headers: { "x-mana-vault": "1" } });
     expect(deleted.status()).toBe(200);

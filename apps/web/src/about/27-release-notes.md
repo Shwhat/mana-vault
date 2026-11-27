@@ -2,6 +2,11 @@
 
 The installed version is shown at the top of the in-app guide.
 
+## 0.41.0 (2026-11-27): Engine choices and distributions
+
+- Choose between engine-provided piles and respond to searchable list choices, including optional cancellation and special choices with an item selected.
+- Distribute amounts across engine-provided options within individual and total limits.
+
 ## 0.40.0 (2026-11-27): Manual battlefield attachments
 
 - Attach battlefield cards to other battlefield cards in solo and multiplayer manual games. Attachments clear when either card leaves the battlefield.
