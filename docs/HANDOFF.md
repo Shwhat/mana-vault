@@ -1,5 +1,12 @@
 # Mana Vault handoff
 
+## 0.43.0 (2026-11-27): Manual multiplayer outcomes
+
+- A seated player can report their own loss separately from concession. Eliminated players cannot act or search their library, turns skip them, and the table closes with one remaining player. Closed tables show player-reported outcomes to participants and spectators.
+- Focused server tests and browser scenarios passed, including 1v1 and four-player games ended through player-reported poison losses. Manual rules are still player-resolved; this does not establish full phase acceptance.
+- `PW_CHANNEL=chrome npm run test:all` passed: 426 server tests (3 skipped), 67 web tests, 3 play-core tests, 3 protocol tests, 3 Wiki tests and 126 browser tests (1 live-engine test skipped locally). Version and guide static checks passed.
+- Delivery is pending. The 0.41.0 private-engine workflow passed saved-deck and hidden-state tests, native land play ending by concession, and spoof rejection. The 0.42.0 private-engine workflow is running. Full native gameplay, production deployment and engine reconnect acceptance remain incomplete.
+
 ## 0.42.0 (2026-11-27): Manual battlefield copies
 
 - Copy your own battlefield cards as tokens in offline solo and manual multiplayer. Copies retain face-down status but start untapped without counters or attachments. Copying an opponent's card is not supported.

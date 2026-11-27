@@ -21,6 +21,15 @@ async function createCommanderDeck(page: Page, name: string, mainCard: string): 
   return deckId;
 }
 
+async function reportPoisonLoss(page: Page): Promise<void> {
+  const poison = page.locator(".play-totals > span").filter({ hasText: "Poison" });
+  for (let count = 1; count <= 10; count += 1) {
+    await poison.getByRole("button", { name: "+", exact: true }).click();
+    await expect(poison.locator("b")).toHaveText(String(count));
+  }
+  await page.getByRole("button", { name: "Report loss" }).click();
+}
+
 test("private manual Commander table plays shared cards without exposing opponents' hands", async ({ browser, page }) => {
   const otherContext = await browser.newContext();
   const otherPage = await otherContext.newPage();
@@ -129,10 +138,14 @@ test("private manual Commander table plays shared cards without exposing opponen
     await expect(page.locator(".play-player-row .play-player").first()).toContainText("Active");
     await page.getByRole("button", { name: "Draw" }).click();
     await expect(page.locator(".play-player-row .play-player").first()).toContainText("Hand 8");
-    await page.getByRole("button", { name: "Concede" }).click();
+    await reportPoisonLoss(page);
     await expect(page.locator("#view-play")).toContainText("Game ended");
     await expect(otherPage.locator("#view-play")).toContainText("Game ended");
     await expect(spectatorPage.locator("#view-play")).toContainText("Game ended");
+    for (const target of [page, otherPage, spectatorPage]) {
+      await expect(target.locator(".play-player-row .play-player").first()).toContainText("Reported loss");
+      await expect(target.locator(".play-player-row .play-player").nth(1)).toContainText("Remaining player");
+    }
 
     await page.setViewportSize({ width: 390, height: 844 });
     await page.getByRole("navigation", { name: "Main" }).getByRole("button", { name: "Play" }).click();
@@ -205,11 +218,12 @@ test("four-player manual Commander tables keep every hand private and advance tu
     await expect(page.locator(".play-player-row .play-player").first()).toContainText("Hand 8");
     for (const seat of [0, 1, 2]) {
       const currentPage = playerPages[seat]!;
-      await currentPage.getByRole("button", { name: "Concede" }).click();
+      await reportPoisonLoss(currentPage);
       if (seat < 2) {
         for (const target of playerPages) {
-          await expect(target.locator(".play-player-row .play-player").nth(seat)).toContainText("Conceded");
+          await expect(target.locator(".play-player-row .play-player").nth(seat)).toContainText("Reported loss");
         }
+        await expect(currentPage.getByRole("button", { name: "Draw" })).toHaveCount(0);
       } else {
         for (const target of playerPages) {
           await expect(target.locator("#view-play")).toContainText("Game ended");
@@ -218,6 +232,7 @@ test("four-player manual Commander tables keep every hand private and advance tu
     }
     for (const currentPage of playerPages) {
       await expect(currentPage.locator("#view-play")).toContainText("Game ended");
+      await expect(currentPage.locator(".play-player-row .play-player").nth(3)).toContainText("Remaining player");
     }
   } finally {
     for (const context of guests) await context.close();

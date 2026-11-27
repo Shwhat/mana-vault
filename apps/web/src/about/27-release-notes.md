@@ -2,6 +2,10 @@
 
 The installed version is shown at the top of the in-app guide.
 
+## 0.43.0 (2026-11-27): Manual multiplayer outcomes
+
+- Report your own loss in a manual multiplayer game without conceding. Tables skip eliminated players and show the remaining player when the game closes.
+
 ## 0.42.0 (2026-11-27): Manual battlefield copies
 
 - Copy your battlefield cards as tokens in offline solo and manual multiplayer tables. Copies retain face-down status and start untapped without counters or attachments.

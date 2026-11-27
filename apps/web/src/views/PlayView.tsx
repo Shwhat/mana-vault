@@ -30,6 +30,7 @@ type SharedPlayer = {
   command: ManualCard[];
   commanderDamage: Record<string, number>;
   conceded: boolean;
+  lost: boolean;
 };
 type SharedTable = {
   id: string;
@@ -252,7 +253,7 @@ function ManualTable({ deckId }: { deckId: string }) {
 
   useEffect(() => {
     if (!showLibrary || !table || table.status !== "active" || table.role !== "player"
-      || table.players.find((player) => player.hand !== undefined)?.conceded) return;
+      || table.players.some((player) => player.hand !== undefined && (player.conceded || player.lost))) return;
     let active = true;
     setLibraryError("");
     void request<{ revision: number; cards: ManualCard[] }>(`/api/play/manual/tables/${encodeURIComponent(table.id)}/library`)
@@ -422,27 +423,35 @@ function ManualTable({ deckId }: { deckId: string }) {
             return <section className="play-player" key={seat}><b>Seat {seat + 1}</b><span>{player ? `${player.name} · ${player.deckName ?? "Ready"}` : "Waiting for player"}</span></section>;
           })}
         </div>}
+        {table.status === "closed" && <div className="play-player-row">
+          {table.players.map((player) => <section className="play-player" key={player.seat}>
+            <b>{player.name}</b>
+            <span>{player.conceded ? "Conceded" : player.lost ? "Reported loss"
+              : table.turn !== null && table.players.filter((item) => !item.conceded && !item.lost).length === 1 ? "Remaining player" : "Game closed"}</span>
+          </section>)}
+        </div>}
         {table.status === "active" && <>
           {table.role === "spectator" && <p className="note">You are watching this table. Spectators cannot change the game.</p>}
           <div className="play-player-row">
             {table.players.map((player) => <section className="play-player" key={player.seat}>
-              <b>{player.name}{player.seat === table.activeSeat ? " · Active" : ""}{player.conceded ? " · Conceded" : ""}</b>
+              <b>{player.name}{player.seat === table.activeSeat ? " · Active" : ""}{player.conceded ? " · Conceded" : player.lost ? " · Reported loss" : ""}</b>
               <span>Life {player.life} · Poison {player.poison} · Hand {player.handCount} · Library {player.libraryCount}</span>
               {Object.entries(player.commanderDamage).map(([from, amount]) => <span key={from}>Commander damage from seat {Number(from) + 1}: {amount}</span>)}
-              {own && player.seat !== own.seat && <div className="play-toolbar">
+              {own && !own.conceded && !own.lost && player.seat !== own.seat && <div className="play-toolbar">
                 <button type="button" className="btn small" onClick={() => void act({ type: "commanderDamage", targetSeat: player.seat, delta: 1 })}>+ Commander damage</button>
               </div>}
               <div className="play-card-row">{player.command.map((card) => <div className="engine-card" key={card.id}>{card.name}</div>)}
                 {player.battlefield.map((card) => <div className="engine-card" key={card.id}>{card.tapped ? "Tapped · " : ""}{card.name}{card.attachedTo && ` · Attached to ${attachmentName(card.attachedTo)}`}</div>)}</div>
             </section>)}
           </div>
-          {own && <>
+          {own && !own.conceded && !own.lost && <>
           <div className="play-toolbar">
             <button type="button" className="btn small" disabled={!own.libraryCount} onClick={() => void act({ type: "draw" })}>Draw</button>
             <button type="button" className="btn small" onClick={() => void act({ type: "shuffle" })}>Shuffle</button>
             <button type="button" className="btn small" onClick={() => setShowLibrary((current) => !current)}>{showLibrary ? "Hide library search" : "Search library"}</button>
             <button type="button" className="btn small" disabled={table.activeSeat !== own.seat} onClick={() => void act({ type: "turn" })}>End turn</button>
             <button type="button" className="btn small" onClick={() => void act({ type: "concede" })}>Concede</button>
+            <button type="button" className="btn small" onClick={() => void act({ type: "loss" })}>Report loss</button>
           </div>
           <div className="play-totals">
             <span>Life <button type="button" className="btn small" onClick={() => void act({ type: "life", delta: -1 })}>-</button> <b>{own.life}</b> <button type="button" className="btn small" onClick={() => void act({ type: "life", delta: 1 })}>+</button></span>

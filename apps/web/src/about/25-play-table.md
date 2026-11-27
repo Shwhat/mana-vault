@@ -24,6 +24,8 @@ Each player sees their own hand, public battlefield and graveyard zones, and the
 
 The server stores active table state so a seated player can reload the page or reconnect with the same account. A signed-in spectator with the invitation code can watch public table state, but cannot see any hand or library contents or change the game. The Play workspace lists the most recently created waiting or active table. Recovery after a server process restart has not been verified. A player who leaves an active table concedes.
 
+When a player loses under the rules the group is using, they can select **Report loss**. This removes that player from the game without marking it as a concession; only the player can report their own loss. The table skips players who have lost or conceded and closes when one player remains. Players and spectators see the reported results. Losses are not detected automatically.
+
 ## Limits
 
 - Manual games do not enforce Magic rules. They do not resolve spells, targets, combat, priority or Commander-specific rules.

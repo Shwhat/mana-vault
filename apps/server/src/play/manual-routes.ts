@@ -29,11 +29,30 @@ type PlayerState = {
   poison: number;
   commanderDamage: Record<string, number>;
   conceded: boolean;
+  lost?: boolean;
 };
 type GameState = { turn: number; activeSeat: number; players: PlayerState[] };
 
 const ZONES: readonly Zone[] = ["library", "hand", "battlefield", "graveyard", "exile", "command"];
 const COUNTER_NAMES = new Set(["+1/+1", "-1/-1", "loyalty", "charge", "custom"]);
+
+function isOut(player: PlayerState): boolean {
+  return player.conceded || player.lost === true;
+}
+
+function removeFromGame(state: GameState, player: PlayerState, reason: "concede" | "loss"): void {
+  if (reason === "concede") player.conceded = true;
+  else player.lost = true;
+  if (state.activeSeat === player.seat) {
+    const currentIndex = state.players.findIndex((item) => item.seat === player.seat);
+    const next = state.players.slice(currentIndex + 1).concat(state.players.slice(0, currentIndex))
+      .find((item) => !isOut(item));
+    if (next) {
+      if (next.seat <= player.seat) state.turn += 1;
+      state.activeSeat = next.seat;
+    }
+  }
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -172,6 +191,7 @@ function projectTable(database: DatabaseSync, table: Record<string, unknown>, us
       command: gamePlayer?.command ?? [],
       commanderDamage: gamePlayer?.commanderDamage ?? {},
       conceded: gamePlayer?.conceded ?? false,
+      lost: gamePlayer?.lost ?? false,
     };
   });
   return {
@@ -222,7 +242,7 @@ function applyAction(state: GameState, actorId: number, action: unknown): string
   if (!isRecord(action) || typeof action.type !== "string") return "Choose a valid table action.";
   const player = state.players.find((item) => item.userId === actorId);
   if (!player) return "You are not seated at this table.";
-  if (player.conceded) return "You have conceded this game.";
+  if (isOut(player)) return "You are no longer in this game.";
   const type = action.type;
   if (type === "draw") {
     const card = player.library.shift();
@@ -328,7 +348,7 @@ function applyAction(state: GameState, actorId: number, action: unknown): string
     else target.commanderDamage[key] = next;
   } else if (type === "turn") {
     if (state.activeSeat !== player.seat) return "Only the active player can end the turn.";
-    const remaining = state.players.filter((item) => !item.conceded);
+    const remaining = state.players.filter((item) => !isOut(item));
     if (remaining.length < 2) return "There are not enough active players to continue.";
     const currentIndex = remaining.findIndex((item) => item.seat === player.seat);
     const next = remaining[(currentIndex + 1) % remaining.length];
@@ -336,17 +356,8 @@ function applyAction(state: GameState, actorId: number, action: unknown): string
     if (next.seat <= player.seat) state.turn += 1;
     state.activeSeat = next.seat;
     for (const card of next.battlefield) card.tapped = false;
-  } else if (type === "concede") {
-    player.conceded = true;
-    if (state.activeSeat === player.seat) {
-      const currentIndex = state.players.findIndex((item) => item.seat === player.seat);
-      const next = state.players.slice(currentIndex + 1).concat(state.players.slice(0, currentIndex))
-        .find((item) => !item.conceded);
-      if (next) {
-        if (next.seat <= player.seat) state.turn += 1;
-        state.activeSeat = next.seat;
-      }
-    }
+  } else if (type === "concede" || type === "loss") {
+    removeFromGame(state, player, type);
   } else {
     return "That table action is not supported.";
   }
@@ -469,7 +480,7 @@ export function registerManualPlayRoutes(app: FastifyInstance, database: Databas
     if (table.status !== "active") return reply.code(409).send({ error: "This game is not active." });
     const player = parseState(table.state_json).players.find((item) => item.userId === userId);
     if (!player) return reply.code(404).send({ error: "Table seat not found." });
-    if (player.conceded) return reply.code(403).send({ error: "You have conceded this game." });
+    if (isOut(player)) return reply.code(403).send({ error: "You are no longer in this game." });
     return {
       revision: Number(table.revision),
       cards: [...player.library].sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id)),
@@ -522,7 +533,7 @@ export function registerManualPlayRoutes(app: FastifyInstance, database: Databas
       if (error) {
         return reply.code(400).send({ error });
       }
-      const status = state.players.filter((player) => !player.conceded).length <= 1 ? "closed" : "active";
+      const status = state.players.filter((player) => !isOut(player)).length <= 1 ? "closed" : "active";
       const update = database.prepare(
         "UPDATE play_manual_tables SET state_json = ?, revision = revision + 1, status = ? WHERE id = ? AND revision = ? AND status = 'active'",
       ).run(JSON.stringify(state), status, request.params.tableId, Number(table.revision));
@@ -555,17 +566,9 @@ export function registerManualPlayRoutes(app: FastifyInstance, database: Databas
     const state = parseState(table.state_json);
     const player = state.players.find((item) => item.userId === userId);
     if (!player) return reply.code(404).send({ error: "Table seat not found." });
-    player.conceded = true;
-    if (state.activeSeat === player.seat) {
-      const currentIndex = state.players.findIndex((item) => item.seat === player.seat);
-      const next = state.players.slice(currentIndex + 1).concat(state.players.slice(0, currentIndex))
-        .find((item) => !item.conceded);
-      if (next) {
-        if (next.seat <= player.seat) state.turn += 1;
-        state.activeSeat = next.seat;
-      }
-    }
-    const status = state.players.filter((item) => !item.conceded).length <= 1 ? "closed" : "active";
+    if (isOut(player)) return { left: true };
+    removeFromGame(state, player, "concede");
+    const status = state.players.filter((item) => !isOut(item)).length <= 1 ? "closed" : "active";
     database.prepare(
       "UPDATE play_manual_tables SET state_json = ?, revision = revision + 1, status = ? WHERE id = ? AND revision = ? AND status = 'active'",
     ).run(JSON.stringify(state), status, request.params.tableId, Number(table.revision));

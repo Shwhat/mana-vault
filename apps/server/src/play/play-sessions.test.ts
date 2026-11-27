@@ -543,6 +543,36 @@ describe("authenticated Playmat sessions", () => {
     });
     expect(afterLeave.json().table.status).toBe("active");
     expect(afterLeave.json().table.players[1].conceded).toBe(true);
+    const fourActions = `/api/play/manual/tables/${fourPlayerTable.json().table.id}/actions`;
+    const lost = await app.inject({
+      method: "POST", url: fourActions, headers: { ...guard, cookie: thirdCookie },
+      payload: { revision: afterLeave.json().table.revision, action: { type: "loss" } },
+    });
+    expect(lost.statusCode).toBe(200);
+    expect(lost.json().table.status).toBe("active");
+    expect(lost.json().table.players[2]).toMatchObject({ lost: true, conceded: false });
+    expect(lost.json().table.activeSeat).toBe(3);
+    const lostAction = await app.inject({
+      method: "POST", url: fourActions, headers: { ...guard, cookie: thirdCookie },
+      payload: { revision: lost.json().table.revision, action: { type: "draw" } },
+    });
+    expect(lostAction.statusCode).toBe(400);
+    expect((await app.inject({
+      method: "GET", url: `/api/play/manual/tables/${fourPlayerTable.json().table.id}/library`, headers: { cookie: thirdCookie },
+    })).statusCode).toBe(403);
+    const lostLeave = await app.inject({
+      method: "POST", url: `/api/play/manual/tables/${fourPlayerTable.json().table.id}/leave`,
+      headers: { ...guard, cookie: thirdCookie }, payload: {},
+    });
+    expect(lostLeave.statusCode).toBe(200);
+    const finalLoss = await app.inject({
+      method: "POST", url: fourActions, headers: { ...guard, cookie: fourthCookie },
+      payload: { revision: lost.json().table.revision, action: { type: "loss" } },
+    });
+    expect(finalLoss.statusCode).toBe(200);
+    expect(finalLoss.json().table.status).toBe("closed");
+    expect(finalLoss.json().table.players.map((player: { conceded: boolean; lost: boolean }) => [player.conceded, player.lost]))
+      .toEqual([[false, false], [true, false], [false, true], [false, true]]);
   });
 
   it("keeps the play routes disabled when no engine endpoint is configured", async () => {
