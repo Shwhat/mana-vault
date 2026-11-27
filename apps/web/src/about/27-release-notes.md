@@ -2,6 +2,10 @@
 
 The installed version is shown at the top of the in-app guide.
 
+## 0.43.1 (2026-11-27): Native game completion test
+
+- Add an isolated private-engine browser test intended to play a game to completion without conceding. Live validation is pending.
+
 ## 0.43.0 (2026-11-27): Manual multiplayer outcomes
 
 - Report your own loss in a manual multiplayer game without conceding. Tables skip eliminated players and show the remaining player when the game closes.

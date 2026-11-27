@@ -417,6 +417,7 @@ test("plays a saved-deck engine game through the native Play UI", async ({ page 
     headers: { "x-mana-vault": "1" },
     data: { name: "Engine UI acceptance deck", format: "modern" },
   });
+
   expect(created.status()).toBe(201);
   const deckId = String((await created.json()).id);
 
@@ -492,6 +493,66 @@ test("plays a saved-deck engine game through the native Play UI", async ({ page 
     await expect(page.getByRole("button", { name: "Concede" })).toBeVisible({ timeout: 60_000 });
     await page.getByRole("button", { name: "Concede" }).click();
     await expect(page.locator("#view-play .play-toolbar").first()).toContainText("Game ended", { timeout: 60_000 });
+  } finally {
+    const deleted = await page.request.delete(`/api/decks/${deckId}`, { headers: { "x-mana-vault": "1" } });
+    expect(deleted.status()).toBe(200);
+  }
+});
+
+test("finishes a real engine game without conceding through the native Play UI", async ({ page }) => {
+  test.skip(!process.env.MANAVAULT_PLAYMAT_URL, "requires the private Playmat integration service");
+  test.setTimeout(300_000);
+  await signUp(page, "playenginefinish");
+  const created = await page.request.post("/api/decks", {
+    headers: { "x-mana-vault": "1" },
+    data: { name: "Engine completion acceptance deck", format: "modern" },
+  });
+  expect(created.status()).toBe(201);
+  const deckId = String((await created.json()).id);
+
+  try {
+    const added = await page.request.post(`/api/decks/${deckId}/cards`, {
+      headers: { "x-mana-vault": "1" },
+      data: { cardId: "mountain-m21", zone: "main", quantity: 60 },
+    });
+    expect(added.status()).toBe(201);
+    await page.reload();
+    await page.locator("#modetabs .mtab", { hasText: "Play" }).click();
+    await page.getByLabel("Saved deck").selectOption(deckId);
+    await page.getByLabel("Game type").selectOption("Two Player Duel");
+    await page.getByLabel("Deck format").selectOption("Constructed - Modern");
+    await page.getByRole("button", { name: "Start against AI" }).click();
+
+    const prompt = page.locator(".play-prompt");
+    const ended = page.locator("#view-play .play-toolbar").first().getByText("Game ended", { exact: true });
+    await expect(prompt).toBeVisible({ timeout: 60_000 });
+    let responses = 0;
+    for (; responses < 250; responses += 1) {
+      if (await ended.isVisible()) break;
+      const messageId = await prompt.getAttribute("data-message-id");
+      if (!messageId) throw new Error("The engine did not provide an active prompt.");
+      const keep = prompt.getByRole("button", { name: "Keep", exact: true });
+      const mountain = page.getByRole("button", { name: "Play Mountain" }).first();
+      const pass = prompt.getByRole("button", { name: "Pass priority until next main phase" });
+      if (await keep.isVisible()) {
+        await keep.click();
+      } else if (await prompt.getAttribute("data-web-prompt") === "startingPlayer") {
+        await prompt.getByRole("button").filter({ hasNotText: "Concede" }).first().click();
+      } else if (await mountain.isVisible()) {
+        await mountain.click();
+      } else if (await pass.isVisible()) {
+        await pass.click();
+      } else {
+        throw new Error(`Unsupported engine prompt during completion test: ${await prompt.textContent()}`);
+      }
+      await expect.poll(async () => {
+        if (await ended.isVisible()) return true;
+        const nextId = await prompt.count() ? await prompt.getAttribute("data-message-id") : null;
+        return nextId !== null && nextId !== messageId;
+      }, { timeout: 30_000 }).toBe(true);
+    }
+    expect(responses).toBeLessThan(250);
+    await expect(ended).toBeVisible();
   } finally {
     const deleted = await page.request.delete(`/api/decks/${deckId}`, { headers: { "x-mana-vault": "1" } });
     expect(deleted.status()).toBe(200);

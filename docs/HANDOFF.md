@@ -1,5 +1,11 @@
 # Mana Vault handoff
 
+## 0.43.1 (2026-11-27): Native game completion test
+
+- Add a real-engine browser scenario intended to play an all-land deck through the native interface until the game ends without the player conceding. It must pass in isolated CI before it counts as acceptance evidence; combat and targeting remain unverified in a complete real game.
+- `PW_CHANNEL=chrome npm run test:all` passed: 426 server tests (3 skipped), 67 web tests, 3 play-core tests, 3 protocol tests, 3 Wiki tests and 126 browser tests (2 live-engine tests skipped locally). Version and guide static checks passed. The 0.42.0 private-engine workflow passed its existing concession-based scenario and security checks.
+- Delivery is pending. Local Docker, Podman and usable WSL remain unavailable, so the new live test has not yet run.
+
 ## 0.43.0 (2026-11-27): Manual multiplayer outcomes
 
 - A seated player can report their own loss separately from concession. Eliminated players cannot act or search their library, turns skip them, and the table closes with one remaining player. Closed tables show player-reported outcomes to participants and spectators.
