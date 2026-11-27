@@ -193,6 +193,16 @@ export function addManualToken(game: ManualGame, name: string): ManualGame {
   return { ...game, battlefield: [...game.battlefield, token], nextTokenId: game.nextTokenId + 1 };
 }
 
+export function copyManualCard(game: ManualGame, id: string): ManualGame {
+  const card = game.battlefield.find((item) => item.id === id);
+  if (!card) return game;
+  const copy: ManualCard = {
+    ...card, id: `token:${game.nextTokenId}`, token: true,
+    tapped: false, counters: {}, attachedTo: undefined,
+  };
+  return { ...game, battlefield: [...game.battlefield, copy], nextTokenId: game.nextTokenId + 1 };
+}
+
 export function changeManualTotal(game: ManualGame, key: "life" | "poison", delta: number): ManualGame {
   if (!Number.isSafeInteger(delta) || Math.abs(delta) > 1000) return game;
   return { ...game, [key]: Math.max(0, Math.min(100_000, game[key] + delta)) };

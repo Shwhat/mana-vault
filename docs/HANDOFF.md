@@ -1,5 +1,11 @@
 # Mana Vault handoff
 
+## 0.42.0 (2026-11-27): Manual battlefield copies
+
+- Copy your own battlefield cards as tokens in offline solo and manual multiplayer. Copies retain face-down status but start untapped without counters or attachments. Copying an opponent's card is not supported.
+- Focused offline, server and browser regressions passed, including authorization and face-down privacy. `PW_CHANNEL=chrome npm run test:all` passed: 426 server tests (3 skipped), 67 web tests, 3 play-core tests, 3 protocol tests, 3 Wiki tests and 126 browser tests (1 live-engine test skipped locally). Version and guide static checks passed.
+- Delivery is pending. Full native gameplay and phase acceptance remain incomplete.
+
 ## 0.41.0 (2026-11-27): Engine choices and distributions
 
 - Display both engine-provided piles and submit the selected pile. Support searchable string and keyed list choices, optional cancellation and engine-provided special choices with an item selected. The pinned bridge rejects null string responses; normal optional-choice cancellation uses an empty string, while special choices without an item remain unavailable.

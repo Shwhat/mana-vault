@@ -14,7 +14,7 @@ Manual play is a tabletop helper, not a rules engine. Players resolve spells, pr
 
 ## Manual solo
 
-Choose a saved deck and select **Manual solo**. **New manual game** shuffles the main deck and draws seven. **Mulligan** draws a new hand and asks you to put one card per mulligan on the bottom. Cards from the saved deck, including original custom cards, can be moved through the manual zones. Use the zone buttons to play or move cards, track totals and counters, and add tokens. The game is local to the current browser session and is lost when the page is refreshed or closed.
+Choose a saved deck and select **Manual solo**. **New manual game** shuffles the main deck and draws seven. **Mulligan** draws a new hand and asks you to put one card per mulligan on the bottom. Cards from the saved deck, including original custom cards, can be moved through the manual zones. Use the zone buttons to play or move cards, copy battlefield cards, track totals and counters, and add tokens. The game is local to the current browser session and is lost when the page is refreshed or closed.
 
 ## Multiplayer Commander
 
@@ -28,6 +28,7 @@ The server stores active table state so a seated player can reload the page or r
 
 - Manual games do not enforce Magic rules. They do not resolve spells, targets, combat, priority or Commander-specific rules.
 - Manual attachments connect battlefield cards, not players or other zones; players resolve attachment rules themselves. Attachments are cleared when either card leaves the battlefield.
+- Copy creates a token from one of your battlefield cards. It preserves face-down status but starts untapped and without counters or attachments. Players resolve copy rules themselves; copying opponents' cards is not available.
 - Multiplayer manual tables currently have no match history or general undo.
 - Engine AI is optional and is unavailable unless an administrator separately configures the Playmat service. The workspace supports only the engine prompts it currently displays, including hand or battlefield choices, offered abilities, available attackers and blockers, target, pile and list choices, amount distributions, passing priority and concession. List choices support search, optional cancellation and special choices with an item selected; responses longer than 1000 characters and special choices without an item are unavailable. Single numeric prompts honor engine bounds within the workspace limit of -10000 to 10000 and can be cancelled. Amount distributions allow up to 500 entries and a response of up to 1000 characters; cancellation is available only when the engine offers it. Selection prompts can offer passing even when other choices are unavailable. Combat, target, pile, list and amount distribution interactions have mocked browser coverage but have not yet been verified in a complete real game. A real-engine browser test passed in isolated CI after playing an engine-approved land and ending by concession; it does not verify a non-concession win or all gameplay prompts.
 - The private Compose profile, unpublished engine port and trusted-header boundary passed the Play engine integration workflow. Production deployment and engine reconnect or outage behavior remain unverified. Do not publish the engine port or configure an untrusted engine endpoint.

@@ -116,6 +116,9 @@ test("private manual Commander table plays shared cards without exposing opponen
     await hostBattlefield.locator(".play-card").first().getByRole("button", { name: "Graveyard" }).click();
     await expect(attachment).toHaveValue("");
     await expect(spectatorPage.locator(".play-player-row")).not.toContainText("Attached to Sol Ring");
+    await wolf.getByRole("button", { name: "Copy" }).click();
+    await expect(hostBattlefield.locator(".play-card").filter({ hasText: "Wolf" })).toHaveCount(2);
+    await expect(spectatorPage.locator(".play-player-row .engine-card").filter({ hasText: "Wolf" })).toHaveCount(2);
     expect(otherPageErrors).toEqual([]);
 
     await page.getByRole("button", { name: "End turn" }).click();
@@ -287,6 +290,8 @@ test("manual solo plays an original custom card from a saved deck", async ({ pag
     await expect(battlefield.getByRole("img", { name: customName })).toHaveCount(0);
     await battlefield.getByRole("button", { name: "Reveal" }).click();
     await expect(battlefield.getByRole("img", { name: customName })).toBeVisible();
+    await battlefield.getByRole("button", { name: "Copy" }).click();
+    await expect(battlefield.getByRole("img", { name: customName })).toHaveCount(2);
     await page.getByRole("button", { name: "Show library" }).click();
     await page.getByLabel("Search library").fill("no matching card");
     await expect(page.getByRole("button", { name: `Put ${customName} into hand` })).toHaveCount(0);

@@ -345,14 +345,33 @@ describe("authenticated Playmat sessions", () => {
       expect(view.players[0].battlefield[0]).toMatchObject({ name: "Face down", imageUrl: null, faceDown: true });
       expect(JSON.stringify(view)).not.toContain("Red Hidden Card");
     }
+    const unauthorizedCopy = await app.inject({
+      method: "POST", url: actionsUrl, headers: { ...guard, cookie: secondCookie },
+      payload: { revision: faceDown.json().table.revision, action: { type: "copy", cardId: firstHand[0].id } },
+    });
+    expect(unauthorizedCopy.statusCode).toBe(400);
+    const copied = await app.inject({
+      method: "POST", url: actionsUrl, headers: { ...guard, cookie: firstCookie },
+      payload: { revision: faceDown.json().table.revision, action: { type: "copy", cardId: firstHand[0].id } },
+    });
+    expect(copied.statusCode).toBe(200);
+    expect(copied.json().table.players[0].battlefield[1]).toMatchObject({
+      name: "Red Hidden Card", token: true, faceDown: true, tapped: false, counters: {},
+    });
+    expect(copied.json().table.players[0].battlefield[1].id).not.toBe(firstHand[0].id);
+    for (const cookie of [secondCookie, thirdCookie]) {
+      const view = (await app.inject({ method: "GET", url: `/api/play/manual/tables/${waitingTable.id}`, headers: { cookie } })).json().table;
+      expect(view.players[0].battlefield[1]).toMatchObject({ name: "Face down", imageUrl: null, faceDown: true });
+      expect(JSON.stringify(view)).not.toContain("Red Hidden Card");
+    }
     const unauthorizedReveal = await app.inject({
       method: "POST", url: actionsUrl, headers: { ...guard, cookie: secondCookie },
-      payload: { revision: faceDown.json().table.revision, action: { type: "faceDown", cardId: firstHand[0].id } },
+      payload: { revision: copied.json().table.revision, action: { type: "faceDown", cardId: firstHand[0].id } },
     });
     expect(unauthorizedReveal.statusCode).toBe(400);
     const revealed = await app.inject({
       method: "POST", url: actionsUrl, headers: { ...guard, cookie: firstCookie },
-      payload: { revision: faceDown.json().table.revision, action: { type: "faceDown", cardId: firstHand[0].id } },
+      payload: { revision: copied.json().table.revision, action: { type: "faceDown", cardId: firstHand[0].id } },
     });
     expect(revealed.statusCode).toBe(200);
     const publicView = (await app.inject({

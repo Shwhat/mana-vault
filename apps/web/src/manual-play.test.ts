@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  addManualToken, attachManualCard, changeManualCounter, changeManualTotal, drawManualCards, moveManualCard,
+  addManualToken, attachManualCard, changeManualCounter, changeManualTotal, copyManualCard, drawManualCards, moveManualCard,
   nextManualTurn, playManualCard, shuffleManualLibrary, startManualGame, toggleManualTap,
 } from "./manual-play";
 
@@ -92,5 +92,22 @@ describe("offline manual play", () => {
     expect(sourceMoved.graveyard[0]?.attachedTo).toBeUndefined();
     const moved = moveManualCard(attached, b.id, "battlefield", "graveyard");
     expect(moved.battlefield[0]?.attachedTo).toBeUndefined();
+  });
+
+  it("copies battlefield cards without copying counters, tap state or attachments", () => {
+    const opening = startManualGame(cards, 0, () => 0.5);
+    const played = playManualCard(opening, opening.hand[0]!.id);
+    const id = played.battlefield[0]!.id;
+    const withTarget = addManualToken(played, "Wolf");
+    const attached = attachManualCard(withTarget, id, withTarget.battlefield[1]!.id);
+    const counted = changeManualCounter(toggleManualTap(attached, id), id, "+1/+1", 1);
+    const facedown = moveManualCard(counted, id, "battlefield", "battlefield", { faceDown: true });
+    const copied = copyManualCard(facedown, id);
+    expect(copied.battlefield).toHaveLength(3);
+    expect(copied.battlefield[2]).toMatchObject({ name: "Island", token: true, faceDown: true, tapped: false, counters: {} });
+    expect(copied.battlefield[2]!.attachedTo).toBeUndefined();
+    expect(copied.battlefield[2]!.id).not.toBe(id);
+    expect(facedown.battlefield).toHaveLength(2);
+    expect(copyManualCard(facedown, "missing")).toBe(facedown);
   });
 });

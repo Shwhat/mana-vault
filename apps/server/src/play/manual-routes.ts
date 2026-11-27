@@ -308,6 +308,14 @@ function applyAction(state: GameState, actorId: number, action: unknown): string
       id: randomUUID(), name, imageUrl: null, custom: false, token: true,
       tapped: false, faceDown: false, counters: {},
     });
+  } else if (type === "copy") {
+    const card = player.battlefield.find((item) => item.id === action.cardId);
+    if (!card) return "Choose one of your battlefield cards.";
+    if (player.battlefield.length >= 500) return "Your battlefield supports up to 500 cards.";
+    player.battlefield.push({
+      id: randomUUID(), name: card.name, imageUrl: card.imageUrl, custom: card.custom, token: true,
+      tapped: false, faceDown: card.faceDown, counters: {},
+    });
   } else if (type === "commanderDamage") {
     const targetSeat = action.targetSeat;
     const delta = action.delta;

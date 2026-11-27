@@ -2,6 +2,10 @@
 
 The installed version is shown at the top of the in-app guide.
 
+## 0.42.0 (2026-11-27): Manual battlefield copies
+
+- Copy your battlefield cards as tokens in offline solo and manual multiplayer tables. Copies retain face-down status and start untapped without counters or attachments.
+
 ## 0.41.0 (2026-11-27): Engine choices and distributions
 
 - Choose between engine-provided piles and respond to searchable list choices, including optional cancellation and special choices with an item selected.

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "re
 import { request } from "../api";
 import { Icon } from "../icons";
 import {
-  addManualToken, attachManualCard, canAttachManualCard, changeManualCounter, changeManualTotal, drawManualCards, moveManualCard,
+  addManualToken, attachManualCard, canAttachManualCard, changeManualCounter, changeManualTotal, copyManualCard, drawManualCards, moveManualCard,
   nextManualTurn, playManualCard, shuffleManualLibrary, startManualGame, toggleManualTap, type ManualCard, type ManualGame, type ManualZone,
 } from "../manual-play";
 import { useApp } from "../store";
@@ -176,6 +176,7 @@ function ManualSolo({ cards }: { cards: readonly DeckCard[] }) {
       {zone("Battlefield", game.battlefield, (card) => <>
         <button type="button" className="btn small" onClick={() => setGame((current) => current ? toggleManualTap(current, card.id) : current)}>{card.tapped ? "Untap" : "Tap"}</button>
         <button type="button" className="btn small" onClick={() => setGame((current) => current ? changeManualCounter(current, card.id, "+1/+1", 1) : current)}>+1/+1</button>
+        <button type="button" className="btn small" onClick={() => setGame((current) => current ? copyManualCard(current, card.id) : current)}>Copy</button>
         <button type="button" className="btn small" onClick={() => move(card, "battlefield", "graveyard")}>Graveyard</button>
         <button type="button" className="btn small" onClick={() => move(card, "battlefield", "exile")}>Exile</button>
         <button type="button" className="btn small" onClick={() => setGame((current) => current ? moveManualCard(current, card.id, "battlefield", "battlefield", { faceDown: !card.faceDown }) : current)}>{card.faceDown ? "Reveal" : "Face down"}</button>
@@ -462,6 +463,7 @@ function ManualTable({ deckId }: { deckId: string }) {
             <button type="button" className="btn small" onClick={() => void act({ type: "tap", cardId: card.id })}>{card.tapped ? "Untap" : "Tap"}</button>
             <button type="button" className="btn small" onClick={() => void act({ type: "faceDown", cardId: card.id })}>{card.faceDown ? "Reveal" : "Face down"}</button>
             <button type="button" className="btn small" onClick={() => void act({ type: "counter", cardId: card.id, counter: "+1/+1", delta: 1 })}>+1/+1</button>
+            <button type="button" className="btn small" onClick={() => void act({ type: "copy", cardId: card.id })}>Copy</button>
             <label>Attached to <select aria-label={`Attach ${card.name}`} value={card.attachedTo ?? ""}
               onChange={(event) => void act({ type: "attach", cardId: card.id, targetId: event.target.value || null })}>
               <option value="">Nothing</option>
