@@ -13,6 +13,7 @@ type GameCard = {
   tapped: boolean;
   faceDown: boolean;
   counters: Record<string, number>;
+  attachedTo?: string;
 };
 type PlayerState = {
   userId: number;
@@ -164,7 +165,7 @@ function projectTable(database: DatabaseSync, table: Record<string, unknown>, us
       handCount: gamePlayer?.hand.length ?? null,
       hand: own ? gamePlayer?.hand ?? [] : undefined,
       battlefield: gamePlayer?.battlefield.map((card) => card.faceDown && !own
-        ? { id: card.id, name: "Face down", imageUrl: null, custom: false, token: false, tapped: card.tapped, faceDown: true, counters: card.counters }
+        ? { id: card.id, name: "Face down", imageUrl: null, custom: false, token: false, tapped: card.tapped, faceDown: true, counters: card.counters, attachedTo: card.attachedTo }
         : card) ?? [],
       graveyard: gamePlayer?.graveyard ?? [],
       exile: gamePlayer?.exile ?? [],
@@ -245,8 +246,33 @@ function applyAction(state: GameState, actorId: number, action: unknown): string
     if (to !== "battlefield") {
       card.faceDown = false;
       card.tapped = false;
+      delete card.attachedTo;
+      if (from === "battlefield") {
+        for (const other of state.players.flatMap((item) => item.battlefield)) {
+          if (other.attachedTo === card.id) delete other.attachedTo;
+        }
+      }
     }
     player[to as Zone].push(card);
+  } else if (type === "attach") {
+    const card = player.battlefield.find((item) => item.id === action.cardId);
+    if (!card || (action.targetId !== null && typeof action.targetId !== "string")) {
+      return "Choose one of your battlefield cards and a valid attachment target.";
+    }
+    if (action.targetId === null) {
+      delete card.attachedTo;
+    } else {
+      const battlefield = state.players.flatMap((item) => item.battlefield);
+      let target = battlefield.find((item) => item.id === action.targetId);
+      if (!target) return "Choose a battlefield card as the attachment target.";
+      const visited = new Set<string>();
+      while (target) {
+        if (target.id === card.id || visited.has(target.id)) return "Attachments cannot form a cycle.";
+        visited.add(target.id);
+        target = battlefield.find((item) => item.id === target?.attachedTo);
+      }
+      card.attachedTo = action.targetId;
+    }
   } else if (type === "faceDown") {
     const card = player.battlefield.find((item) => item.id === action.cardId);
     if (!card) return "Choose one of your battlefield cards.";

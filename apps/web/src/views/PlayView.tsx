@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "re
 import { request } from "../api";
 import { Icon } from "../icons";
 import {
-  addManualToken, changeManualCounter, changeManualTotal, drawManualCards, moveManualCard,
+  addManualToken, attachManualCard, canAttachManualCard, changeManualCounter, changeManualTotal, drawManualCards, moveManualCard,
   nextManualTurn, playManualCard, shuffleManualLibrary, startManualGame, toggleManualTap, type ManualCard, type ManualGame, type ManualZone,
 } from "../manual-play";
 import { useApp } from "../store";
@@ -179,6 +179,12 @@ function ManualSolo({ cards }: { cards: readonly DeckCard[] }) {
         <button type="button" className="btn small" onClick={() => move(card, "battlefield", "graveyard")}>Graveyard</button>
         <button type="button" className="btn small" onClick={() => move(card, "battlefield", "exile")}>Exile</button>
         <button type="button" className="btn small" onClick={() => setGame((current) => current ? moveManualCard(current, card.id, "battlefield", "battlefield", { faceDown: !card.faceDown }) : current)}>{card.faceDown ? "Reveal" : "Face down"}</button>
+        <label>Attached to <select aria-label={`Attach ${card.name}`} value={card.attachedTo ?? ""}
+          onChange={(event) => setGame((current) => current ? attachManualCard(current, card.id, event.target.value || null) : current)}>
+          <option value="">Nothing</option>
+          {game.battlefield.filter((target) => target.id !== card.id).map((target) =>
+            <option value={target.id} key={target.id} disabled={!canAttachManualCard(game, card.id, target.id)}>{target.name}</option>)}
+        </select></label>
         {Object.entries(card.counters).map(([name, count]) => <span className="badge" key={name}>{name}: {count}</span>)}
       </>)}
       {zone("Hand", game.hand, (card) => <button type="button" className="btn small primary" onClick={() => play(card)}>{game.bottom > 0 ? "Put on bottom" : "Play"}</button>)}
@@ -363,6 +369,11 @@ function ManualTable({ deckId }: { deckId: string }) {
   };
 
   const own = table?.players.find((player) => player.hand !== undefined);
+  const battlefield = table?.players.flatMap((player) => player.battlefield.map((card) => ({ card, player }))) ?? [];
+  const attachmentName = (id: string) => {
+    const target = battlefield.find((item) => item.card.id === id);
+    return target ? `${target.card.name} (${target.player.name})` : "Unavailable card";
+  };
   const zone = (title: string, cards: readonly ManualCard[], body: (card: ManualCard) => ReactNode) => (
     <section className="play-zone" key={title}>
       <h3>{title} <span className="cnt">{cards.length}</span></h3>
@@ -421,7 +432,7 @@ function ManualTable({ deckId }: { deckId: string }) {
                 <button type="button" className="btn small" onClick={() => void act({ type: "commanderDamage", targetSeat: player.seat, delta: 1 })}>+ Commander damage</button>
               </div>}
               <div className="play-card-row">{player.command.map((card) => <div className="engine-card" key={card.id}>{card.name}</div>)}
-                {player.battlefield.map((card) => <div className="engine-card" key={card.id}>{card.tapped ? "Tapped · " : ""}{card.name}</div>)}</div>
+                {player.battlefield.map((card) => <div className="engine-card" key={card.id}>{card.tapped ? "Tapped · " : ""}{card.name}{card.attachedTo && ` · Attached to ${attachmentName(card.attachedTo)}`}</div>)}</div>
             </section>)}
           </div>
           {own && <>
@@ -451,6 +462,12 @@ function ManualTable({ deckId }: { deckId: string }) {
             <button type="button" className="btn small" onClick={() => void act({ type: "tap", cardId: card.id })}>{card.tapped ? "Untap" : "Tap"}</button>
             <button type="button" className="btn small" onClick={() => void act({ type: "faceDown", cardId: card.id })}>{card.faceDown ? "Reveal" : "Face down"}</button>
             <button type="button" className="btn small" onClick={() => void act({ type: "counter", cardId: card.id, counter: "+1/+1", delta: 1 })}>+1/+1</button>
+            <label>Attached to <select aria-label={`Attach ${card.name}`} value={card.attachedTo ?? ""}
+              onChange={(event) => void act({ type: "attach", cardId: card.id, targetId: event.target.value || null })}>
+              <option value="">Nothing</option>
+              {battlefield.filter((target) => target.card.id !== card.id).map((target) =>
+                <option key={target.card.id} value={target.card.id}>{target.card.name} ({target.player.name})</option>)}
+            </select></label>
             {Object.entries(card.counters).map(([name, count]) => <span className="badge" key={name}>{name}: {count}</span>)}
             <button type="button" className="btn small" onClick={() => move(card, "battlefield", "graveyard")}>Graveyard</button>
             <button type="button" className="btn small" onClick={() => move(card, "battlefield", "exile")}>Exile</button>

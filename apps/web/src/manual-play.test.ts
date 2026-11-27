@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  addManualToken, changeManualCounter, changeManualTotal, drawManualCards, moveManualCard,
+  addManualToken, attachManualCard, changeManualCounter, changeManualTotal, drawManualCards, moveManualCard,
   nextManualTurn, playManualCard, shuffleManualLibrary, startManualGame, toggleManualTap,
 } from "./manual-play";
 
@@ -73,5 +73,24 @@ describe("offline manual play", () => {
     expect(next.battlefield[0]?.counters).toEqual({});
     expect(changeManualTotal(changeManualTotal(next, "life", -2), "poison", 1)).toMatchObject({ life: 18, poison: 1 });
     expect(drawManualCards(next).hand).toHaveLength(7);
+  });
+
+  it("attaches battlefield cards without cycles and detaches them when their target leaves", () => {
+    const opening = startManualGame(cards, 0, () => 0.5);
+    const first = playManualCard(opening, opening.hand[0]!.id);
+    const second = playManualCard(first, first.hand[0]!.id);
+    const [a, b] = second.battlefield;
+    if (!a || !b) throw new Error("Missing battlefield cards");
+    const attached = attachManualCard(second, a.id, b.id);
+    expect(attached.battlefield[0]?.attachedTo).toBe(b.id);
+    expect(second.battlefield[0]?.attachedTo).toBeUndefined();
+    expect(attachManualCard(attached, b.id, a.id)).toBe(attached);
+    expect(attachManualCard(attached, a.id, a.id)).toBe(attached);
+    expect(attachManualCard(attached, a.id, "missing")).toBe(attached);
+    expect(attachManualCard(attached, a.id, null).battlefield[0]?.attachedTo).toBeUndefined();
+    const sourceMoved = moveManualCard(attached, a.id, "battlefield", "graveyard");
+    expect(sourceMoved.graveyard[0]?.attachedTo).toBeUndefined();
+    const moved = moveManualCard(attached, b.id, "battlefield", "graveyard");
+    expect(moved.battlefield[0]?.attachedTo).toBeUndefined();
   });
 });

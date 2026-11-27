@@ -105,6 +105,17 @@ test("private manual Commander table plays shared cards without exposing opponen
     await expect(page.locator(".play-zone").filter({ has: page.locator("h3", { hasText: "Battlefield" }) })).toContainText("Sol Ring");
     await expect(otherPage.locator(".play-player-row")).toContainText("Sol Ring");
     await expect(spectatorPage.locator(".play-player-row")).toContainText("Sol Ring");
+    await page.getByLabel("Token", { exact: true }).fill("Wolf");
+    await page.getByRole("button", { name: "Add", exact: true }).click();
+    const wolf = hostBattlefield.locator(".play-card").filter({ hasText: "Wolf" });
+    const attachment = wolf.getByLabel("Attach Wolf");
+    const targetId = await attachment.locator("option").nth(1).getAttribute("value");
+    if (!targetId) throw new Error("Missing attachment target");
+    await attachment.selectOption(targetId);
+    await expect(spectatorPage.locator(".play-player-row")).toContainText("Wolf · Attached to Sol Ring");
+    await hostBattlefield.locator(".play-card").first().getByRole("button", { name: "Graveyard" }).click();
+    await expect(attachment).toHaveValue("");
+    await expect(spectatorPage.locator(".play-player-row")).not.toContainText("Attached to Sol Ring");
     expect(otherPageErrors).toEqual([]);
 
     await page.getByRole("button", { name: "End turn" }).click();
@@ -283,7 +294,15 @@ test("manual solo plays an original custom card from a saved deck", async ({ pag
     await page.getByRole("button", { name: `Put ${customName} into hand` }).click();
     await expect(hand.locator(".play-card")).toHaveCount(7);
     await expect(page.locator(".play-toolbar")).toContainText("0 in library");
+    await page.getByLabel("Token", { exact: true }).fill("Wolf");
+    await page.getByRole("button", { name: "Add", exact: true }).click();
+    const wolfAttachment = battlefield.getByLabel("Attach Wolf");
+    const customTarget = await wolfAttachment.locator("option").nth(1).getAttribute("value");
+    if (!customTarget) throw new Error("Missing custom card attachment target");
+    await wolfAttachment.selectOption(customTarget);
+    await expect(wolfAttachment).toHaveValue(customTarget);
     await battlefield.getByRole("button", { name: "Graveyard" }).first().click();
+    await expect(wolfAttachment).toHaveValue("");
     const graveyard = page.locator(".play-zone").filter({ has: page.locator("h3", { hasText: "Graveyard" }) });
     await expect(graveyard.getByRole("img", { name: customName })).toBeVisible();
     await page.getByRole("button", { name: "Next turn and untap" }).click();

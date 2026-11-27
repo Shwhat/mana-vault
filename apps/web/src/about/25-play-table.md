@@ -27,7 +27,8 @@ The server stores active table state so a seated player can reload the page or r
 ## Limits
 
 - Manual games do not enforce Magic rules. They do not resolve spells, targets, combat, priority or Commander-specific rules.
-- Multiplayer manual tables currently have no match history, attachments or general undo.
+- Manual attachments connect battlefield cards, not players or other zones; players resolve attachment rules themselves. Attachments are cleared when either card leaves the battlefield.
+- Multiplayer manual tables currently have no match history or general undo.
 - Engine AI is optional and is unavailable unless an administrator separately configures the Playmat service. The workspace supports only the engine prompts it currently displays, including hand or battlefield choices, offered abilities, available attackers and blockers, target choices, passing priority and concession. Numeric prompts honor engine bounds within the workspace limit of -10000 to 10000, and can be cancelled. Selection prompts can offer passing even when other choices are unavailable. Combat and target interactions have mocked browser coverage but have not yet been verified in a complete real game. A real-engine browser test passed in isolated CI after playing an engine-approved land and ending by concession; it does not verify a non-concession win or all gameplay prompts.
 - The private Compose profile, unpublished engine port and trusted-header boundary passed the Play engine integration workflow. Production deployment and engine reconnect or outage behavior remain unverified. Do not publish the engine port or configure an untrusted engine endpoint.
 - Engine AI and Android-specific table behavior have not been independently validated against a production deployment.

@@ -369,6 +369,45 @@ describe("authenticated Playmat sessions", () => {
     });
     expect(returned.statusCode).toBe(200);
     expect(returned.json().table.players[0].hand.find((card: { id: string }) => card.id === firstHand[0].id).faceDown).toBe(false);
+    const redPlayed = await app.inject({
+      method: "POST", url: actionsUrl, headers: { ...guard, cookie: firstCookie },
+      payload: { revision: returned.json().table.revision, action: { type: "playFaceDown", cardId: firstHand[0].id } },
+    });
+    expect(redPlayed.statusCode).toBe(200);
+    const blueId = secondView.players[1].hand[0].id;
+    const bluePlayed = await app.inject({
+      method: "POST", url: actionsUrl, headers: { ...guard, cookie: secondCookie },
+      payload: { revision: redPlayed.json().table.revision, action: { type: "play", cardId: blueId } },
+    });
+    expect(bluePlayed.statusCode).toBe(200);
+    const attach = await app.inject({
+      method: "POST", url: actionsUrl, headers: { ...guard, cookie: secondCookie },
+      payload: { revision: bluePlayed.json().table.revision, action: { type: "attach", cardId: blueId, targetId: firstHand[0].id } },
+    });
+    expect(attach.statusCode).toBe(200);
+    expect(attach.json().table.players[1].battlefield[0].attachedTo).toBe(firstHand[0].id);
+    const spectatorView = (await app.inject({
+      method: "GET", url: `/api/play/manual/tables/${waitingTable.id}`, headers: { cookie: thirdCookie },
+    })).json().table;
+    expect(spectatorView.players[0].battlefield[0].name).toBe("Face down");
+    expect(spectatorView.players[1].battlefield[0].attachedTo).toBe(firstHand[0].id);
+    expect(JSON.stringify(spectatorView)).not.toContain("Red Hidden Card");
+    const cycle = await app.inject({
+      method: "POST", url: actionsUrl, headers: { ...guard, cookie: firstCookie },
+      payload: { revision: attach.json().table.revision, action: { type: "attach", cardId: firstHand[0].id, targetId: blueId } },
+    });
+    expect(cycle.statusCode).toBe(400);
+    const unauthorizedAttach = await app.inject({
+      method: "POST", url: actionsUrl, headers: { ...guard, cookie: secondCookie },
+      payload: { revision: attach.json().table.revision, action: { type: "attach", cardId: firstHand[0].id, targetId: null } },
+    });
+    expect(unauthorizedAttach.statusCode).toBe(400);
+    const targetMoved = await app.inject({
+      method: "POST", url: actionsUrl, headers: { ...guard, cookie: firstCookie },
+      payload: { revision: attach.json().table.revision, action: { type: "move", cardId: firstHand[0].id, from: "battlefield", to: "hand" } },
+    });
+    expect(targetMoved.statusCode).toBe(200);
+    expect(targetMoved.json().table.players[1].battlefield[0].attachedTo).toBeUndefined();
     const spectatorAction = await app.inject({
       method: "POST",
       url: `/api/play/manual/tables/${waitingTable.id}/actions`,

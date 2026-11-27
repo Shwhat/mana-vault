@@ -12,6 +12,7 @@ export type ManualCard = Readonly<{
   tapped: boolean;
   faceDown: boolean;
   counters: Readonly<Record<string, number>>;
+  attachedTo?: string;
 }>;
 
 export type ManualGame = Readonly<{
@@ -119,12 +120,37 @@ export function moveManualCard(
     ...card,
     tapped: options.tapped ?? (to === "battlefield" ? card.tapped : false),
     faceDown: options.faceDown ?? (to === "battlefield" ? card.faceDown : false),
+    attachedTo: to === "battlefield" ? card.attachedTo : undefined,
   };
   return {
     ...game,
     ...(from === to
       ? { [from]: source.map((item) => item.id === id ? moved : item) }
-      : { [from]: source.filter((item) => item.id !== id), [to]: [...game[to], moved] }),
+      : { [from]: source.filter((item) => item.id !== id).map((item) =>
+        from === "battlefield" && item.attachedTo === id ? { ...item, attachedTo: undefined } : item), [to]: [...game[to], moved] }),
+  };
+}
+
+export function canAttachManualCard(game: ManualGame, id: string, targetId: string | null): boolean {
+  if (!game.battlefield.some((item) => item.id === id)) return false;
+  if (targetId !== null) {
+    let target = game.battlefield.find((item) => item.id === targetId);
+    if (!target) return false;
+    const visited = new Set<string>();
+    while (target) {
+      if (target.id === id || visited.has(target.id)) return false;
+      visited.add(target.id);
+      target = game.battlefield.find((item) => item.id === target?.attachedTo);
+    }
+  }
+  return true;
+}
+
+export function attachManualCard(game: ManualGame, id: string, targetId: string | null): ManualGame {
+  if (!canAttachManualCard(game, id, targetId)) return game;
+  return {
+    ...game,
+    battlefield: game.battlefield.map((item) => item.id === id ? { ...item, attachedTo: targetId ?? undefined } : item),
   };
 }
 

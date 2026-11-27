@@ -2,6 +2,10 @@
 
 The installed version is shown at the top of the in-app guide.
 
+## 0.40.0 (2026-11-27): Manual battlefield attachments
+
+- Attach battlefield cards to other battlefield cards in solo and multiplayer manual games. Attachments clear when either card leaves the battlefield.
+
 ## 0.39.2 (2026-11-27): Engine numeric prompts
 
 - Honor the engine's numeric prompt bounds within the workspace limit, reject invalid values and allow the player to cancel.
