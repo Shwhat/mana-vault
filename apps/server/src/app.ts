@@ -40,6 +40,7 @@ import { NOTES_PUBLIC, type NoteFetcher, registerNoteRoutes } from "./notes.js";
 import { registerNoteWebRoutes } from "./notes-web.js";
 import { createScryfallSearch, type SearchFetcher } from "./scryfall-search.js";
 import { scryfallDirectives } from "./search-expression.js";
+import { initializeEngineIdentityTable } from "./play/engine-identity.js";
 
 declare module "fastify" {
   interface FastifyRequest {
@@ -115,6 +116,7 @@ export async function buildApp(
   options: AppOptions = {},
 ): Promise<FastifyInstance> {
   initializeDatabase(database);
+  initializeEngineIdentityTable(database);
   const app = Fastify({ logger: process.env.NODE_ENV !== "test" });
   const promoTypeExists = database.prepare("SELECT 1 FROM cards WHERE instr(',' || lower(promo_types) || ',', ?) > 0 LIMIT 1");
   const searchScryfall = createScryfallSearch(options.scryfallSearchFetcher);

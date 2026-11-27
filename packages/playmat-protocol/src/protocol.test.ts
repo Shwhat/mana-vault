@@ -1,11 +1,26 @@
 import { describe, expect, it } from "vitest";
 import { parseServerMessage, ProtocolError, request } from "./index.js";
 
-describe("Playmat discovery requests", () => {
-  it("encodes positional requests without exposing arbitrary methods", () => {
+describe("Playmat requests", () => {
+  it("encodes discovery, authentication and gameplay methods without exposing arbitrary RPC", () => {
     expect(JSON.parse(request(5, "ping", "", "hello"))).toEqual({ jsonrpc: "2.0", id: 5, method: "ping", params: ["", "hello"] });
     expect(JSON.parse(request("id", "getDeckTypes"))).toEqual({ jsonrpc: "2.0", id: "id", method: "getDeckTypes", params: [] });
+    expect(JSON.parse(request(6, "connectUser", "mv_user", "", "session", "restore"))).toEqual({
+      jsonrpc: "2.0", id: 6, method: "connectUser", params: ["mv_user", "", "session", "restore"],
+    });
+    expect(JSON.parse(request(7, "roomJoinTable", "session", "room", "table", "mv_user", "Human", 5, {
+      cards: [], sideboard: [],
+    }))).toEqual({
+      jsonrpc: "2.0", id: 7, method: "roomJoinTable",
+      params: ["session", "room", "table", "mv_user", "Human", 5, { cards: [], sideboard: [] }],
+    });
+    expect(JSON.parse(request(8, "sendPlayerBoolean", "game", "session", false))).toMatchObject({
+      method: "sendPlayerBoolean", params: ["game", "session", false],
+    });
     expect(() => request(1, "connectAdmin" as "ping")).toThrow("Unsupported RPC method");
+    expect(() => request(1, "lookupCards", Array.from({ length: 501 }, () => ({
+      amount: 1, cardName: "Card", cardNumber: "1", setCode: "SET",
+    })))).toThrow("at most 500");
   });
 });
 
