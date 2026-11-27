@@ -38,6 +38,12 @@ test("plays a saved-deck engine game through the native Play UI", async ({ page 
       await expect(prompt).not.toHaveAttribute("data-message-id", firstMessage ?? "");
     }
 
+    const playMountain = page.getByRole("button", { name: "Play Mountain" }).first();
+    await expect(playMountain).toBeVisible({ timeout: 60_000 });
+    await playMountain.click();
+    await expect(page.locator(".play-player-row .engine-card").filter({ hasText: "Mountain" }).first())
+      .toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole("button", { name: "Concede" })).toBeVisible();
     await page.getByRole("button", { name: "Concede" }).click();
     await expect(page.locator("#view-play .play-toolbar").first()).toContainText("Game ended", { timeout: 60_000 });
   } finally {

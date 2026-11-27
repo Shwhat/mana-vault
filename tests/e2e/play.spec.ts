@@ -58,6 +58,10 @@ test("private manual Commander table plays shared cards without exposing opponen
     await page.locator("#modetabs .mtab", { hasText: "Play" }).click();
     await page.getByLabel("Saved deck").selectOption(hostDeck);
     await page.getByRole("tab", { name: "Multiplayer table" }).click();
+    await otherPage.reload();
+    await otherPage.locator("#modetabs .mtab", { hasText: "Play" }).click();
+    await otherPage.getByLabel("Saved deck").selectOption(guestDeck);
+    await otherPage.getByRole("tab", { name: "Multiplayer table" }).click();
     const hostHand = page.locator(".play-zone").filter({ has: page.locator("h3", { hasText: "Hand" }) });
     const guestHand = otherPage.locator(".play-zone").filter({ has: otherPage.locator("h3", { hasText: "Hand" }) });
     await expect(hostHand.locator(".playcardname")).toHaveCount(7);
@@ -82,6 +86,15 @@ test("private manual Commander table plays shared cards without exposing opponen
     await expect(otherPage.locator(".play-player-row")).toContainText("Sol Ring");
     await expect(spectatorPage.locator(".play-player-row")).toContainText("Sol Ring");
     expect(otherPageErrors).toEqual([]);
+
+    await page.getByRole("button", { name: "End turn" }).click();
+    await expect(otherPage.locator(".play-player-row .play-player").nth(1)).toContainText("Active");
+    await otherPage.getByRole("button", { name: "Draw" }).click();
+    await expect(page.locator(".play-player-row .play-player").nth(1)).toContainText("Hand 8");
+    await otherPage.getByRole("button", { name: "End turn" }).click();
+    await expect(page.locator(".play-player-row .play-player").first()).toContainText("Active");
+    await page.getByRole("button", { name: "Draw" }).click();
+    await expect(page.locator(".play-player-row .play-player").first()).toContainText("Hand 7");
 
     await page.setViewportSize({ width: 390, height: 844 });
     await page.getByRole("navigation", { name: "Main" }).getByRole("button", { name: "Play" }).click();
@@ -208,6 +221,8 @@ test("manual solo plays an original custom card from a saved deck", async ({ pag
     await page.locator("#modetabs .mtab", { hasText: "Play" }).click();
     await page.getByLabel("Saved deck").selectOption(deckId);
     await page.getByRole("tab", { name: "Manual solo" }).click();
+    await page.context().setOffline(true);
+    await expect.poll(() => page.evaluate(() => navigator.onLine)).toBe(false);
     await page.getByRole("button", { name: "New manual game" }).click();
 
     const hand = page.locator(".play-zone").filter({ has: page.locator("h3", { hasText: "Hand" }) });
@@ -222,6 +237,7 @@ test("manual solo plays an original custom card from a saved deck", async ({ pag
     await page.getByRole("button", { name: "Next turn and untap" }).click();
     await expect(page.locator(".play-toolbar")).toContainText("Turn 2");
   } finally {
+    await page.context().setOffline(false);
     if (deckId) {
       const deletedDeck = await page.request.delete(`/api/decks/${deckId}`, { headers: { "x-mana-vault": "1" } });
       expect(deletedDeck.status()).toBe(200);

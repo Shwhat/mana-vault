@@ -6,7 +6,7 @@ The **Play** mode is a workspace for testing saved decks. Open it from the deskt
 
 | Mode | What it does |
 |---|---|
-| Engine AI | Starts an optional Playmat game from a saved deck after checking exact card printings. Supported prompts are answered in the native workspace, including concession. The server must have a Playmat engine configured. |
+| Engine AI | Starts an optional Playmat game from a saved deck after checking exact card printings. During the player's selection prompt, cards marked playable by the engine can be played from hand. Supported prompts are answered in the native workspace, including concession. The server must have a Playmat engine configured. |
 | Manual solo | Starts an offline game in this browser with a shuffled main deck, a seven-card hand, mulligans, draws, zones, taps, counters, tokens, life, poison, dice and coin flips. |
 | Multiplayer table | Hosts a private manual Commander table for two or four signed-in players, joins a waiting table, or watches with an invitation code. |
 
@@ -28,6 +28,6 @@ The server stores active table state so a seated player can reload the page or r
 
 - Manual games do not enforce Magic rules. They do not resolve spells, targets, combat, priority or Commander-specific rules.
 - Manual tables currently have no match history, attachments, face-down card controls or general undo.
-- Engine AI is optional and is unavailable unless an administrator separately configures the Playmat service. The workspace supports only the engine prompts it currently displays, including concession. A real-engine browser test exercises starting from a saved deck, keeping the opening hand and ending by concession; it does not verify a non-concession win or all gameplay prompts.
+- Engine AI is optional and is unavailable unless an administrator separately configures the Playmat service. The workspace supports only the engine prompts it currently displays, including card play when the engine marks a hand card playable and concession. A real-engine browser test exercises starting from a saved deck, keeping the opening hand, playing an engine-approved land and ending by concession; it does not verify a non-concession win or all gameplay prompts.
 - The private Compose profile, unpublished engine port and trusted-header boundary passed the Play engine integration workflow. Production deployment and engine reconnect or outage behavior remain unverified. Do not publish the engine port or configure an untrusted engine endpoint.
 - Engine AI and Android-specific table behavior have not been independently validated against a production deployment.

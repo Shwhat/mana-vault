@@ -1,5 +1,21 @@
 # Mana Vault handoff
 
+## 0.32.0 (2026-11-27): Native Engine AI card play
+
+- The Engine AI workspace now renders a Play action for hand cards present in the current `canPlayObjects` list during `GAME_SELECT`, and responds with the selected card UUID. The private-engine browser flow now plays a Mountain before conceding.
+- Synchronized workspace manifests, lockfile, release notes, Capabilities, Play guide, README, roadmap and handoff for 0.32.0.
+- Validation: `PW_CHANNEL=chrome npm run test:all` passed: typechecks, 426 server tests (3 skipped), 64 web tests, 3 play-core tests, 3 Playmat protocol tests, 3 Wiki tests and 125 browser tests. The live-engine browser test was skipped locally because no Playmat URL is configured; it must pass in CI on the pushed head. The production build reports the existing large-chunk warning. `git diff --check` and version/lockfile checks passed.
+- Phase 1 production deployment and engine reconnect/outage acceptance remain open. Phase 2 still lacks a non-concession completed game and broader prompt, spell, target and combat coverage. Phase 3 and Phase 4 acceptance remain incomplete.
+- Delivery: PR #52 is a draft. Commit/push, current-head CI and review status remain pending. Do not merge until required checks and approvals pass; post-merge server/container and Android artifacts are also pending.
+
+## 0.31.1 (2026-11-27): Multiplayer play acceptance
+
+- Expanded the two-player browser flow to reload both seated players, exercise shared table state, verify hidden hands and complete a full turn cycle. The four-player flow checks each seat's turn and viewer-specific hand visibility. The custom-card solo flow now runs while the browser is offline.
+- Synchronized all workspace versions and lockfile records at 0.31.1; updated the release notes, roadmap and handoff.
+- Validation: final full validation is pending after this test-only change. The 0.31.0 snapshot passed `PW_CHANNEL=chrome npm run test:all`: typechecks, 426 server tests (3 skipped), 64 web tests, 3 play-core tests, 3 Playmat protocol tests, 3 Wiki tests and 125 browser tests (1 live-engine browser test skipped locally). Static tests and `git diff --check` passed.
+- Phase 1 production deployment and engine reconnect/outage acceptance remain open. Phase 2 native gameplay is incomplete. Phase 3 and Phase 4 acceptance still exceeds the current browser coverage.
+- Delivery: PR #52 remains a draft. Current-head CI, review, merge and matching post-merge artifacts remain pending.
+
 ## 0.31.0 (2026-11-27): Native Play engine controls
 
 - Added a native concession control to current Engine AI prompts and a browser acceptance test that starts a saved-deck game, answers the opening-hand prompt, concedes and waits for the engine-reported terminal result. The test is configured to run inside the private Playmat integration network.
@@ -61,11 +77,11 @@
 - Validation: `PW_CHANNEL=chrome npm run test:all` passed, including 119 browser tests. `git diff --check` passed.
 - At handoff, version 0.24.8 and automatic synchronization are pending delivery. Verify the workflow, container, Android build and debug APK for the merged commit.
 
-Last updated: 2026-11-27, version 0.31.0 native Play engine controls and local validation passed; live UI integration and PR delivery are pending.
+Last updated: 2026-11-27, version 0.32.0 native Engine AI card play in progress; validation and delivery are pending.
 
-## Current next steps (0.31.0)
+## Current next steps (0.32.0)
 
-- Review the complete diff, then commit and push to PR #52. Verify the new private-engine native UI browser check and all other checks for the exact pushed commit. Keep the PR a draft until the remaining Play Table acceptance gates are met.
+- Run the focused and full validation gates, review the complete diff, then commit and push to PR #52. Verify the new private-engine card-play browser check and all other checks for the exact pushed commit. Keep the PR a draft until the remaining Play Table acceptance gates are met.
 - Keep the PR unmerged until required checks and approvals pass. After merge, verify the exact-SHA container and Android workflows and the matching debug APK.
 - Complete Phase 1 production deployment and engine reconnect/outage acceptance before describing Play Table phases 2 through 4 as complete.
 
@@ -334,4 +350,4 @@ None known.
 
 ## Where work stopped
 
-The current branch `feature/play-table-phase-one-followup` is based on `main` at merge commit `8cc6ad6` (PR #51). Version 0.31.0 passes local `PW_CHANNEL=chrome npm run test:all`; the live-engine browser acceptance is skipped locally because Docker and a configured engine are unavailable. The new private-engine browser workflow, remaining Phase 1 deployment/reconnect acceptance, required PR checks and approvals, merge, server/container and Android CI verification, and matching debug APK remain pending. Play Table phases 2 through 4 are not accepted as complete.
+The current branch `feature/play-table-phase-one-followup` is based on `main` at merge commit `8cc6ad6` (PR #51). Version 0.31.0 passed local `PW_CHANNEL=chrome npm run test:all`; the current 0.31.1 browser-test update needs final validation. The live-engine browser acceptance is skipped locally because Docker and a configured engine are unavailable. The new private-engine browser workflow, remaining Phase 1 deployment/reconnect acceptance, required PR checks and approvals, merge, server/container and Android CI verification, and matching debug APK remain pending. Play Table phases 2 through 4 are not accepted as complete.

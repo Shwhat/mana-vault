@@ -3,9 +3,10 @@
 Status: the 0.30.0 work adds an initial native Play workspace, offline solo
 play, and server-stored private manual tables for two or four players. Focused
 tests cover table membership, hidden hands and libraries, revision-checked
-actions, a full four-player turn cycle, reconnect after a page reload, leaving a
-table, and playing an original custom card through the offline manual game UI.
-The Play engine integration CI passed on commit `8a84091713ab617128b1f51989f5b47a4030ca1b`: it built the private Compose profile, verified no published engine ports, ran live saved-deck and hidden-state tests, and rejected a spoofed trusted identity. A native UI browser test is now configured for the private engine workflow, but has not yet run on this branch. Local Docker, Podman and WSL remain unavailable. Production deployment and live engine reconnect/outage behavior remain unverified, so Phase 1 is not fully accepted. The new UI is not acceptance of phases 2 through 4.
+actions, two-player and four-player turn cycles, reloads by seated players,
+leaving a table, and playing an original custom card through the offline manual
+game UI with the browser's network disabled.
+The Play engine integration CI passed on commit `8a84091713ab617128b1f51989f5b47a4030ca1b`: it built the private Compose profile, verified no published engine ports, ran live saved-deck and hidden-state tests, and rejected a spoofed trusted identity. The private-engine browser flow now exercises playing an engine-approved hand card before concession; it must pass on the pushed 0.32.0 head. Local Docker, Podman and WSL remain unavailable. Production deployment and live engine reconnect/outage behavior remain unverified, so Phase 1 is not fully accepted. This does not complete phases 2 through 4.
 
 ## Implemented foundation work
 
@@ -27,7 +28,7 @@ remain pending.
 | Files | Implemented scope and remaining gate |
 | --- | --- |
 | `apps/server/src/play/engine-identity.ts`, `app.ts`, `admin.ts` | Persist an opaque engine name per Mana Vault user, manage server-side sessions and close them on account or last-device revocation. The spoofed trusted-header boundary passed PR CI; production deployment remains unverified. |
-| `apps/server/src/play/playmat-connection.ts`, `play-sessions.ts`, `routes.ts`, `packages/playmat-protocol/src/rpc.ts` | Server-only WebSocket client, RPC allowlist, authenticated game routes, per-user event queues, prompt freshness and takeover refusal. The initial Engine AI UI is present; deployment and prompt coverage remain incomplete. |
+| `apps/server/src/play/playmat-connection.ts`, `play-sessions.ts`, `routes.ts`, `packages/playmat-protocol/src/rpc.ts`, `apps/web/src/views/PlayView.tsx` | Server-only WebSocket client, RPC allowlist, authenticated game routes, per-user event queues, prompt freshness and takeover refusal. The Engine AI UI can play hand cards exposed by `canPlayObjects` during `GAME_SELECT`; deployment and broader prompt coverage remain incomplete. |
 | `apps/server/src/play/manual-routes.ts`, `apps/web/src/views/PlayView.tsx` | Server-authoritative manual table membership and state for two or four players, per-player hidden-zone projection, invitation-code read-only spectators, offline solo mode and a first native workspace. Full manual interactions and match history are not implemented. |
 | `apps/server/src/play/deck-converter.ts`, `routes.ts` | Convert authorized immutable snapshots, verify exact printings, validate against the live engine and start the human-plus-AI match. A real game and hidden-state isolation passed CI; production deployment remains unverified. |
 | `apps/server/src/play/*.test.ts`, `packages/playmat-protocol/src/*.test.ts` | Synthetic lifecycle and route tests plus an optional real-engine acceptance test. Loopback test evidence does not prove private deployment security. |

@@ -2,6 +2,17 @@
 
 The installed version is shown at the top of the in-app guide.
 
+## 0.32.0 (2026-11-27): Native Engine AI card play
+
+- Show Play buttons for hand cards the Playmat engine marks playable during the player's selection prompt. Send the selected card ID as the prompt-bound response.
+- Extend the private-engine browser flow to play an engine-approved Mountain before conceding.
+- Keep Phase 2 open: this does not verify a non-concession win, all prompts, targeting or combat.
+
+## 0.31.1 (2026-11-27): Multiplayer play acceptance
+
+- Expand the two-player browser flow to reload both seated players and complete a shared turn cycle with hidden-hand assertions. The four-player flow also exercises each seat's turn and hand privacy. Verify original custom-card solo play while the browser is offline.
+- Keep the overall Phase 4 gate open until full-game and reconnect acceptance is complete.
+
 ## 0.31.0 (2026-11-27): Native Play engine controls
 
 - Add a native concession control to current Playmat prompts and a browser acceptance flow that starts a saved-deck game, answers the opening-hand prompt and observes the engine-reported terminal result.

@@ -72,6 +72,12 @@ function cardName(value: unknown): string {
   return typeof card.name === "string" ? card.name : "Card";
 }
 
+function cardObjectId(value: unknown): string | null {
+  const card = record(value);
+  const id = card?.id ?? card?.cardId;
+  return typeof id === "string" ? id : null;
+}
+
 function cardsIn(value: unknown): unknown[] {
   const cards = record(value);
   return cards ? Object.values(cards) : [];
@@ -448,6 +454,8 @@ function AutomatedGame({ deckId, options, engineError }: { deckId: string; optio
   const view = gameView(lastState);
   const prompt = [...events].reverse().find(({ event }) => event.objectId === game?.gameId && PROMPTS.has(event.method));
   const promptData = record(prompt?.event.data);
+  const promptView = gameView(prompt);
+  const playableObjects = record(view?.canPlayObjects) ?? record(promptView?.canPlayObjects);
 
   useEffect(() => {
     if (!game) return;
@@ -545,7 +553,19 @@ function AutomatedGame({ deckId, options, engineError }: { deckId: string; optio
             </section>)}
           </div>
           <section className="play-zone"><h3>Your hand <span className="cnt">{hand.length}</span></h3>
-            <div className="play-card-row">{hand.map((card, index) => <div className="engine-card" key={String(record(card)?.cardId ?? index)}>{cardName(card)}</div>)}</div>
+            <div className="play-card-row">{hand.map((card, index) => {
+              const id = cardObjectId(card);
+              const name = cardName(card);
+              const canPlay = prompt?.event.method === "GAME_SELECT"
+                && id !== null
+                && playableObjects !== null
+                && Object.prototype.hasOwnProperty.call(playableObjects, id);
+              return <div className="engine-card" key={id ?? index}>
+                {name}
+                {canPlay && <button type="button" className="btn small primary" aria-label={`Play ${name}`}
+                  onClick={() => void respond("sendPlayerUUID", id)}>Play</button>}
+              </div>;
+            })}</div>
           </section>
           {stack.length > 0 && <section className="play-zone"><h3>Stack</h3><div className="play-card-row">{stack.map((card, index) => <div className="engine-card" key={String(record(card)?.cardId ?? index)}>{cardName(card)}</div>)}</div></section>}
         </>}
