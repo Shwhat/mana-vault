@@ -1,5 +1,12 @@
 # Mana Vault handoff
 
+## 0.36.0 (2026-11-27): Native combat choices
+
+- Render engine-approved attacker and blocker choices, send their IDs to the current prompt, and confirm declarations with the engine. Add single-step priority passing and target labels with option and card-picker fallbacks.
+- Validation: the focused combat/target browser regression passed. `PW_CHANNEL=chrome npm run test:all` passed: typechecks, 426 server tests (3 skipped), 64 web tests, 3 play-core tests, 3 Playmat protocol tests, 3 Wiki tests and 126 browser tests (1 live-engine test skipped locally). Version and guide static checks passed.
+- Delivery: the 0.35.0 checkpoint was committed and pushed as `9c7acb2` to draft PR #52; its Android workflow passed and produced `mana-vault-0.35.0-debug`, and its exact-head Play engine workflow is running. Version 0.36.0 awaits commit, push and its own exact-head workflows.
+- Mocked prompts do not establish complete real-game combat or targeting. Phase 1 production deployment/reconnect acceptance and phases 2 through 4 remain open.
+
 ## 0.35.0 (2026-11-27): Engine ability choices and solo face-down cards
 
 - Render `GAME_CHOOSE_ABILITY` choices from the pinned Playmat UUID-to-label map and submit the chosen UUID to the active prompt.
@@ -15,7 +22,7 @@
 - Extend the mocked browser regression through a prompt-bound `sendPlayerUUID` response for mana payment.
 - Validation: the focused Engine AI browser regression passed. `PW_CHANNEL=chrome npm run test:all` passed: typechecks, 426 server tests (3 skipped), 64 web tests, 3 play-core tests, 3 Playmat protocol tests, 3 Wiki tests and 126 browser tests (1 live-engine test skipped locally). Version/lockfile static checks and `git diff --check` passed.
 - Phase 1 production deployment/reconnect acceptance and Phase 2 real-game completion, broader prompts, targeting and combat remain open. Phases 3 and 4 also remain incomplete.
-- Delivery: the 0.33.0 update was pushed to PR #52 as `aab1f8d`. Its Android workflow passed and produced `mana-vault-0.33.0-debug`; its Play engine test failed because it could not find the playable Mountain action. The pinned Playmat contract nests IDs under `canPlayObjects.objects`; 0.34.0 corrects this and requires a fresh exact-head run. PR #52 remains a draft and unmerged.
+- Delivery: 0.34.0 was pushed to PR #52 as `e408b4a`. Android passed and produced `mana-vault-0.34.0-debug`. Its Play engine workflow passed saved-deck and hidden-state tests but failed to find Play Mountain in the native UI. The test could click Yes on a mulligan prompt, which the pinned engine treats as mulligan rather than keep; 0.35.0 uses the engine's actual labels and selects Keep. Whether this resolves the failure requires exact-head live verification. PR #52 remains a draft and unmerged.
 
 ## 0.33.0 (2026-11-27): Native Engine AI battlefield choices
 

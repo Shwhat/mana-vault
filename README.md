@@ -36,7 +36,7 @@ The server maintains a local card catalog, collection and deck data in SQLite, w
 | **Collection management** | Organize binders, boxes and wishlists; track exact printings, finishes, conditions, languages, proxies and set completion. |
 | **Advanced card search** | Search with Scryfall-style syntax, art and Oracle tags, prices, card text and ownership filters. Browse grid, binder or list layouts. |
 | **Deck builder** | Build decks, link owned copies, identify missing cards, check format rules, view statistics and playtest opening hands. |
-| **Play table** | Test saved decks against an optional Playmat AI, choose engine-approved cards and abilities, pay mana with approved sources and pass priority, play official or original custom cards offline solo, host private two- or four-player Commander tables, or watch as an invited spectator. |
+| **Play table** | Test saved decks against an optional Playmat AI, choose engine-approved cards, abilities and combatants, pay mana with approved sources and pass priority, play official or original custom cards offline solo, host private two- or four-player Commander tables, or watch as an invited spectator. |
 | **Card scanning** | Use your desktop or phone camera to recognize cards, select printings and add them to a collection or deck. |
 | **Trading** | Browse other accounts' trade binders, select source and destination collections, compare offers, make counteroffers and complete trades. |
 | **Purchase and price tracking** | Record singles, sealed products, sales, receipts and pack openings. Compare market prices and track historical values. |

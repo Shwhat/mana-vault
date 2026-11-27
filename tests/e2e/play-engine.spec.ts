@@ -1,6 +1,6 @@
 import { expect, signUp, test } from "./fixtures";
 
-test("offers engine-approved battlefield choices, mana sources and abilities", async ({ page }) => {
+test("offers engine-approved actions, combat choices and named targets", async ({ page }) => {
   await signUp(page, "playboardselect");
   const created = await page.request.post("/api/decks", {
     headers: { "x-mana-vault": "1" },
@@ -19,6 +19,8 @@ test("offers engine-approved battlefield choices, mana sources and abilities", a
     const chosenCardId = "11111111-1111-4111-8111-111111111111";
     const unavailableCardId = "22222222-2222-4222-8222-222222222222";
     const abilityId = "33333333-3333-4333-8333-333333333333";
+    const defender = "44444444-4444-4444-8444-444444444444";
+    const libraryCardId = "55555555-5555-4555-8555-555555555555";
     const submittedActions: { expectedMessageId?: number; type?: string; data?: string | boolean }[] = [];
     const events = [
       {
@@ -39,7 +41,7 @@ test("offers engine-approved battlefield choices, mana sources and abilities", a
                   [chosenCardId]: { id: chosenCardId, name: "Available Sol Ring" },
                   [unavailableCardId]: { id: unavailableCardId, name: "Unavailable Creature" },
                 },
-              }],
+              }, { playerId: defender, name: "Opponent", battlefield: {} }],
               myHand: {},
               canPlayObjects: {
                 objects: {
@@ -95,6 +97,62 @@ test("offers engine-approved battlefield choices, mana sources and abilities", a
           data: { message: "Keep this hand?", options: { "UI.left.btn.text": "Mulligan", "UI.right.btn.text": "Keep" } },
         },
       },
+      {
+        id: 6,
+        event: {
+          method: "GAME_SELECT", objectId: gameId, messageId: 6,
+          data: { message: "Select attackers", options: { possibleAttackers: [chosenCardId] } },
+        },
+      },
+      {
+        id: 7,
+        event: {
+          method: "GAME_TARGET", objectId: gameId, messageId: 7,
+          data: { message: "Choose defender", targets: [defender] },
+        },
+      },
+      {
+        id: 8,
+        event: {
+          method: "GAME_SELECT", objectId: gameId, messageId: 8,
+          data: { message: "Select blockers", options: { possibleBlockers: [chosenCardId] } },
+        },
+      },
+      {
+        id: 9,
+        event: {
+          method: "GAME_SELECT", objectId: gameId, messageId: 9,
+          data: { message: "Confirm blockers", options: { possibleBlockers: [] } },
+        },
+      },
+      {
+        id: 10,
+        event: {
+          method: "GAME_TARGET", objectId: gameId, messageId: 10,
+          data: { message: "Choose a target", targets: [], options: { possibleTargets: [chosenCardId] } },
+        },
+      },
+      {
+        id: 11,
+        event: {
+          method: "GAME_TARGET", objectId: gameId, messageId: 11,
+          data: {
+            message: "Choose a card",
+            cardsView1: { [libraryCardId]: { id: libraryCardId, name: "Library Card" } },
+          },
+        },
+      },
+      {
+        id: 12,
+        event: { method: "GAME_SELECT", objectId: gameId, messageId: 12, data: { message: "Priority" } },
+      },
+      {
+        id: 13,
+        event: {
+          method: "GAME_SELECT", objectId: gameId, messageId: 13,
+          data: { message: "Confirm attackers", options: { possibleAttackers: [] } },
+        },
+      },
     ];
 
     await page.route("**/api/play/**", async (route) => {
@@ -113,9 +171,7 @@ test("offers engine-approved battlefield choices, mana sources and abilities", a
         const after = Number(url.searchParams.get("after"));
         const nextEvents = after === 0
           ? events.slice(0, 2)
-          : after === 2 && submittedActions.length > 0 ? [events[2]]
-          : after === 3 && submittedActions.length > 1 ? [events[3]]
-          : after === 4 && submittedActions.length > 2 ? [events[4]] : [];
+          : after >= 2 && after < events.length && submittedActions.length >= after - 1 ? [events[after]] : [];
         await route.fulfill({ json: { events: nextEvents } });
       } else if (url.pathname.endsWith("/actions") && request.method() === "POST") {
         submittedActions.push(JSON.parse(request.postData() ?? "{}") as typeof submittedActions[number]);
@@ -165,6 +221,31 @@ test("offers engine-approved battlefield choices, mana sources and abilities", a
       type: "sendPlayerBoolean",
       data: false,
     });
+    await page.getByRole("button", { name: "Select Available Sol Ring as attacker" }).click();
+    await expect.poll(() => submittedActions).toHaveLength(5);
+    await expect(submittedActions[4]).toMatchObject({ expectedMessageId: 6, type: "sendPlayerUUID", data: chosenCardId });
+    await page.getByRole("button", { name: "Opponent", exact: true }).click();
+    await expect.poll(() => submittedActions).toHaveLength(6);
+    await expect(submittedActions[5]).toMatchObject({ expectedMessageId: 7, type: "sendPlayerUUID", data: defender });
+    await page.getByRole("button", { name: "Select Available Sol Ring as blocker" }).click();
+    await expect.poll(() => submittedActions).toHaveLength(7);
+    await expect(submittedActions[6]).toMatchObject({ expectedMessageId: 8, type: "sendPlayerUUID", data: chosenCardId });
+    await expect(page.getByRole("button", { name: "Pass priority", exact: true })).toHaveCount(0);
+    await page.getByRole("button", { name: "Finish blockers" }).click();
+    await expect.poll(() => submittedActions).toHaveLength(8);
+    await expect(submittedActions[7]).toMatchObject({ expectedMessageId: 9, type: "sendPlayerBoolean", data: true });
+    await page.getByRole("button", { name: "Available Sol Ring", exact: true }).click();
+    await expect.poll(() => submittedActions).toHaveLength(9);
+    await expect(submittedActions[8]).toMatchObject({ expectedMessageId: 10, type: "sendPlayerUUID", data: chosenCardId });
+    await page.getByRole("button", { name: "Library Card", exact: true }).click();
+    await expect.poll(() => submittedActions).toHaveLength(10);
+    await expect(submittedActions[9]).toMatchObject({ expectedMessageId: 11, type: "sendPlayerUUID", data: libraryCardId });
+    await page.getByRole("button", { name: "Pass priority", exact: true }).click();
+    await expect.poll(() => submittedActions).toHaveLength(11);
+    await expect(submittedActions[10]).toMatchObject({ expectedMessageId: 12, type: "sendPlayerBoolean", data: false });
+    await page.getByRole("button", { name: "Finish attackers" }).click();
+    await expect.poll(() => submittedActions).toHaveLength(12);
+    await expect(submittedActions[11]).toMatchObject({ expectedMessageId: 13, type: "sendPlayerBoolean", data: true });
   } finally {
     const deleted = await page.request.delete(`/api/decks/${deckId}`, { headers: { "x-mana-vault": "1" } });
     expect(deleted.status()).toBe(200);

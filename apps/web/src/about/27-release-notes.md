@@ -2,6 +2,12 @@
 
 The installed version is shown at the top of the in-app guide.
 
+## 0.36.0 (2026-11-27): Native combat choices
+
+- Offer the engine's available attackers and blockers, submit each chosen object to the active prompt, and confirm the declaration without applying rules locally.
+- Add a single-step priority pass and label known target players and cards, including target lists supplied in engine options or card pickers.
+- Mocked browser coverage exercises the responses. Full combat, targeting and a complete non-concession engine game remain unverified.
+
 ## 0.35.0 (2026-11-27): Engine ability choices and solo face-down cards
 
 - Show engine-provided ability choices and submit the selected ability ID against the current prompt.
@@ -11,7 +17,7 @@ The installed version is shown at the top of the in-app guide.
 
 ## 0.34.0 (2026-11-27): Native Engine AI mana payment
 
-- Read playable object IDs from the pinned Playmat `canPlayObjects.objects` map and prefer the active prompt's current view over older game state. This fixes the hand-card action that was missing in private-engine CI.
+- Read playable object IDs from the pinned Playmat `canPlayObjects.objects` map and prefer the active prompt's current view over older game state.
 - During `GAME_PLAY_MANA`, show Tap for mana actions for battlefield objects the current engine view marks playable. Submit the selected object UUID against the active prompt.
 - Extend the UI regression to verify prompt-bound battlefield selection and mana-source responses.
 - Keep Phase 2 open: the mocked interaction does not establish a completed real game, all prompt support, targeting or combat.

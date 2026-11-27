@@ -451,11 +451,13 @@ function AutomatedGame({ deckId, options, engineError }: { deckId: string; optio
   const gameTypes = useMemo(() => namedOptions(options?.gameTypes ?? []), [options]);
   const deckTypes = useMemo(() => namedOptions(options?.deckTypes ?? []), [options]);
   const lastState = [...events].reverse().find(({ event }) => event.objectId === game?.gameId && STATE_EVENTS.has(event.method));
-  const view = gameView(lastState);
   const prompt = [...events].reverse().find(({ event }) => event.objectId === game?.gameId && PROMPTS.has(event.method));
   const promptData = record(prompt?.event.data);
   const promptOptions = record(promptData?.options);
   const promptView = gameView(prompt);
+  const stateView = gameView(lastState);
+  const view = promptView && Array.isArray(promptView.players) && (prompt?.id ?? 0) > (lastState?.id ?? 0)
+    ? promptView : stateView;
   const playableObjects = record(record(promptView?.canPlayObjects)?.objects)
     ?? record(record(view?.canPlayObjects)?.objects);
 
@@ -515,16 +517,41 @@ function AutomatedGame({ deckId, options, engineError }: { deckId: string; optio
     }
   };
 
-  const choices = array(promptData?.targets ?? promptData?.choices ?? promptData?.options);
+  const targets = array(promptData?.targets);
+  const possibleTargets = array(promptOptions?.possibleTargets);
+  const choices = prompt?.event.method === "GAME_TARGET"
+    ? targets.length ? targets : possibleTargets.length ? possibleTargets : Object.keys(record(promptData?.cardsView1) ?? {})
+    : array(promptData?.choices ?? promptData?.options);
   const abilities = prompt?.event.method === "GAME_CHOOSE_ABILITY" ? record(promptData?.choices) : null;
   const players = array(view?.players).map(record).filter((player): player is Record<string, unknown> => player !== null);
   const playerName = (player: Record<string, unknown>) => typeof player.name === "string" ? player.name : "Player";
   const playerZones = (player: Record<string, unknown>) => cardsIn(player.battlefield);
   const hand = cardsIn(view?.myHand);
   const stack = cardsIn(view?.stack);
+  const combatKind = prompt?.event.method === "GAME_SELECT"
+    ? Array.isArray(promptOptions?.possibleAttackers) ? "attackers"
+      : Array.isArray(promptOptions?.possibleBlockers) ? "blockers" : null
+    : null;
+  const combatIds = new Set(array(combatKind === "attackers" ? promptOptions?.possibleAttackers : promptOptions?.possibleBlockers)
+    .filter((id): id is string => typeof id === "string"));
+  if (combatKind) {
+    for (const group of array(view?.combat)) {
+      for (const [id, card] of Object.entries(record(record(group)?.[combatKind]) ?? {})) {
+        const controllerId = record(card)?.controllerId;
+        if (typeof controllerId !== "string" || typeof view?.myPlayerId !== "string" || controllerId === view.myPlayerId) combatIds.add(id);
+      }
+    }
+  }
+  const targetName = (id: string): string => {
+    const player = players.find((item) => item.playerId === id);
+    if (player) return playerName(player);
+    const cards = [...cardsIn(promptData?.cardsView1), ...hand, ...stack, ...players.flatMap(playerZones)];
+    const card = cards.find((item) => cardObjectId(item) === id);
+    return card ? cardName(card) : id;
+  };
   const over = events.some(({ event }) => event.objectId === game?.gameId && event.method === "GAME_OVER");
   const canChooseObject = (id: string | null): id is string =>
-    (prompt?.event.method === "GAME_SELECT" || prompt?.event.method === "GAME_PLAY_MANA")
+    ((prompt?.event.method === "GAME_SELECT" && !combatKind) || prompt?.event.method === "GAME_PLAY_MANA")
     && id !== null
     && playableObjects !== null
     && Object.prototype.hasOwnProperty.call(playableObjects, id);
@@ -566,6 +593,9 @@ function AutomatedGame({ deckId, options, engineError }: { deckId: string; optio
                   {canChooseObject(id) && <button type="button" className="btn small"
                     aria-label={payingMana ? `Tap ${name} for mana` : `Choose ${name}`}
                     onClick={() => void respond("sendPlayerUUID", id)}>{payingMana ? "Tap for mana" : "Choose"}</button>}
+                  {id && combatKind && combatIds.has(id) && <button type="button" className="btn small"
+                    aria-label={`Select ${name} as ${combatKind === "attackers" ? "attacker" : "blocker"}`}
+                    onClick={() => void respond("sendPlayerUUID", id)}>Select</button>}
                 </div>;
               })}</div>
             </section>)}
@@ -590,7 +620,11 @@ function AutomatedGame({ deckId, options, engineError }: { deckId: string; optio
             <button type="button" className="btn primary" onClick={() => void respond("sendPlayerBoolean", true)}>{typeof promptOptions?.["UI.left.btn.text"] === "string" ? promptOptions["UI.left.btn.text"] : "Yes"}</button>
             <button type="button" className="btn" onClick={() => void respond("sendPlayerBoolean", false)}>{typeof promptOptions?.["UI.right.btn.text"] === "string" ? promptOptions["UI.right.btn.text"] : "No"}</button>
           </>}
-          {prompt.event.method === "GAME_SELECT" && <button type="button" className="btn"
+          {prompt.event.method === "GAME_SELECT" && combatKind && <button type="button" className="btn primary"
+            onClick={() => void respond("sendPlayerBoolean", true)}>Finish {combatKind}</button>}
+          {prompt.event.method === "GAME_SELECT" && !combatKind && <button type="button" className="btn"
+            onClick={() => void respond("sendPlayerBoolean", false)}>Pass priority</button>}
+          {prompt.event.method === "GAME_SELECT" && !combatKind && <button type="button" className="btn"
             onClick={() => void respond("sendPlayerAction", "PASS_PRIORITY_UNTIL_NEXT_MAIN_PHASE")}>
             Pass priority until next main phase
           </button>}
@@ -603,12 +637,15 @@ function AutomatedGame({ deckId, options, engineError }: { deckId: string; optio
             <button type="button" className="btn" key={id} onClick={() => void respond("sendPlayerUUID", id)}>{label}</button>)}
           {choices.map((choice, index) => {
             const value = typeof choice === "string" ? choice : record(choice)?.id;
-            const label = typeof choice === "string" ? choice : record(choice)?.name;
+            const label = typeof choice === "string"
+              ? prompt.event.method === "GAME_TARGET" ? targetName(choice) : choice
+              : record(choice)?.name;
             if (typeof value !== "string") return null;
             const type = prompt.event.method === "GAME_TARGET" ? "sendPlayerUUID" : /^[0-9a-f-]{36}$/i.test(value) ? "sendPlayerUUID" : "sendPlayerString";
-            return <button type="button" className="btn" key={`${value}:${index}`} onClick={() => void respond(type, value)}>{typeof label === "string" ? label : value}</button>;
+            return <button type="button" className="btn" key={`${value}:${index}`} onClick={() => void respond(type, value)}>{typeof label === "string" ? label : prompt.event.method === "GAME_TARGET" ? targetName(value) : value}</button>;
           })}
           {prompt.event.method !== "GAME_ASK" && prompt.event.method !== "GAME_GET_AMOUNT" && choices.length === 0
+            && !combatKind
             && (!abilities || Object.values(abilities).every((label) => typeof label !== "string"))
             && <p className="note">This prompt requires an engine response format not available in the workspace yet.</p>}
         </section>}

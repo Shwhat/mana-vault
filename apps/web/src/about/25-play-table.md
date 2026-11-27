@@ -6,7 +6,7 @@ The **Play** mode is a workspace for testing saved decks. Open it from the deskt
 
 | Mode | What it does |
 |---|---|
-| Engine AI | Starts an optional Playmat game from a saved deck after checking exact card printings. Cards marked playable by the engine can be chosen from hand or the battlefield, offered abilities can be selected, mana can be paid with approved battlefield sources, and priority can be passed until the next main phase. Supported prompts are answered in the native workspace, including concession. The server must have a Playmat engine configured. |
+| Engine AI | Starts an optional Playmat game from a saved deck after checking exact card printings. Cards marked playable by the engine can be chosen from hand or the battlefield, offered abilities and combatants can be selected, mana can be paid with approved battlefield sources, and priority can be passed. Supported prompts are answered in the native workspace, including concession. The server must have a Playmat engine configured. |
 | Manual solo | Starts an offline game in this browser with a shuffled main deck, a seven-card hand, mulligans, draws, zones, taps, face-down cards, counters, tokens, life, poison, dice and coin flips. |
 | Multiplayer table | Hosts a private manual Commander table for two or four signed-in players, joins a waiting table, or watches with an invitation code. |
 
@@ -28,6 +28,6 @@ The server stores active table state so a seated player can reload the page or r
 
 - Manual games do not enforce Magic rules. They do not resolve spells, targets, combat, priority or Commander-specific rules.
 - Multiplayer manual tables currently have no match history, attachments, face-down card controls or general undo.
-- Engine AI is optional and is unavailable unless an administrator separately configures the Playmat service. The workspace supports only the engine prompts it currently displays, including hand choices during selection, battlefield choices during selection or mana payment when the engine marks an object playable, offered ability choices, passing priority until the next main phase and concession. A real-engine browser test exercises starting from a saved deck, playing an engine-approved land, passing priority and ending by concession; it does not verify a non-concession win or all gameplay prompts.
+- Engine AI is optional and is unavailable unless an administrator separately configures the Playmat service. The workspace supports only the engine prompts it currently displays, including hand or battlefield choices, offered abilities, available attackers and blockers, target choices, passing priority and concession. Combat and target interactions have mocked browser coverage but have not yet been verified in a complete real game. A real-engine browser test exercises starting from a saved deck, playing an engine-approved land, passing priority and ending by concession; it does not verify a non-concession win or all gameplay prompts.
 - The private Compose profile, unpublished engine port and trusted-header boundary passed the Play engine integration workflow. Production deployment and engine reconnect or outage behavior remain unverified. Do not publish the engine port or configure an untrusted engine endpoint.
 - Engine AI and Android-specific table behavior have not been independently validated against a production deployment.
