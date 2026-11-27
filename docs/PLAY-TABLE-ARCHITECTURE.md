@@ -1,6 +1,8 @@
 # Play table architecture assessment
 
-Status: foundation contracts and protocol parsing are implemented. An isolated
+Status: shared contracts, protocol parsing, an allowlisted server-only RPC
+client, opaque account identity mapping and exact-printing deck conversion are
+implemented locally. Synthetic tests cover these foundations. An isolated
 test-only engine and an upstream AI game were exercised, but no game is
 connected to Mana Vault. This assessment begins phase 1 of
 [the specification](MANA-VAULT-PLAY-TABLE-SPEC.md).
@@ -72,6 +74,14 @@ underscore constraint; do not use or transmit the user's Mana Vault password.
 Use a dedicated fresh engine account database and a reserved namespace to avoid
 colliding with existing engine accounts or the engine owner. Fail closed if
 isolation, mapping or provisioning cannot be verified.
+
+The current server foundations generate and persist an opaque, format-valid
+engine name for each enabled Mana Vault account and initialize the mapping
+table at app startup. They do not provision engine accounts, create a trusted
+deployment, open a connection from an authenticated route, revoke an already
+active engine session when an account is disabled, or authorize gameplay
+events. The WebSocket transport and deck converter are not yet wired into
+routes or a session manager.
 
 Playmat's [SSO documentation](https://github.com/arcanite24/playmat/blob/7bd086f7a390846cad7b397b762d8b5c84da332e/ops/web/README.md#single-sign-on)
 states that the header is read at the WebSocket handshake only from trusted

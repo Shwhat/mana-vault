@@ -2,6 +2,10 @@
 
 The installed version is shown at the top of the in-app guide.
 
+## 0.28.0 (2026-11-26): Play engine integration foundations
+
+- Add server-side protocol transport, opaque account identity mapping and exact-printing deck conversion as internal foundations. No play screen, engine deployment or playable game is included.
+
 ## 0.27.0 (2026-11-26): Play table deck snapshots
 
 - Add an internal, access-checked snapshot of saved deck data for future play integration. Playable tables and engine integration are not yet available.

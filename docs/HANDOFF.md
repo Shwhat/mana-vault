@@ -1,5 +1,13 @@
 # Mana Vault handoff
 
+## 0.28.0 (2026-11-26): Play engine integration foundations
+
+- Added an allowlisted server-side Playmat WebSocket client with finite message and request limits, server-only identity header, in-memory restore tokens, reconnect after ordinary disconnects and no automatic reconnect after takeover.
+- Added a persistent opaque engine identity mapping initialized with the database, and exact-printing conversion for immutable deck snapshots. Synthetic tests cover transport, identity mapping, unsupported printings, fallback detection, maybeboard exclusion and commander/sideboard restrictions.
+- These are not a playable integration: no private engine deployment, authenticated game routes, session manager, live deck validation or real saved-deck AI game exists. Phase 1 remains gated; later phases have not started.
+- Validation: `PW_CHANNEL=chrome npm run test:all` passed at 0.28.0: 415 server tests, 60 web tests, 6 shared package tests, 3 Wiki tests and 122 browser tests. `git diff --check` passed.
+- PR, merge and server/Android delivery verification are pending.
+
 ## 0.27.0 (2026-11-26): Play table deck snapshots
 
 - Added an internal, access-checked immutable deck snapshot with owner and shared-member tests. It retains all zones, selected printings and missing printing entries for later compatibility checks; it does not create games or persist match history.
