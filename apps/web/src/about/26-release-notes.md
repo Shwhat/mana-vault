@@ -2,6 +2,13 @@
 
 The installed version is shown at the top of the in-app guide.
 
+## 0.29.0 (2026-11-26): Server-side Playmat game integration
+
+- Add authenticated per-user Playmat sessions and server routes for engine discovery, exact-printing saved-deck validation, private AI table startup, player game events and fresh prompt responses.
+- Close engine sessions on logout, account deletion or disablement, password reset, sign-out everywhere, and removal of the last valid device or session.
+- A live integration test completed an AI game from a saved exact-printing deck and verified the saved deck stayed unchanged. The event wait race is fixed.
+- This is not a playable user interface. The live test used a session-local engine on loopback; Docker, private-network identity isolation, hidden-state isolation and reconnect behavior remain unverified. Phase 1 is not complete, and later phases remain gated.
+
 ## 0.28.0 (2026-11-26): Play engine integration foundations
 
 - Add server-side protocol transport, opaque account identity mapping and exact-printing deck conversion as internal foundations. No play screen, engine deployment or playable game is included.

@@ -25,6 +25,11 @@ const secureSetting = (process.env.MANAVAULT_SECURE_COOKIE ?? "auto").trim().toL
 if (!["auto", "always", "never"].includes(secureSetting)) {
   throw new Error("MANAVAULT_SECURE_COOKIE must be auto, always or never");
 }
+const playmatUrl = process.env.MANAVAULT_PLAYMAT_URL?.trim();
+const playmatTimeout = Number(process.env.MANAVAULT_PLAYMAT_TIMEOUT_MS ?? 15_000);
+if (playmatUrl && (!Number.isSafeInteger(playmatTimeout) || playmatTimeout < 100 || playmatTimeout > 60_000)) {
+  throw new Error("MANAVAULT_PLAYMAT_TIMEOUT_MS must be between 100 and 60000");
+}
 const version = (JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as { version: string }).version;
 // a restore saved in Administration is put in place before the database is opened
 if (applyPendingRestore(databasePath)) console.log("Restored the server backup chosen in Administration");
@@ -41,6 +46,7 @@ const app = await buildApp(undefined, undefined, updater.getStatus, updater.requ
   secureCookie: secureSetting as "auto" | "always" | "never",
   version,
   databasePath,
+  ...(playmatUrl ? { playmat: { url: playmatUrl, timeoutMs: playmatTimeout } } : {}),
   exitAfterRestore: true,
   setUpdateInterval: updater.setIntervalHours,
 });

@@ -41,6 +41,8 @@ import { registerNoteWebRoutes } from "./notes-web.js";
 import { createScryfallSearch, type SearchFetcher } from "./scryfall-search.js";
 import { scryfallDirectives } from "./search-expression.js";
 import { initializeEngineIdentityTable } from "./play/engine-identity.js";
+import { registerPlayRoutes } from "./play/routes.js";
+import { PlaySessionManager, type PlaySessionOptions } from "./play/play-sessions.js";
 
 declare module "fastify" {
   interface FastifyRequest {
@@ -81,6 +83,8 @@ export interface AppOptions {
   notesFetcher?: NoteFetcher;
   /** Checks once an hour whether today's MTGJSON prices are saved (off in tests). */
   mtgjsonSchedule?: boolean;
+  /** Private Playmat engine endpoint. Omitted when engine play is not deployed. */
+  playmat?: PlaySessionOptions;
 }
 
 declare module "fastify" {
@@ -133,6 +137,13 @@ export async function buildApp(
   const requireSignIn = options.requireSignIn ?? true;
   const secureMode = options.secureCookie ?? "auto";
   const auth = new AuthStore(database, options.passwordIterations ?? DEFAULT_ITERATIONS);
+  const playSessions = options.playmat && requireSignIn ? new PlaySessionManager(database, options.playmat) : null;
+  const disconnectPlaySessionIfUnauthorized = playSessions
+    ? (userId: number) => playSessions.disconnectIfUnauthorized(userId)
+    : undefined;
+  const stopPlaySessionSweep = playSessions?.startExpirySweep((userId, error) => {
+    app.log.error({ userId, error }, "Could not expire Playmat session");
+  });
   // settings saved in Administration; environment variables (and test options) lock some of them
   const forced: Partial<ServerSettings> = { ...(options.settingsEnv?.forced ?? {}) };
   const locks: Locks = { ...(options.settingsEnv?.locks ?? {}) };
@@ -275,6 +286,8 @@ export async function buildApp(
     database, auth, settings, version: options.version ?? "", startedAt: Date.now(), databasePath,
     fetcher: (options.fetcher ?? fetch) as unknown as Parameters<typeof registerAdminRoutes>[1]["fetcher"],
     applySettings, exitAfterRestore: options.exitAfterRestore ?? false, pictureSummary: () => pictures.summary(),
+    disconnectPlaySession: playSessions ? (userId: number) => playSessions.disconnectUser(userId) : undefined,
+    disconnectPlaySessionIfUnauthorized,
   };
   registerAdminRoutes(app, adminContext);
   registerExtrasRoutes(app, database, settings, options.fetcher as typeof fetch | undefined);
@@ -289,6 +302,10 @@ export async function buildApp(
     stopBackups();
     pictures.stop();
     mtgjson.stop();
+    stopPlaySessionSweep?.();
+    await playSessions?.disconnectAll((userId, error) => {
+      app.log.error({ userId, error }, "Could not close Playmat session");
+    });
   });
   applySettings();
 
@@ -403,7 +420,8 @@ export async function buildApp(
     return startSession(request, reply, user);
   });
 
-  registerMobileRoutes(app, database, revision, signIn);
+  registerMobileRoutes(app, database, revision, signIn, disconnectPlaySessionIfUnauthorized);
+  registerPlayRoutes(app, database, playSessions);
   registerAppUpdateRoutes(app, { version: options.version ?? "", databasePath, fetcher: options.fetcher });
 
   app.post("/api/logout", async (request, reply) => {
@@ -411,6 +429,16 @@ export async function buildApp(
     if (token) auth.endSession(token);
     if (request.deviceId) database.prepare("DELETE FROM devices WHERE id = ?").run(request.deviceId);
     reply.header("set-cookie", sessionCookie("", 0, secure(request)));
+    if (request.user) {
+      if (disconnectPlaySessionIfUnauthorized) {
+        try {
+          await disconnectPlaySessionIfUnauthorized(request.user.id);
+        } catch (error) {
+          request.log.error({ error, userId: request.user.id }, "Could not close Playmat session on sign out");
+          return reply.code(503).send({ error: "You are signed out, but the play engine could not confirm session cleanup." });
+        }
+      }
+    }
     return { ok: true };
   });
 

@@ -1,62 +1,67 @@
 # Play table roadmap and proposed file plan
 
-Status: server-side integration foundations are implemented locally. Synthetic
-tests cover the protocol client, deck conversion and opaque account mapping,
-but no playable table or game connection is available in Mana Vault yet. The
-[architecture assessment](PLAY-TABLE-ARCHITECTURE.md) records the candidate
-engine revision, security boundary and limitations.
+Status: server-side authenticated Playmat routes and per-user sessions are
+implemented locally. A real saved-deck AI game completed against the
+session-local test engine, and the saved deck remained unchanged. The Playmat
+event wait race is fixed and revocation tests cover account deletion and last
+device removal. Phase 1 remains incomplete because the private Compose
+deployment, trusted-header isolation, hidden-state isolation and live reconnect
+have not been verified. Phases 2 through 4 remain gated.
 
 ## Implemented foundation work
 
 The shared play contracts and transport-independent protocol parsing remain in
-place. Additional server-only foundations now include an allowlisted RPC
-WebSocket client, a persistent opaque engine identity mapping, and conversion
-of immutable deck snapshots to exact-printing engine deck lists. Focused
-synthetic tests cover request/response handling, restore-token rotation,
-takeover refusal, unsupported printing detection and disabled accounts. These
-foundations are not an integrated or playable feature and do not complete
-phase 1.
+place. The parser recognizes the pinned engine's gameplay and player-prompt
+events, and table creation carries per-seat player types. Server-side integration includes an allowlisted RPC WebSocket client, a
+persistent opaque engine identity mapping, conversion of immutable deck
+snapshots to exact-printing engine deck lists, authenticated routes, prompt
+freshness checks and account session cleanup. A Compose `play` profile builds
+the pinned engine source on a private internal network with no published
+engine ports. A live test completed an AI game using a saved Mana Vault deck.
+The Compose profile and trusted peer isolation remain unvalidated because
+Docker, Podman and WSL are unavailable here. There is no user-facing Play
+workspace, so this is not yet a playable feature.
 
 | Files | Implemented scope and remaining gate |
 | --- | --- |
-| `apps/server/src/play/engine-identity.ts`, `app.ts` | Persist an opaque engine name per active Mana Vault user and initialize its table. Actual trusted-header identity isolation, revocation of active engine sessions and a private engine deployment remain unverified. |
-| `apps/server/src/play/playmat-connection.ts`, `packages/playmat-protocol/src/rpc.ts` | Server-only WebSocket client with an RPC allowlist, finite limits, in-memory restore tokens and takeover refusal. No app route, session lifecycle manager or gameplay event projection is integrated. |
-| `apps/server/src/play/deck-converter.ts` | Convert authorized snapshots to exact catalog printings, exclude maybeboard, reject unsupported entries and detect name fallback. Live engine lookup and validation are not yet exercised. |
-| `apps/server/src/play/*.test.ts`, `packages/playmat-protocol/src/*.test.ts` | Synthetic tests cover the implemented foundations only. They are not evidence of engine security or game acceptance. |
+| `apps/server/src/play/engine-identity.ts`, `app.ts`, `admin.ts` | Persist an opaque engine name per Mana Vault user, manage server-side sessions and close them on account or last-device revocation. Private trusted-header isolation remains unverified. |
+| `apps/server/src/play/playmat-connection.ts`, `play-sessions.ts`, `routes.ts`, `packages/playmat-protocol/src/rpc.ts` | Server-only WebSocket client, RPC allowlist, authenticated game routes, per-user event queues, prompt freshness and takeover refusal. No user-facing Play UI exists. |
+| `apps/server/src/play/deck-converter.ts`, `routes.ts` | Convert authorized immutable snapshots, verify exact printings, validate against the live engine and start the human-plus-AI match. The local acceptance test completed a real game; production deployment and hidden-state boundaries are unverified. |
+| `apps/server/src/play/*.test.ts`, `packages/playmat-protocol/src/*.test.ts` | Synthetic lifecycle and route tests plus an optional real-engine acceptance test. Loopback test evidence does not prove private deployment security. |
 | Package manifests and lockfile | Add server WebSocket dependencies and build the shared protocol package before server tests and type-checks. |
-| `Dockerfile` and relevant CI configuration | Shared workspaces are included in build and production stages. Runtime image validation remains pending; no engine service is added. |
+| `docker-compose.yml`, `.env.example` | An optional profile builds the pinned Playmat source with trusted-header SSO, fixed app-only trust, an internal network, persistent engine data and resource limits. Docker validation and actual network isolation remain pending. |
 | About pages, release notes, README and `docs/HANDOFF.md` | Do not advertise playable tables. Update user-facing documentation only after resulting behavior exists; keep the handoff and release state accurate. |
 
 Before delivery, test the engine-disabled app, workspace build, unit/static
 tests, Docker runtime and the full `npm run test:all` gate. Verify Android
-delivery after an authorized merge. No automated game is claimed by this slice.
+delivery after an authorized merge. The local live game passed, but phase 1 is
+not accepted until the private engine and hidden-state boundaries are verified.
 
 ## Remaining phase 1
 
-1. Select and verify a source-built or digest-pinned engine image and private
-   service. The loopback-only test build verified health and discovery, but
-   was modified for local binding and does not provide production isolation.
-   Record platform, resources, persistence and engine-disabled operation.
-2. Integrate and test a server-side session manager and authenticated routes.
-   Verify trusted-header spoofing, name collision, disable/delete/logout
-   revocation, per-player isolation and takeover behavior. No shared privileged
-   player session.
-3. Use the internal access-checked immutable deck snapshot for live engine
-   lookup and validation. Synthetic tests cover maybeboard exclusion, exact
-   printing checks, unsupported entries and unsafe commander/sideboard
-   mappings; verify these against the pinned engine before starting a match.
-4. Build a minimal server-side harness to create a table, add a human and AI,
-   start a match, receive player-specific views and prompts, and send valid
-   responses. A real engine-reported terminal result is required; a mock or
-   health check is not sufficient. Verify reconnect, outage behavior and that
-   no gameplay changes decks or collections.
-5. Review the phase 1 acceptance criteria in the specification and record the
-   actual commands, results, unresolved limitations and security evidence
-   before moving to native gameplay.
+1. Build and verify the source-pinned engine service and private network. The
+   Compose profile is configured but untested; the session-local test build
+   reported healthy and completed the Mana Vault deck AI game, but does not
+   prove deployment isolation. Record platform, resources, persistence and
+   engine-disabled operation.
+2. Verify trusted-header spoofing, name collision, disable/delete/logout and
+   last-device revocation, per-player isolation and takeover behavior against
+   the real configured deployment. Synthetic revocation and takeover tests
+   pass; deployment and multi-human hidden-state isolation remain unverified.
+3. Live lookup, exact-printing verification, deck validation, AI table start,
+   terminal game result and immutable saved-deck verification passed against
+   the session-local engine. Retain the unsupported-card and format tests.
+4. Verify reconnect and engine outage behavior on the configured deployment.
+   The integration code has finite timeouts and the live game test passes, but
+   reconnect and outage recovery have not been accepted against the private
+   engine profile.
+5. Review every Phase 1 acceptance criterion in the specification and record
+   the commands, results, unresolved limitations and security evidence before
+   starting the native gameplay phase.
 
-The exact files for these later steps depend on live protocol and identity
-findings. Propose their changes before implementation rather than assuming
-unverified signatures, permissions or deployment behavior.
+Phases 2 through 4 must not start until the remaining Phase 1 acceptance
+criteria pass. Do not assume unverified signatures, permissions or deployment
+behavior.
 
 ## Later phases
 

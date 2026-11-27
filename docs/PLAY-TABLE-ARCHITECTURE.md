@@ -1,10 +1,12 @@
 # Play table architecture assessment
 
-Status: shared contracts, protocol parsing, an allowlisted server-only RPC
-client, opaque account identity mapping and exact-printing deck conversion are
-implemented locally. Synthetic tests cover these foundations. An isolated
-test-only engine and an upstream AI game were exercised, but no game is
-connected to Mana Vault. This assessment begins phase 1 of
+Status: authenticated server-side Playmat routes and per-user sessions now
+connect to the pinned engine. A real saved-deck AI game completed against a
+session-local test server, and the saved deck remained unchanged. An optional
+Compose profile builds the pinned engine on an internal network, but Docker,
+Podman and WSL are unavailable in this environment, so the profile and
+trusted-header network isolation are not validated. There is no user-facing
+Play workspace. Phase 1 is not complete. This assessment covers phase 1 of
 [the specification](MANA-VAULT-PLAY-TABLE-SPEC.md).
 
 ## Baseline
@@ -61,10 +63,12 @@ engine, its admin methods, passwords or restore tokens to the browser. Do not
 fall back silently to manual play if the engine fails.
 
 The foundation's zone projection covers only uniformly public, owner-only or
-hidden zones. It does not model face-down cards or selective reveals, and its
-types and parser do not themselves authorize sessions or make raw engine
-events safe to forward. Extend and test those boundaries before connecting
-them to a game or browser.
+hidden zones. It does not model face-down cards or selective reveals. The
+server now forwards allowlisted game event methods through authenticated,
+per-user connections, but it does not yet project or redact event payloads.
+The pinned engine's player-specific view behavior and multi-human hidden-state
+isolation remain unverified. Do not expose these routes through a Play UI until
+those boundaries are tested.
 
 Candidate identity bridge: enable engine authentication and trusted-header SSO,
 with a private engine network and only the Mana Vault server trusted to provide
@@ -75,13 +79,15 @@ Use a dedicated fresh engine account database and a reserved namespace to avoid
 colliding with existing engine accounts or the engine owner. Fail closed if
 isolation, mapping or provisioning cannot be verified.
 
-The current server foundations generate and persist an opaque, format-valid
-engine name for each enabled Mana Vault account and initialize the mapping
-table at app startup. They do not provision engine accounts, create a trusted
-deployment, open a connection from an authenticated route, revoke an already
-active engine session when an account is disabled, or authorize gameplay
-events. The WebSocket transport and deck converter are not yet wired into
-routes or a session manager.
+The current server integration generates and persists an opaque, format-valid
+engine name for each enabled Mana Vault account and initializes the mapping
+table at app startup. Authenticated routes create and close per-user engine
+sessions, validate saved decks, start a human-plus-AI table, and return a
+filtered event queue with prompt-bound responses. Logout, account deletion,
+account disablement, password reset, sign-out-everywhere and removal of the
+last authorized device close the engine session. Synthetic tests cover these
+paths. The private deployment and its actual trusted-header isolation have not
+been verified.
 
 Playmat's [SSO documentation](https://github.com/arcanite24/playmat/blob/7bd086f7a390846cad7b397b762d8b5c84da332e/ops/web/README.md#single-sign-on)
 states that the header is read at the WebSocket handshake only from trusted
@@ -112,15 +118,15 @@ engine format. Report every unsupported or ambiguous card and any name fallback
 before starting a match. Engine operations must not write deck or collection
 rows.
 
-An eventual optional engine service should have no host-published game or
-admin ports, use only a private network, persistent engine data with a
-documented backup policy, a tested health check and finite resource limits.
-The pinned server constructs the WebSocket listener with a port-only
-`InetSocketAddress`, so it binds all interfaces rather than honoring the
-configured server address. A host-based test must prevent external access; a
-loopback address in `config.xml` alone does not isolate the WebSocket.
-Even loopback does not establish trusted-header identity isolation from other
-local processes on a shared machine.
+The optional `play` Compose profile builds the pinned Playmat source revision,
+publishes no engine ports, and attaches the app and engine to a dedicated
+internal network. The engine trusts only the app's fixed address for
+`X-Mana-Vault-User`; password sign-in is disabled, engine data is persisted,
+and container CPU, memory and process limits are set. The configured subnet
+and addresses must not overlap networks on the Docker host. This configuration
+has not been validated because no local container runtime is available. Set
+`MANAVAULT_PLAYMAT_URL=ws://play-engine:17172` when enabling the `play` profile.
+The app's server routes can start a game, but there is no user-facing Play UI.
 The existing app port, Dockhand workflow and engine-disabled behavior must
 remain intact. The upstream server runs as its own user; do not assume its UID
 or volume permissions match Mana Vault's UID 65532. The upstream stack includes
@@ -154,6 +160,14 @@ upstream behavior in that configuration, not private deployment or a Mana
 Vault identity bridge; another local process using the trusted peer address
 could still impersonate an identity.
 
+A later session-local test engine used the integration routes and an exact
+M21 Island printing from a saved Mana Vault deck. The engine validated the
+deck, started a human-versus-AI match, emitted a terminal event, and the
+saved deck snapshot matched its pre-game state. The test fixed an event wait
+race by delivering accepted game events to active server-side waiters. The
+engine remained loopback-only on a shared host. This does not verify Docker
+network isolation, two-human hidden-state separation, or live reconnect.
+
 ## Licensing
 
 The pinned [Playmat license](https://github.com/arcanite24/playmat/blob/7bd086f7a390846cad7b397b762d8b5c84da332e/LICENSE.txt)
@@ -168,6 +182,7 @@ repository license change is proposed.
 
 The file plan and acceptance gates are in
 [PLAY-TABLE-ROADMAP.md](PLAY-TABLE-ROADMAP.md). Unknowns include trusted-header
-behavior in the actual deployment, image provenance and
-architecture support, AI and format coverage, printing fallback, private
-prompts, and restart/reconnection behavior. None is validated by this document.
+behavior in the actual deployment, image build and architecture support, AI
+and format coverage, printing fallback, private prompts, multi-human
+hidden-state isolation and restart/reconnection behavior. The loopback game
+acceptance does not resolve these deployment and security limitations.

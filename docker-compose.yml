@@ -12,6 +12,8 @@ services:
       MANAVAULT_SIGNUP: ${MANAVAULT_SIGNUP:-}
       MANAVAULT_SECURE_COOKIE: ${MANAVAULT_SECURE_COOKIE:-}
       MANAVAULT_CARD_UPDATE_INTERVAL_HOURS: ${MANAVAULT_CARD_UPDATE_INTERVAL_HOURS:-}
+      MANAVAULT_PLAYMAT_URL: ${MANAVAULT_PLAYMAT_URL:-}
+      MANAVAULT_PLAYMAT_TIMEOUT_MS: ${MANAVAULT_PLAYMAT_TIMEOUT_MS:-15000}
       MANAVAULT_PICTURES_DIR: /pictures
     volumes:
       - ${MANAVAULT_DATA_DIR:-/opt/mana-vault/data}:/data
@@ -22,3 +24,45 @@ services:
       timeout: 5s
       start_period: 15s
       retries: 3
+    networks:
+      default: {}
+      play-engine:
+        ipv4_address: ${MANAVAULT_PLAY_APP_IP:-172.30.254.2}
+
+  play-engine:
+    profiles: ["play"]
+    build:
+      context: https://github.com/arcanite24/playmat.git#7bd086f7a390846cad7b397b762d8b5c84da332e
+      dockerfile: ops/web/Dockerfile.server
+    restart: unless-stopped
+    environment:
+      XMAGE_AUTH: "true"
+      XMAGE_AUTH_TRUSTED_HEADER: X-Mana-Vault-User
+      XMAGE_PASSWORD_SIGNIN: "false"
+      XMAGE_TRUSTED_PROXIES: ${MANAVAULT_PLAY_APP_IP:-172.30.254.2}/32
+      XMAGE_SERVER_ADDRESS: 0.0.0.0
+      XMAGE_GATEWAY: "off"
+    volumes:
+      - play-engine-db:/opt/xmage/db
+    mem_limit: 8g
+    cpus: 4.0
+    pids_limit: 256
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/17173 && printf 'GET /healthz HTTP/1.0\\r\\n\\r\\n' >&3 && head -n1 <&3 | grep -q ' 200 '"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15m
+      retries: 3
+    networks:
+      play-engine:
+        ipv4_address: ${MANAVAULT_PLAY_ENGINE_IP:-172.30.254.3}
+
+networks:
+  play-engine:
+    internal: true
+    ipam:
+      config:
+        - subnet: ${MANAVAULT_PLAY_ENGINE_SUBNET:-172.30.254.0/29}
+
+volumes:
+  play-engine-db:
