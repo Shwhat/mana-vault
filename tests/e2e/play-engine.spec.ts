@@ -44,6 +44,17 @@ test("plays a saved-deck engine game through the native Play UI", async ({ page 
     await expect(page.locator(".play-player-row .engine-card").filter({ hasText: "Mountain" }).first())
       .toBeVisible({ timeout: 30_000 });
     await expect(page.getByRole("button", { name: "Concede" })).toBeVisible();
+    const previousPromptId = await prompt.getAttribute("data-message-id");
+    if (!previousPromptId) throw new Error("The card-play prompt did not have a message ID.");
+    const passPriority = page.getByRole("button", { name: "Pass priority until next main phase" });
+    const passResponse = page.waitForResponse((response) =>
+      /\/api\/play\/games\/[^/]+\/actions$/.test(new URL(response.url()).pathname)
+      && response.request().method() === "POST",
+    );
+    await passPriority.click();
+    expect((await passResponse).status()).toBe(200);
+    await expect(prompt).not.toHaveAttribute("data-message-id", previousPromptId, { timeout: 60_000 });
+    await expect(page.getByRole("button", { name: "Concede" })).toBeVisible({ timeout: 60_000 });
     await page.getByRole("button", { name: "Concede" }).click();
     await expect(page.locator("#view-play .play-toolbar").first()).toContainText("Game ended", { timeout: 60_000 });
   } finally {

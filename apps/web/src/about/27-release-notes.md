@@ -2,6 +2,12 @@
 
 The installed version is shown at the top of the in-app guide.
 
+## 0.32.2 (2026-11-27): Native Engine AI priority control
+
+- Add a prompt-bound action to pass priority until the next main phase in the Engine AI workspace.
+- Extend the private-engine browser flow to submit the priority action and wait for the next prompt.
+- Keep Phase 2 open: this does not verify a non-concession win, all prompts, targeting or combat.
+
 ## 0.32.1 (2026-11-27): Multiplayer game-end acceptance
 
 - Extend the two-player and four-player browser scenarios through concession, verifying that each game closes and connected players and spectators receive the ended state.

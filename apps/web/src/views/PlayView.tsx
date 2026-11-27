@@ -575,6 +575,10 @@ function AutomatedGame({ deckId, options, engineError }: { deckId: string; optio
             <button type="button" className="btn primary" onClick={() => void respond("sendPlayerBoolean", true)}>Yes</button>
             <button type="button" className="btn" onClick={() => void respond("sendPlayerBoolean", false)}>No</button>
           </>}
+          {prompt.event.method === "GAME_SELECT" && <button type="button" className="btn"
+            onClick={() => void respond("sendPlayerAction", "PASS_PRIORITY_UNTIL_NEXT_MAIN_PHASE")}>
+            Pass priority until next main phase
+          </button>}
           <button type="button" className="btn" onClick={() => void respond("sendPlayerAction", "CONCEDE")}>Concede</button>
           {prompt.event.method === "GAME_GET_AMOUNT" && <>
             <input type="number" min={0} max={10000} value={amount} onChange={(event) => setAmount(Number(event.target.value))} aria-label="Amount" />

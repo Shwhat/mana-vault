@@ -106,7 +106,7 @@ This page lists what Mana Vault does in the current version, followed by what is
 ### Play table
 
 - Open the top-level Play mode from desktop or phone navigation, or from the deck's Playtest tab.
-- Start an optional Playmat Engine AI match from a saved deck and play cards the engine marks playable from your hand. Exact-printing checks run before launch; engine availability depends on separate server configuration, and only the player prompts currently shown in the workspace are supported, including game concession.
+- Start an optional Playmat Engine AI match from a saved deck, play cards the engine marks playable from your hand and pass priority until the next main phase. Exact-printing checks run before launch; engine availability depends on separate server configuration, and only the player prompts currently shown in the workspace are supported, including game concession.
 - Play a local offline solo game with opening hands, mulligans, draws, zones, taps, counters, tokens, life, poison, dice and coin flips. Refreshing the page ends this local game.
 - Host a private manual Commander table for two or four signed-in players, or join with its invitation code. The game state is stored on the server for reconnects. Each player receives their own hand and library counts, not opponents' hands or libraries.
 - Move cards between supported zones, track life, poison, commander damage, counters and tokens, draw and shuffle, change turns, and concede. Signed-in spectators with an invitation code can see public state but cannot see hidden cards or change the game. Manual tables do not enforce Magic rules.
