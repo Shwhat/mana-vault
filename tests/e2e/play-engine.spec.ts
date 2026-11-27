@@ -21,7 +21,7 @@ test("offers engine-approved actions, combat choices and named targets", async (
     const abilityId = "33333333-3333-4333-8333-333333333333";
     const defender = "44444444-4444-4444-8444-444444444444";
     const libraryCardId = "55555555-5555-4555-8555-555555555555";
-    const submittedActions: { expectedMessageId?: number; type?: string; data?: string | boolean }[] = [];
+    const submittedActions: { expectedMessageId?: number; type?: string; data?: string | number | boolean }[] = [];
     const events = [
       {
         id: 1,
@@ -153,6 +153,22 @@ test("offers engine-approved actions, combat choices and named targets", async (
           data: { message: "Confirm attackers", options: { possibleAttackers: [] } },
         },
       },
+      {
+        id: 14,
+        event: { method: "GAME_GET_AMOUNT", objectId: gameId, messageId: 14, data: { message: "Choose an amount", min: 3, max: 5 } },
+      },
+      {
+        id: 15,
+        event: { method: "GAME_GET_AMOUNT", objectId: gameId, messageId: 15, data: { message: "Choose another amount", min: -3, max: 2 } },
+      },
+      {
+        id: 16,
+        event: { method: "GAME_GET_AMOUNT", objectId: gameId, messageId: 16, data: { message: "Choose an unsupported amount", min: 10001, max: 20000 } },
+      },
+      {
+        id: 17,
+        event: { method: "GAME_GET_AMOUNT", objectId: gameId, messageId: 17, data: { message: "Choose a large amount", min: -20000, max: 20000 } },
+      },
     ];
 
     await page.route("**/api/play/**", async (route) => {
@@ -249,6 +265,34 @@ test("offers engine-approved actions, combat choices and named targets", async (
     await page.getByRole("button", { name: "Finish attackers" }).click();
     await expect.poll(() => submittedActions).toHaveLength(12);
     await expect(submittedActions[11]).toMatchObject({ expectedMessageId: 13, type: "sendPlayerBoolean", data: true });
+    const amount = page.getByLabel("Amount");
+    const submit = page.getByRole("button", { name: "Submit", exact: true });
+    await expect(amount).toHaveValue("3");
+    await amount.fill("6");
+    await expect(submit).toBeDisabled();
+    await amount.fill("3.5");
+    await expect(submit).toBeDisabled();
+    await amount.fill("");
+    await expect(submit).toBeDisabled();
+    await amount.fill("4");
+    await submit.click();
+    await expect.poll(() => submittedActions).toHaveLength(13);
+    await expect(submittedActions[12]).toMatchObject({ expectedMessageId: 14, type: "sendPlayerInteger", data: 4 });
+    await expect(amount).toHaveValue("-3");
+    await page.getByRole("button", { name: "Cancel", exact: true }).click();
+    await expect.poll(() => submittedActions).toHaveLength(14);
+    await expect(submittedActions[13]).toMatchObject({ expectedMessageId: 15, type: "sendPlayerBoolean", data: false });
+    await expect(page.getByText("This engine amount range is invalid or outside the workspace limit of -10000 to 10000.")).toBeVisible();
+    await expect(submit).toHaveCount(0);
+    await page.getByRole("button", { name: "Cancel", exact: true }).click();
+    await expect(amount).toHaveValue("-10000");
+    await expect(page.getByText("The workspace supports amounts from -10000 to 10000.")).toBeVisible();
+    await amount.fill("10001");
+    await expect(submit).toBeDisabled();
+    await amount.fill("10000");
+    await submit.click();
+    await expect.poll(() => submittedActions).toHaveLength(16);
+    await expect(submittedActions[15]).toMatchObject({ expectedMessageId: 17, type: "sendPlayerInteger", data: 10000 });
   } finally {
     const deleted = await page.request.delete(`/api/decks/${deckId}`, { headers: { "x-mana-vault": "1" } });
     expect(deleted.status()).toBe(200);

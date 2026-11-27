@@ -1,5 +1,11 @@
 # Mana Vault handoff
 
+## 0.39.2 (2026-11-27): Engine numeric prompts
+
+- Use the engine-supplied minimum and maximum for numeric prompts within the server limit, reject invalid input and allow cancellation.
+- Focused engine prompt browser regression and `PW_CHANNEL=chrome npm run test:all` passed: 426 server tests (3 skipped), 65 web tests, 3 play-core tests, 3 protocol tests, 3 Wiki tests and 126 browser tests (1 live-engine test skipped locally). Delivery remains pending; full native gameplay and phase acceptance remain incomplete.
+- The 0.39.1 Play engine CI failed while building the engine because Maven Central returned HTTP 429; engine tests did not run for that commit.
+
 ## 0.39.1 (2026-11-27): Engine prompt clarity
 
 - Clarify the limitation message shown with engine selection prompts that already offer a pass response.

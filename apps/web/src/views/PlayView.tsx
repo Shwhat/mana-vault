@@ -488,12 +488,20 @@ function AutomatedGame({ deckId, options, engineError }: { deckId: string; optio
   const [deckType, setDeckType] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [amount, setAmount] = useState(1);
+  const [amountInput, setAmountInput] = useState<{ promptId: number; value: string } | null>(null);
   const gameTypes = useMemo(() => namedOptions(options?.gameTypes ?? []), [options]);
   const deckTypes = useMemo(() => namedOptions(options?.deckTypes ?? []), [options]);
   const lastState = [...events].reverse().find(({ event }) => event.objectId === game?.gameId && STATE_EVENTS.has(event.method));
   const prompt = [...events].reverse().find(({ event }) => event.objectId === game?.gameId && PROMPTS.has(event.method));
   const promptData = record(prompt?.event.data);
+  const amountMin = typeof promptData?.min === "number" && Number.isSafeInteger(promptData.min) ? promptData.min : null;
+  const amountMax = typeof promptData?.max === "number" && Number.isSafeInteger(promptData.max) ? promptData.max : null;
+  const supportedMin = amountMin === null ? null : Math.max(amountMin, -10_000);
+  const supportedMax = amountMax === null ? null : Math.min(amountMax, 10_000);
+  const amountRangeValid = supportedMin !== null && supportedMax !== null && supportedMin <= supportedMax;
+  const amountValue = amountInput && amountInput.promptId === prompt?.id ? amountInput.value : amountRangeValid ? String(supportedMin) : "";
+  const amount = amountValue.trim() === "" ? NaN : Number(amountValue);
+  const amountValid = amountRangeValid && Number.isSafeInteger(amount) && amount >= supportedMin && amount <= supportedMax;
   const promptOptions = record(promptData?.options);
   const promptView = gameView(prompt);
   const stateView = gameView(lastState);
@@ -531,6 +539,7 @@ function AutomatedGame({ deckId, options, engineError }: { deckId: string; optio
     setBusy(true);
     setEvents([]);
     setCursor(0);
+    setAmountInput(null);
     try {
       const started = await request<EngineResponse>("/api/play/games", {
         method: "POST",
@@ -672,8 +681,13 @@ function AutomatedGame({ deckId, options, engineError }: { deckId: string; optio
           </button>}
           <button type="button" className="btn" onClick={() => void respond("sendPlayerAction", "CONCEDE")}>Concede</button>
           {prompt.event.method === "GAME_GET_AMOUNT" && <>
-            <input type="number" min={0} max={10000} value={amount} onChange={(event) => setAmount(Number(event.target.value))} aria-label="Amount" />
-            <button type="button" className="btn primary" onClick={() => void respond("sendPlayerInteger", amount)}>Submit</button>
+            {amountRangeValid ? <>
+              <label>Amount <input type="number" min={supportedMin} max={supportedMax} step={1} value={amountValue}
+                onChange={(event) => setAmountInput({ promptId: prompt.id, value: event.target.value })} /></label>
+              {(amountMin !== supportedMin || amountMax !== supportedMax) && <p className="note">The workspace supports amounts from -10000 to 10000.</p>}
+              <button type="button" className="btn primary" disabled={!amountValid} onClick={() => void respond("sendPlayerInteger", amount)}>Submit</button>
+            </> : <p className="note warn">This engine amount range is invalid or outside the workspace limit of -10000 to 10000.</p>}
+            <button type="button" className="btn" onClick={() => void respond("sendPlayerBoolean", false)}>Cancel</button>
           </>}
           {abilities && Object.entries(abilities).map(([id, label]) => typeof label === "string" &&
             <button type="button" className="btn" key={id} onClick={() => void respond("sendPlayerUUID", id)}>{label}</button>)}

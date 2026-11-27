@@ -2,6 +2,10 @@
 
 The installed version is shown at the top of the in-app guide.
 
+## 0.39.2 (2026-11-27): Engine numeric prompts
+
+- Honor the engine's numeric prompt bounds within the workspace limit, reject invalid values and allow the player to cancel.
+
 ## 0.39.1 (2026-11-27): Engine prompt clarity
 
 - Clarify that some choices may be missing from engine selection prompts without incorrectly saying the available pass response is unsupported.

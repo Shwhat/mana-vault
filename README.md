@@ -46,7 +46,7 @@ The server maintains a local card catalog, collection and deck data in SQLite, w
 | **Mobile and offline** | Install the web app or use the Android app for offline card search, scanning and library edits that sync when connected. |
 | **Server administration** | Manage accounts, invitations, storage, device sessions, scheduled data updates and whole-server backups. |
 
-Manual tables leave Magic rules to the players, keep opponents' hands and libraries private, and support read-only invited spectators. The Playmat engine is optional and is not included or enabled by default.
+Manual tables leave Magic rules to the players, keep opponents' hands and libraries private, and support read-only invited spectators. The Playmat engine is optional and is not included or enabled by default. Supported numeric prompts respect the engine's bounds within the workspace limit of -10000 to 10000 and may be cancelled.
 
 ### Built for collectors who self-host
 
