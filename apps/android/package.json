@@ -1,7 +1,7 @@
 {
   "name": "@mana-vault/android",
   "private": true,
-  "version": "0.30.0",
+  "version": "0.31.0",
   "scripts": {
     "sync": "cap sync android",
     "apk:debug": "cap sync android && cd android && ./gradlew --no-daemon assembleDebug",

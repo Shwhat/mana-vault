@@ -2,13 +2,24 @@
 
 The installed version is shown at the top of the in-app guide.
 
+## 0.31.0 (2026-11-27): Native Play engine controls
+
+- Add a native concession control to current Playmat prompts and a browser acceptance flow that starts a saved-deck game, answers the opening-hand prompt and observes the engine-reported terminal result.
+- Run the browser acceptance flow against the pinned private Playmat service in the Play engine integration workflow.
+- This does not complete Phase 2: the acceptance flow ends by concession and does not verify a non-concession win, all prompts, spell casting, targeting or combat.
+
+## 0.30.1 (2026-11-27): Play Table acceptance coverage
+
+- Add browser coverage for moving an original custom card through an offline manual game and completing a four-player turn cycle with viewer-specific hand visibility.
+- Keep the Play Table phases 2 through 4 status explicit; this test coverage does not complete their acceptance gates.
+
 ## 0.30.0 (2026-11-27): Native Play workspace and manual tables
 
 - Add a top-level Play workspace with optional Engine AI, offline manual solo and private manual Commander table modes, linked from saved decks and phone navigation.
 - Add server-stored two- and four-player tables with invitation codes, revision-checked actions, reconnect polling, read-only spectators and player-specific views that omit opponents' hands and libraries.
 - Add manual actions for drawing, shuffling, zone movement, taps, counters, tokens, life, poison, commander damage, turn changes and concession. Manual play does not enforce Magic rules.
-- Keep the Play mode tabs compact on phones. Add privacy and reconnect tests for two- and four-player tables and browser coverage for reload, hidden hands, battlefield actions and phone layout.
-- The Play workspace is an initial implementation, not completion of Play Table phases 2 through 4. Engine AI requires a separately configured Playmat service and supports only the prompts shown in the UI. Match history, full manual interactions and server-restart recovery remain unimplemented or unverified. Private engine deployment and trusted-network validation are still pending.
+- Keep the Play mode tabs compact on phones. Add offline custom-card coverage and two- and four-player browser flows for reloads, hidden hands, battlefield actions, turn changes, and phone layout.
+- The Play workspace is an initial implementation, not completion of Play Table phases 2 through 4. Engine AI requires a separately configured Playmat service and supports only the prompts shown in the UI. Match history, full manual interactions, production deployment and engine reconnect or outage recovery remain unimplemented or unverified. PR CI validated the private Compose profile, unpublished engine ports, saved-deck hidden-state behavior and trusted-header isolation.
 
 ## 0.29.0 (2026-11-26): Server-side Playmat game integration
 

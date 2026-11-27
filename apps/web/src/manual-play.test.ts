@@ -31,6 +31,20 @@ describe("offline manual play", () => {
     expect(played.battlefield).toHaveLength(1);
   });
 
+  it("plays an original custom card through the offline manual game", () => {
+    const customDeck = [
+      { entry_id: 3, name: "Custom Bear", image_url: null, type_line: "Creature - Bear", custom: true, quantity: 1, zone: "main" as const },
+    ];
+    const opening = startManualGame(customDeck, 0, () => 0);
+    expect(opening.hand).toHaveLength(1);
+    expect(opening.hand[0]).toMatchObject({ name: "Custom Bear", typeLine: "Creature - Bear", custom: true });
+
+    const played = playManualCard(opening, opening.hand[0]!.id);
+    expect(played.hand).toHaveLength(0);
+    expect(played.battlefield[0]).toMatchObject({ name: "Custom Bear", custom: true });
+    expect(customDeck[0]?.quantity).toBe(1);
+  });
+
   it("moves public cards, tracks counters and totals, creates tokens, and untaps on the next turn", () => {
     const opening = startManualGame(cards, 0, () => 0.5);
     const played = playManualCard(opening, opening.hand[0]!.id);

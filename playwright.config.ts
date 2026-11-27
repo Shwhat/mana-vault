@@ -23,7 +23,12 @@ export default defineConfig({
   webServer: {
     command: "node tests/e2e/serve.mjs",
     url: `http://127.0.0.1:${port}/api/health`,
-    env: { NODE_ENV: "test", E2E_PORT: String(port) },
+    env: {
+      NODE_ENV: "test",
+      E2E_PORT: String(port),
+      ...(process.env.MANAVAULT_PLAYMAT_URL ? { MANAVAULT_PLAYMAT_URL: process.env.MANAVAULT_PLAYMAT_URL } : {}),
+      ...(process.env.MANAVAULT_PLAYMAT_TIMEOUT_MS ? { MANAVAULT_PLAYMAT_TIMEOUT_MS: process.env.MANAVAULT_PLAYMAT_TIMEOUT_MS } : {}),
+    },
     reuseExistingServer: false,
     timeout: 30_000,
   },

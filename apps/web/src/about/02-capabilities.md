@@ -90,7 +90,7 @@ This page lists what Mana Vault does in the current version, followed by what is
 - Show the cards as a list, text, stacks of pictures or a grid, grouped by type, subtype, type and tag, rarity, color, color identity, mana value, set, artist or your own tags, and sorted by name, mana value, price, rarity or color.
 - Check a deck against its format: deck and sideboard size, copies of each card, banned and not legal cards, and the commander's color identity.
 - Keep a maybeboard of cards being considered, list the tokens the deck makes, and point at a card name for a large picture.
-- Playtest: shuffle, draw opening hands, mulligan, draw and play cards offline. The top-level Play workspace also offers Engine AI, manual solo and private manual Commander tables with read-only spectators; see [Play table](/about/play-table).
+- Playtest: shuffle, draw opening hands, mulligan, draw and play official or original custom cards offline. The top-level Play workspace also offers Engine AI, manual solo and private manual Commander tables with read-only spectators; see [Play table](/about/play-table).
 - Write a description with headings, lists and links, choose a cover card, and see the history of every change.
 - Link each deck card to the copy in a collection that fills it: one deck per copy, chosen when a card is free in more than one collection, changeable later, following the copy when it moves or changes printing (or keeping its version when you choose), and missing when it is removed.
 - Rename and delete decks.
@@ -106,11 +106,11 @@ This page lists what Mana Vault does in the current version, followed by what is
 ### Play table
 
 - Open the top-level Play mode from desktop or phone navigation, or from the deck's Playtest tab.
-- Start an optional Playmat Engine AI match from a saved deck. Exact-printing checks run before launch; engine availability depends on separate server configuration, and only the player prompts currently shown in the workspace are supported.
+- Start an optional Playmat Engine AI match from a saved deck. Exact-printing checks run before launch; engine availability depends on separate server configuration, and only the player prompts currently shown in the workspace are supported, including game concession.
 - Play a local offline solo game with opening hands, mulligans, draws, zones, taps, counters, tokens, life, poison, dice and coin flips. Refreshing the page ends this local game.
 - Host a private manual Commander table for two or four signed-in players, or join with its invitation code. The game state is stored on the server for reconnects. Each player receives their own hand and library counts, not opponents' hands or libraries.
 - Move cards between supported zones, track life, poison, commander damage, counters and tokens, draw and shuffle, change turns, and concede. Signed-in spectators with an invitation code can see public state but cannot see hidden cards or change the game. Manual tables do not enforce Magic rules.
-- The initial table version does not include match history, server-restart recovery guarantees, all manual table interactions or full Playmat prompt support. The private engine deployment and trusted-network boundary are still pending validation; do not expose the engine port.
+- The initial table version does not include match history, server-restart recovery guarantees, all manual table interactions or full Playmat prompt support. The private Compose profile, unpublished port and trusted-header spoof boundary passed PR CI. Production deployment and engine reconnect or outage behavior remain unverified; do not expose the engine port.
 
 ### Proxies and custom cards
 

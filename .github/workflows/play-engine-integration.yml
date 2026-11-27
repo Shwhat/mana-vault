@@ -6,25 +6,33 @@ on:
     paths:
       - ".github/workflows/play-engine-integration.yml"
       - "Dockerfile"
+      - "Dockerfile.playtest"
       - "docker-compose.yml"
       - "docker-compose.play-test.yml"
+      - "playwright.config.ts"
       - "apps/server/src/play/**"
       - "apps/web/src/views/Play*.tsx"
       - "apps/web/src/components/play/**"
       - "packages/play-core/**"
       - "packages/playmat-protocol/**"
+      - "tests/e2e/play-engine.spec.ts"
+      - "tests/e2e/serve.mjs"
   push:
     branches: [main]
     paths:
       - ".github/workflows/play-engine-integration.yml"
       - "Dockerfile"
+      - "Dockerfile.playtest"
       - "docker-compose.yml"
       - "docker-compose.play-test.yml"
+      - "playwright.config.ts"
       - "apps/server/src/play/**"
       - "apps/web/src/views/Play*.tsx"
       - "apps/web/src/components/play/**"
       - "packages/play-core/**"
       - "packages/playmat-protocol/**"
+      - "tests/e2e/play-engine.spec.ts"
+      - "tests/e2e/serve.mjs"
 
 permissions:
   contents: read
@@ -58,6 +66,10 @@ jobs:
       - name: Run real saved-deck and hidden-state tests
         run: |
           docker compose --profile play -f docker-compose.yml -f docker-compose.play-test.yml run --rm --build play-test-runner npm run test --workspace @mana-vault/server -- src/play/play-sessions.test.ts
+
+      - name: Run native Play UI against the private engine
+        run: |
+          docker compose --profile play -f docker-compose.yml -f docker-compose.play-test.yml run --rm --build play-e2e-runner
 
       - name: Reject a spoofed trusted identity from another peer
         run: |

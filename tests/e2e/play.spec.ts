@@ -1,4 +1,4 @@
-import { test, expect, signUp } from "./fixtures";
+import { choose, test, expect, signUp } from "./fixtures";
 import type { Page } from "@playwright/test";
 
 async function createCommanderDeck(page: Page, name: string, mainCard: string): Promise<string> {
@@ -90,5 +90,155 @@ test("private manual Commander table plays shared cards without exposing opponen
   } finally {
     await otherContext.close();
     await spectatorContext.close();
+  }
+});
+
+test("four-player manual Commander tables keep every hand private and advance turns", async ({ browser, page }) => {
+  const guests = await Promise.all([browser.newContext(), browser.newContext(), browser.newContext()]);
+  const guestPages = await Promise.all(guests.map((context) => context.newPage()));
+  try {
+    await signUp(page, "fourhost");
+    for (const [index, guestPage] of guestPages.entries()) await signUp(guestPage, `fourguest${index}`);
+
+    const deckIds = [
+      await createCommanderDeck(page, "Host four-player deck", "sol-ring"),
+      await createCommanderDeck(guestPages[0]!, "First four-player deck", "llanowar"),
+      await createCommanderDeck(guestPages[1]!, "Second four-player deck", "bolt-lea"),
+      await createCommanderDeck(guestPages[2]!, "Third four-player deck", "shivan"),
+    ];
+    await page.reload();
+    for (const guestPage of guestPages) await guestPage.reload();
+
+    const openTable = async (target: Page, deckId: string) => {
+      await target.locator("#modetabs .mtab", { hasText: "Play" }).click();
+      await target.getByLabel("Saved deck").selectOption(deckId);
+      await target.getByRole("tab", { name: "Multiplayer table" }).click();
+    };
+    await openTable(page, deckIds[0]!);
+    await page.getByRole("button", { name: "Create four-player table" }).click();
+    const inviteCode = (await page.getByText(/Invite code:/).textContent())?.replace("Invite code:", "").trim();
+    if (!inviteCode) throw new Error("The new four-player table did not display an invitation code.");
+
+    for (let index = 0; index < guestPages.length; index += 1) {
+      const guestPage = guestPages[index]!;
+      await openTable(guestPage, deckIds[index + 1]!);
+      await guestPage.getByLabel("Invitation code").fill(inviteCode);
+      await guestPage.getByRole("button", { name: "Join table" }).click();
+    }
+
+    await page.getByRole("button", { name: "Start game" }).click();
+    for (const target of [page, ...guestPages]) {
+      await expect(target.getByRole("button", { name: "Draw" })).toBeVisible();
+      await expect(target.locator(".play-player-row")).toContainText("Hand 7");
+    }
+    const playerPages = [page, ...guestPages];
+    const mainCards = ["Sol Ring", "Llanowar Elves", "Lightning Bolt", "Shivan Dragon"];
+    for (let seat = 0; seat < playerPages.length; seat += 1) {
+      const currentView = playerPages[seat]!.locator("#view-play");
+      await expect(currentView).toContainText(mainCards[seat]!);
+      for (let otherSeat = 0; otherSeat < mainCards.length; otherSeat += 1) {
+        if (otherSeat !== seat) await expect(currentView).not.toContainText(mainCards[otherSeat]!);
+      }
+    }
+
+    await page.getByRole("button", { name: "End turn" }).click();
+    for (let seat = 1; seat < playerPages.length; seat += 1) {
+      const currentPage = playerPages[seat]!;
+      await expect(currentPage.locator(".play-player-row .play-player").nth(seat)).toContainText("Active");
+      await currentPage.getByRole("button", { name: "Draw" }).click();
+      await expect(page.locator(".play-player-row .play-player").nth(seat)).toContainText("Hand 8");
+      await currentPage.getByRole("button", { name: "End turn" }).click();
+    }
+    await expect(page.locator(".play-player-row .play-player").first()).toContainText("Active");
+    await page.getByRole("button", { name: "Draw" }).click();
+    await expect(page.locator(".play-player-row .play-player").first()).toContainText("Hand 8");
+  } finally {
+    for (const context of guests) await context.close();
+  }
+});
+
+test("manual solo plays an original custom card from a saved deck", async ({ page }) => {
+  const suffix = Date.now().toString(36).slice(-5);
+  const setCode = `p${suffix}`;
+  const customName = `Practice Bear ${suffix}`;
+  let customCardId: string | null = null;
+  let deckId: string | null = null;
+  let customSetCreated = false;
+
+  try {
+    await signUp(page, "playcustom");
+    await page.keyboard.press("5");
+    await page.getByRole("tab", { name: "Card maker" }).click();
+    await page.getByRole("tab", { name: "Custom sets" }).click();
+    await page.locator(".setmaker .makerlist").getByRole("button", { name: "New set" }).click();
+    await page.locator("#sm-code").fill(setCode);
+    await page.locator("#sm-name").fill(`Playtest ${suffix}`);
+    await page.getByRole("button", { name: "Create set" }).click();
+    await expect(page.getByText(`Custom set ${setCode.toUpperCase()} created`)).toBeVisible();
+    customSetCreated = true;
+    await page.getByRole("tab", { name: "Card maker" }).click();
+    await choose(page, page.locator("#cm-set"), setCode);
+    await page.locator("#cm-name").fill(customName);
+    await page.locator("#cm-typeLine").fill("Creature - Bear");
+    await page.locator("#cm-power").fill("2");
+    await page.locator("#cm-toughness").fill("2");
+    await page.getByRole("button", { name: "Save to card database" }).click();
+    await expect(page.getByText(`${customName} saved to the card database`)).toBeVisible();
+
+    const cardResponse = await page.request.get(`/api/cards?q=${encodeURIComponent(customName)}`);
+    expect(cardResponse.status()).toBe(200);
+    const cardMatches = await cardResponse.json() as Array<{ id: string; name: string }>;
+    const customCard = cardMatches.find((card) => card.name === customName);
+    if (!customCard) throw new Error("The newly saved custom card was not returned by card search.");
+    customCardId = customCard.id;
+
+    const createdDeck = await page.request.post("/api/decks", {
+      headers: { "x-mana-vault": "1" },
+      data: { name: `Custom playtest ${suffix}`, format: "casual" },
+    });
+    expect(createdDeck.status()).toBe(201);
+    deckId = String((await createdDeck.json()).id);
+    const addedCard = await page.request.post(`/api/decks/${deckId}/cards`, {
+      headers: { "x-mana-vault": "1" },
+      data: { cardId: customCard.id, zone: "main", quantity: 8 },
+    });
+    expect(addedCard.status()).toBe(201);
+
+    await page.reload();
+    await page.locator("#modetabs .mtab", { hasText: "Play" }).click();
+    await page.getByLabel("Saved deck").selectOption(deckId);
+    await page.getByRole("tab", { name: "Manual solo" }).click();
+    await page.getByRole("button", { name: "New manual game" }).click();
+
+    const hand = page.locator(".play-zone").filter({ has: page.locator("h3", { hasText: "Hand" }) });
+    await expect(hand.locator(".play-card")).toHaveCount(7);
+    await expect(hand.getByRole("img", { name: customName }).first()).toBeVisible();
+    await hand.getByRole("button", { name: "Play" }).first().click();
+    const battlefield = page.locator(".play-zone").filter({ has: page.locator("h3", { hasText: "Battlefield" }) });
+    await expect(battlefield.getByRole("img", { name: customName })).toBeVisible();
+    await battlefield.getByRole("button", { name: "Graveyard" }).first().click();
+    const graveyard = page.locator(".play-zone").filter({ has: page.locator("h3", { hasText: "Graveyard" }) });
+    await expect(graveyard.getByRole("img", { name: customName })).toBeVisible();
+    await page.getByRole("button", { name: "Next turn and untap" }).click();
+    await expect(page.locator(".play-toolbar")).toContainText("Turn 2");
+  } finally {
+    if (deckId) {
+      const deletedDeck = await page.request.delete(`/api/decks/${deckId}`, { headers: { "x-mana-vault": "1" } });
+      expect(deletedDeck.status()).toBe(200);
+    }
+    if (customSetCreated) {
+      if (!customCardId) {
+        const customCardsResponse = await page.request.get("/api/custom/cards");
+        expect(customCardsResponse.status()).toBe(200);
+        const customCards = await customCardsResponse.json() as Array<{ id: string; name: string }>;
+        customCardId = customCards.find((card) => card.name === customName)?.id ?? null;
+      }
+      if (customCardId) {
+        const deletedCard = await page.request.delete(`/api/custom/cards/${customCardId}`, { headers: { "x-mana-vault": "1" } });
+        expect(deletedCard.status()).toBe(200);
+      }
+      const deletedSet = await page.request.delete(`/api/custom/sets/${setCode}`, { headers: { "x-mana-vault": "1" } });
+      expect(deletedSet.status()).toBe(200);
+    }
   }
 });

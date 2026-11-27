@@ -3,10 +3,9 @@
 Status: the 0.30.0 work adds an initial native Play workspace, offline solo
 play, and server-stored private manual tables for two or four players. Focused
 tests cover table membership, hidden hands and libraries, revision-checked
-actions, turn changes, reconnect after a page reload and leaving a table.
-Phase 1 remains incomplete because the private Compose deployment,
-trusted-header isolation, hidden-state isolation and live engine reconnect
-have not been verified. The new UI is not acceptance of phases 2 through 4.
+actions, a full four-player turn cycle, reconnect after a page reload, leaving a
+table, and playing an original custom card through the offline manual game UI.
+The Play engine integration CI passed on commit `8a84091713ab617128b1f51989f5b47a4030ca1b`: it built the private Compose profile, verified no published engine ports, ran live saved-deck and hidden-state tests, and rejected a spoofed trusted identity. A native UI browser test is now configured for the private engine workflow, but has not yet run on this branch. Local Docker, Podman and WSL remain unavailable. Production deployment and live engine reconnect/outage behavior remain unverified, so Phase 1 is not fully accepted. The new UI is not acceptance of phases 2 through 4.
 
 ## Implemented foundation work
 
@@ -18,19 +17,22 @@ snapshots to exact-printing engine deck lists, authenticated routes, prompt
 freshness checks and account session cleanup. A Compose `play` profile builds
 the pinned engine source on a private internal network with no published
 engine ports. A live test completed an AI game using a saved Mana Vault deck.
-The Compose profile and trusted peer isolation remain unvalidated because
-Docker, Podman and WSL are unavailable here. The 0.30.0 branch adds a first
-user-facing Play workspace, but its phase acceptance gates remain pending.
+The Compose profile, unpublished ports, live hidden-state behavior and trusted
+peer spoof rejection passed PR CI on commit
+`8a84091713ab617128b1f51989f5b47a4030ca1b`. Production deployment and
+engine-session reconnect or outage recovery remain unverified. The 0.30.0
+branch adds a first user-facing Play workspace, but its phase acceptance gates
+remain pending.
 
 | Files | Implemented scope and remaining gate |
 | --- | --- |
-| `apps/server/src/play/engine-identity.ts`, `app.ts`, `admin.ts` | Persist an opaque engine name per Mana Vault user, manage server-side sessions and close them on account or last-device revocation. Private trusted-header isolation remains unverified. |
+| `apps/server/src/play/engine-identity.ts`, `app.ts`, `admin.ts` | Persist an opaque engine name per Mana Vault user, manage server-side sessions and close them on account or last-device revocation. The spoofed trusted-header boundary passed PR CI; production deployment remains unverified. |
 | `apps/server/src/play/playmat-connection.ts`, `play-sessions.ts`, `routes.ts`, `packages/playmat-protocol/src/rpc.ts` | Server-only WebSocket client, RPC allowlist, authenticated game routes, per-user event queues, prompt freshness and takeover refusal. The initial Engine AI UI is present; deployment and prompt coverage remain incomplete. |
 | `apps/server/src/play/manual-routes.ts`, `apps/web/src/views/PlayView.tsx` | Server-authoritative manual table membership and state for two or four players, per-player hidden-zone projection, invitation-code read-only spectators, offline solo mode and a first native workspace. Full manual interactions and match history are not implemented. |
-| `apps/server/src/play/deck-converter.ts`, `routes.ts` | Convert authorized immutable snapshots, verify exact printings, validate against the live engine and start the human-plus-AI match. The local acceptance test completed a real game; production deployment and hidden-state boundaries are unverified. |
+| `apps/server/src/play/deck-converter.ts`, `routes.ts` | Convert authorized immutable snapshots, verify exact printings, validate against the live engine and start the human-plus-AI match. A real game and hidden-state isolation passed CI; production deployment remains unverified. |
 | `apps/server/src/play/*.test.ts`, `packages/playmat-protocol/src/*.test.ts` | Synthetic lifecycle and route tests plus an optional real-engine acceptance test. Loopback test evidence does not prove private deployment security. |
 | Package manifests and lockfile | Add server WebSocket dependencies and build the shared protocol package before server tests and type-checks. |
-| `docker-compose.yml`, `.env.example` | An optional profile builds the pinned Playmat source with trusted-header SSO, fixed app-only trust, an internal network, persistent engine data and resource limits. Docker validation and actual network isolation remain pending. |
+| `docker-compose.yml`, `.env.example` | An optional profile builds the pinned Playmat source with trusted-header SSO, fixed app-only trust, an internal network, persistent engine data and resource limits. PR CI validated unpublished ports and rejected an untrusted peer; production deployment remains pending. |
 | About pages, release notes, README and `docs/HANDOFF.md` | Describe the initial modes and their limits accurately. Do not claim phase acceptance or verified production engine security. |
 
 Before delivery, test the engine-disabled app, workspace build, unit/static
@@ -40,25 +42,24 @@ not accepted until the private engine and hidden-state boundaries are verified.
 
 ## Remaining phase 1
 
-1. Build and verify the source-pinned engine service and private network. The
-   Compose profile is configured but untested; the session-local test build
-   reported healthy and completed the Mana Vault deck AI game, but does not
-   prove deployment isolation. Record platform, resources, persistence and
-   engine-disabled operation.
-2. Verify trusted-header spoofing, name collision, disable/delete/logout and
-   last-device revocation, per-player isolation and takeover behavior against
-   the real configured deployment. Synthetic revocation and takeover tests
-   pass; deployment and multi-human hidden-state isolation remain unverified.
+1. The source-pinned engine service and private Compose network passed the PR
+   integration workflow, including health, startup and no published engine
+   ports. Production-host deployment, persistence, platform support and
+   engine-disabled operation still need verification.
+2. The workflow rejected a trusted-header identity spoofed by an untrusted
+   peer. Keep account revocation, name collision, per-player isolation and
+   takeover coverage; verify any remaining cases against the configured
+   deployment.
 3. Live lookup, exact-printing verification, deck validation, AI table start,
-   terminal game result and immutable saved-deck verification passed against
-   the session-local engine. Retain the unsupported-card and format tests.
+   terminal game result, hidden-state isolation and immutable saved-deck
+   verification passed in PR CI. Retain the unsupported-card and format tests.
 4. Verify reconnect and engine outage behavior on the configured deployment.
-   The integration code has finite timeouts and the live game test passes, but
-   reconnect and outage recovery have not been accepted against the private
-   engine profile.
+   The integration code has finite timeouts and CI passed the live game test,
+   but reconnect and outage recovery have not been accepted against the
+   private engine profile.
 5. Review every Phase 1 acceptance criterion in the specification and record
    the commands, results, unresolved limitations and security evidence before
-   starting the native gameplay phase.
+   accepting the native gameplay phase.
 
 The 0.30.0 implementation began phases 2 through 4 before the remaining Phase 1
 acceptance criteria passed. Treat it as a functional prototype, not an accepted

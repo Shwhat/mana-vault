@@ -28,3 +28,19 @@ services:
     networks:
       play-engine:
         ipv4_address: ${MANAVAULT_PLAY_PROBE_IP:-172.30.254.4}
+
+  play-e2e-runner:
+    image: mana-vault-play-e2e
+    build:
+      context: .
+      dockerfile: Dockerfile.playtest
+    depends_on:
+      play-engine:
+        condition: service_healthy
+    environment:
+      MANAVAULT_PLAYMAT_URL: ws://play-engine:17172
+      E2E_PORT: 4317
+    command: ["npm", "run", "test:e2e:run", "--", "tests/e2e/play-engine.spec.ts"]
+    networks:
+      play-engine:
+        ipv4_address: ${MANAVAULT_PLAY_APP_IP:-172.30.254.2}
