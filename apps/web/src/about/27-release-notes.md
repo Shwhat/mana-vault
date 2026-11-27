@@ -2,6 +2,11 @@
 
 The installed version is shown at the top of the in-app guide.
 
+## 0.32.1 (2026-11-27): Multiplayer game-end acceptance
+
+- Extend the two-player and four-player browser scenarios through concession, verifying that each game closes and connected players and spectators receive the ended state.
+- These manual-table tests do not enforce Magic rules or complete Phase 4 acceptance.
+
 ## 0.32.0 (2026-11-27): Native Engine AI card play
 
 - Show Play buttons for hand cards the Playmat engine marks playable during the player's selection prompt. Send the selected card ID as the prompt-bound response.

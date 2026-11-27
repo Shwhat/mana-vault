@@ -6,7 +6,7 @@ tests cover table membership, hidden hands and libraries, revision-checked
 actions, two-player and four-player turn cycles, reloads by seated players,
 leaving a table, and playing an original custom card through the offline manual
 game UI with the browser's network disabled.
-The Play engine integration CI passed on commit `8a84091713ab617128b1f51989f5b47a4030ca1b`: it built the private Compose profile, verified no published engine ports, ran live saved-deck and hidden-state tests, and rejected a spoofed trusted identity. The private-engine browser flow now exercises playing an engine-approved hand card before concession; it must pass on the pushed 0.32.0 head. Local Docker, Podman and WSL remain unavailable. Production deployment and live engine reconnect/outage behavior remain unverified, so Phase 1 is not fully accepted. This does not complete phases 2 through 4.
+The Play engine integration CI passed on commit `8a84091713ab617128b1f51989f5b47a4030ca1b`: it built the private Compose profile, verified no published engine ports, ran live saved-deck and hidden-state tests, and rejected a spoofed trusted identity. The private-engine browser flow now exercises playing an engine-approved hand card before concession; it must pass on the pushed 0.32.0 head. The 0.32.1 manual table scenarios also end both two-player and four-player sessions through concession. Local Docker, Podman and WSL remain unavailable. Production deployment and live engine reconnect/outage behavior remain unverified, so Phase 1 is not fully accepted. These tests do not complete phases 2 through 4.
 
 ## Implemented foundation work
 

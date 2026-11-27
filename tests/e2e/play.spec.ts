@@ -95,6 +95,10 @@ test("private manual Commander table plays shared cards without exposing opponen
     await expect(page.locator(".play-player-row .play-player").first()).toContainText("Active");
     await page.getByRole("button", { name: "Draw" }).click();
     await expect(page.locator(".play-player-row .play-player").first()).toContainText("Hand 7");
+    await page.getByRole("button", { name: "Concede" }).click();
+    await expect(page.locator("#view-play")).toContainText("Game ended");
+    await expect(otherPage.locator("#view-play")).toContainText("Game ended");
+    await expect(spectatorPage.locator("#view-play")).toContainText("Game ended");
 
     await page.setViewportSize({ width: 390, height: 844 });
     await page.getByRole("navigation", { name: "Main" }).getByRole("button", { name: "Play" }).click();
@@ -165,6 +169,22 @@ test("four-player manual Commander tables keep every hand private and advance tu
     await expect(page.locator(".play-player-row .play-player").first()).toContainText("Active");
     await page.getByRole("button", { name: "Draw" }).click();
     await expect(page.locator(".play-player-row .play-player").first()).toContainText("Hand 8");
+    for (const seat of [0, 1, 2]) {
+      const currentPage = playerPages[seat]!;
+      await currentPage.getByRole("button", { name: "Concede" }).click();
+      if (seat < 2) {
+        for (const target of playerPages) {
+          await expect(target.locator(".play-player-row .play-player").nth(seat)).toContainText("Conceded");
+        }
+      } else {
+        for (const target of playerPages) {
+          await expect(target.locator("#view-play")).toContainText("Game ended");
+        }
+      }
+    }
+    for (const currentPage of playerPages) {
+      await expect(currentPage.locator("#view-play")).toContainText("Game ended");
+    }
   } finally {
     for (const context of guests) await context.close();
   }

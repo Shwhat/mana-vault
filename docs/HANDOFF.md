@@ -1,5 +1,12 @@
 # Mana Vault handoff
 
+## 0.32.1 (2026-11-27): Multiplayer game-end acceptance
+
+- Extend the two-player and four-player manual Commander browser tests through concession. Verify the table closes and every seated player's view, plus the 1v1 spectator view, receives the ended state.
+- This adds test coverage only. Manual tables still do not enforce game rules, and this does not complete Phase 4 acceptance.
+- Validation: focused `PW_CHANNEL=chrome npm run test:e2e:run -- tests/e2e/play.spec.ts` passed (3 tests). `PW_CHANNEL=chrome npm run test:all` passed: typechecks, 426 server tests (3 skipped), 64 web tests, 3 play-core tests, 3 Playmat protocol tests, 3 Wiki tests and 125 browser tests. The live-engine test was skipped locally because no Playmat URL is configured. Version/lockfile checks and `git diff --check` passed.
+- Delivery: the 0.32.1 changes are ready to commit and push. The 0.32.0 Android workflow passed, but its exact-head private-engine workflow is still running; 0.32.1 requires its own CI run. PR #52 remains a draft and unmerged.
+
 ## 0.32.0 (2026-11-27): Native Engine AI card play
 
 - The Engine AI workspace now renders a Play action for hand cards present in the current `canPlayObjects` list during `GAME_SELECT`, and responds with the selected card UUID. The private-engine browser flow now plays a Mountain before conceding.
@@ -77,11 +84,11 @@
 - Validation: `PW_CHANNEL=chrome npm run test:all` passed, including 119 browser tests. `git diff --check` passed.
 - At handoff, version 0.24.8 and automatic synchronization are pending delivery. Verify the workflow, container, Android build and debug APK for the merged commit.
 
-Last updated: 2026-11-27, version 0.32.0 native Engine AI card play in progress; validation and delivery are pending.
+Last updated: 2026-11-27, version 0.32.1 multiplayer game-end acceptance in progress; validation and delivery are pending.
 
-## Current next steps (0.32.0)
+## Current next steps (0.32.1)
 
-- Run the focused and full validation gates, review the complete diff, then commit and push to PR #52. Verify the new private-engine card-play browser check and all other checks for the exact pushed commit. Keep the PR a draft until the remaining Play Table acceptance gates are met.
+- Run the focused and full validation gates, review the complete diff, then commit and push to PR #52. Verify the native card-play browser check and all other checks for the exact pushed commit. Keep the PR a draft until the remaining Play Table acceptance gates are met.
 - Keep the PR unmerged until required checks and approvals pass. After merge, verify the exact-SHA container and Android workflows and the matching debug APK.
 - Complete Phase 1 production deployment and engine reconnect/outage acceptance before describing Play Table phases 2 through 4 as complete.
 
