@@ -2,6 +2,10 @@
 
 The installed version is shown at the top of the in-app guide.
 
+## 0.39.0 (2026-11-27): Multiplayer face-down cards
+
+- Play cards face down directly from hand, turn your battlefield cards face down, and reveal them. Opponents and spectators receive a hidden representation without the card's identity or artwork.
+
 ## 0.38.0 (2026-11-27): Private multiplayer library search
 
 - Seated players can search their own library by name and move a selected card to hand in a manual multiplayer game. Results are sorted instead of revealing draw order; opponents and spectators cannot access them.

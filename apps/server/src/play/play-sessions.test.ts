@@ -332,6 +332,43 @@ describe("authenticated Playmat sessions", () => {
     expect(JSON.stringify(blueLibrary.json())).not.toContain("Red Hidden Card");
     expect((await app.inject({ method: "GET", url: libraryUrl, headers: { cookie: thirdCookie } })).statusCode).toBe(404);
     expect((await app.inject({ method: "GET", url: libraryUrl, headers: { cookie: fourthCookie } })).statusCode).toBe(404);
+    const actionsUrl = `/api/play/manual/tables/${waitingTable.id}/actions`;
+    const faceDown = await app.inject({
+      method: "POST", url: actionsUrl, headers: { ...guard, cookie: firstCookie },
+      payload: { revision: firstView.revision, action: { type: "playFaceDown", cardId: firstHand[0].id } },
+    });
+    expect(faceDown.statusCode).toBe(200);
+    expect(faceDown.json().table.players[0].battlefield[0].name).toBe("Red Hidden Card");
+    for (const cookie of [secondCookie, thirdCookie]) {
+      const view = (await app.inject({ method: "GET", url: `/api/play/manual/tables/${waitingTable.id}`, headers: { cookie } })).json().table;
+      expect(view.players[0].battlefield[0]).toMatchObject({ name: "Face down", imageUrl: null, faceDown: true });
+      expect(JSON.stringify(view)).not.toContain("Red Hidden Card");
+    }
+    const unauthorizedReveal = await app.inject({
+      method: "POST", url: actionsUrl, headers: { ...guard, cookie: secondCookie },
+      payload: { revision: faceDown.json().table.revision, action: { type: "faceDown", cardId: firstHand[0].id } },
+    });
+    expect(unauthorizedReveal.statusCode).toBe(400);
+    const revealed = await app.inject({
+      method: "POST", url: actionsUrl, headers: { ...guard, cookie: firstCookie },
+      payload: { revision: faceDown.json().table.revision, action: { type: "faceDown", cardId: firstHand[0].id } },
+    });
+    expect(revealed.statusCode).toBe(200);
+    const publicView = (await app.inject({
+      method: "GET", url: `/api/play/manual/tables/${waitingTable.id}`, headers: { cookie: secondCookie },
+    })).json().table;
+    expect(publicView.players[0].battlefield[0].name).toBe("Red Hidden Card");
+    const turnedDown = await app.inject({
+      method: "POST", url: actionsUrl, headers: { ...guard, cookie: firstCookie },
+      payload: { revision: revealed.json().table.revision, action: { type: "faceDown", cardId: firstHand[0].id } },
+    });
+    expect(turnedDown.statusCode).toBe(200);
+    const returned = await app.inject({
+      method: "POST", url: actionsUrl, headers: { ...guard, cookie: firstCookie },
+      payload: { revision: turnedDown.json().table.revision, action: { type: "move", cardId: firstHand[0].id, from: "battlefield", to: "hand" } },
+    });
+    expect(returned.statusCode).toBe(200);
+    expect(returned.json().table.players[0].hand.find((card: { id: string }) => card.id === firstHand[0].id).faceDown).toBe(false);
     const spectatorAction = await app.inject({
       method: "POST",
       url: `/api/play/manual/tables/${waitingTable.id}/actions`,

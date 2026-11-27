@@ -163,7 +163,9 @@ function projectTable(database: DatabaseSync, table: Record<string, unknown>, us
       libraryCount: gamePlayer?.library.length ?? null,
       handCount: gamePlayer?.hand.length ?? null,
       hand: own ? gamePlayer?.hand ?? [] : undefined,
-      battlefield: gamePlayer?.battlefield ?? [],
+      battlefield: gamePlayer?.battlefield.map((card) => card.faceDown && !own
+        ? { id: card.id, name: "Face down", imageUrl: null, custom: false, token: false, tapped: card.tapped, faceDown: true, counters: card.counters }
+        : card) ?? [],
       graveyard: gamePlayer?.graveyard ?? [],
       exile: gamePlayer?.exile ?? [],
       command: gamePlayer?.command ?? [],
@@ -227,10 +229,10 @@ function applyAction(state: GameState, actorId: number, action: unknown): string
     player.hand.push(card);
   } else if (type === "shuffle") {
     shuffle(player.library);
-  } else if (type === "play" || type === "move") {
+  } else if (type === "play" || type === "playFaceDown" || type === "move") {
     const cardId = action.cardId;
-    const from = type === "play" ? "hand" : action.from;
-    const to = type === "play" ? "battlefield" : action.to;
+    const from = type === "move" ? action.from : "hand";
+    const to = type === "move" ? action.to : "battlefield";
     if (typeof cardId !== "string" || !ZONES.includes(from as Zone) || !ZONES.includes(to as Zone) || from === to) {
       return "Choose a valid card and destination.";
     }
@@ -239,7 +241,16 @@ function applyAction(state: GameState, actorId: number, action: unknown): string
     if (index < 0) return "That card is not in your zone.";
     const [card] = source.splice(index, 1);
     if (!card) return "That card is not in your zone.";
+    if (type === "playFaceDown") card.faceDown = true;
+    if (to !== "battlefield") {
+      card.faceDown = false;
+      card.tapped = false;
+    }
     player[to as Zone].push(card);
+  } else if (type === "faceDown") {
+    const card = player.battlefield.find((item) => item.id === action.cardId);
+    if (!card) return "Choose one of your battlefield cards.";
+    card.faceDown = !card.faceDown;
   } else if (type === "tap") {
     const card = player.battlefield.find((item) => item.id === action.cardId);
     if (!card) return "Choose one of your battlefield cards.";

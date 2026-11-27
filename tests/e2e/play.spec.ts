@@ -94,7 +94,14 @@ test("private manual Commander table plays shared cards without exposing opponen
     await expect(spectatorPage.locator("#view-play")).not.toContainText("Sol Ring");
     await page.getByRole("button", { name: "Hide library search" }).click();
 
-    await hostHand.getByRole("button", { name: "Play" }).first().click();
+    await hostHand.getByRole("button", { name: "Play face down" }).first().click();
+    const hostBattlefield = page.locator(".play-zone").filter({ has: page.locator("h3", { hasText: "Battlefield" }) });
+    await expect(hostBattlefield).toContainText("Your card: Sol Ring");
+    await expect(otherPage.locator(".play-player-row")).toContainText("Face down");
+    await expect(spectatorPage.locator(".play-player-row")).toContainText("Face down");
+    await expect(otherPage.locator("#view-play")).not.toContainText("Sol Ring");
+    await expect(spectatorPage.locator("#view-play")).not.toContainText("Sol Ring");
+    await hostBattlefield.getByRole("button", { name: "Reveal" }).click();
     await expect(page.locator(".play-zone").filter({ has: page.locator("h3", { hasText: "Battlefield" }) })).toContainText("Sol Ring");
     await expect(otherPage.locator(".play-player-row")).toContainText("Sol Ring");
     await expect(spectatorPage.locator(".play-player-row")).toContainText("Sol Ring");

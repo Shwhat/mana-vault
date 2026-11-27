@@ -447,13 +447,18 @@ function ManualTable({ deckId }: { deckId: string }) {
           </div>
           {own.command.length > 0 && zone("Command zone", own.command, (card) => <button type="button" className="btn small" onClick={() => move(card, "command", "battlefield")}>Play</button>)}
           {zone("Battlefield", own.battlefield, (card) => <>
+            {card.faceDown && <span className="badge">Your card: {card.name}</span>}
             <button type="button" className="btn small" onClick={() => void act({ type: "tap", cardId: card.id })}>{card.tapped ? "Untap" : "Tap"}</button>
+            <button type="button" className="btn small" onClick={() => void act({ type: "faceDown", cardId: card.id })}>{card.faceDown ? "Reveal" : "Face down"}</button>
             <button type="button" className="btn small" onClick={() => void act({ type: "counter", cardId: card.id, counter: "+1/+1", delta: 1 })}>+1/+1</button>
             {Object.entries(card.counters).map(([name, count]) => <span className="badge" key={name}>{name}: {count}</span>)}
             <button type="button" className="btn small" onClick={() => move(card, "battlefield", "graveyard")}>Graveyard</button>
             <button type="button" className="btn small" onClick={() => move(card, "battlefield", "exile")}>Exile</button>
           </>)}
-          {zone("Hand", own.hand ?? [], (card) => <button type="button" className="btn small primary" onClick={() => move(card, "hand", "battlefield")}>Play</button>)}
+          {zone("Hand", own.hand ?? [], (card) => <>
+            <button type="button" className="btn small primary" onClick={() => move(card, "hand", "battlefield")}>Play</button>
+            <button type="button" className="btn small" onClick={() => void act({ type: "playFaceDown", cardId: card.id })}>Play face down</button>
+          </>)}
           {zone("Graveyard", own.graveyard, (card) => <button type="button" className="btn small" onClick={() => move(card, "graveyard", "hand")}>Return to hand</button>)}
           {zone("Exile", own.exile, (card) => <button type="button" className="btn small" onClick={() => move(card, "exile", "hand")}>Return to hand</button>)}
           {showLibrary && !own.conceded && <section className="play-zone">
