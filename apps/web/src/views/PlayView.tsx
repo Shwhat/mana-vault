@@ -573,6 +573,8 @@ function AutomatedGame({ deckId, options, engineError }: { deckId: string; optio
   const [deckType, setDeckType] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [pollError, setPollError] = useState("");
+  const [hasPolled, setHasPolled] = useState(false);
   const [amountInput, setAmountInput] = useState<{ promptId: number; value: string } | null>(null);
   const [specialChoice, setSpecialChoice] = useState<number | null>(null);
   const [choiceSearch, setChoiceSearch] = useState<{ promptId: number; value: string } | null>(null);
@@ -631,9 +633,10 @@ function AutomatedGame({ deckId, options, engineError }: { deckId: string; optio
           setCursor(next);
           if (result.events.some(({ event }) => event.objectId === game.gameId && event.method === "GAME_OVER")) setBusy(false);
         }
-        setError("");
+        setPollError("");
+        setHasPolled(true);
       } catch (reason) {
-        if (active) setError(reason instanceof Error ? reason.message : "Could not load game events.");
+        if (active) setPollError(reason instanceof Error ? reason.message : "Could not load game events.");
       }
       if (active) timer = window.setTimeout(() => { void poll(); }, 600);
     };
@@ -643,6 +646,8 @@ function AutomatedGame({ deckId, options, engineError }: { deckId: string; optio
 
   const start = async () => {
     setError("");
+    setPollError("");
+    setHasPolled(false);
     setBusy(true);
     setEvents([]);
     setCursor(0);
@@ -754,7 +759,7 @@ function AutomatedGame({ deckId, options, engineError }: { deckId: string; optio
       {game && <>
         <div className="play-toolbar">
           <b>{game.gameId}</b>
-          <span className="badge">{over ? "Game ended" : "Connected"}</span>
+          <span className="badge">{over ? "Game ended" : pollError ? "Connection unavailable" : hasPolled ? "Connected" : "Connecting"}</span>
         </div>
         {(turn !== null || phase || step || activePlayer || priorityPlayer) && <div className="play-toolbar" aria-label="Game progress">
           {turn !== null && <span>Turn {turn}</span>}
@@ -885,6 +890,7 @@ function AutomatedGame({ deckId, options, engineError }: { deckId: string; optio
         </section>}
       </>}
       {error && <p className="note warn" role="alert">{error}</p>}
+      {pollError && !over && <p className="note warn" role="alert">{pollError} Retrying game updates.</p>}
       {events.length > 0 && <details className="play-log"><summary>Game log</summary>
         <ol>{events.filter(({ event }) => event.objectId === game?.gameId).slice(-30).map(({ id, event }) =>
           <li key={id}>{eventMessage({ id, event })}</li>)}</ol>

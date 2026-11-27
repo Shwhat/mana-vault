@@ -48,6 +48,8 @@ The server maintains a local card catalog, collection and deck data in SQLite, w
 
 Manual tables leave Magic rules to the players, keep opponents' hands and libraries private, and support read-only invited spectators. Players can drag their own cards between zones or use a destination selector, including library top or bottom, copy their battlefield cards and attach battlefield cards in manual solo and multiplayer games. Multiplayer players can report their own loss to finish a game. The Playmat engine is optional and is not included or enabled by default. Its workspace displays the engine's turn, phase, step, active player and priority when provided. Supported engine prompts include pile, list and amount distribution choices; single numeric prompts respect the engine's bounds within the workspace limit of -10000 to 10000 and may be cancelled.
 
+The engine workspace reports game-update outages while retrying, and action errors remain visible until the next action. Reconnecting active engine games is covered by simulated tests but has not been verified against a real deployment.
+
 ### Built for collectors who self-host
 
 - Single Docker container, published for `amd64` and `arm64`.

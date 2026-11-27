@@ -10,6 +10,8 @@ The **Play** mode is a workspace for testing saved decks. Open it from the deskt
 | Manual solo | Starts an offline game in this browser with a shuffled main deck, a seven-card hand, mulligans, draws, library search and shuffle, zones, taps, face-down cards, counters, tokens, life, poison, dice and coin flips. |
 | Multiplayer table | Hosts a private manual Commander table for two or four signed-in players, joins a waiting table, or watches with an invitation code. |
 
+Engine AI shows when game updates are unavailable and retries them. Action errors remain visible until another action is attempted. A restored connection must rejoin its tracked games before it can serve updates; real-engine recovery is not yet verified.
+
 Manual play is a tabletop helper, not a rules engine. Players resolve spells, priority, combat, triggers and other Magic rules themselves. Playing cards never changes the saved deck or collection.
 
 In manual solo and multiplayer games, drag your own cards between zones or use each card's **Move to** selector, including on touch devices. The selector offers the top or bottom of the library; the Library drop target places cards on the bottom. Open library search to move cards out of your library. Changing zones clears counters, and leaving the battlefield clears attachments. During a solo mulligan, choose the required cards to put on the bottom before moving other cards from hand.

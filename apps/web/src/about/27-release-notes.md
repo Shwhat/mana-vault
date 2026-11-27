@@ -2,6 +2,10 @@
 
 The installed version is shown at the top of the in-app guide.
 
+## 0.45.2 (2026-11-27): Engine connection recovery
+
+- Retry failed active-game rejoins before returning a restored engine connection. Show game-update outages and retain action errors until the next action.
+
 ## 0.45.1 (2026-11-27): Engine acceptance documentation
 
 - Record the isolated all-land game completed through the native workspace without player concession, and its gameplay limitations.

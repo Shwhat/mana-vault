@@ -3,13 +3,14 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { WebSocketServer, type WebSocket } from "ws";
 import type { AddressInfo } from "node:net";
 import type { ServerEvent } from "@mana-vault/playmat-protocol";
 import { buildApp } from "../app.js";
 import { cardExtrasStatement, cardInsertStatement } from "../database.js";
 import { PlaymatConnection } from "./playmat-connection.js";
+import { PlaySessionManager } from "./play-sessions.js";
 
 const cleanup: Array<() => Promise<void>> = [];
 const servers: WebSocketServer[] = [];
@@ -22,7 +23,8 @@ afterEach(async () => {
   }
 });
 
-async function engine(takeOverOnFirstDeckQuery = false, eventDelayMs = 0, rejectLogin: () => boolean = () => false) {
+async function engine(takeOverOnFirstDeckQuery = false, eventDelayMs = 0, rejectLogin: () => boolean = () => false,
+  joinGame?: (gameId: string) => Promise<boolean>) {
   const server = new WebSocketServer({ host: "127.0.0.1", port: 0 });
   servers.push(server);
   await new Promise<void>((resolve) => server.once("listening", resolve));
@@ -33,7 +35,7 @@ async function engine(takeOverOnFirstDeckQuery = false, eventDelayMs = 0, reject
     connectionCount += 1;
     const identity = String(request.headers["x-mana-vault-user"] ?? "");
     identities.set(identity, socket);
-    socket.on("message", (raw) => {
+    socket.on("message", async (raw) => {
       const message = JSON.parse(raw.toString()) as { id: number; method: string; params: unknown[] };
       calls.push({ identity, method: message.method, params: message.params });
       if (takeOverOnFirstDeckQuery && connectionCount === 1 && message.method === "getDeckTypes") {
@@ -52,7 +54,7 @@ async function engine(takeOverOnFirstDeckQuery = false, eventDelayMs = 0, reject
         roomCreateTable: { tableId: "table-test" },
         roomJoinTable: true,
         matchStart: true,
-        gameJoin: true,
+        gameJoin: message.method === "gameJoin" && joinGame ? await joinGame(String(message.params[0])) : true,
         roomLeaveTableOrTournament: true,
         matchQuit: true,
         sendPlayerBoolean: true,
@@ -731,6 +733,78 @@ describe("authenticated Playmat sessions", () => {
     expect(logins).toHaveLength(3);
     expect(logins[1]?.params[3]).toBe("test-restore-token-00000001");
     expect(logins[2]?.params[3]).toBe("test-restore-token-00000001");
+  });
+
+  it("retries failed game rejoining without repeating successful joins", async () => {
+    let rejectSecond = true;
+    const engineServer = await engine(false, 0, () => false, async (gameId) => gameId !== "game-two" || !rejectSecond);
+    const { database } = await signedInApp(engineServer.url);
+    const userId = Number(database.prepare("SELECT id FROM users WHERE name = 'player-one'").get()?.id);
+    const sessions = new PlaySessionManager(database, { url: engineServer.url, timeoutMs: 1000 });
+    cleanup.unshift(() => sessions.disconnectAll((_id, error) => { throw error; }));
+    const original = await sessions.connectionFor(userId);
+    sessions.registerGame(userId, "game-one");
+    sessions.registerGame(userId, "game-two");
+    engineServer.identities.values().next().value?.terminate();
+    await vi.waitFor(() => expect(original.isClosed).toBe(true));
+
+    await expect(sessions.connectionFor(userId)).rejects.toThrow("could not restore the active game");
+    expect(engineServer.calls.filter(({ method }) => method === "gameJoin").map(({ params }) => params[0]))
+      .toEqual(["game-one", "game-two"]);
+    rejectSecond = false;
+    await sessions.connectionFor(userId);
+    expect(engineServer.calls.filter(({ method }) => method === "gameJoin").map(({ params }) => params[0]))
+      .toEqual(["game-one", "game-two", "game-two"]);
+    expect(engineServer.connectionCount).toBe(2);
+  });
+
+  it("waits for game rejoining before returning a restored connection to concurrent callers", async () => {
+    let finishJoin: ((value: boolean) => void) | undefined;
+    const engineServer = await engine(false, 0, () => false, () => new Promise<boolean>((resolve) => { finishJoin = resolve; }));
+    const { database } = await signedInApp(engineServer.url);
+    const userId = Number(database.prepare("SELECT id FROM users WHERE name = 'player-one'").get()?.id);
+    const sessions = new PlaySessionManager(database, { url: engineServer.url, timeoutMs: 1000 });
+    cleanup.unshift(() => sessions.disconnectAll((_id, error) => { throw error; }));
+    const original = await sessions.connectionFor(userId);
+    sessions.registerGame(userId, "game-one");
+    engineServer.identities.values().next().value?.terminate();
+    await vi.waitFor(() => expect(original.isClosed).toBe(true));
+
+    let secondCompleted = false;
+    const first = sessions.connectionFor(userId);
+    await vi.waitFor(() => expect(finishJoin).toBeDefined());
+    const second = sessions.connectionFor(userId).then((connection) => {
+      secondCompleted = true;
+      return connection;
+    });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(secondCompleted).toBe(false);
+    finishJoin?.(true);
+    const [firstResult, secondResult] = await Promise.all([first, second]);
+    expect(secondResult).toBe(firstResult);
+    expect(engineServer.calls.filter(({ method }) => method === "gameJoin")).toHaveLength(1);
+  });
+
+  it("closes a restored connection when the user signs out during game rejoining", async () => {
+    let finishJoin: ((value: boolean) => void) | undefined;
+    const engineServer = await engine(false, 0, () => false, () => new Promise<boolean>((resolve) => { finishJoin = resolve; }));
+    const { database } = await signedInApp(engineServer.url);
+    const userId = Number(database.prepare("SELECT id FROM users WHERE name = 'player-one'").get()?.id);
+    const sessions = new PlaySessionManager(database, { url: engineServer.url, timeoutMs: 1000 });
+    cleanup.unshift(() => sessions.disconnectAll((_id, error) => { throw error; }));
+    const original = await sessions.connectionFor(userId);
+    sessions.registerGame(userId, "game-one");
+    engineServer.identities.values().next().value?.terminate();
+    await vi.waitFor(() => expect(original.isClosed).toBe(true));
+
+    const reconnect = expect(sessions.connectionFor(userId)).rejects.toThrow("session ended while reconnecting");
+    await vi.waitFor(() => expect(finishJoin).toBeDefined());
+    const disconnect = sessions.disconnectUser(userId);
+    finishJoin?.(true);
+    await expect(disconnect).resolves.toBeUndefined();
+    await reconnect;
+    expect(sessions.ownsGame(userId, "game-one")).toBe(false);
+    expect(engineServer.calls.filter(({ method }) => method === "disconnectSession")).toHaveLength(1);
   });
 
   it("closes the affected engine session when an admin disables its account", async () => {

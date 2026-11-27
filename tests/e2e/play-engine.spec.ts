@@ -420,6 +420,77 @@ test("offers engine-approved actions, combat choices and named targets", async (
   }
 });
 
+test("reports engine update failures and preserves action errors until retried", async ({ page }) => {
+  await signUp(page, "playengineoutage");
+  const created = await page.request.post("/api/decks", {
+    headers: { "x-mana-vault": "1" },
+    data: { name: "Engine outage test deck", format: "modern" },
+  });
+  expect(created.status()).toBe(201);
+  const deckId = String((await created.json()).id);
+  let offline = false;
+  let rejectAction = true;
+  let polls = 0;
+  try {
+    await page.route("**/api/play/**", async (route) => {
+      const request = route.request();
+      const url = new URL(request.url());
+      if (url.pathname === "/api/play/status") {
+        await route.fulfill({ json: { enabled: true } });
+      } else if (url.pathname === "/api/play/options") {
+        await route.fulfill({ json: { gameTypes: ["Two Player Duel"], deckTypes: ["Constructed - Modern"] } });
+      } else if (url.pathname === "/api/play/games" && request.method() === "POST") {
+        await route.fulfill({ json: { tableId: "outage-table", gameId: "outage-game" } });
+      } else if (url.pathname === "/api/play/events") {
+        polls += 1;
+        if (offline) {
+          await route.fulfill({ status: 503, json: { error: "The play engine is unavailable." } });
+        } else {
+          const events = Number(url.searchParams.get("after")) === 0
+            ? [{ id: 1, event: { method: "GAME_SELECT", objectId: "outage-game", messageId: 1, data: { message: "Priority" } } }]
+            : [];
+          await route.fulfill({ json: { events } });
+        }
+      } else if (url.pathname.endsWith("/actions")) {
+        await route.fulfill(rejectAction
+          ? { status: 409, json: { error: "The action was rejected." } }
+          : { json: {} });
+      } else {
+        await route.continue();
+      }
+    });
+
+    await page.reload();
+    await page.locator("#modetabs .mtab", { hasText: "Play" }).click();
+    await page.getByLabel("Saved deck").selectOption(deckId);
+    await page.getByLabel("Game type").selectOption("Two Player Duel");
+    await page.getByLabel("Deck format").selectOption("Constructed - Modern");
+    await page.getByRole("button", { name: "Start against AI" }).click();
+    const toolbar = page.locator("#view-play .play-toolbar").filter({ hasText: "outage-game" });
+    await expect(toolbar).toContainText("Connected");
+    await page.getByRole("button", { name: "Pass priority", exact: true }).click();
+    await expect(page.getByRole("alert")).toContainText("The action was rejected.");
+    const priorPolls = polls;
+    await expect.poll(() => polls).toBeGreaterThan(priorPolls);
+    await expect(page.getByRole("alert")).toContainText("The action was rejected.");
+
+    offline = true;
+    await expect(toolbar).toContainText("Connection unavailable");
+    await expect(page.getByRole("alert").filter({ hasText: "The play engine is unavailable." })).toContainText("Retrying game updates.");
+    await expect(page.getByRole("alert").filter({ hasText: "The action was rejected." })).toBeVisible();
+    offline = false;
+    await expect(toolbar).toContainText("Connected");
+    await expect(page.getByRole("alert").filter({ hasText: "The play engine is unavailable." })).toHaveCount(0);
+    await expect(page.getByRole("alert").filter({ hasText: "The action was rejected." })).toBeVisible();
+    rejectAction = false;
+    await page.getByRole("button", { name: "Pass priority", exact: true }).click();
+    await expect(page.getByRole("alert")).toHaveCount(0);
+  } finally {
+    const deleted = await page.request.delete(`/api/decks/${deckId}`, { headers: { "x-mana-vault": "1" } });
+    expect(deleted.status()).toBe(200);
+  }
+});
+
 test("plays a saved-deck engine game through the native Play UI", async ({ page }) => {
   test.skip(!process.env.MANAVAULT_PLAYMAT_URL, "requires the private Playmat integration service");
   test.setTimeout(180_000);

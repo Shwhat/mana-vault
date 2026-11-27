@@ -1,5 +1,12 @@
 # Mana Vault handoff
 
+## 0.45.2 (2026-11-27): Engine connection recovery
+
+- Rejoining tracked games is now part of the shared reconnect operation. Failed rejoins are retried without repeating successful joins, concurrent callers wait for restoration, and signing out during restoration closes the recovered connection. The workspace reports update failures while retrying and keeps action errors visible until the next action.
+- Focused synthetic server and browser regressions passed. The 0.45.1 exact-head isolated engine workflow passed, including the all-land native game and spoof rejection. Real-engine reconnect, outage recovery, combat, targeting and production deployment remain unverified.
+- `PW_CHANNEL=chrome npm run test:all` passed: 429 server tests (3 skipped), 68 web tests, 3 play-core tests, 3 protocol tests, 3 Wiki tests and 127 browser tests (2 live-engine tests skipped locally). Delivery remains pending.
+- A local synthetic engine was stopped after an unexpected wildcard listener was detected; shared-host loopback is not a trusted security boundary.
+
 ## 0.45.1 (2026-11-27): Engine acceptance documentation
 
 - The 0.44.1 private-engine workflow completed an all-land game through the native UI without the player conceding, and passed the saved-deck, hidden-state and spoof-rejection checks. This does not verify combat, targeting or all engine prompts. Exact-head engine validation for 0.45.0 is pending.

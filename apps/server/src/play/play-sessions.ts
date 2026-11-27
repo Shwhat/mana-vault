@@ -24,10 +24,13 @@ const PLAYER_PROMPT_EVENTS = new Set([
   "GAME_PLAY_MANA", "GAME_PLAY_XMANA", "GAME_GET_AMOUNT", "GAME_GET_MULTI_AMOUNT",
 ]);
 
+class PlaySessionEndedError extends Error {}
+
 export class PlaySessionManager {
   readonly #connections = new Map<number, Promise<PlaymatConnection>>();
   readonly #events = new Map<number, PlayerEvent[]>();
   readonly #games = new Map<number, Set<string>>();
+  readonly #gamesToRestore = new Map<number, Set<string>>();
   readonly #gameMessageIds = new Map<number, Map<string, number>>();
   readonly #claimedGameMessages = new Map<number, Set<string>>();
   readonly #listeners = new Map<number, Set<(event: PlayerEvent) => void>>();
@@ -49,30 +52,48 @@ export class PlaySessionManager {
         if (!current) throw new Error("Playmat session ended while connecting");
         return current;
       }
-      if (!connection.isClosed) return connection;
+      if (!connection.isClosed && !this.#gamesToRestore.get(userId)?.size) return connection;
       if (connection.wasTakenOver) {
         this.#connections.delete(userId);
         this.#takenOver.add(userId);
         throw new Error("Playmat session was signed in elsewhere");
       }
 
+      let restored: PlaymatConnection | undefined;
       let reconnecting: Promise<PlaymatConnection>;
-      reconnecting = connection.reconnect().catch((error: unknown) => {
-        if (this.#connections.get(userId) === reconnecting) this.#connections.set(userId, existing);
+      reconnecting = Promise.resolve().then(async () => {
+        restored = connection.isClosed ? await connection.reconnect() : connection;
+        if (this.#connections.get(userId) !== reconnecting) {
+          throw new PlaySessionEndedError("Playmat session ended while reconnecting");
+        }
+        if (restored !== connection) this.#gamesToRestore.set(userId, new Set(this.#games.get(userId)));
+        const remaining = this.#gamesToRestore.get(userId);
+        for (const gameId of remaining ?? []) {
+          if (!this.ownsGame(userId, gameId)) {
+            remaining?.delete(gameId);
+            continue;
+          }
+          const joined = await restored.call("gameJoin", gameId, restored.sessionId);
+          if (joined !== true) throw new Error("Playmat could not restore the active game");
+          remaining?.delete(gameId);
+        }
+        if (this.#connections.get(userId) !== reconnecting) {
+          throw new PlaySessionEndedError("Playmat session ended while reconnecting");
+        }
+        this.#gamesToRestore.delete(userId);
+        return restored;
+      }).catch(async (error: unknown) => {
+        if (this.#connections.get(userId) === reconnecting) {
+          this.#connections.set(userId, restored ? Promise.resolve(restored) : existing);
+        } else {
+          if (restored && !restored.isClosed) await restored.disconnect();
+          throw new PlaySessionEndedError("Playmat session ended while reconnecting", { cause: error });
+        }
         if (error instanceof PlaymatRpcError && error.reason === "signedInElsewhere") this.#takenOver.add(userId);
         throw error;
       });
       this.#connections.set(userId, reconnecting);
-      const restored = await reconnecting;
-      if (this.#connections.get(userId) !== reconnecting) {
-        await restored.disconnect();
-        throw new Error("Playmat session ended while reconnecting");
-      }
-      for (const gameId of this.#games.get(userId) ?? []) {
-        const joined = await restored.call("gameJoin", gameId, restored.sessionId);
-        if (joined !== true) throw new Error("Playmat could not restore the active game");
-      }
-      return restored;
+      return reconnecting;
     }
 
     let opening: Promise<PlaymatConnection>;
@@ -185,10 +206,15 @@ export class PlaySessionManager {
     this.#takenOver.delete(userId);
     this.#events.delete(userId);
     this.#games.delete(userId);
+    this.#gamesToRestore.delete(userId);
     this.#gameMessageIds.delete(userId);
     this.#claimedGameMessages.delete(userId);
     if (!connection) return;
-    await (await connection).disconnect();
+    try {
+      await (await connection).disconnect();
+    } catch (error) {
+      if (!(error instanceof PlaySessionEndedError)) throw error;
+    }
   }
 
   async disconnectIfUnauthorized(userId: number): Promise<void> {
