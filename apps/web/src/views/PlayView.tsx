@@ -520,6 +520,10 @@ function AutomatedGame({ deckId, options, engineError }: { deckId: string; optio
   const hand = cardsIn(view?.myHand);
   const stack = cardsIn(view?.stack);
   const over = events.some(({ event }) => event.objectId === game?.gameId && event.method === "GAME_OVER");
+  const canChooseObject = (id: string | null): id is string => prompt?.event.method === "GAME_SELECT"
+    && id !== null
+    && playableObjects !== null
+    && Object.prototype.hasOwnProperty.call(playableObjects, id);
 
   return (
     <section className="play-panel">
@@ -549,17 +553,22 @@ function AutomatedGame({ deckId, options, engineError }: { deckId: string; optio
             {players.map((player, index) => <section className="play-player" key={String(player.playerId ?? index)}>
               <b>{playerName(player)}</b>
               <span>Life {String(player.life ?? "?")} · Hand {String(player.handCount ?? "?")} · Library {String(player.libraryCount ?? "?")}</span>
-              <div className="play-card-row">{playerZones(player).map((card, cardIndex) => <div className="engine-card" key={String(record(card)?.id ?? cardIndex)}>{cardName(card)}</div>)}</div>
+              <div className="play-card-row">{playerZones(player).map((card, cardIndex) => {
+                const id = cardObjectId(card);
+                const name = cardName(card);
+                return <div className="engine-card" key={id ?? cardIndex}>
+                  {name}
+                  {canChooseObject(id) && <button type="button" className="btn small" aria-label={`Choose ${name}`}
+                    onClick={() => void respond("sendPlayerUUID", id)}>Choose</button>}
+                </div>;
+              })}</div>
             </section>)}
           </div>
           <section className="play-zone"><h3>Your hand <span className="cnt">{hand.length}</span></h3>
             <div className="play-card-row">{hand.map((card, index) => {
               const id = cardObjectId(card);
               const name = cardName(card);
-              const canPlay = prompt?.event.method === "GAME_SELECT"
-                && id !== null
-                && playableObjects !== null
-                && Object.prototype.hasOwnProperty.call(playableObjects, id);
+              const canPlay = canChooseObject(id);
               return <div className="engine-card" key={id ?? index}>
                 {name}
                 {canPlay && <button type="button" className="btn small primary" aria-label={`Play ${name}`}

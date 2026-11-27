@@ -1,11 +1,19 @@
 # Mana Vault handoff
 
+## 0.33.0 (2026-11-27): Native Engine AI battlefield choices
+
+- Add a Choose action for battlefield cards that the engine lists in `canPlayObjects` during `GAME_SELECT`, using the same prompt-bound UUID response as hand-card play.
+- Add browser coverage for engine-approved versus unavailable battlefield cards and verify the submitted card UUID.
+- Validation: the focused Engine AI browser regression passed. `PW_CHANNEL=chrome npm run test:all` passed: typechecks, 426 server tests (3 skipped), 64 web tests, 3 play-core tests, 3 Playmat protocol tests, 3 Wiki tests and 126 browser tests (1 live-engine test skipped locally). `git diff --check` and synchronized version/lockfile static tests passed.
+- Phase 1 production deployment/reconnect acceptance and Phase 2 non-concession gameplay, broader prompts, targeting and combat remain open. Phases 3 and 4 also remain incomplete.
+- Delivery: the working change is not committed or pushed. PR #52 remains a draft and unmerged. The 0.32.2 exact-head Android workflow passed and produced `mana-vault-0.32.2-debug`; its private-engine workflow has built the pinned engine and is running saved-deck acceptance. Version 0.33.0 requires its own CI and Android artifact after it is pushed.
+
 ## 0.32.2 (2026-11-27): Native Engine AI priority control
 
 - Add the supported `PASS_PRIORITY_UNTIL_NEXT_MAIN_PHASE` player action to the `GAME_SELECT` prompt and test its HTTP acceptance in the private-engine browser flow.
 - Validation: `PW_CHANNEL=chrome npm run test:all` passed: typechecks, 426 server tests (3 skipped), 64 web tests, 3 play-core tests, 3 Playmat protocol tests, 3 Wiki tests and 125 browser tests. The live-engine test was skipped locally because no Playmat URL is configured; exact-head CI remains required. The production build reports the existing large-chunk warning. Version/lockfile checks and `git diff --check` passed.
 - Phase 1 deployment/reconnect acceptance and Phase 2 native-game completion remain open. This control does not validate normal game completion or all gameplay prompts.
-- Delivery: 0.32.2 changes are not committed or pushed yet. PR #52 remains a draft and unmerged.
+- Delivery: commit `bf4594b` is pushed to PR #52. Its Android workflow passed and produced `mana-vault-0.32.2-debug`; its private-engine workflow is running. PR #52 remains a draft and unmerged.
 
 ## 0.32.1 (2026-11-27): Multiplayer game-end acceptance
 
@@ -91,11 +99,11 @@
 - Validation: `PW_CHANNEL=chrome npm run test:all` passed, including 119 browser tests. `git diff --check` passed.
 - At handoff, version 0.24.8 and automatic synchronization are pending delivery. Verify the workflow, container, Android build and debug APK for the merged commit.
 
-Last updated: 2026-11-27, version 0.32.2 native Engine AI priority control in progress; validation and delivery are pending.
+Last updated: 2026-11-27, version 0.33.0 native Engine AI battlefield choices in progress; validation and delivery are pending.
 
-## Current next steps (0.32.2)
+## Current next steps (0.33.0)
 
-- Run the focused and full validation gates, review the complete diff, then commit and push to PR #52. Verify native card play and priority pass in the private-engine browser check and all other checks for the exact pushed commit. Keep the PR a draft until the remaining Play Table acceptance gates are met.
+- Run the focused and full validation gates, review the complete diff, then commit and push to PR #52. Verify native hand-card play, battlefield choices and priority pass in the private-engine browser check and all other checks for the exact pushed commit. Keep the PR a draft until the remaining Play Table acceptance gates are met.
 - Keep the PR unmerged until required checks and approvals pass. After merge, verify the exact-SHA container and Android workflows and the matching debug APK.
 - Complete Phase 1 production deployment and engine reconnect/outage acceptance before describing Play Table phases 2 through 4 as complete.
 

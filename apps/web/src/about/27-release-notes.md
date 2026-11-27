@@ -2,6 +2,12 @@
 
 The installed version is shown at the top of the in-app guide.
 
+## 0.33.0 (2026-11-27): Native Engine AI battlefield choices
+
+- Show a Choose action for battlefield cards listed in the engine's current `canPlayObjects` during `GAME_SELECT`, and submit the selected UUID against that prompt.
+- Add browser coverage proving only engine-approved objects are selectable and the UI sends the selected card ID.
+- Keep Phase 2 open: this does not verify a non-concession win, all prompts, targeting or combat.
+
 ## 0.32.2 (2026-11-27): Native Engine AI priority control
 
 - Add a prompt-bound action to pass priority until the next main phase in the Engine AI workspace.
