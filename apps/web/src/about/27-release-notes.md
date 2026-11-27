@@ -2,6 +2,11 @@
 
 The installed version is shown at the top of the in-app guide.
 
+## 0.44.1 (2026-11-27): Manual custom-card game test
+
+- Add a browser acceptance scenario for an original custom card in a completed private manual game.
+- Adjust the finite response limit for the all-land engine completion test after isolated CI showed both libraries nearly empty at the previous limit.
+
 ## 0.44.0 (2026-11-27): Manual zone movement
 
 - Drag your cards between manual zones or choose a destination, including the top or bottom of your library. Changing zones clears counters; multiplayer boards show public graveyards and exile.

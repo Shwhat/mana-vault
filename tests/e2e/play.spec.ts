@@ -248,12 +248,13 @@ test("four-player manual Commander tables keep every hand private and advance tu
   }
 });
 
-test("manual solo plays an original custom card from a saved deck", async ({ page }) => {
+test("plays an original custom card offline and in a completed manual game", async ({ browser, page }) => {
   const suffix = Date.now().toString(36).slice(-5);
   const setCode = `p${suffix}`;
   const customName = `Practice Bear ${suffix}`;
   let customCardId: string | null = null;
   let deckId: string | null = null;
+  let multiplayerDeckId: string | null = null;
   let customSetCreated = false;
 
   try {
@@ -345,8 +346,47 @@ test("manual solo plays an original custom card from a saved deck", async ({ pag
     await expect(graveyard.getByRole("img", { name: customName })).toBeVisible();
     await page.getByRole("button", { name: "Next turn and untap" }).click();
     await expect(page.locator(".play-toolbar")).toContainText("Turn 2");
+
+    await page.context().setOffline(false);
+    multiplayerDeckId = await createCommanderDeck(page, `Custom Commander ${suffix}`, customCard.id);
+    const guestContext = await browser.newContext();
+    try {
+      const guest = await guestContext.newPage();
+      await signUp(guest, "customguest");
+      const guestDeck = await createCommanderDeck(guest, `Guest Commander ${suffix}`, "llanowar");
+      await page.reload();
+      await page.locator("#modetabs .mtab", { hasText: "Play" }).click();
+      await page.getByLabel("Saved deck").selectOption(multiplayerDeckId);
+      await page.getByRole("tab", { name: "Multiplayer table" }).click();
+      await page.getByRole("button", { name: "Create two-player table" }).click();
+      const inviteText = await page.getByText(/Invite code:/).textContent();
+      const inviteCode = inviteText?.replace("Invite code:", "").trim();
+      if (!inviteCode) throw new Error("The new table did not display an invitation code.");
+      await guest.reload();
+      await guest.locator("#modetabs .mtab", { hasText: "Play" }).click();
+      await guest.getByLabel("Saved deck").selectOption(guestDeck);
+      await guest.getByRole("tab", { name: "Multiplayer table" }).click();
+      await guest.getByLabel("Invitation code").fill(inviteCode);
+      await guest.getByRole("button", { name: "Join table" }).click();
+      await expect(page.getByRole("button", { name: "Start game" })).toBeEnabled();
+      await page.getByRole("button", { name: "Start game" }).click();
+      await expect(guest.getByRole("button", { name: "Draw" })).toBeVisible();
+      await expect(guest.locator("#view-play")).not.toContainText(customName);
+      await page.locator('.play-zone[data-zone="hand"]').getByRole("button", { name: "Play", exact: true }).first().click();
+      await expect(guest.locator(".play-player-row")).toContainText(customName);
+      await reportPoisonLoss(guest);
+      await expect(page.locator("#view-play")).toContainText("Game ended");
+      await expect(guest.locator("#view-play")).toContainText("Game ended");
+      await expect(page.locator(".play-player-row .play-player").first()).toContainText("Remaining player");
+    } finally {
+      await guestContext.close();
+    }
   } finally {
     await page.context().setOffline(false);
+    if (multiplayerDeckId) {
+      const deletedDeck = await page.request.delete(`/api/decks/${multiplayerDeckId}`, { headers: { "x-mana-vault": "1" } });
+      expect(deletedDeck.status()).toBe(200);
+    }
     if (deckId) {
       const deletedDeck = await page.request.delete(`/api/decks/${deckId}`, { headers: { "x-mana-vault": "1" } });
       expect(deletedDeck.status()).toBe(200);

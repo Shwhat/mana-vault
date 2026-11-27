@@ -527,8 +527,9 @@ test("finishes a real engine game without conceding through the native Play UI",
     const ended = page.locator("#view-play .play-toolbar").first().getByText("Game ended", { exact: true });
     await expect(prompt).toBeVisible({ timeout: 60_000 });
     let responses = 0;
+    const maxResponses = 300;
     const responseCounts = { keep: 0, startingPlayer: 0, mountain: 0, pass: 0 };
-    for (; responses < 250; responses += 1) {
+    for (; responses < maxResponses; responses += 1) {
       if (await ended.isVisible()) break;
       const messageId = await prompt.getAttribute("data-message-id");
       if (!messageId) throw new Error("The engine did not provide an active prompt.");
@@ -556,7 +557,7 @@ test("finishes a real engine game without conceding through the native Play UI",
         return nextId !== null && nextId !== messageId;
       }, { timeout: 30_000 }).toBe(true);
     }
-    if (responses === 250) {
+    if (responses === maxResponses) {
       throw new Error(`Engine game did not finish after ${responses} responses: ${JSON.stringify({
         responseCounts,
         players: await page.locator(".play-player").allTextContents(),

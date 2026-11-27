@@ -1,5 +1,11 @@
 # Mana Vault handoff
 
+## 0.44.1 (2026-11-27): Manual custom-card game test
+
+- Add acceptance coverage for playing an original custom card in a private manual game through a player-reported outcome, in addition to offline solo play. The focused browser test passed.
+- `PW_CHANNEL=chrome npm run test:all` passed: 426 server tests (3 skipped), 68 web tests, 3 play-core tests, 3 protocol tests, 3 Wiki tests and 126 browser tests (2 live-engine tests skipped locally). Delivery remains pending.
+- The 0.44.0 isolated engine test reached 250 responses with four and five cards left in the players' libraries; 50 land plays and 198 passes had advanced the all-land game. Increase the finite response limit to 300 while retaining the 300-second timeout. The updated limit still requires isolated live validation; combat and targeting remain unverified in a complete real game.
+
 ## 0.44.0 (2026-11-27): Manual zone movement
 
 - Manual solo and multiplayer allow dragging owned cards between zones or selecting a destination, including the library top or bottom (dragging places cards on the bottom). Library cards remain private to their owner until moved to a public zone. Zone changes clear counters and battlefield attachments; multiplayer player boards show public graveyards and exile.
