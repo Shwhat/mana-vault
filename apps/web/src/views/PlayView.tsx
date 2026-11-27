@@ -614,7 +614,8 @@ function AutomatedGame({ deckId, options, engineError }: { deckId: string; optio
           </section>
           {stack.length > 0 && <section className="play-zone"><h3>Stack</h3><div className="play-card-row">{stack.map((card, index) => <div className="engine-card" key={String(record(card)?.cardId ?? index)}>{cardName(card)}</div>)}</div></section>}
         </>}
-        {prompt && !over && <section className="play-prompt" aria-live="polite" data-message-id={prompt.event.messageId}>
+        {prompt && !over && <section className="play-prompt" aria-live="polite" data-message-id={prompt.event.messageId}
+          data-web-prompt={typeof promptOptions?.webPrompt === "string" ? promptOptions.webPrompt : undefined}>
           <h3>{eventMessage(prompt)}</h3>
           {prompt.event.method === "GAME_ASK" && <>
             <button type="button" className="btn primary" onClick={() => void respond("sendPlayerBoolean", true)}>{typeof promptOptions?.["UI.left.btn.text"] === "string" ? promptOptions["UI.left.btn.text"] : "Yes"}</button>

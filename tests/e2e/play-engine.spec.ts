@@ -94,7 +94,7 @@ test("offers engine-approved actions, combat choices and named targets", async (
           method: "GAME_ASK",
           objectId: gameId,
           messageId: 5,
-          data: { message: "Keep this hand?", options: { "UI.left.btn.text": "Mulligan", "UI.right.btn.text": "Keep" } },
+          data: { message: "Keep this hand?", options: { "UI.left.btn.text": "Mulligan", "UI.right.btn.text": "Keep", webPrompt: "mulligan" } },
         },
       },
       {
@@ -214,6 +214,7 @@ test("offers engine-approved actions, combat choices and named targets", async (
       data: abilityId,
     });
     await expect(page.getByRole("button", { name: "Mulligan" })).toBeVisible();
+    await expect(page.locator(".play-prompt")).toHaveAttribute("data-web-prompt", "mulligan");
     await page.getByRole("button", { name: "Keep" }).click();
     await expect.poll(() => submittedActions).toHaveLength(4);
     await expect(submittedActions[3]).toMatchObject({
@@ -283,15 +284,32 @@ test("plays a saved-deck engine game through the native Play UI", async ({ page 
 
     const prompt = page.locator(".play-prompt");
     await expect(prompt).toBeVisible({ timeout: 60_000 });
-    const firstMessage = await prompt.getAttribute("data-message-id");
-    const keepHand = page.getByRole("button", { name: "Keep", exact: true });
-    if (await keepHand.isVisible()) {
-      await keepHand.click();
-      await expect(prompt).not.toHaveAttribute("data-message-id", firstMessage ?? "");
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      const messageId = await prompt.getAttribute("data-message-id");
+      const keepHand = prompt.getByRole("button", { name: "Keep", exact: true });
+      if (await keepHand.isVisible()) {
+        await keepHand.click();
+      } else if (await prompt.getAttribute("data-web-prompt") === "startingPlayer") {
+        await prompt.getByRole("button").filter({ hasNotText: "Concede" }).first().click();
+      } else {
+        break;
+      }
+      await expect(prompt).not.toHaveAttribute("data-message-id", messageId ?? "", { timeout: 60_000 });
     }
 
     const playMountain = page.getByRole("button", { name: "Play Mountain" }).first();
-    await expect(playMountain).toBeVisible({ timeout: 60_000 });
+    try {
+      await expect(playMountain).toBeVisible({ timeout: 60_000 });
+    } catch (reason) {
+      const hasPrompt = await prompt.count() > 0;
+      console.error("Engine UI state:", JSON.stringify({
+        prompt: hasPrompt ? await prompt.textContent() : null,
+        marker: hasPrompt ? await prompt.getAttribute("data-web-prompt") : null,
+        handCount: await page.locator(".play-zone").filter({ has: page.locator("h3", { hasText: "Your hand" }) }).locator(".engine-card").count(),
+        error: await page.locator("#view-play [role=alert]").allTextContents(),
+      }));
+      throw reason;
+    }
     await playMountain.click();
     await expect(page.locator(".play-player-row .engine-card").filter({ hasText: "Mountain" }).first())
       .toBeVisible({ timeout: 30_000 });

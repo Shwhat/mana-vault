@@ -1,5 +1,12 @@
 # Mana Vault handoff
 
+## 0.36.1 (2026-11-27): Native engine startup test
+
+- The live browser test now handles the engine's marked starting-player prompt and reports bounded UI diagnostics if the playable Mountain remains unavailable. The UI exposes the engine's prompt marker as an HTML data attribute for this check.
+- Version 0.35.0's live workflow failed again to find Play Mountain; saved-deck and hidden-state tests passed, and Android produced `mana-vault-0.35.0-debug`. The cause is not yet established. Version 0.36.0 was pushed as `fddeda3`; Android passed and produced `mana-vault-0.36.0-debug`, and its Play engine check is running.
+- Validation: the focused browser regression passed. `PW_CHANNEL=chrome npm run test:all` passed: typechecks, 426 server tests (3 skipped), 64 web tests, 3 play-core tests, 3 Playmat protocol tests, 3 Wiki tests and 126 browser tests (1 live-engine test skipped locally). Version and guide static checks passed.
+- Delivery of 0.36.1 is pending. Full native gameplay, real combat and targeting, production deployment/reconnect acceptance and phases 3 through 4 remain open.
+
 ## 0.36.0 (2026-11-27): Native combat choices
 
 - Render engine-approved attacker and blocker choices, send their IDs to the current prompt, and confirm declarations with the engine. Add single-step priority passing and target labels with option and card-picker fallbacks.

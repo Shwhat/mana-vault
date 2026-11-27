@@ -2,6 +2,11 @@
 
 The installed version is shown at the top of the in-app guide.
 
+## 0.36.1 (2026-11-27): Native engine startup test
+
+- Let the live browser test answer the engine's marked starting-player prompt before attempting to play a card.
+- Record bounded UI diagnostics if the test still cannot find the playable card. Live-engine verification remains pending.
+
 ## 0.36.0 (2026-11-27): Native combat choices
 
 - Offer the engine's available attackers and blockers, submit each chosen object to the active prompt, and confirm the declaration without applying rules locally.
