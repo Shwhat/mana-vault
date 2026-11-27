@@ -31,6 +31,11 @@ test("offers engine-approved actions, combat choices and named targets", async (
           messageId: 1,
           data: {
             gameView: {
+              turn: 2,
+              phase: "COMBAT",
+              step: "DECLARE_ATTACKERS",
+              activePlayerName: "You",
+              priorityPlayerName: "Opponent",
               players: [{
                 playerId: "player",
                 name: "You",
@@ -258,6 +263,12 @@ test("offers engine-approved actions, combat choices and named targets", async (
     await page.getByRole("button", { name: "Start against AI" }).click();
     const chooseCard = page.getByRole("button", { name: "Choose Available Sol Ring" });
     await expect(chooseCard).toBeVisible();
+    const progress = page.getByLabel("Game progress");
+    await expect(progress).toContainText("Turn 2");
+    await expect(progress).toContainText("Phase: combat");
+    await expect(progress).toContainText("Step: declare attackers");
+    await expect(progress).toContainText("Active: You");
+    await expect(progress).toContainText("Priority: Opponent");
     await expect(page.getByRole("button", { name: "Pass priority", exact: true })).toBeVisible();
     await expect(page.getByText("This prompt requires an engine response format not available in the workspace yet.")).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Choose Unavailable Creature" })).toHaveCount(0);
@@ -476,6 +487,7 @@ test("plays a saved-deck engine game through the native Play UI", async ({ page 
       }));
       throw reason;
     }
+    await expect(page.getByLabel("Game progress")).toContainText("Turn");
     await playMountain.click();
     await expect(page.locator(".play-player-row .engine-card").filter({ hasText: "Mountain" }).first())
       .toBeVisible({ timeout: 30_000 });

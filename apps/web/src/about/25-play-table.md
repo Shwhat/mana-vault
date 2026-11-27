@@ -6,7 +6,7 @@ The **Play** mode is a workspace for testing saved decks. Open it from the deskt
 
 | Mode | What it does |
 |---|---|
-| Engine AI | Starts an optional Playmat game from a saved deck after checking exact card printings. Cards marked playable by the engine can be chosen from hand or the battlefield, offered abilities and combatants can be selected, mana can be paid with approved battlefield sources, and priority can be passed. Supported prompts are answered in the native workspace, including concession. The server must have a Playmat engine configured. |
+| Engine AI | Starts an optional Playmat game from a saved deck after checking exact card printings. The workspace shows the engine-provided turn, phase, step, active player and priority when available. Cards marked playable by the engine can be chosen from hand or the battlefield, offered abilities and combatants can be selected, mana can be paid with approved battlefield sources, and priority can be passed. Supported prompts are answered in the native workspace, including concession. The server must have a Playmat engine configured. |
 | Manual solo | Starts an offline game in this browser with a shuffled main deck, a seven-card hand, mulligans, draws, library search and shuffle, zones, taps, face-down cards, counters, tokens, life, poison, dice and coin flips. |
 | Multiplayer table | Hosts a private manual Commander table for two or four signed-in players, joins a waiting table, or watches with an invitation code. |
 

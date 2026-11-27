@@ -2,6 +2,10 @@
 
 The installed version is shown at the top of the in-app guide.
 
+## 0.45.0 (2026-11-27): Engine turn progress
+
+- Show the turn, phase, step, active player and priority in the engine workspace when provided by the engine.
+
 ## 0.44.1 (2026-11-27): Manual custom-card game test
 
 - Add a browser acceptance scenario for an original custom card in a completed private manual game.

@@ -700,6 +700,11 @@ function AutomatedGame({ deckId, options, engineError }: { deckId: string; optio
   const playerZones = (player: Record<string, unknown>) => cardsIn(player.battlefield);
   const hand = cardsIn(view?.myHand);
   const stack = cardsIn(view?.stack);
+  const turn = typeof view?.turn === "number" && Number.isSafeInteger(view.turn) && view.turn >= 0 ? view.turn : null;
+  const phase = typeof view?.phase === "string" ? view.phase.toLowerCase().replace(/_/g, " ") : "";
+  const step = typeof view?.step === "string" ? view.step.toLowerCase().replace(/_/g, " ") : "";
+  const activePlayer = typeof view?.activePlayerName === "string" ? view.activePlayerName : "";
+  const priorityPlayer = typeof view?.priorityPlayerName === "string" ? view.priorityPlayerName : "";
   const combatKind = prompt?.event.method === "GAME_SELECT"
     ? Array.isArray(promptOptions?.possibleAttackers) ? "attackers"
       : Array.isArray(promptOptions?.possibleBlockers) ? "blockers" : null
@@ -751,6 +756,13 @@ function AutomatedGame({ deckId, options, engineError }: { deckId: string; optio
           <b>{game.gameId}</b>
           <span className="badge">{over ? "Game ended" : "Connected"}</span>
         </div>
+        {(turn !== null || phase || step || activePlayer || priorityPlayer) && <div className="play-toolbar" aria-label="Game progress">
+          {turn !== null && <span>Turn {turn}</span>}
+          {phase && <span>Phase: {phase}</span>}
+          {step && <span>Step: {step}</span>}
+          {activePlayer && <span>Active: {activePlayer}</span>}
+          {priorityPlayer && <span>Priority: {priorityPlayer}</span>}
+        </div>}
         {view && <>
           <div className="play-player-row">
             {players.map((player, index) => <section className="play-player" key={String(player.playerId ?? index)}>

@@ -1,5 +1,10 @@
 # Mana Vault handoff
 
+## 0.45.0 (2026-11-27): Engine turn progress
+
+- Show the engine-provided turn, phase, step, active player and priority when available. Focused mocked-engine browser coverage passed; a real-engine assertion remains pending isolated CI.
+- `PW_CHANNEL=chrome npm run test:all` passed: 426 server tests (3 skipped), 68 web tests, 3 play-core tests, 3 protocol tests, 3 Wiki tests and 126 browser tests (2 live-engine tests skipped locally). Delivery remains pending.
+
 ## 0.44.1 (2026-11-27): Manual custom-card game test
 
 - Add acceptance coverage for playing an original custom card in a private manual game through a player-reported outcome, in addition to offline solo play. The focused browser test passed.
