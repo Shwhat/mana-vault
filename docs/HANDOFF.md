@@ -1,5 +1,10 @@
 # Mana Vault handoff
 
+## 0.45.1 (2026-11-27): Engine acceptance documentation
+
+- The 0.44.1 private-engine workflow completed an all-land game through the native UI without the player conceding, and passed the saved-deck, hidden-state and spoof-rejection checks. This does not verify combat, targeting or all engine prompts. Exact-head engine validation for 0.45.0 is pending.
+- `PW_CHANNEL=chrome npm run test:all` passed: 426 server tests (3 skipped), 68 web tests, 3 play-core tests, 3 protocol tests, 3 Wiki tests and 126 browser tests (2 live-engine tests skipped locally). Delivery remains pending.
+
 ## 0.45.0 (2026-11-27): Engine turn progress
 
 - Show the engine-provided turn, phase, step, active player and priority when available. Focused mocked-engine browser coverage passed; a real-engine assertion remains pending isolated CI.

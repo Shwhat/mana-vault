@@ -2,6 +2,10 @@
 
 The installed version is shown at the top of the in-app guide.
 
+## 0.45.1 (2026-11-27): Engine acceptance documentation
+
+- Record the isolated all-land game completed through the native workspace without player concession, and its gameplay limitations.
+
 ## 0.45.0 (2026-11-27): Engine turn progress
 
 - Show the turn, phase, step, active player and priority in the engine workspace when provided by the engine.
@@ -17,7 +21,7 @@ The installed version is shown at the top of the in-app guide.
 
 ## 0.43.1 (2026-11-27): Native game completion test
 
-- Add an isolated private-engine browser test intended to play a game to completion without conceding. Live validation is pending.
+- Add an isolated private-engine browser test intended to play a game to completion without conceding. The all-land scenario passed in isolated CI with 0.44.1.
 
 ## 0.43.0 (2026-11-27): Manual multiplayer outcomes
 
