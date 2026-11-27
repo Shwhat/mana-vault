@@ -31,6 +31,7 @@ Under the title bar, the mode tabs switch the program between its parts. The tab
 | Search | Card search (Card search) | 1 |
 | Collection | The open collection (Collection view) | 2 |
 | Decks | The open deck (Deck view) | 3 |
+| Play | Engine AI, manual solo and multiplayer tables; see [Play table](/about/play-table) | |
 | Trade | Trades (Trade view), with a count when trades wait for your answer | 4 |
 | Proxies | The print list and the card maker (Proxies view) | 5 |
 | Purchases | Purchase history (Purchases view); see [Purchases](/about/purchases) | 6 |
@@ -83,7 +84,7 @@ Commands that can be used are shown in the normal text color.
 
 ## Work area
 
-The work area in the middle shows one of the views, chosen with the mode tabs or keys 1 to 7. Each view has a header row with its name, a search or filter box where it applies, and a count on the right.
+The work area in the middle shows one of the views, chosen with the mode tabs or their listed shortcut keys. Each view has a header row with its name, a search or filter box where it applies, and a count on the right.
 
 | View | Shows |
 |---|---|
@@ -91,6 +92,7 @@ The work area in the middle shows one of the views, chosen with the mode tabs or
 | Card search | Search results as a grid of card pictures, binder pages or a list, with prices and owned counts; see [Card search](/about/card-search) |
 | Collection | The open collection, in five tabs: Cards (a grid of card pictures, binder pages or a list), Completion, Missing, Statistics and Notes; see [Collections](/about/collections), [Set completion](/about/set-completion) and [Prices and statistics](/about/prices-and-statistics) |
 | Deck | The open deck, in seven tabs: Cards (the format check and the cards by zone and group as a list, text, stacks or grid), Add (Quick add and a card search), Ownership, Statistics, Playtest, Notes and History; see [Decks](/about/decks) |
+| Play | Engine AI, manual solo and private two- or four-player Commander tables; see [Play table](/about/play-table) |
 | Trade | Saved trades: You give and You get with their searches, the balance bar, wishlist matches and other accounts' trade binders; see [Wishlists and trading](/about/wishlists-and-trading) |
 | Proxies | The print list with sheet settings, preview and exports (Print tab), the card maker (Card maker tab) and custom sets with their symbols (Custom sets tab); see [Proxies and the card maker](/about/proxies) |
 | Wiki | The tree of notes pages (search, Pinned, Recent, Decks, Collections, My pages) and the open page; see [Notes and the Wiki](/about/notes-and-the-wiki) |
@@ -182,7 +184,7 @@ Below 900 pixels wide, and always in the Android app, the title bar, menus, mode
 
 - A top bar with the deck name, "Card", "Scan" or "Mana Vault", in the Android app the sync button (see [Android app](/about/android-app)), **Filters** in the collection, deck and trade views, **Trades** with a count when trades wait for your answer, an **Inbox** button with a count when offers are waiting, and the **Menu** button at the top right.
 - The current view, filling the screen. Phones open on Home. The card search adds a **Filters** button under the search box.
-- A bottom tab bar: **Home**, **Search**, **Collection**, **Decks**, **Trade**, **Proxies** and **Scan**. Search is card search. Decks shows the open deck, with the deck switcher at the top. Scan opens the camera scanner in place of the view (see [Scanning cards](/about/scanning-cards)). Purchases and Wiki open from their buttons on Home and from the View section of the Menu.
+- A bottom tab bar: **Home**, **Search**, **Collection**, **Decks**, **Play**, **Trade**, **Proxies** and **Scan**. Search is card search. Decks shows the open deck, with the deck switcher at the top. Play opens the [Play table](/about/play-table). Scan opens the camera scanner in place of the view (see [Scanning cards](/about/scanning-cards)). Purchases and Wiki open from their buttons on Home and from the View section of the Menu.
 - Tapping a card opens its card page (except while picking rows).
 - **Menu** opens a sheet with one section per menu (File, Edit, View, Help). Tapping a section opens it. The last section, **Account**, is open and holds Inbox, Change password, Devices and Sign out; the Android app adds Sync now, Notifications and Check for updates. Commands that do not apply are not shown.
 - Sheets that slide up from the bottom: **Filters**, **Menu** and the scanned list in the scanner. Close a sheet with **Close**, by tapping outside it, or with Esc.

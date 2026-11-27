@@ -268,7 +268,7 @@ export type BackupSummary = {
 
 export type User = { id: number; name: string; admin?: boolean; mustChange?: boolean };
 
-export type View = "home" | "cards" | "collection" | "deck" | "trade" | "proxies" | "purchases" | "wiki" | "about" | "admin";
+export type View = "home" | "cards" | "collection" | "deck" | "play" | "trade" | "proxies" | "purchases" | "wiki" | "about" | "admin";
 export type CollectionTab = "cards" | "completion" | "missing" | "stats" | "notes";
 export type DeckTab = "cards" | "add" | "ownership" | "stats" | "playtest" | "notes" | "history";
 export type DeckView = "list" | "text" | "stacks" | "grid";

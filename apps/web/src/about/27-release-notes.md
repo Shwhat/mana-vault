@@ -2,6 +2,142 @@
 
 The installed version is shown at the top of the in-app guide.
 
+## 0.45.2 (2026-11-27): Engine connection recovery
+
+- Retry failed active-game rejoins before returning a restored engine connection. Show game-update outages and retain action errors until the next action.
+
+## 0.45.1 (2026-11-27): Engine acceptance documentation
+
+- Record the isolated all-land game completed through the native workspace without player concession, and its gameplay limitations.
+
+## 0.45.0 (2026-11-27): Engine turn progress
+
+- Show the turn, phase, step, active player and priority in the engine workspace when provided by the engine.
+
+## 0.44.1 (2026-11-27): Manual custom-card game test
+
+- Add a browser acceptance scenario for an original custom card in a completed private manual game.
+- Adjust the finite response limit for the all-land engine completion test after isolated CI showed both libraries nearly empty at the previous limit.
+
+## 0.44.0 (2026-11-27): Manual zone movement
+
+- Drag your cards between manual zones or choose a destination, including the top or bottom of your library. Changing zones clears counters; multiplayer boards show public graveyards and exile.
+
+## 0.43.1 (2026-11-27): Native game completion test
+
+- Add an isolated private-engine browser test intended to play a game to completion without conceding. The all-land scenario passed in isolated CI with 0.44.1.
+
+## 0.43.0 (2026-11-27): Manual multiplayer outcomes
+
+- Report your own loss in a manual multiplayer game without conceding. Tables skip eliminated players and show the remaining player when the game closes.
+
+## 0.42.0 (2026-11-27): Manual battlefield copies
+
+- Copy your battlefield cards as tokens in offline solo and manual multiplayer tables. Copies retain face-down status and start untapped without counters or attachments.
+
+## 0.41.0 (2026-11-27): Engine choices and distributions
+
+- Choose between engine-provided piles and respond to searchable list choices, including optional cancellation and special choices with an item selected.
+- Distribute amounts across engine-provided options within individual and total limits.
+
+## 0.40.0 (2026-11-27): Manual battlefield attachments
+
+- Attach battlefield cards to other battlefield cards in solo and multiplayer manual games. Attachments clear when either card leaves the battlefield.
+
+## 0.39.2 (2026-11-27): Engine numeric prompts
+
+- Honor the engine's numeric prompt bounds within the workspace limit, reject invalid values and allow the player to cancel.
+
+## 0.39.1 (2026-11-27): Engine prompt clarity
+
+- Clarify that some choices may be missing from engine selection prompts without incorrectly saying the available pass response is unsupported.
+
+## 0.39.0 (2026-11-27): Multiplayer face-down cards
+
+- Play cards face down directly from hand, turn your battlefield cards face down, and reveal them. Opponents and spectators receive a hidden representation without the card's identity or artwork.
+
+## 0.38.0 (2026-11-27): Private multiplayer library search
+
+- Seated players can search their own library by name and move a selected card to hand in a manual multiplayer game. Results are sorted instead of revealing draw order; opponents and spectators cannot access them.
+- Update the live engine UI test to pass priority when it starts before a legal land-play opportunity. Real-engine verification remains pending.
+
+## 0.37.0 (2026-11-27): Offline solo library search
+
+- Search a solo game's library by card name, move a selected card to hand and shuffle the remaining library without changing the saved deck.
+- Browser coverage exercises an original custom card while offline. Multiplayer library search remains unavailable.
+
+## 0.36.1 (2026-11-27): Native engine startup test
+
+- Let the live browser test answer the engine's marked starting-player prompt before attempting to play a card.
+- Record bounded UI diagnostics if the test still cannot find the playable card. Live-engine verification remains pending.
+
+## 0.36.0 (2026-11-27): Native combat choices
+
+- Offer the engine's available attackers and blockers, submit each chosen object to the active prompt, and confirm the declaration without applying rules locally.
+- Add a single-step priority pass and label known target players and cards, including target lists supplied in engine options or card pickers.
+- Mocked browser coverage exercises the responses. Full combat, targeting and a complete non-concession engine game remain unverified.
+
+## 0.35.0 (2026-11-27): Engine ability choices and solo face-down cards
+
+- Show engine-provided ability choices and submit the selected ability ID against the current prompt.
+- Use the engine's labels for yes/no prompts so choices such as Mulligan and Keep retain their intended meaning.
+- Fix the offline solo battlefield controls so cards can be turned face down and revealed again.
+- Browser regressions cover ability selection and the face-down round trip with an original custom card while offline. Full native engine gameplay and multiplayer face-down controls remain incomplete.
+
+## 0.34.0 (2026-11-27): Native Engine AI mana payment
+
+- Read playable object IDs from the pinned Playmat `canPlayObjects.objects` map and prefer the active prompt's current view over older game state.
+- During `GAME_PLAY_MANA`, show Tap for mana actions for battlefield objects the current engine view marks playable. Submit the selected object UUID against the active prompt.
+- Extend the UI regression to verify prompt-bound battlefield selection and mana-source responses.
+- Keep Phase 2 open: the mocked interaction does not establish a completed real game, all prompt support, targeting or combat.
+
+## 0.33.0 (2026-11-27): Native Engine AI battlefield choices
+
+- Add the initial Choose action for battlefield cards listed in `canPlayObjects` during `GAME_SELECT`, and browser coverage for the prompt-bound UUID response.
+- The private-engine check found the ID map is nested under `canPlayObjects.objects`; the 0.34.0 update corrects the lookup before merge.
+- Keep Phase 2 open: this does not verify a non-concession win, all prompts, targeting or combat.
+
+## 0.32.2 (2026-11-27): Native Engine AI priority control
+
+- Add a prompt-bound action to pass priority until the next main phase in the Engine AI workspace.
+- Extend the private-engine browser flow to submit the priority action and wait for the next prompt.
+- Keep Phase 2 open: this does not verify a non-concession win, all prompts, targeting or combat.
+
+## 0.32.1 (2026-11-27): Multiplayer game-end acceptance
+
+- Extend the two-player and four-player browser scenarios through concession, verifying that each game closes and connected players and spectators receive the ended state.
+- These manual-table tests do not enforce Magic rules or complete Phase 4 acceptance.
+
+## 0.32.0 (2026-11-27): Native Engine AI card play
+
+- Show Play buttons for hand cards the Playmat engine marks playable during the player's selection prompt. Send the selected card ID as the prompt-bound response.
+- Extend the private-engine browser flow to play an engine-approved Mountain before conceding.
+- Keep Phase 2 open: this does not verify a non-concession win, all prompts, targeting or combat.
+
+## 0.31.1 (2026-11-27): Multiplayer play acceptance
+
+- Expand the two-player browser flow to reload both seated players and complete a shared turn cycle with hidden-hand assertions. The four-player flow also exercises each seat's turn and hand privacy. Verify original custom-card solo play while the browser is offline.
+- Keep the overall Phase 4 gate open until full-game and reconnect acceptance is complete.
+
+## 0.31.0 (2026-11-27): Native Play engine controls
+
+- Add a native concession control to current Playmat prompts and a browser acceptance flow that starts a saved-deck game, answers the opening-hand prompt and observes the engine-reported terminal result.
+- Run the browser acceptance flow against the pinned private Playmat service in the Play engine integration workflow.
+- This does not complete Phase 2: the acceptance flow ends by concession and does not verify a non-concession win, all prompts, spell casting, targeting or combat.
+
+## 0.30.1 (2026-11-27): Play Table acceptance coverage
+
+- Add browser coverage for moving an original custom card through an offline manual game and completing a four-player turn cycle with viewer-specific hand visibility.
+- Keep the Play Table phases 2 through 4 status explicit; this test coverage does not complete their acceptance gates.
+
+## 0.30.0 (2026-11-27): Native Play workspace and manual tables
+
+- Add a top-level Play workspace with optional Engine AI, offline manual solo and private manual Commander table modes, linked from saved decks and phone navigation.
+- Add server-stored two- and four-player tables with invitation codes, revision-checked actions, reconnect polling, read-only spectators and player-specific views that omit opponents' hands and libraries.
+- Add manual actions for drawing, shuffling, zone movement, taps, counters, tokens, life, poison, commander damage, turn changes and concession. Manual play does not enforce Magic rules.
+- Keep the Play mode tabs compact on phones. Add offline custom-card coverage and two- and four-player browser flows for reloads, hidden hands, battlefield actions, turn changes, and phone layout.
+- The Play workspace is an initial implementation, not completion of Play Table phases 2 through 4. Engine AI requires a separately configured Playmat service and supports only the prompts shown in the UI. Match history, full manual interactions, production deployment and engine reconnect or outage recovery remain unimplemented or unverified. PR CI validated the private Compose profile, unpublished engine ports, saved-deck hidden-state behavior and trusted-header isolation.
+
 ## 0.29.0 (2026-11-26): Server-side Playmat game integration
 
 - Add authenticated per-user Playmat sessions and server routes for engine discovery, exact-printing saved-deck validation, private AI table startup, player game events and fresh prompt responses.

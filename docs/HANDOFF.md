@@ -1,13 +1,193 @@
 # Mana Vault handoff
 
+## 0.45.2 (2026-11-27): Engine connection recovery
+
+- Rejoining tracked games is now part of the shared reconnect operation. Failed rejoins are retried without repeating successful joins, concurrent callers wait for restoration, and signing out during restoration closes the recovered connection. The workspace reports update failures while retrying and keeps action errors visible until the next action.
+- Focused synthetic server and browser regressions passed. The 0.45.1 exact-head isolated engine workflow passed, including the all-land native game and spoof rejection. Real-engine reconnect, outage recovery, combat, targeting and production deployment remain unverified.
+- `PW_CHANNEL=chrome npm run test:all` passed: 429 server tests (3 skipped), 68 web tests, 3 play-core tests, 3 protocol tests, 3 Wiki tests and 127 browser tests (2 live-engine tests skipped locally). Delivery remains pending.
+- A local synthetic engine was stopped after an unexpected wildcard listener was detected; shared-host loopback is not a trusted security boundary.
+
+## 0.45.1 (2026-11-27): Engine acceptance documentation
+
+- The 0.44.1 private-engine workflow completed an all-land game through the native UI without the player conceding, and passed the saved-deck, hidden-state and spoof-rejection checks. This does not verify combat, targeting or all engine prompts. Exact-head engine validation for 0.45.0 is pending.
+- `PW_CHANNEL=chrome npm run test:all` passed: 426 server tests (3 skipped), 68 web tests, 3 play-core tests, 3 protocol tests, 3 Wiki tests and 126 browser tests (2 live-engine tests skipped locally). Delivery remains pending.
+
+## 0.45.0 (2026-11-27): Engine turn progress
+
+- Show the engine-provided turn, phase, step, active player and priority when available. Focused mocked-engine browser coverage passed; a real-engine assertion remains pending isolated CI.
+- `PW_CHANNEL=chrome npm run test:all` passed: 426 server tests (3 skipped), 68 web tests, 3 play-core tests, 3 protocol tests, 3 Wiki tests and 126 browser tests (2 live-engine tests skipped locally). Delivery remains pending.
+
+## 0.44.1 (2026-11-27): Manual custom-card game test
+
+- Add acceptance coverage for playing an original custom card in a private manual game through a player-reported outcome, in addition to offline solo play. The focused browser test passed.
+- `PW_CHANNEL=chrome npm run test:all` passed: 426 server tests (3 skipped), 68 web tests, 3 play-core tests, 3 protocol tests, 3 Wiki tests and 126 browser tests (2 live-engine tests skipped locally). Delivery remains pending.
+- The 0.44.0 isolated engine test reached 250 responses with four and five cards left in the players' libraries; 50 land plays and 198 passes had advanced the all-land game. Increase the finite response limit to 300 while retaining the 300-second timeout. The updated limit still requires isolated live validation; combat and targeting remain unverified in a complete real game.
+
+## 0.44.0 (2026-11-27): Manual zone movement
+
+- Manual solo and multiplayer allow dragging owned cards between zones or selecting a destination, including the library top or bottom (dragging places cards on the bottom). Library cards remain private to their owner until moved to a public zone. Zone changes clear counters and battlefield attachments; multiplayer player boards show public graveyards and exile.
+- Focused offline, server and browser zone-movement tests passed. `PW_CHANNEL=chrome npm run test:all` passed: 426 server tests (3 skipped), 68 web tests, 3 play-core tests, 3 protocol tests, 3 Wiki tests and 126 browser tests (2 live-engine tests skipped locally).
+- Delivery is pending. The 0.43.1 isolated live-engine job failed because the all-land non-concession scenario reached its 250-response limit without ending; the cause is not yet established. The test now reports response counts and player state at that limit to help diagnose the next isolated run. Full native gameplay, production deployment and engine reconnect acceptance remain incomplete.
+
+## 0.43.1 (2026-11-27): Native game completion test
+
+- Add a real-engine browser scenario intended to play an all-land deck through the native interface until the game ends without the player conceding. It must pass in isolated CI before it counts as acceptance evidence; combat and targeting remain unverified in a complete real game.
+- `PW_CHANNEL=chrome npm run test:all` passed: 426 server tests (3 skipped), 67 web tests, 3 play-core tests, 3 protocol tests, 3 Wiki tests and 126 browser tests (2 live-engine tests skipped locally). Version and guide static checks passed. The 0.42.0 private-engine workflow passed its existing concession-based scenario and security checks.
+- Delivery is pending. Local Docker, Podman and usable WSL remain unavailable, so the new live test has not yet run.
+
+## 0.43.0 (2026-11-27): Manual multiplayer outcomes
+
+- A seated player can report their own loss separately from concession. Eliminated players cannot act or search their library, turns skip them, and the table closes with one remaining player. Closed tables show player-reported outcomes to participants and spectators.
+- Focused server tests and browser scenarios passed, including 1v1 and four-player games ended through player-reported poison losses. Manual rules are still player-resolved; this does not establish full phase acceptance.
+- `PW_CHANNEL=chrome npm run test:all` passed: 426 server tests (3 skipped), 67 web tests, 3 play-core tests, 3 protocol tests, 3 Wiki tests and 126 browser tests (1 live-engine test skipped locally). Version and guide static checks passed.
+- Delivery is pending. The 0.41.0 private-engine workflow passed saved-deck and hidden-state tests, native land play ending by concession, and spoof rejection. The 0.42.0 private-engine workflow is running. Full native gameplay, production deployment and engine reconnect acceptance remain incomplete.
+
+## 0.42.0 (2026-11-27): Manual battlefield copies
+
+- Copy your own battlefield cards as tokens in offline solo and manual multiplayer. Copies retain face-down status but start untapped without counters or attachments. Copying an opponent's card is not supported.
+- Focused offline, server and browser regressions passed, including authorization and face-down privacy. `PW_CHANNEL=chrome npm run test:all` passed: 426 server tests (3 skipped), 67 web tests, 3 play-core tests, 3 protocol tests, 3 Wiki tests and 126 browser tests (1 live-engine test skipped locally). Version and guide static checks passed.
+- Delivery is pending. Full native gameplay and phase acceptance remain incomplete.
+
+## 0.41.0 (2026-11-27): Engine choices and distributions
+
+- Display both engine-provided piles and submit the selected pile. Support searchable string and keyed list choices, optional cancellation and engine-provided special choices with an item selected. The pinned bridge rejects null string responses; normal optional-choice cancellation uses an empty string, while special choices without an item remain unavailable.
+- Support engine amount distributions with per-entry and total validation, optional engine-provided cancellation, a 500-entry limit and a 1000-character response limit.
+- The 0.40.0 private-engine workflow passed saved-deck and hidden-state tests, native land play ending by concession, and the trusted-identity spoof rejection. Exact-head validation for 0.41.0 remains pending.
+- Focused prompt and server tests and `PW_CHANNEL=chrome npm run test:all` passed: 426 server tests (3 skipped), 66 web tests, 3 play-core tests, 3 protocol tests, 3 Wiki tests and 126 browser tests (1 live-engine test skipped locally). Version and guide static checks passed.
+- Delivery is pending. Full native gameplay and phase acceptance remain incomplete.
+
+## 0.40.0 (2026-11-27): Manual battlefield attachments
+
+- Manual solo and multiplayer cards can attach to battlefield cards, including opponents' cards. The server rejects cycles and unauthorized source cards, clears attachments when either card leaves and preserves face-down privacy.
+- Focused server, offline and multiplayer attachment tests and `PW_CHANNEL=chrome npm run test:all` passed: 426 server tests (3 skipped), 66 web tests, 3 play-core tests, 3 protocol tests, 3 Wiki tests and 126 browser tests (1 live-engine test skipped locally). Delivery remains pending; full native gameplay and phase acceptance remain incomplete.
+
+## 0.39.2 (2026-11-27): Engine numeric prompts
+
+- Use the engine-supplied minimum and maximum for numeric prompts within the server limit, reject invalid input and allow cancellation.
+- Focused engine prompt browser regression and `PW_CHANNEL=chrome npm run test:all` passed: 426 server tests (3 skipped), 65 web tests, 3 play-core tests, 3 protocol tests, 3 Wiki tests and 126 browser tests (1 live-engine test skipped locally). Delivery remains pending; full native gameplay and phase acceptance remain incomplete.
+- The 0.39.1 Play engine CI failed while building the engine because Maven Central returned HTTP 429; engine tests did not run for that commit.
+
+## 0.39.1 (2026-11-27): Engine prompt clarity
+
+- Clarify the limitation message shown with engine selection prompts that already offer a pass response.
+- Validation: the focused engine browser regression passed. `PW_CHANNEL=chrome npm run test:all` passed: typechecks, 426 server tests (3 skipped), 65 web tests, 3 play-core tests, 3 Playmat protocol tests, 3 Wiki tests and 126 browser tests (1 live-engine test skipped locally). Delivery is pending. Full native gameplay and phase acceptance remain incomplete.
+
+## 0.39.0 (2026-11-27): Multiplayer face-down cards
+
+- Allow seated players to play cards face down directly from hand, turn their battlefield cards face down and reveal them. Public projections omit the identities and artwork of face-down cards.
+- Validation: focused server and multiplayer browser regressions passed. `PW_CHANNEL=chrome npm run test:all` passed: typechecks, 426 server tests (3 skipped), 65 web tests, 3 play-core tests, 3 Playmat protocol tests, 3 Wiki tests and 126 browser tests (1 live-engine test skipped locally). Delivery is pending.
+- Version 0.39.0 was pushed as `46ff307` to draft PR #52. Android passed and produced `mana-vault-0.39.0-debug`; the exact-head Play engine workflow is running.
+- Manual table rules remain player-resolved; native engine gameplay and phase acceptance remain incomplete.
+
+## 0.38.0 (2026-11-27): Private multiplayer library search
+
+- Add private library search and selected-card movement to hand for seated manual-table players. The player-only endpoint returns a sorted list rather than draw order, and actions remain revision checked.
+- The live engine UI test now passes priority when waiting at an instants-only prompt before a legal land-play opportunity; this change still needs verification against the real engine.
+- Validation: focused server and multiplayer browser regressions passed. `PW_CHANNEL=chrome npm run test:all` passed before the live-test-only update: typechecks, 426 server tests (3 skipped), 65 web tests, 3 play-core tests, 3 Playmat protocol tests, 3 Wiki tests and 126 browser tests (1 live-engine test skipped locally). Version 0.38.0 was pushed as `a901e32` to draft PR #52. Android passed and produced `mana-vault-0.38.0-debug`; the isolated Play engine workflow passed saved-deck, hidden-state, native UI land play and concession, and spoof-rejection checks. This is not a non-concession game.
+- Manual table rules remain player-resolved; native engine gameplay and phase acceptance remain incomplete.
+
+## 0.37.0 (2026-11-27): Offline solo library search
+
+- Add a searchable offline solo library, moving selected cards to hand and shuffling the remaining library without mutating the saved deck.
+- Validation: focused manual-play unit tests and the offline original-custom-card browser regression passed. `PW_CHANNEL=chrome npm run test:all` passed: typechecks, 426 server tests (3 skipped), 65 web tests, 3 play-core tests, 3 Playmat protocol tests, 3 Wiki tests and 126 browser tests (1 live-engine test skipped locally). Version and guide static checks passed.
+- Version 0.36.1 was pushed as `a5190f0` to draft PR #52; Android passed and produced `mana-vault-0.36.1-debug`. Its live UI check failed while waiting to play a Mountain at an instants-only priority prompt. Version 0.37.0 was pushed as `0274d97`; Android passed and produced `mana-vault-0.37.0-debug`, while its live UI check failed at the same prompt.
+- Full native gameplay, real combat and targeting, production deployment/reconnect acceptance and phases 3 through 4 remain open.
+
+## 0.36.1 (2026-11-27): Native engine startup test
+
+- The live browser test now handles the engine's marked starting-player prompt and reports bounded UI diagnostics if the playable Mountain remains unavailable. The UI exposes the engine's prompt marker as an HTML data attribute for this check.
+- Version 0.35.0's live workflow failed again to find Play Mountain; saved-deck and hidden-state tests passed, and Android produced `mana-vault-0.35.0-debug`. The cause is not yet established. Version 0.36.0 was pushed as `fddeda3`; Android passed and produced `mana-vault-0.36.0-debug`, but its live UI check failed at the same step.
+- Validation: the focused browser regression passed. `PW_CHANNEL=chrome npm run test:all` passed: typechecks, 426 server tests (3 skipped), 64 web tests, 3 play-core tests, 3 Playmat protocol tests, 3 Wiki tests and 126 browser tests (1 live-engine test skipped locally). Version and guide static checks passed.
+- Delivery of 0.36.1 is pending. Full native gameplay, real combat and targeting, production deployment/reconnect acceptance and phases 3 through 4 remain open.
+
+## 0.36.0 (2026-11-27): Native combat choices
+
+- Render engine-approved attacker and blocker choices, send their IDs to the current prompt, and confirm declarations with the engine. Add single-step priority passing and target labels with option and card-picker fallbacks.
+- Validation: the focused combat/target browser regression passed. `PW_CHANNEL=chrome npm run test:all` passed: typechecks, 426 server tests (3 skipped), 64 web tests, 3 play-core tests, 3 Playmat protocol tests, 3 Wiki tests and 126 browser tests (1 live-engine test skipped locally). Version and guide static checks passed.
+- Delivery: the 0.35.0 checkpoint was committed and pushed as `9c7acb2` to draft PR #52; its Android workflow passed and produced `mana-vault-0.35.0-debug`, and its exact-head Play engine workflow is running. Version 0.36.0 awaits commit, push and its own exact-head workflows.
+- Mocked prompts do not establish complete real-game combat or targeting. Phase 1 production deployment/reconnect acceptance and phases 2 through 4 remain open.
+
+## 0.35.0 (2026-11-27): Engine ability choices and solo face-down cards
+
+- Render `GAME_CHOOSE_ABILITY` choices from the pinned Playmat UUID-to-label map and submit the chosen UUID to the active prompt.
+- Use the engine's supplied labels for boolean prompts, including the Mulligan and Keep buttons.
+- Fix manual solo battlefield face-down and reveal controls, including for original custom cards offline.
+- Validation: the two focused browser regressions passed. `PW_CHANNEL=chrome npm run test:all` passed: typechecks, 426 server tests (3 skipped), 64 web tests, 3 play-core tests, 3 Playmat protocol tests, 3 Wiki tests and 126 browser tests (1 live-engine test skipped locally). Version/lockfile static checks and `git diff --check` passed.
+- Delivery: the 0.34.0 checkpoint was committed and pushed as `e408b4a` to draft PR #52; its exact-head Android workflow passed and its Play engine workflow is running. Version 0.35.0 awaits commit, push and its own exact-head workflows.
+- Phase 1 production deployment/reconnect acceptance and Phase 2 real-game completion, broader prompts, targeting and combat remain open. Phases 3 and 4 also remain incomplete.
+
+## 0.34.0 (2026-11-27): Native Engine AI mana payment
+
+- Read playable object IDs from the pinned Playmat `canPlayObjects.objects` map, prefer the active prompt's map over older game state, and expose approved battlefield objects as Tap for mana actions during `GAME_PLAY_MANA`.
+- Extend the mocked browser regression through a prompt-bound `sendPlayerUUID` response for mana payment.
+- Validation: the focused Engine AI browser regression passed. `PW_CHANNEL=chrome npm run test:all` passed: typechecks, 426 server tests (3 skipped), 64 web tests, 3 play-core tests, 3 Playmat protocol tests, 3 Wiki tests and 126 browser tests (1 live-engine test skipped locally). Version/lockfile static checks and `git diff --check` passed.
+- Phase 1 production deployment/reconnect acceptance and Phase 2 real-game completion, broader prompts, targeting and combat remain open. Phases 3 and 4 also remain incomplete.
+- Delivery: 0.34.0 was pushed to PR #52 as `e408b4a`. Android passed and produced `mana-vault-0.34.0-debug`. Its Play engine workflow passed saved-deck and hidden-state tests but failed to find Play Mountain in the native UI. The test could click Yes on a mulligan prompt, which the pinned engine treats as mulligan rather than keep; 0.35.0 uses the engine's actual labels and selects Keep. Whether this resolves the failure requires exact-head live verification. PR #52 remains a draft and unmerged.
+
+## 0.33.0 (2026-11-27): Native Engine AI battlefield choices
+
+- Add a Choose action for battlefield cards that the engine lists in `canPlayObjects` during `GAME_SELECT`, using the same prompt-bound UUID response as hand-card play.
+- Add browser coverage for engine-approved versus unavailable battlefield cards and verify the submitted card UUID.
+- Validation: the focused Engine AI browser regression passed. `PW_CHANNEL=chrome npm run test:all` passed: typechecks, 426 server tests (3 skipped), 64 web tests, 3 play-core tests, 3 Playmat protocol tests, 3 Wiki tests and 126 browser tests (1 live-engine test skipped locally). `git diff --check` and synchronized version/lockfile static tests passed.
+- Phase 1 production deployment/reconnect acceptance and Phase 2 non-concession gameplay, broader prompts, targeting and combat remain open. Phases 3 and 4 also remain incomplete.
+- Delivery: commit `aab1f8d` is pushed to PR #52; Android passed, but the Play engine workflow failed because the UI did not find the hand-card action. The 0.34.0 change corrects the `canPlayObjects.objects` lookup. PR #52 remains a draft and unmerged.
+
+## 0.32.2 (2026-11-27): Native Engine AI priority control
+
+- Add the supported `PASS_PRIORITY_UNTIL_NEXT_MAIN_PHASE` player action to the `GAME_SELECT` prompt and test its HTTP acceptance in the private-engine browser flow.
+- Validation: `PW_CHANNEL=chrome npm run test:all` passed: typechecks, 426 server tests (3 skipped), 64 web tests, 3 play-core tests, 3 Playmat protocol tests, 3 Wiki tests and 125 browser tests. The live-engine test was skipped locally because no Playmat URL is configured; exact-head CI remains required. The production build reports the existing large-chunk warning. Version/lockfile checks and `git diff --check` passed.
+- Phase 1 deployment/reconnect acceptance and Phase 2 native-game completion remain open. This control does not validate normal game completion or all gameplay prompts.
+- Delivery: commit `bf4594b` is pushed to PR #52. Its Android workflow passed and produced `mana-vault-0.32.2-debug`; its private-engine workflow is running. PR #52 remains a draft and unmerged.
+
+## 0.32.1 (2026-11-27): Multiplayer game-end acceptance
+
+- Extend the two-player and four-player manual Commander browser tests through concession. Verify the table closes and every seated player's view, plus the 1v1 spectator view, receives the ended state.
+- This adds test coverage only. Manual tables still do not enforce game rules, and this does not complete Phase 4 acceptance.
+- Validation: focused `PW_CHANNEL=chrome npm run test:e2e:run -- tests/e2e/play.spec.ts` passed (3 tests). `PW_CHANNEL=chrome npm run test:all` passed: typechecks, 426 server tests (3 skipped), 64 web tests, 3 play-core tests, 3 Playmat protocol tests, 3 Wiki tests and 125 browser tests. The live-engine test was skipped locally because no Playmat URL is configured. Version/lockfile checks and `git diff --check` passed.
+- Delivery: the 0.32.1 changes are ready to commit and push. The 0.32.0 Android workflow passed, but its exact-head private-engine workflow is still running; 0.32.1 requires its own CI run. PR #52 remains a draft and unmerged.
+
+## 0.32.0 (2026-11-27): Native Engine AI card play
+
+- The Engine AI workspace now renders a Play action for hand cards present in the current `canPlayObjects` list during `GAME_SELECT`, and responds with the selected card UUID. The private-engine browser flow now plays a Mountain before conceding.
+- Synchronized workspace manifests, lockfile, release notes, Capabilities, Play guide, README, roadmap and handoff for 0.32.0.
+- Validation: `PW_CHANNEL=chrome npm run test:all` passed: typechecks, 426 server tests (3 skipped), 64 web tests, 3 play-core tests, 3 Playmat protocol tests, 3 Wiki tests and 125 browser tests. The live-engine browser test was skipped locally because no Playmat URL is configured; it must pass in CI on the pushed head. The production build reports the existing large-chunk warning. `git diff --check` and version/lockfile checks passed.
+- Phase 1 production deployment and engine reconnect/outage acceptance remain open. Phase 2 still lacks a non-concession completed game and broader prompt, spell, target and combat coverage. Phase 3 and Phase 4 acceptance remain incomplete.
+- Delivery: PR #52 is a draft. Commit/push, current-head CI and review status remain pending. Do not merge until required checks and approvals pass; post-merge server/container and Android artifacts are also pending.
+
+## 0.31.1 (2026-11-27): Multiplayer play acceptance
+
+- Expanded the two-player browser flow to reload both seated players, exercise shared table state, verify hidden hands and complete a full turn cycle. The four-player flow checks each seat's turn and viewer-specific hand visibility. The custom-card solo flow now runs while the browser is offline.
+- Synchronized all workspace versions and lockfile records at 0.31.1; updated the release notes, roadmap and handoff.
+- Validation: final full validation is pending after this test-only change. The 0.31.0 snapshot passed `PW_CHANNEL=chrome npm run test:all`: typechecks, 426 server tests (3 skipped), 64 web tests, 3 play-core tests, 3 Playmat protocol tests, 3 Wiki tests and 125 browser tests (1 live-engine browser test skipped locally). Static tests and `git diff --check` passed.
+- Phase 1 production deployment and engine reconnect/outage acceptance remain open. Phase 2 native gameplay is incomplete. Phase 3 and Phase 4 acceptance still exceeds the current browser coverage.
+- Delivery: PR #52 remains a draft. Current-head CI, review, merge and matching post-merge artifacts remain pending.
+
+## 0.31.0 (2026-11-27): Native Play engine controls
+
+- Added a native concession control to current Engine AI prompts and a browser acceptance test that starts a saved-deck game, answers the opening-hand prompt, concedes and waits for the engine-reported terminal result. The test is configured to run inside the private Playmat integration network.
+- Bumped synchronized workspace versions to 0.31.0 and updated the README, Capabilities, Play guide, release notes and roadmap. Kept the Phase 2 limitation explicit: the new browser flow ends by concession and does not verify a normal win, broad prompt support, spell casting, targeting or combat.
+- Validation: `PW_CHANNEL=chrome npm run test:all` passed: typechecks, 426 server tests (3 skipped), 64 web tests, 3 play-core tests, 3 Playmat protocol tests, 3 Wiki tests and 125 browser tests (1 live-engine browser test skipped because the local environment has no configured engine). The production build reports the existing large-chunk warning. `git diff --check` and version/lockfile checks passed.
+- The Play engine integration and Android checks passed on PR base commit `8a84091713ab617128b1f51989f5b47a4030ca1b`. The engine workflow validated the private Compose profile, unpublished engine ports, live saved-deck and hidden-state tests, and rejection of a spoofed trusted identity. Local Docker, Podman and WSL remain unavailable.
+- Phase 1 engine reconnect/outage and production deployment acceptance remain open. Phase 2 native engine gameplay is incomplete. Phase 3 and Phase 4 acceptance remains broader than the manual custom-card and four-player turn-cycle browser tests.
+- Delivery: PR #52 remains a draft. The new private-engine browser workflow and full validation, review, merge and matching post-merge container/Android artifacts are pending.
+
+## 0.30.0 (2026-11-27): Native Play workspace and manual tables
+
+- Added a top-level Play workspace with Engine AI, manual solo and multiplayer table modes. Engine AI depends on the separately configured Playmat service; manual play does not enforce Magic rules.
+- Added server-stored two- and four-player tables with invitation codes, saved-deck snapshots, revision-checked actions, reconnect polling, read-only spectators and player-specific projections that omit opponents' hands and libraries.
+- Added manual actions for drawing, shuffling, zone movement, tapping, counters, tokens, life, poison, commander damage, turn changes, concession and leaving a table. Invitation-code spectators have read-only public views. Phone-mode tabs stay compact.
+- Validation: `PW_CHANNEL=chrome npm run test:all` passed at the original 0.30.0 snapshot: typechecks, 426 server tests (3 skipped), 63 web tests, 3 play-core tests, 3 Playmat protocol tests, 3 Wiki tests and 123 browser tests. The production build reports the existing large-chunk warning.
+- PR CI validated the private Compose profile, the absence of published engine ports, live saved-deck and hidden-state behavior, and the trusted-header spoofing boundary on commit `8a84091713ab617128b1f51989f5b47a4030ca1b`. Docker, Podman and WSL were unavailable for local validation. Production deployment and engine reconnect/outage behavior remain unverified, and Play Table phases 2 through 4 are not accepted as complete.
+- Delivery: this work is not merged. Required PR checks and approvals, container and Android CI results, and the matching debug APK remain pending.
+
 ## 0.29.0 (2026-11-26): Server-side Playmat game integration
 
 - Added authenticated per-user Playmat sessions and server routes for discovery, exact-printing saved-deck validation, private AI table startup, filtered player events and prompt-bound responses. A delayed synthetic event test covers delivery while the route is waiting.
 - Account deletion and removal of a user's last valid device/session now close the engine session immediately. Logout, disablement, password reset and sign-out-everywhere also revoke it.
 - The optional live acceptance test passed against the session-local Playmat 1.4.63-V2 test engine using an exact M21 Island printing: the engine reported a terminal result and the original saved deck remained unchanged.
 - Phase 1 is not complete. Docker, Podman and WSL are unavailable in this environment, so the pinned Compose service and private trusted-header boundary are unvalidated. Hidden-state isolation across human players and live reconnect also remain unverified. Phases 2 through 4 are gated and were not started; the existing offline deck Playtest is unchanged.
-- Validation: focused Playmat session tests passed (9 tests), including the live saved-deck AI game after the latest account/device revocation changes. Server type-check passed. `PW_CHANNEL=chrome npm run test:all` passed: 423 server tests, 60 web tests, 6 shared package tests, 3 Wiki tests and 122 browser tests; the environment-gated live test is run separately. Version and lockfile checks and `git diff --check` passed. Docker/Compose validation and Android CI validation remain pending.
-- Delivery: 0.29.0 remains unmerged and is not ready to merge until Phase 1 security and deployment evidence is complete. Server/container and Android artifacts for this version are pending.
+- Validation: focused Playmat session tests passed (9 tests), including the live saved-deck AI game after the latest account/device revocation changes. Server type-check passed. `PW_CHANNEL=chrome npm run test:all` passed: 423 server tests, 60 web tests, 6 shared package tests, 3 Wiki tests and 122 browser tests; the environment-gated live test is run separately. Version and lockfile checks and `git diff --check` passed. The private Compose deployment and trusted-header boundary remain unvalidated.
+- Delivery: 0.29.0 merged in PR #51 at `8cc6ad6d21b43c6413356c9869d6e1510a7885c0`. The exact-SHA container and Android workflows passed, and the matching `mana-vault-0.29.0-debug` artifact and main-branch debug pre-release were verified. This does not satisfy the remaining Phase 1 deployment/security acceptance.
 
 ## 0.28.0 (2026-11-26): Play engine integration foundations
 
@@ -43,7 +223,13 @@
 - Validation: `PW_CHANNEL=chrome npm run test:all` passed, including 119 browser tests. `git diff --check` passed.
 - At handoff, version 0.24.8 and automatic synchronization are pending delivery. Verify the workflow, container, Android build and debug APK for the merged commit.
 
-Last updated: 2026-11-26, version 0.29.0 Playmat integration work pending validation and delivery.
+Last updated: 2026-11-27, version 0.34.0 native Engine AI mana payment in progress; validation and delivery are pending.
+
+## Current next steps (0.34.0)
+
+- Run the focused and full validation gates, review the complete diff, then commit and push to PR #52. Verify native hand-card play, battlefield choices, mana payment and priority pass in the private-engine browser check and all other checks for the exact pushed commit. Keep the PR a draft until the remaining Play Table acceptance gates are met.
+- Keep the PR unmerged until required checks and approvals pass. After merge, verify the exact-SHA container and Android workflows and the matching debug APK.
+- Complete Phase 1 production deployment and engine reconnect/outage acceptance before describing Play Table phases 2 through 4 as complete.
 
 ## Project
 
@@ -66,9 +252,9 @@ Mana Vault is Devon's self-hosted Magic: The Gathering collection and deck manag
 - The app is in early development: change things when they need to change. Do not hold back or work around a change to keep older versions, older files or older data working (Devon, 2026-11-22). Mark stored formats with the app version rather than a separate number.
 - Deployment follows the docker-server-setup skill: Dockhand only, no Watchtower, absolute data path, UID 65532, no cloudflared or reverse proxy in the stack.
 
-## Next (0.24.0)
+## Historical follow-ups from 0.24.0
 
-- Nothing is specified. Follow-ups to ask Devon: web pages into notes with real sites (paste from Chrome and the phone, saved pages from Chrome and Firefox, the article reader on deck and primer sites, sites that refuse or block the server); notes and the Wiki in daily use (the editor on a phone, drag and drop, the clash question, an Obsidian vault import, offline notes in the app); and from 0.21.0: whether MTGJSON's data works on the real server (a card database update or Update MTGJSON data now, the 90-day history download and its size, the daily prices), the main price source, precons, Scan barcode with real boxes (UPC data in MTGJSON is not certain for every product), expected values and the pull check with real packs, Change collection..., New collection..., tabs keeping their place, and PNG rarity symbols; and the earlier follow-ups (named products with a real Commander deck, the Custom sets tab, 0.19.0 features with real receipts).
+- Follow-ups from earlier releases: web pages into notes with real sites (paste from Chrome and the phone, saved pages from Chrome and Firefox, the article reader on deck and primer sites, sites that refuse or block the server); notes and the Wiki in daily use (the editor on a phone, drag and drop, the clash question, an Obsidian vault import, offline notes in the app); and from 0.21.0: whether MTGJSON's data works on the real server (a card database update or Update MTGJSON data now, the 90-day history download and its size, the daily prices), the main price source, precons, Scan barcode with real boxes (UPC data in MTGJSON is not certain for every product), expected values and the pull check with real packs, Change collection..., New collection..., tabs keeping their place, and PNG rarity symbols; and the earlier follow-ups (named products with a real Commander deck, the Custom sets tab, 0.19.0 features with real receipts).
 - Left from earlier specs: a chart of one entry's value over time on the purchase entry page (SPEC-0.15.0).
 - Not built from SPEC-0.21.0: expected value on a "set page" (there is no set page; each booster's value shows in Open virtual packs... and on purchase lines); booster contents for offline expected value and pull checks in the app (both need the server); a Buylist column in a column picker (there is no column picker; Buylist prices in lists in the View menu shows it instead); Deckbox id matching (Deckbox files carry no store id).
 
@@ -310,4 +496,4 @@ None known.
 
 ## Where work stopped
 
-0.1.0 to 0.23.0 are merged to main. 0.23.1 (type group order, phone zone buttons) is in pull request 39 (branch v0.23.1) (`PW_CHANNEL=chrome npm run test:all`). The debug APK is the `mana-vault-0.23.1-debug` artifact of the `Android app` workflow. Still to check on real devices: pasting from real sites in Chrome and in the app, a page saved from Chrome and Firefox, New page from web address... on real sites (and one that blocks servers), the notes editor on a phone, offline notes and the clash question in the app; and the earlier list: a card database update that loads MTGJSON's data (sizes, time and memory of AllPrintings and AllPrices), real barcodes, a real Commander deck opened with its decklist, Match cards with real store receipts and photos, the Opening started notification and Start scanning, the live update stream in the app, double tap in the Search screen, picture downloads, a printed test sheet with card backs, a MakePlayingCards upload, trading between two accounts, then the release key, the four repository secrets and a release tag.
+The current branch `feature/play-table-phase-one-followup` is based on `main` at merge commit `8cc6ad6` (PR #51). Version 0.31.0 passed local `PW_CHANNEL=chrome npm run test:all`; the current 0.31.1 browser-test update needs final validation. The live-engine browser acceptance is skipped locally because Docker and a configured engine are unavailable. The new private-engine browser workflow, remaining Phase 1 deployment/reconnect acceptance, required PR checks and approvals, merge, server/container and Android CI verification, and matching debug APK remain pending. Play Table phases 2 through 4 are not accepted as complete.

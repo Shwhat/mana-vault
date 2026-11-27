@@ -282,7 +282,7 @@ The Statistics tab is described in [Prices and statistics](/about/prices-and-sta
 
 ## Playtest
 
-The Playtest tab draws sample hands from the main deck. It works offline and nothing here changes the deck. A separate server-side Playmat integration is not yet available through the interface.
+The Playtest tab draws sample hands from the main deck. It works offline and nothing here changes the deck. Use **Open Play workspace** in the tab header for local manual solo games, optional Engine AI and private manual Commander tables; see [Play table](/about/play-table).
 
 | Button or action | What happens |
 |---|---|

@@ -42,6 +42,7 @@ import { createScryfallSearch, type SearchFetcher } from "./scryfall-search.js";
 import { scryfallDirectives } from "./search-expression.js";
 import { initializeEngineIdentityTable } from "./play/engine-identity.js";
 import { registerPlayRoutes } from "./play/routes.js";
+import { registerManualPlayRoutes } from "./play/manual-routes.js";
 import { PlaySessionManager, type PlaySessionOptions } from "./play/play-sessions.js";
 
 declare module "fastify" {
@@ -422,6 +423,7 @@ export async function buildApp(
 
   registerMobileRoutes(app, database, revision, signIn, disconnectPlaySessionIfUnauthorized);
   registerPlayRoutes(app, database, playSessions);
+  registerManualPlayRoutes(app, database);
   registerAppUpdateRoutes(app, { version: options.version ?? "", databasePath, fetcher: options.fetcher });
 
   app.post("/api/logout", async (request, reply) => {

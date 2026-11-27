@@ -204,6 +204,7 @@ export function useActions(store: Store): Record<string, Action> {
         run: () => inboxDialog(store),
       },
       "view.deck": { label: "Deck view", short: "Deck", icon: "deck", key: "3", on: store.view === "deck", run: () => store.setView("deck") },
+      "view.play": { label: "Play workspace", short: "Play", icon: "playtest", on: store.view === "play", run: () => store.setView("play") },
       "view.trade": { label: "Trade view", short: "Trade", icon: "trade", key: "4", on: store.view === "trade", run: () => store.setView("trade") },
       "view.proxies": { label: "Proxies view", short: "Proxies", icon: "print", key: "5", on: store.view === "proxies", run: () => store.setView("proxies") },
       "view.purchases": { label: "Purchases view", short: "Purchases", icon: "usd", key: "6", on: store.view === "purchases", run: () => store.setView("purchases") },

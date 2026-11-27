@@ -12,7 +12,7 @@ export const MENUS: Menu[] = [
   {
     id: "view", name: "View", items: [
       "view.purchases", "view.wiki", "-", "theme.light", "theme.dark", "theme.system", "-", "prices.pictures", "prices.source", "prices.buylist", "cardLayout", "-",
-      "panel.filters", "panel.collections", "panel.decks", "panel.card", "panel.decklist", "panel.review",
+      "view.play", "panel.filters", "panel.collections", "panel.decks", "panel.card", "panel.decklist", "panel.review",
     ],
   },
   { id: "help", name: "Help", items: ["shortcuts", "about"] },
@@ -24,6 +24,7 @@ export const MODE_TABS: Array<{ action: string; name: string; view: string }> = 
   { action: "view.cards", name: "Search", view: "cards" },
   { action: "view.collection", name: "Collection", view: "collection" },
   { action: "view.deck", name: "Decks", view: "deck" },
+  { action: "view.play", name: "Play", view: "play" },
   { action: "view.trade", name: "Trade", view: "trade" },
   { action: "view.proxies", name: "Proxies", view: "proxies" },
   { action: "view.purchases", name: "Purchases", view: "purchases" },

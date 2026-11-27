@@ -19,6 +19,7 @@ import CardScanner from "./CardScanner";
 import { ContextMenuHost } from "./ContextMenu";
 import { PurchasesView } from "../views/PurchasesView";
 import { WikiView } from "../views/WikiView";
+import { PlayView } from "../views/PlayView";
 import { Dock } from "./Dock";
 import { ModeTabs, TitleBar, UndoButtons, useWorkspaceActions } from "./MenuBar";
 import { StatusBar } from "./StatusBar";
@@ -33,6 +34,7 @@ function CenterView({ actions, onFilters }: { actions: Record<string, Action>; o
   if (store.view === "home") return <HomeView actions={actions} />;
   if (store.view === "collection") return <CollectionView actions={actions} />;
   if (store.view === "deck") return <DeckView actions={actions} />;
+  if (store.view === "play") return <PlayView />;
   if (store.view === "trade") return <TradeView actions={actions} />;
   if (store.view === "proxies") return <ProxiesView actions={actions} />;
   if (store.view === "purchases") return <PurchasesView actions={actions} />;
@@ -126,7 +128,7 @@ export function PhoneShell({ actions }: { actions: Record<string, Action> }) {
   }, [store.selection]);
 
   const leave = () => { setSheet(null); store.setScannerOpen(false); store.setCardPage(null); };
-  const tab = (id: "home" | "cards" | "collection" | "deck" | "trade" | "proxies", label: string, icon: string) => (
+  const tab = (id: "home" | "cards" | "collection" | "deck" | "play" | "trade" | "proxies", label: string, icon: string) => (
     <button type="button" className={store.view === id && !sheet && !store.scannerOpen ? "ptab on" : "ptab"}
       onClick={() => { setSheet(null); store.setScannerOpen(false); store.pressTab(id); }}>
       <Icon name={icon} /><span>{label}</span>
@@ -168,6 +170,7 @@ export function PhoneShell({ actions }: { actions: Record<string, Action> }) {
         {tab("cards", "Search", "find")}
         {tab("collection", "Collection", "collection")}
         {tab("deck", "Decks", "deck")}
+        {tab("play", "Play", "playtest")}
         {tab("trade", "Trade", "trade")}
         {tab("proxies", "Proxies", "print")}
         <button type="button" className={store.scannerOpen && !sheet && !store.cardPage ? "ptab on" : "ptab"} onClick={() => { setSheet(null); store.setCardPage(null); store.setScannerOpen(true); }}>

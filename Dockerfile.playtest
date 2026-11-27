@@ -1,0 +1,17 @@
+FROM mcr.microsoft.com/playwright:v1.65.1-noble
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+COPY packages/play-core/package.json packages/play-core/package.json
+COPY packages/playmat-protocol/package.json packages/playmat-protocol/package.json
+COPY apps/server/package.json apps/server/package.json
+COPY apps/web/package.json apps/web/package.json
+COPY tsconfig.base.json ./
+RUN npm ci
+
+COPY packages packages
+COPY apps/server apps/server
+COPY apps/web apps/web
+COPY tests tests
+COPY playwright.config.ts ./
+RUN npm run build

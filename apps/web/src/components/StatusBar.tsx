@@ -8,7 +8,7 @@ import { useApp, zoneLabel } from "../store";
 import { changeCollectionDialog } from "./PurchaseDialogs";
 import { PURCHASES_CHANGED } from "../live";
 
-const VIEW_NAMES = { home: "Home", cards: "Card search", collection: "Collection", deck: "Deck", trade: "Trade", proxies: "Proxies", purchases: "Purchases", wiki: "Wiki", about: "About", admin: "Administration" } as const;
+const VIEW_NAMES = { home: "Home", cards: "Card search", collection: "Collection", deck: "Deck", play: "Play", trade: "Trade", proxies: "Proxies", purchases: "Purchases", wiki: "Wiki", about: "About", admin: "Administration" } as const;
 
 export function StatusBar({ actions }: { actions: Record<string, Action> }) {
   const store = useApp();
