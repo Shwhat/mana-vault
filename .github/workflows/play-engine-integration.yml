@@ -1,0 +1,68 @@
+name: Play engine integration
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/play-engine-integration.yml"
+      - "Dockerfile"
+      - "docker-compose.yml"
+      - "docker-compose.play-test.yml"
+      - "apps/server/src/play/**"
+      - "apps/web/src/views/Play*.tsx"
+      - "apps/web/src/components/play/**"
+      - "packages/play-core/**"
+      - "packages/playmat-protocol/**"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/play-engine-integration.yml"
+      - "Dockerfile"
+      - "docker-compose.yml"
+      - "docker-compose.play-test.yml"
+      - "apps/server/src/play/**"
+      - "apps/web/src/views/Play*.tsx"
+      - "apps/web/src/components/play/**"
+      - "packages/play-core/**"
+      - "packages/playmat-protocol/**"
+
+permissions:
+  contents: read
+
+jobs:
+  live-engine:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      MANAVAULT_PLAY_ENGINE_SUBNET: 172.30.254.0/29
+      MANAVAULT_PLAY_APP_IP: 172.30.254.2
+      MANAVAULT_PLAY_ENGINE_IP: 172.30.254.3
+      MANAVAULT_PLAY_PROBE_IP: 172.30.254.4
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Validate the private Compose profile
+        run: docker compose --profile play -f docker-compose.yml -f docker-compose.play-test.yml config --quiet
+
+      - name: Build and start the pinned engine
+        run: docker compose --profile play up --build --detach --wait --wait-timeout 900 play-engine
+
+      - name: Verify the engine has no published ports
+        run: |
+          container="$(docker compose --profile play ps -q play-engine)"
+          test -n "$container"
+          published="$(docker inspect --format '{{range $port, $bindings := .NetworkSettings.Ports}}{{range $bindings}}{{if .HostPort}}{{.HostPort}}{{end}}{{end}}{{end}}' "$container")"
+          test -z "$published"
+
+      - name: Run real saved-deck and hidden-state tests
+        run: |
+          docker compose --profile play -f docker-compose.yml -f docker-compose.play-test.yml run --rm --build play-test-runner npm run test --workspace @mana-vault/server -- src/play/play-sessions.test.ts
+
+      - name: Reject a spoofed trusted identity from another peer
+        run: |
+          docker compose --profile play -f docker-compose.yml -f docker-compose.play-test.yml run --rm --build play-untrusted-probe npm run test --workspace @mana-vault/server -- src/play/play-sessions.test.ts -t "rejects a trusted-header identity supplied by an untrusted engine peer"
+
+      - name: Stop the test engine and remove its temporary data
+        if: always()
+        run: docker compose --profile play -f docker-compose.yml -f docker-compose.play-test.yml down --volumes

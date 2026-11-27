@@ -36,6 +36,7 @@ Card search is where cards are found. From a search result a card is added to th
 | [Collections](/about/collections) | Collections, where new cards go, copy details, filter tags, the binder layout, picking rows, removing and moving cards |
 | [Set completion](/about/set-completion) | Linking sets, completion and finish rules, missing cards and exports |
 | [Decks](/about/decks) | Formats, zones, linking deck cards to collection copies, building, the ownership check, renaming and deleting decks |
+| [Play table](/about/play-table) | Engine AI, manual solo, private two- or four-player Commander tables and current limitations |
 | [Prices and statistics](/about/prices-and-statistics) | Prices, values, sorting by price and the Statistics tabs |
 | [Wishlists and trading](/about/wishlists-and-trading) | Wishlists, cards for trade, saved trades, trading with other accounts, matches and the trade binder |
 | [Proxies and the card maker](/about/proxies) | The print list, sheet settings, PDF and MPC exports, and making custom cards and custom sets |

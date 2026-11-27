@@ -1,12 +1,12 @@
 # Play table roadmap and proposed file plan
 
-Status: server-side authenticated Playmat routes and per-user sessions are
-implemented locally. A real saved-deck AI game completed against the
-session-local test engine, and the saved deck remained unchanged. The Playmat
-event wait race is fixed and revocation tests cover account deletion and last
-device removal. Phase 1 remains incomplete because the private Compose
-deployment, trusted-header isolation, hidden-state isolation and live reconnect
-have not been verified. Phases 2 through 4 remain gated.
+Status: the 0.30.0 work adds an initial native Play workspace, offline solo
+play, and server-stored private manual tables for two or four players. Focused
+tests cover table membership, hidden hands and libraries, revision-checked
+actions, turn changes, reconnect after a page reload and leaving a table.
+Phase 1 remains incomplete because the private Compose deployment,
+trusted-header isolation, hidden-state isolation and live engine reconnect
+have not been verified. The new UI is not acceptance of phases 2 through 4.
 
 ## Implemented foundation work
 
@@ -19,18 +19,19 @@ freshness checks and account session cleanup. A Compose `play` profile builds
 the pinned engine source on a private internal network with no published
 engine ports. A live test completed an AI game using a saved Mana Vault deck.
 The Compose profile and trusted peer isolation remain unvalidated because
-Docker, Podman and WSL are unavailable here. There is no user-facing Play
-workspace, so this is not yet a playable feature.
+Docker, Podman and WSL are unavailable here. The 0.30.0 branch adds a first
+user-facing Play workspace, but its phase acceptance gates remain pending.
 
 | Files | Implemented scope and remaining gate |
 | --- | --- |
 | `apps/server/src/play/engine-identity.ts`, `app.ts`, `admin.ts` | Persist an opaque engine name per Mana Vault user, manage server-side sessions and close them on account or last-device revocation. Private trusted-header isolation remains unverified. |
-| `apps/server/src/play/playmat-connection.ts`, `play-sessions.ts`, `routes.ts`, `packages/playmat-protocol/src/rpc.ts` | Server-only WebSocket client, RPC allowlist, authenticated game routes, per-user event queues, prompt freshness and takeover refusal. No user-facing Play UI exists. |
+| `apps/server/src/play/playmat-connection.ts`, `play-sessions.ts`, `routes.ts`, `packages/playmat-protocol/src/rpc.ts` | Server-only WebSocket client, RPC allowlist, authenticated game routes, per-user event queues, prompt freshness and takeover refusal. The initial Engine AI UI is present; deployment and prompt coverage remain incomplete. |
+| `apps/server/src/play/manual-routes.ts`, `apps/web/src/views/PlayView.tsx` | Server-authoritative manual table membership and state for two or four players, per-player hidden-zone projection, invitation-code read-only spectators, offline solo mode and a first native workspace. Full manual interactions and match history are not implemented. |
 | `apps/server/src/play/deck-converter.ts`, `routes.ts` | Convert authorized immutable snapshots, verify exact printings, validate against the live engine and start the human-plus-AI match. The local acceptance test completed a real game; production deployment and hidden-state boundaries are unverified. |
 | `apps/server/src/play/*.test.ts`, `packages/playmat-protocol/src/*.test.ts` | Synthetic lifecycle and route tests plus an optional real-engine acceptance test. Loopback test evidence does not prove private deployment security. |
 | Package manifests and lockfile | Add server WebSocket dependencies and build the shared protocol package before server tests and type-checks. |
 | `docker-compose.yml`, `.env.example` | An optional profile builds the pinned Playmat source with trusted-header SSO, fixed app-only trust, an internal network, persistent engine data and resource limits. Docker validation and actual network isolation remain pending. |
-| About pages, release notes, README and `docs/HANDOFF.md` | Do not advertise playable tables. Update user-facing documentation only after resulting behavior exists; keep the handoff and release state accurate. |
+| About pages, release notes, README and `docs/HANDOFF.md` | Describe the initial modes and their limits accurately. Do not claim phase acceptance or verified production engine security. |
 
 Before delivery, test the engine-disabled app, workspace build, unit/static
 tests, Docker runtime and the full `npm run test:all` gate. Verify Android
@@ -59,9 +60,12 @@ not accepted until the private engine and hidden-state boundaries are verified.
    the commands, results, unresolved limitations and security evidence before
    starting the native gameplay phase.
 
-Phases 2 through 4 must not start until the remaining Phase 1 acceptance
-criteria pass. Do not assume unverified signatures, permissions or deployment
-behavior.
+The 0.30.0 implementation began phases 2 through 4 before the remaining Phase 1
+acceptance criteria passed. Treat it as a functional prototype, not an accepted
+release of those phases. Do not declare phases 2 through 4 complete or expose
+the engine in a production deployment until the Phase 1 security and deployment
+evidence is recorded. Do not assume unverified signatures, permissions or
+deployment behavior.
 
 ## Later phases
 

@@ -236,7 +236,7 @@ test("the menu bar opens menus and switches between them; the mode tabs switch t
   await page.keyboard.press("Escape");
   await expect(page.locator("#dropdown")).toHaveCount(0);
   // tabs switch the program
-  await expect(page.locator("#modetabs .mtab")).toHaveText(["Home", "Search", "Collection", "Decks", "Trade", "Proxies", "Purchases", "Wiki"]);
+  await expect(page.locator("#modetabs .mtab")).toHaveText(["Home", "Search", "Collection", "Decks", "Play", "Trade", "Proxies", "Purchases", "Wiki"]);
   for (const [name, view] of [["Wiki", "#view-wiki"], ["Purchases", "#view-purchases"], ["Proxies", "#view-proxies"], ["Trade", "#view-trade"], ["Collection", "#view-collection"], ["Search", "#view-cards"]] as const) {
     await page.locator("#modetabs .mtab", { hasText: name }).click();
     await expect(page.locator(view)).toBeVisible();
@@ -294,7 +294,7 @@ test.describe("phone layout", () => {
 
   test("tabs, card page and the nested menu", async ({ page }) => {
     await signUp(page, "phone");
-    await expect(page.locator("#ptabs .ptab")).toHaveText(["Home", "Search", "Collection", "Decks", "Trade", "Proxies", "Scan"]);
+    await expect(page.locator("#ptabs .ptab")).toHaveText(["Home", "Search", "Collection", "Decks", "Play", "Trade", "Proxies", "Scan"]);
     await expect(page.locator("#view-home")).toBeVisible();
     await expect(page.locator("#titlebar")).toHaveCount(0);
     await page.locator(".ptab", { hasText: "Search" }).click();

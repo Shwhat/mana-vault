@@ -115,10 +115,11 @@ test("a card with one printing asks only for the finish, with Add as foil choosi
   await expect(status(page)).toHaveText("Sol Ring (foil) added to Main collection");
 });
 
-test("workspaces are in the account menu, not the View menu", async ({ page }) => {
+test("configured workspaces are in the account menu, not the View menu", async ({ page }) => {
   await signUp(page, "v18ws");
   await page.locator('#menubar .mbtn[data-menu="View"]').dispatchEvent("mousedown");
-  await expect(page.locator("#dropdown")).not.toContainText("workspace");
+  await expect(page.locator("#dropdown")).toContainText("Play workspace");
+  await expect(page.locator("#dropdown")).not.toContainText("Manage workspaces...");
   await page.keyboard.press("Escape");
   await accountMenu(page, "Collection workspace");
   await expect(status(page)).toHaveText("Collection workspace");

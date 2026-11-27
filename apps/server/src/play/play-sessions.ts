@@ -58,7 +58,7 @@ export class PlaySessionManager {
 
       let reconnecting: Promise<PlaymatConnection>;
       reconnecting = connection.reconnect().catch((error: unknown) => {
-        if (this.#connections.get(userId) === reconnecting) this.#connections.delete(userId);
+        if (this.#connections.get(userId) === reconnecting) this.#connections.set(userId, existing);
         if (error instanceof PlaymatRpcError && error.reason === "signedInElsewhere") this.#takenOver.add(userId);
         throw error;
       });

@@ -1,13 +1,22 @@
 # Mana Vault handoff
 
+## 0.30.0 (2026-11-27): Native Play workspace and manual tables
+
+- Added a top-level Play workspace with Engine AI, manual solo and multiplayer table modes. Engine AI depends on the separately configured Playmat service; manual play does not enforce Magic rules.
+- Added server-stored two- and four-player tables with invitation codes, saved-deck snapshots, revision-checked actions, reconnect polling, read-only spectators and player-specific projections that omit opponents' hands and libraries.
+- Added manual actions for drawing, shuffling, zone movement, tapping, counters, tokens, life, poison, commander damage, turn changes, concession and leaving a table. Phone-mode tabs stay compact.
+- Validation: `PW_CHANNEL=chrome npm run test:all` passed: typechecks, 426 server tests (3 skipped), 63 web tests, 3 play-core tests, 3 Playmat protocol tests, 3 Wiki tests and 123 browser tests. The production build reports the existing large-chunk warning.
+- Phase 1 deployment and trusted-header isolation remain unverified, so Play Table phases 2 through 4 are not accepted as complete. Docker, Podman and WSL were unavailable for validating the private Compose profile.
+- Delivery: this work is not merged. Required PR checks and approvals, container and Android CI results, and the matching debug APK remain pending.
+
 ## 0.29.0 (2026-11-26): Server-side Playmat game integration
 
 - Added authenticated per-user Playmat sessions and server routes for discovery, exact-printing saved-deck validation, private AI table startup, filtered player events and prompt-bound responses. A delayed synthetic event test covers delivery while the route is waiting.
 - Account deletion and removal of a user's last valid device/session now close the engine session immediately. Logout, disablement, password reset and sign-out-everywhere also revoke it.
 - The optional live acceptance test passed against the session-local Playmat 1.4.63-V2 test engine using an exact M21 Island printing: the engine reported a terminal result and the original saved deck remained unchanged.
 - Phase 1 is not complete. Docker, Podman and WSL are unavailable in this environment, so the pinned Compose service and private trusted-header boundary are unvalidated. Hidden-state isolation across human players and live reconnect also remain unverified. Phases 2 through 4 are gated and were not started; the existing offline deck Playtest is unchanged.
-- Validation: focused Playmat session tests passed (9 tests), including the live saved-deck AI game after the latest account/device revocation changes. Server type-check passed. `PW_CHANNEL=chrome npm run test:all` passed: 423 server tests, 60 web tests, 6 shared package tests, 3 Wiki tests and 122 browser tests; the environment-gated live test is run separately. Version and lockfile checks and `git diff --check` passed. Docker/Compose validation and Android CI validation remain pending.
-- Delivery: 0.29.0 remains unmerged and is not ready to merge until Phase 1 security and deployment evidence is complete. Server/container and Android artifacts for this version are pending.
+- Validation: focused Playmat session tests passed (9 tests), including the live saved-deck AI game after the latest account/device revocation changes. Server type-check passed. `PW_CHANNEL=chrome npm run test:all` passed: 423 server tests, 60 web tests, 6 shared package tests, 3 Wiki tests and 122 browser tests; the environment-gated live test is run separately. Version and lockfile checks and `git diff --check` passed. The private Compose deployment and trusted-header boundary remain unvalidated.
+- Delivery: 0.29.0 merged in PR #51 at `8cc6ad6d21b43c6413356c9869d6e1510a7885c0`. The exact-SHA container and Android workflows passed, and the matching `mana-vault-0.29.0-debug` artifact and main-branch debug pre-release were verified. This does not satisfy the remaining Phase 1 deployment/security acceptance.
 
 ## 0.28.0 (2026-11-26): Play engine integration foundations
 
@@ -43,7 +52,13 @@
 - Validation: `PW_CHANNEL=chrome npm run test:all` passed, including 119 browser tests. `git diff --check` passed.
 - At handoff, version 0.24.8 and automatic synchronization are pending delivery. Verify the workflow, container, Android build and debug APK for the merged commit.
 
-Last updated: 2026-11-26, version 0.29.0 Playmat integration work pending validation and delivery.
+Last updated: 2026-11-27, version 0.30.0 Play Table work validated locally; review and delivery are pending.
+
+## Current next steps (0.30.0)
+
+- Verify version consistency and review the complete diff, then commit, push and open a PR.
+- Keep the PR unmerged until required checks and approvals pass. After merge, verify the exact-SHA container and Android workflows and the matching debug APK.
+- Complete Phase 1 private deployment, trusted-header isolation, hidden-state and reconnect acceptance before describing Play Table phases 2 through 4 as complete.
 
 ## Project
 
@@ -66,9 +81,9 @@ Mana Vault is Devon's self-hosted Magic: The Gathering collection and deck manag
 - The app is in early development: change things when they need to change. Do not hold back or work around a change to keep older versions, older files or older data working (Devon, 2026-11-22). Mark stored formats with the app version rather than a separate number.
 - Deployment follows the docker-server-setup skill: Dockhand only, no Watchtower, absolute data path, UID 65532, no cloudflared or reverse proxy in the stack.
 
-## Next (0.24.0)
+## Historical follow-ups from 0.24.0
 
-- Nothing is specified. Follow-ups to ask Devon: web pages into notes with real sites (paste from Chrome and the phone, saved pages from Chrome and Firefox, the article reader on deck and primer sites, sites that refuse or block the server); notes and the Wiki in daily use (the editor on a phone, drag and drop, the clash question, an Obsidian vault import, offline notes in the app); and from 0.21.0: whether MTGJSON's data works on the real server (a card database update or Update MTGJSON data now, the 90-day history download and its size, the daily prices), the main price source, precons, Scan barcode with real boxes (UPC data in MTGJSON is not certain for every product), expected values and the pull check with real packs, Change collection..., New collection..., tabs keeping their place, and PNG rarity symbols; and the earlier follow-ups (named products with a real Commander deck, the Custom sets tab, 0.19.0 features with real receipts).
+- Follow-ups from earlier releases: web pages into notes with real sites (paste from Chrome and the phone, saved pages from Chrome and Firefox, the article reader on deck and primer sites, sites that refuse or block the server); notes and the Wiki in daily use (the editor on a phone, drag and drop, the clash question, an Obsidian vault import, offline notes in the app); and from 0.21.0: whether MTGJSON's data works on the real server (a card database update or Update MTGJSON data now, the 90-day history download and its size, the daily prices), the main price source, precons, Scan barcode with real boxes (UPC data in MTGJSON is not certain for every product), expected values and the pull check with real packs, Change collection..., New collection..., tabs keeping their place, and PNG rarity symbols; and the earlier follow-ups (named products with a real Commander deck, the Custom sets tab, 0.19.0 features with real receipts).
 - Left from earlier specs: a chart of one entry's value over time on the purchase entry page (SPEC-0.15.0).
 - Not built from SPEC-0.21.0: expected value on a "set page" (there is no set page; each booster's value shows in Open virtual packs... and on purchase lines); booster contents for offline expected value and pull checks in the app (both need the server); a Buylist column in a column picker (there is no column picker; Buylist prices in lists in the View menu shows it instead); Deckbox id matching (Deckbox files carry no store id).
 
@@ -310,4 +325,4 @@ None known.
 
 ## Where work stopped
 
-0.1.0 to 0.23.0 are merged to main. 0.23.1 (type group order, phone zone buttons) is in pull request 39 (branch v0.23.1) (`PW_CHANNEL=chrome npm run test:all`). The debug APK is the `mana-vault-0.23.1-debug` artifact of the `Android app` workflow. Still to check on real devices: pasting from real sites in Chrome and in the app, a page saved from Chrome and Firefox, New page from web address... on real sites (and one that blocks servers), the notes editor on a phone, offline notes and the clash question in the app; and the earlier list: a card database update that loads MTGJSON's data (sizes, time and memory of AllPrintings and AllPrices), real barcodes, a real Commander deck opened with its decklist, Match cards with real store receipts and photos, the Opening started notification and Start scanning, the live update stream in the app, double tap in the Search screen, picture downloads, a printed test sheet with card backs, a MakePlayingCards upload, trading between two accounts, then the release key, the four repository secrets and a release tag.
+The current branch `feature/play-table-phase-one-followup` is based on `main` at merge commit `8cc6ad6` (PR #51). The full Chrome test suite passes for 0.30.0, but this work is not merged. Required PR checks and approvals, Phase 1 deployment/security acceptance, server/container and Android CI verification, and the matching debug APK remain pending. The 0.30.0 UI and manual-table work is an initial implementation, not acceptance of phases 2 through 4.

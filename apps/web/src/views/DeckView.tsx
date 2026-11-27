@@ -660,6 +660,7 @@ export function DeckView({ actions }: { actions: Record<string, Action> }) {
             <button key={id} type="button" role="tab" aria-selected={tab === id} className={tab === id ? "on" : ""} onClick={() => store.setDeckTab(id)}>{label}</button>
           ))}
         </div>
+        {tab === "playtest" && <button type="button" className="btn small" onClick={() => store.setView("play")}>Open Play workspace</button>}
         {deck.role === "member" && <span className="badge">Shared by {deck.owner?.name}</span>}
         {deck.role === "owner" && (deck.sharedWith?.length ?? 0) > 0 && <span className="badge">Shared with {deck.sharedWith!.map((person) => person.name).join(", ")}</span>}
         {tab === "cards" && (

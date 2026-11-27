@@ -36,6 +36,7 @@ The server maintains a local card catalog, collection and deck data in SQLite, w
 | **Collection management** | Organize binders, boxes and wishlists; track exact printings, finishes, conditions, languages, proxies and set completion. |
 | **Advanced card search** | Search with Scryfall-style syntax, art and Oracle tags, prices, card text and ownership filters. Browse grid, binder or list layouts. |
 | **Deck builder** | Build decks, link owned copies, identify missing cards, check format rules, view statistics and playtest opening hands. |
+| **Play table** | Test saved decks against an optional Playmat AI, play offline solo, host private two- or four-player Commander tables, or watch as an invited spectator. |
 | **Card scanning** | Use your desktop or phone camera to recognize cards, select printings and add them to a collection or deck. |
 | **Trading** | Browse other accounts' trade binders, select source and destination collections, compare offers, make counteroffers and complete trades. |
 | **Purchase and price tracking** | Record singles, sealed products, sales, receipts and pack openings. Compare market prices and track historical values. |
@@ -44,6 +45,8 @@ The server maintains a local card catalog, collection and deck data in SQLite, w
 | **Notes and wiki** | Write linked notes for decks and collections, organize a personal wiki and import or export Markdown pages. |
 | **Mobile and offline** | Install the web app or use the Android app for offline card search, scanning and library edits that sync when connected. |
 | **Server administration** | Manage accounts, invitations, storage, device sessions, scheduled data updates and whole-server backups. |
+
+Manual tables leave Magic rules to the players, keep opponents' hands and libraries private, and support read-only invited spectators. The Playmat engine is optional and is not included or enabled by default.
 
 ### Built for collectors who self-host
 

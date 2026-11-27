@@ -850,6 +850,54 @@ button.tag.badge{border:0;cursor:pointer;font:inherit;font-size:10.5px}
 .ptrow.small .ptcard{width:70px}
 .ptx{position:absolute;right:3px;top:3px;width:22px;height:22px;border:0;border-radius:50%;background:rgba(20,28,40,.75);color:#fff;cursor:pointer;line-height:1}
 .phone .ptcard{width:30%}
+#view-play{overflow:auto}
+.play-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px;border-bottom:1px solid var(--line);background:var(--panel)}
+.play-heading h1{display:flex;align-items:center;gap:8px;margin:0;font-size:20px}
+.play-heading h1 .ico{width:24px;height:24px}
+.play-heading p{margin:4px 0 0;color:var(--muted);font-size:12px}
+.play-heading label,.play-toolbar label{display:flex;align-items:center;gap:8px}
+.play-heading select,.play-toolbar select,.play-toolbar input{max-width:260px;padding:6px;border:1px solid var(--line);border-radius:4px;background:var(--panel2);color:var(--text)}
+.play-tabs{margin:10px 12px 0;align-self:flex-start}
+.play-panel{padding:12px;max-width:1200px}
+.play-panel>h2{margin:4px 0 8px;font-size:17px}
+.play-panel>p{max-width:800px}
+.play-toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:8px 0}
+.play-toolbar .phpos{margin-left:auto}
+.play-totals{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:12px 0;padding:8px;border:1px solid var(--line);border-radius:6px;background:var(--panel)}
+.play-totals>span{display:flex;align-items:center;gap:6px}
+.play-totals b{min-width:24px;text-align:center}
+.play-token{display:flex;align-items:center;gap:6px}
+.play-token input{width:120px;padding:5px;border:1px solid var(--line);border-radius:4px;background:var(--panel2);color:var(--text)}
+.play-random{flex-wrap:wrap}
+.play-zone{margin:12px 0;padding:10px;border:1px solid var(--line);border-radius:7px;background:var(--panel2)}
+.play-zone h3{display:flex;align-items:center;gap:8px;margin:0 0 8px;font-size:13px}
+.play-card-row{display:flex;align-items:flex-start;gap:8px;flex-wrap:wrap}
+.play-card{width:150px;min-height:110px;display:flex;flex-direction:column;justify-content:space-between;overflow:hidden;border:1px solid var(--line);border-radius:6px;background:var(--panel);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.play-card.tapped{transform:rotate(5deg);opacity:.8}
+.play-card>img{width:100%;height:auto;max-height:210px;object-fit:cover}
+.playcardname{display:flex;min-height:70px;align-items:center;justify-content:center;flex-direction:column;gap:4px;padding:8px;text-align:center;font-size:13px;font-weight:600}
+.playcardname small{font-size:10px;color:var(--muted)}
+.play-card-actions{display:flex;flex-wrap:wrap;align-items:center;gap:4px;padding:5px}
+.play-card-actions .btn{font-size:11px}
+.play-player-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:8px}
+.play-player{padding:10px;border:1px solid var(--line);border-radius:6px;background:var(--panel)}
+.play-player>span{display:block;margin:4px 0;color:var(--muted);font-size:12px}
+.engine-card{min-width:100px;padding:8px;border:1px solid var(--line);border-radius:5px;background:var(--panel);font-size:12px}
+.play-prompt{margin:12px 0;padding:12px;border:1px solid var(--accent);border-radius:7px;background:var(--panel)}
+.play-prompt h3{margin:0 0 8px;font-size:14px}
+.play-prompt .btn{margin:0 6px 6px 0}
+.play-log{margin:12px 0;padding:8px;background:var(--panel);border:1px solid var(--line);border-radius:6px}
+.play-log ol{max-height:220px;overflow:auto;padding-left:22px;font-size:12px}
+.play-library-list{display:flex;flex-wrap:wrap;gap:6px}
+.play-library-list span{padding:4px 7px;border-radius:4px;background:var(--panel);font-size:12px}
+.phone .play-heading{align-items:flex-start;flex-direction:column}
+.phone .play-heading select{width:min(100%,360px)}
+.phone .seg.play-tabs{flex:none;align-self:flex-start}
+.phone .play-tabs button{flex:none}
+.phone .play-panel{padding:8px}
+.phone .play-toolbar .phpos{margin-left:0}
+.phone .play-card{width:calc(50% - 5px)}
+.phone .play-totals{gap:8px}
 .deckinfo{padding:10px;max-width:760px}
 .deckinfo .prow{grid-template-columns:110px 1fr;max-width:520px}
 .deckinfo select{padding:2px 4px;border:1px solid var(--line);border-radius:3px;background:var(--panel2)}

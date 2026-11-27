@@ -2,12 +2,13 @@
 
 Status: authenticated server-side Playmat routes and per-user sessions now
 connect to the pinned engine. A real saved-deck AI game completed against a
-session-local test server, and the saved deck remained unchanged. An optional
-Compose profile builds the pinned engine on an internal network, but Docker,
-Podman and WSL are unavailable in this environment, so the profile and
-trusted-header network isolation are not validated. There is no user-facing
-Play workspace. Phase 1 is not complete. This assessment covers phase 1 of
-[the specification](MANA-VAULT-PLAY-TABLE-SPEC.md).
+session-local test server, and the saved deck remained unchanged. Version
+0.30.0 adds an initial Play workspace and separate server-authoritative manual
+tables. An optional Compose profile builds the pinned engine on an internal
+network, but Docker, Podman and WSL are unavailable in this environment, so
+the profile and trusted-header network isolation are not validated. Phase 1
+and the acceptance gates for phases 2 through 4 are not complete. This
+assessment covers phase 1 of [the specification](MANA-VAULT-PLAY-TABLE-SPEC.md).
 
 ## Baseline
 
@@ -64,11 +65,18 @@ fall back silently to manual play if the engine fails.
 
 The foundation's zone projection covers only uniformly public, owner-only or
 hidden zones. It does not model face-down cards or selective reveals. The
-server now forwards allowlisted game event methods through authenticated,
-per-user connections, but it does not yet project or redact event payloads.
-The pinned engine's player-specific view behavior and multi-human hidden-state
-isolation remain unverified. Do not expose these routes through a Play UI until
-those boundaries are tested.
+server forwards allowlisted game event methods through authenticated, per-user
+connections. The Play UI currently offers only a human-versus-AI game, not
+engine-based human multiplayer or spectators. The pinned engine's
+player-specific view behavior and multi-human hidden-state isolation remain
+unverified; do not enable those modes until those boundaries are tested.
+
+The 0.30.0 manual table uses a separate SQLite-backed game state. Deck access
+is checked when each player joins; the server applies revision-checked actions
+and returns a player's hand only to that player. Synthetic route tests and a
+browser test cover 1v1 and four-seat hidden-zone separation. This evidence does
+not validate Playmat's trusted-header boundary, production networking or
+engine event privacy.
 
 Candidate identity bridge: enable engine authentication and trusted-header SSO,
 with a private engine network and only the Mana Vault server trusted to provide
@@ -126,12 +134,13 @@ and container CPU, memory and process limits are set. The configured subnet
 and addresses must not overlap networks on the Docker host. This configuration
 has not been validated because no local container runtime is available. Set
 `MANAVAULT_PLAYMAT_URL=ws://play-engine:17172` when enabling the `play` profile.
-The app's server routes can start a game, but there is no user-facing Play UI.
-The existing app port, Dockhand workflow and engine-disabled behavior must
-remain intact. The upstream server runs as its own user; do not assume its UID
-or volume permissions match Mana Vault's UID 65532. The upstream stack includes
-other services and a proxy; it is not a drop-in deployment for this repository.
-Updates and rollback need a verified image digest and compatible data backup.
+The initial Engine AI UI calls the authenticated server routes; the manual
+table routes do not depend on Playmat. The existing app port, Dockhand workflow
+and engine-disabled behavior must remain intact. The upstream server runs as
+its own user; do not assume its UID or volume permissions match Mana Vault's
+UID 65532. The upstream stack includes other services and a proxy; it is not a
+drop-in deployment for this repository. Updates and rollback need a verified
+image digest and compatible data backup.
 
 ### Local engine evidence
 
