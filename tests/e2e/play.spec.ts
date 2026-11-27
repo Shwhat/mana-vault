@@ -103,6 +103,15 @@ test("private manual Commander table plays shared cards without exposing opponen
     await expect(spectatorPage.locator("#view-play")).not.toContainText("Sol Ring");
     await page.getByRole("button", { name: "Hide library search" }).click();
 
+    await hostHand.getByLabel("Move Sol Ring from hand").first().selectOption("exile");
+    const hostExile = page.locator('.play-zone[data-zone="exile"]');
+    await expect(hostExile).toContainText("Sol Ring");
+    await expect(spectatorPage.locator(".play-player-row")).toContainText("Exile: Sol Ring");
+    await hostExile.locator(".play-card").first().dragTo(hostHand);
+    await expect(hostHand.locator(".playcardname")).toHaveCount(8);
+    await expect(hostExile.locator(".play-card")).toHaveCount(0);
+    await expect(spectatorPage.locator(".play-player-row")).not.toContainText("Sol Ring");
+
     await hostHand.getByRole("button", { name: "Play face down" }).first().click();
     const hostBattlefield = page.locator(".play-zone").filter({ has: page.locator("h3", { hasText: "Battlefield" }) });
     await expect(hostBattlefield).toContainText("Your card: Sol Ring");
@@ -307,6 +316,11 @@ test("manual solo plays an original custom card from a saved deck", async ({ pag
     await expect(battlefield.getByRole("img", { name: customName })).toBeVisible();
     await battlefield.getByRole("button", { name: "Copy" }).click();
     await expect(battlefield.getByRole("img", { name: customName })).toHaveCount(2);
+    await battlefield.getByLabel(`Move ${customName} from battlefield`).last().selectOption("exile");
+    const exile = page.locator('.play-zone[data-zone="exile"]');
+    await expect(exile.getByRole("img", { name: customName })).toBeVisible();
+    await exile.locator(".play-card").first().dragTo(battlefield);
+    await expect(battlefield.getByRole("img", { name: customName })).toHaveCount(2);
     await page.getByRole("button", { name: "Show library" }).click();
     await page.getByLabel("Search library").fill("no matching card");
     await expect(page.getByRole("button", { name: `Put ${customName} into hand` })).toHaveCount(0);
@@ -316,6 +330,10 @@ test("manual solo plays an original custom card from a saved deck", async ({ pag
     await expect(page.locator(".play-toolbar")).toContainText("0 in library");
     await page.getByLabel("Token", { exact: true }).fill("Wolf");
     await page.getByRole("button", { name: "Add", exact: true }).click();
+    await battlefield.getByLabel("Move Wolf from battlefield").selectOption("library-top");
+    await page.getByRole("button", { name: "Draw" }).click();
+    await expect(hand.getByText("Wolf", { exact: false })).toBeVisible();
+    await hand.getByLabel("Move Wolf from hand").selectOption("battlefield");
     const wolfAttachment = battlefield.getByLabel("Attach Wolf");
     const customTarget = await wolfAttachment.locator("option").nth(1).getAttribute("value");
     if (!customTarget) throw new Error("Missing custom card attachment target");

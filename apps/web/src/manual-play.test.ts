@@ -59,6 +59,19 @@ describe("offline manual play", () => {
     expect(deck[0]?.quantity).toBe(11);
   });
 
+  it("moves a battlefield card to the bottom of the library and resets battlefield state", () => {
+    const opening = startManualGame(cards, 0, () => 0.5);
+    const played = playManualCard(opening, opening.hand[0]!.id);
+    const id = played.battlefield[0]!.id;
+    const counted = changeManualCounter(toggleManualTap(played, id), id, "+1/+1", 1);
+    const faceDown = moveManualCard(counted, id, "battlefield", "battlefield", { faceDown: true });
+    const moved = moveManualCard(faceDown, id, "battlefield", "library");
+    expect(moved.battlefield).toHaveLength(0);
+    expect(moved.library.at(-1)).toMatchObject({ id, tapped: false, faceDown: false, counters: {} });
+    expect(moveManualCard(faceDown, id, "battlefield", "library", { libraryPosition: "top" }).library[0]?.id).toBe(id);
+    expect(faceDown.battlefield).toHaveLength(1);
+  });
+
   it("moves public cards, tracks counters and totals, creates tokens, and untaps on the next turn", () => {
     const opening = startManualGame(cards, 0, () => 0.5);
     const played = playManualCard(opening, opening.hand[0]!.id);

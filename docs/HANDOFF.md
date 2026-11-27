@@ -1,5 +1,11 @@
 # Mana Vault handoff
 
+## 0.44.0 (2026-11-27): Manual zone movement
+
+- Manual solo and multiplayer allow dragging owned cards between zones or selecting a destination, including the library top or bottom (dragging places cards on the bottom). Library cards remain private to their owner until moved to a public zone. Zone changes clear counters and battlefield attachments; multiplayer player boards show public graveyards and exile.
+- Focused offline, server and browser zone-movement tests passed. `PW_CHANNEL=chrome npm run test:all` passed: 426 server tests (3 skipped), 68 web tests, 3 play-core tests, 3 protocol tests, 3 Wiki tests and 126 browser tests (2 live-engine tests skipped locally).
+- Delivery is pending. The 0.43.1 isolated live-engine job failed because the all-land non-concession scenario reached its 250-response limit without ending; the cause is not yet established. The test now reports response counts and player state at that limit to help diagnose the next isolated run. Full native gameplay, production deployment and engine reconnect acceptance remain incomplete.
+
 ## 0.43.1 (2026-11-27): Native game completion test
 
 - Add a real-engine browser scenario intended to play an all-land deck through the native interface until the game ends without the player conceding. It must pass in isolated CI before it counts as acceptance evidence; combat and targeting remain unverified in a complete real game.

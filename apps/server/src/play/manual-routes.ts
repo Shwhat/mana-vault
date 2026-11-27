@@ -257,11 +257,15 @@ function applyAction(state: GameState, actorId: number, action: unknown): string
     if (typeof cardId !== "string" || !ZONES.includes(from as Zone) || !ZONES.includes(to as Zone) || from === to) {
       return "Choose a valid card and destination.";
     }
+    if (action.position !== undefined && (to !== "library" || (action.position !== "top" && action.position !== "bottom"))) {
+      return "Choose the top or bottom of your library.";
+    }
     const source = player[from as Zone];
     const index = source.findIndex((card) => card.id === cardId);
     if (index < 0) return "That card is not in your zone.";
     const [card] = source.splice(index, 1);
     if (!card) return "That card is not in your zone.";
+    card.counters = {};
     if (type === "playFaceDown") card.faceDown = true;
     if (to !== "battlefield") {
       card.faceDown = false;
@@ -273,7 +277,8 @@ function applyAction(state: GameState, actorId: number, action: unknown): string
         }
       }
     }
-    player[to as Zone].push(card);
+    if (to === "library" && action.position === "top") player.library.unshift(card);
+    else player[to as Zone].push(card);
   } else if (type === "attach") {
     const card = player.battlefield.find((item) => item.id === action.cardId);
     if (!card || (action.targetId !== null && typeof action.targetId !== "string")) {

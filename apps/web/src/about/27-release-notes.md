@@ -2,6 +2,10 @@
 
 The installed version is shown at the top of the in-app guide.
 
+## 0.44.0 (2026-11-27): Manual zone movement
+
+- Drag your cards between manual zones or choose a destination, including the top or bottom of your library. Changing zones clears counters; multiplayer boards show public graveyards and exile.
+
 ## 0.43.1 (2026-11-27): Native game completion test
 
 - Add an isolated private-engine browser test intended to play a game to completion without conceding. Live validation is pending.

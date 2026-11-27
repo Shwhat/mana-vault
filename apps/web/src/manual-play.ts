@@ -31,7 +31,7 @@ export type ManualGame = Readonly<{
 }>;
 
 type ManualDeckEntry = Pick<DeckCard, "entry_id" | "name" | "image_url" | "type_line" | "custom" | "quantity" | "zone">;
-type MoveOptions = { tapped?: boolean; faceDown?: boolean };
+type MoveOptions = { tapped?: boolean; faceDown?: boolean; libraryPosition?: "top" | "bottom" };
 
 function shuffled<T>(items: readonly T[], random: () => number): T[] {
   const result = [...items];
@@ -110,7 +110,7 @@ export function moveManualCard(
   game: ManualGame,
   id: string,
   from: ManualZone,
-  to: Exclude<ManualZone, "library">,
+  to: ManualZone,
   options: MoveOptions = {},
 ): ManualGame {
   const source = game[from];
@@ -121,13 +121,15 @@ export function moveManualCard(
     tapped: options.tapped ?? (to === "battlefield" ? card.tapped : false),
     faceDown: options.faceDown ?? (to === "battlefield" ? card.faceDown : false),
     attachedTo: to === "battlefield" ? card.attachedTo : undefined,
+    counters: from === to ? card.counters : {},
   };
   return {
     ...game,
     ...(from === to
       ? { [from]: source.map((item) => item.id === id ? moved : item) }
       : { [from]: source.filter((item) => item.id !== id).map((item) =>
-        from === "battlefield" && item.attachedTo === id ? { ...item, attachedTo: undefined } : item), [to]: [...game[to], moved] }),
+        from === "battlefield" && item.attachedTo === id ? { ...item, attachedTo: undefined } : item),
+      [to]: to === "library" && options.libraryPosition === "top" ? [moved, ...game[to]] : [...game[to], moved] }),
   };
 }
 

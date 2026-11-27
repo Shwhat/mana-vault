@@ -428,6 +428,28 @@ describe("authenticated Playmat sessions", () => {
     });
     expect(targetMoved.statusCode).toBe(200);
     expect(targetMoved.json().table.players[1].battlefield[0].attachedTo).toBeUndefined();
+    const countedBlue = await app.inject({
+      method: "POST", url: actionsUrl, headers: { ...guard, cookie: secondCookie },
+      payload: { revision: targetMoved.json().table.revision, action: { type: "counter", cardId: blueId, counter: "+1/+1", delta: 1 } },
+    });
+    expect(countedBlue.statusCode).toBe(200);
+    const exiledBlue = await app.inject({
+      method: "POST", url: actionsUrl, headers: { ...guard, cookie: secondCookie },
+      payload: { revision: countedBlue.json().table.revision, action: { type: "move", cardId: blueId, from: "battlefield", to: "exile" } },
+    });
+    expect(exiledBlue.statusCode).toBe(200);
+    expect(exiledBlue.json().table.players[1].exile[0].counters).toEqual({});
+    const topBlue = await app.inject({
+      method: "POST", url: actionsUrl, headers: { ...guard, cookie: secondCookie },
+      payload: { revision: exiledBlue.json().table.revision, action: { type: "move", cardId: blueId, from: "exile", to: "library", position: "top" } },
+    });
+    expect(topBlue.statusCode).toBe(200);
+    const drewBlue = await app.inject({
+      method: "POST", url: actionsUrl, headers: { ...guard, cookie: secondCookie },
+      payload: { revision: topBlue.json().table.revision, action: { type: "draw" } },
+    });
+    expect(drewBlue.statusCode).toBe(200);
+    expect(drewBlue.json().table.players[1].hand.at(-1).id).toBe(blueId);
     const spectatorAction = await app.inject({
       method: "POST",
       url: `/api/play/manual/tables/${waitingTable.id}/actions`,

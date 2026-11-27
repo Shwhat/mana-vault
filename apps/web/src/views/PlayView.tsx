@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type DragEvent, type FormEvent, type ReactNode } from "react";
 import { request } from "../api";
 import { Icon } from "../icons";
 import {
@@ -102,6 +102,49 @@ function cardPicture(card: Pick<ManualCard, "name" | "imageUrl" | "custom" | "to
     : <span className="playcardname">{card.name}{card.custom && <small>Custom</small>}{card.token && <small>Token</small>}</span>;
 }
 
+type ManualDestination = ManualZone | "library-top";
+const MANUAL_ZONES: readonly { id: ManualDestination; label: string }[] = [
+  { id: "library-top", label: "Library top" },
+  { id: "library", label: "Library bottom" },
+  { id: "hand", label: "Hand" },
+  { id: "battlefield", label: "Battlefield" },
+  { id: "graveyard", label: "Graveyard" },
+  { id: "exile", label: "Exile" },
+  { id: "command", label: "Command zone" },
+];
+
+function ManualMoveSelect({ card, from, move, disabled }: {
+  card: ManualCard; from: ManualZone; move: (card: ManualCard, from: ManualZone, to: ManualDestination) => void; disabled?: boolean;
+}) {
+  return <label>Move to <select aria-label={`Move ${card.name} from ${from}`} value="" disabled={disabled}
+    onChange={(event) => {
+      const target = MANUAL_ZONES.find(({ id }) => id === event.target.value);
+      if (target && target.id !== from) move(card, from, target.id);
+    }}>
+    <option value="">Choose zone</option>
+    {MANUAL_ZONES.filter(({ id }) => id !== from && !(from === "library" && id === "library-top")).map(({ id, label }) => <option key={id} value={id}>{label}</option>)}
+  </select></label>;
+}
+
+function useManualZoneDrag(move: (card: ManualCard, from: ManualZone, to: ManualDestination) => void) {
+  const [dragging, setDragging] = useState<{ card: ManualCard; from: ManualZone } | null>(null);
+  const start = (event: DragEvent, card: ManualCard, from: ManualZone) => {
+    event.dataTransfer.setData("text/plain", card.id);
+    event.dataTransfer.effectAllowed = "move";
+    setDragging({ card, from });
+  };
+  const target = (to: ManualZone) => ({
+    onDragOver: (event: DragEvent) => { if (dragging && dragging.from !== to) event.preventDefault(); },
+    onDrop: (event: DragEvent) => {
+      if (!dragging || dragging.from === to) return;
+      event.preventDefault();
+      move(dragging.card, dragging.from, to);
+      setDragging(null);
+    },
+  });
+  return { start, target, end: () => setDragging(null) };
+}
+
 function ManualSolo({ cards }: { cards: readonly DeckCard[] }) {
   const [game, setGame] = useState<ManualGame | null>(null);
   const [tokenName, setTokenName] = useState("");
@@ -115,9 +158,11 @@ function ManualSolo({ cards }: { cards: readonly DeckCard[] }) {
   }, [cards]);
 
   const newGame = (mulligans = 0) => setGame(startManualGame(cards, mulligans));
-  const move = (card: ManualCard, from: ManualZone, to: Exclude<ManualZone, "library">) => {
-    setGame((current) => current ? moveManualCard(current, card.id, from, to) : current);
+  const move = (card: ManualCard, from: ManualZone, to: ManualDestination) => {
+    setGame((current) => current ? moveManualCard(current, card.id, from, to === "library-top" ? "library" : to,
+      to === "library-top" ? { libraryPosition: "top" } : {}) : current);
   };
+  const drag = useManualZoneDrag(move);
   const play = (card: ManualCard) => setGame((current) => current ? playManualCard(current, card.id) : current);
 
   if (!game) {
@@ -133,12 +178,13 @@ function ManualSolo({ cards }: { cards: readonly DeckCard[] }) {
     );
   }
 
-  const zone = (title: string, values: readonly ManualCard[], body: (card: ManualCard) => ReactNode, extra?: ReactNode) => (
-    <section className="play-zone">
+  const zone = (title: string, from: ManualZone, values: readonly ManualCard[], body: (card: ManualCard) => ReactNode, extra?: ReactNode) => (
+    <section className="play-zone" data-zone={from} {...drag.target(from)}>
       <h3>{title} <span className="cnt">{values.length}</span>{extra}</h3>
-      <div className="play-card-row">{values.map((card) => <article className={card.tapped ? "play-card tapped" : "play-card"} key={card.id}>
+      <div className="play-card-row">{values.map((card) => <article className={card.tapped ? "play-card tapped" : "play-card"} key={card.id}
+        draggable={from !== "hand" || game.bottom === 0} onDragStart={(event) => drag.start(event, card, from)} onDragEnd={drag.end}>
         {cardPicture(card)}
-        <div className="play-card-actions">{body(card)}</div>
+        <div className="play-card-actions">{body(card)}<ManualMoveSelect card={card} from={from} move={move} disabled={from === "hand" && game.bottom > 0} /></div>
       </article>)}</div>
     </section>
   );
@@ -173,8 +219,8 @@ function ManualSolo({ cards }: { cards: readonly DeckCard[] }) {
           {roll && <b role="status">{roll}</b>}
         </span>
       </div>
-      {game.command.length > 0 && zone("Command zone", game.command, (card) => <button type="button" className="btn small" onClick={() => move(card, "command", "battlefield")}>Play</button>)}
-      {zone("Battlefield", game.battlefield, (card) => <>
+      {zone("Command zone", "command", game.command, (card) => <button type="button" className="btn small" onClick={() => move(card, "command", "battlefield")}>Play</button>)}
+      {zone("Battlefield", "battlefield", game.battlefield, (card) => <>
         <button type="button" className="btn small" onClick={() => setGame((current) => current ? toggleManualTap(current, card.id) : current)}>{card.tapped ? "Untap" : "Tap"}</button>
         <button type="button" className="btn small" onClick={() => setGame((current) => current ? changeManualCounter(current, card.id, "+1/+1", 1) : current)}>+1/+1</button>
         <button type="button" className="btn small" onClick={() => setGame((current) => current ? copyManualCard(current, card.id) : current)}>Copy</button>
@@ -189,15 +235,17 @@ function ManualSolo({ cards }: { cards: readonly DeckCard[] }) {
         </select></label>
         {Object.entries(card.counters).map(([name, count]) => <span className="badge" key={name}>{name}: {count}</span>)}
       </>)}
-      {zone("Hand", game.hand, (card) => <button type="button" className="btn small primary" onClick={() => play(card)}>{game.bottom > 0 ? "Put on bottom" : "Play"}</button>)}
-      {zone("Graveyard", game.graveyard, (card) => <button type="button" className="btn small" onClick={() => move(card, "graveyard", "hand")}>Return to hand</button>)}
-      {zone("Exile", game.exile, (card) => <button type="button" className="btn small" onClick={() => move(card, "exile", "hand")}>Return to hand</button>)}
-      {showLibrary && <section className="play-zone"><h3>Library <span className="cnt">{game.library.length}</span></h3>
+      {zone("Hand", "hand", game.hand, (card) => <button type="button" className="btn small primary" onClick={() => play(card)}>{game.bottom > 0 ? "Put on bottom" : "Play"}</button>)}
+      {zone("Graveyard", "graveyard", game.graveyard, (card) => <button type="button" className="btn small" onClick={() => move(card, "graveyard", "hand")}>Return to hand</button>)}
+      {zone("Exile", "exile", game.exile, (card) => <button type="button" className="btn small" onClick={() => move(card, "exile", "hand")}>Return to hand</button>)}
+      <section className="play-zone" data-zone="library" {...drag.target("library")}><h3>Library <span className="cnt">{game.library.length}</span></h3>
+        {showLibrary && <>
         <label>Search library <input value={libraryQuery} onChange={(event) => setLibraryQuery(event.target.value)} /></label>
         <div className="play-library-list">{game.library.filter((card) => card.name.toLowerCase().includes(libraryQuery.trim().toLowerCase())).map((card) =>
-          <span key={card.id}>{card.name} <button type="button" className="btn small" aria-label={`Put ${card.name} into hand`}
-            onClick={() => move(card, "library", "hand")}>To hand</button></span>)}</div>
-      </section>}
+          <span key={card.id} draggable onDragStart={(event) => drag.start(event, card, "library")} onDragEnd={drag.end}>{card.name} <button type="button" className="btn small" aria-label={`Put ${card.name} into hand`}
+            onClick={() => move(card, "library", "hand")}>To hand</button><ManualMoveSelect card={card} from="library" move={move} /></span>)}</div>
+        </>}
+      </section>
       <p className="note">Manual mode does not enforce Magic rules. It is local to this browser session; the engine and other players are not involved.</p>
     </div>
   );
@@ -376,16 +424,21 @@ function ManualTable({ deckId }: { deckId: string }) {
     const target = battlefield.find((item) => item.card.id === id);
     return target ? `${target.card.name} (${target.player.name})` : "Unavailable card";
   };
-  const zone = (title: string, cards: readonly ManualCard[], body: (card: ManualCard) => ReactNode) => (
-    <section className="play-zone" key={title}>
+  const move = (card: ManualCard, from: ManualZone, to: ManualDestination) => void act({
+    type: "move", cardId: card.id, from, to: to === "library-top" ? "library" : to,
+    ...(to === "library-top" ? { position: "top" } : {}),
+  });
+  const drag = useManualZoneDrag(move);
+  const zone = (title: string, from: ManualZone, cards: readonly ManualCard[], body: (card: ManualCard) => ReactNode) => (
+    <section className="play-zone" data-zone={from} key={title} {...drag.target(from)}>
       <h3>{title} <span className="cnt">{cards.length}</span></h3>
-      <div className="play-card-row">{cards.map((card) => <article className={card.tapped ? "play-card tapped" : "play-card"} key={card.id}>
+      <div className="play-card-row">{cards.map((card) => <article className={card.tapped ? "play-card tapped" : "play-card"} key={card.id}
+        draggable onDragStart={(event) => drag.start(event, card, from)} onDragEnd={drag.end}>
         {cardPicture(card)}
-        <div className="play-card-actions">{body(card)}</div>
+        <div className="play-card-actions">{body(card)}<ManualMoveSelect card={card} from={from} move={move} /></div>
       </article>)}</div>
     </section>
   );
-  const move = (card: ManualCard, from: string, to: string) => void act({ type: "move", cardId: card.id, from, to });
 
   return (
     <section className="play-panel">
@@ -442,6 +495,8 @@ function ManualTable({ deckId }: { deckId: string }) {
               </div>}
               <div className="play-card-row">{player.command.map((card) => <div className="engine-card" key={card.id}>{card.name}</div>)}
                 {player.battlefield.map((card) => <div className="engine-card" key={card.id}>{card.tapped ? "Tapped · " : ""}{card.name}{card.attachedTo && ` · Attached to ${attachmentName(card.attachedTo)}`}</div>)}</div>
+              <span>Graveyard: {player.graveyard.length ? player.graveyard.map((card) => card.name).join(", ") : "Empty"}</span>
+              <span>Exile: {player.exile.length ? player.exile.map((card) => card.name).join(", ") : "Empty"}</span>
             </section>)}
           </div>
           {own && !own.conceded && !own.lost && <>
@@ -466,8 +521,8 @@ function ManualTable({ deckId }: { deckId: string }) {
               <button type="submit" className="btn small" disabled={!tokenName.trim()}>Add</button>
             </form>
           </div>
-          {own.command.length > 0 && zone("Command zone", own.command, (card) => <button type="button" className="btn small" onClick={() => move(card, "command", "battlefield")}>Play</button>)}
-          {zone("Battlefield", own.battlefield, (card) => <>
+          {zone("Command zone", "command", own.command, (card) => <button type="button" className="btn small" onClick={() => move(card, "command", "battlefield")}>Play</button>)}
+          {zone("Battlefield", "battlefield", own.battlefield, (card) => <>
             {card.faceDown && <span className="badge">Your card: {card.name}</span>}
             <button type="button" className="btn small" onClick={() => void act({ type: "tap", cardId: card.id })}>{card.tapped ? "Untap" : "Tap"}</button>
             <button type="button" className="btn small" onClick={() => void act({ type: "faceDown", cardId: card.id })}>{card.faceDown ? "Reveal" : "Face down"}</button>
@@ -483,21 +538,23 @@ function ManualTable({ deckId }: { deckId: string }) {
             <button type="button" className="btn small" onClick={() => move(card, "battlefield", "graveyard")}>Graveyard</button>
             <button type="button" className="btn small" onClick={() => move(card, "battlefield", "exile")}>Exile</button>
           </>)}
-          {zone("Hand", own.hand ?? [], (card) => <>
+          {zone("Hand", "hand", own.hand ?? [], (card) => <>
             <button type="button" className="btn small primary" onClick={() => move(card, "hand", "battlefield")}>Play</button>
             <button type="button" className="btn small" onClick={() => void act({ type: "playFaceDown", cardId: card.id })}>Play face down</button>
           </>)}
-          {zone("Graveyard", own.graveyard, (card) => <button type="button" className="btn small" onClick={() => move(card, "graveyard", "hand")}>Return to hand</button>)}
-          {zone("Exile", own.exile, (card) => <button type="button" className="btn small" onClick={() => move(card, "exile", "hand")}>Return to hand</button>)}
-          {showLibrary && !own.conceded && <section className="play-zone">
-            <h3>Library search</h3>
+          {zone("Graveyard", "graveyard", own.graveyard, (card) => <button type="button" className="btn small" onClick={() => move(card, "graveyard", "hand")}>Return to hand</button>)}
+          {zone("Exile", "exile", own.exile, (card) => <button type="button" className="btn small" onClick={() => move(card, "exile", "hand")}>Return to hand</button>)}
+          <section className="play-zone" data-zone="library" {...drag.target("library")}>
+            <h3>Library <span className="cnt">{own.libraryCount}</span></h3>
+            {showLibrary && <>
             <label>Filter library <input value={libraryQuery} onChange={(event) => setLibraryQuery(event.target.value)} /></label>
             {libraryError ? <p className="note warn" role="alert">{libraryError} Close and reopen search to retry.</p> :
               library?.revision !== table.revision ? <p className="note">Loading library search...</p> :
               <div className="play-library-list">{library.cards.filter((card) => card.name.toLowerCase().includes(libraryQuery.trim().toLowerCase())).map((card) =>
-                <span key={card.id}>{card.name} <button type="button" className="btn small" aria-label={`Put ${card.name} into hand`}
-                  onClick={() => move(card, "library", "hand")}>To hand</button></span>)}</div>}
-          </section>}
+                <span key={card.id} draggable onDragStart={(event) => drag.start(event, card, "library")} onDragEnd={drag.end}>{card.name} <button type="button" className="btn small" aria-label={`Put ${card.name} into hand`}
+                  onClick={() => move(card, "library", "hand")}>To hand</button><ManualMoveSelect card={card} from="library" move={move} /></span>)}</div>}
+            </>}
+          </section>
           </>}
         </>}
         {table.status === "closed" && <p className="note">This table is closed. Your last saved view remains available.</p>}

@@ -527,6 +527,7 @@ test("finishes a real engine game without conceding through the native Play UI",
     const ended = page.locator("#view-play .play-toolbar").first().getByText("Game ended", { exact: true });
     await expect(prompt).toBeVisible({ timeout: 60_000 });
     let responses = 0;
+    const responseCounts = { keep: 0, startingPlayer: 0, mountain: 0, pass: 0 };
     for (; responses < 250; responses += 1) {
       if (await ended.isVisible()) break;
       const messageId = await prompt.getAttribute("data-message-id");
@@ -535,12 +536,16 @@ test("finishes a real engine game without conceding through the native Play UI",
       const mountain = page.getByRole("button", { name: "Play Mountain" }).first();
       const pass = prompt.getByRole("button", { name: "Pass priority until next main phase" });
       if (await keep.isVisible()) {
+        responseCounts.keep += 1;
         await keep.click();
       } else if (await prompt.getAttribute("data-web-prompt") === "startingPlayer") {
+        responseCounts.startingPlayer += 1;
         await prompt.getByRole("button").filter({ hasNotText: "Concede" }).first().click();
       } else if (await mountain.isVisible()) {
+        responseCounts.mountain += 1;
         await mountain.click();
       } else if (await pass.isVisible()) {
+        responseCounts.pass += 1;
         await pass.click();
       } else {
         throw new Error(`Unsupported engine prompt during completion test: ${await prompt.textContent()}`);
@@ -551,7 +556,13 @@ test("finishes a real engine game without conceding through the native Play UI",
         return nextId !== null && nextId !== messageId;
       }, { timeout: 30_000 }).toBe(true);
     }
-    expect(responses).toBeLessThan(250);
+    if (responses === 250) {
+      throw new Error(`Engine game did not finish after ${responses} responses: ${JSON.stringify({
+        responseCounts,
+        players: await page.locator(".play-player").allTextContents(),
+        prompt: await prompt.textContent(),
+      })}`);
+    }
     await expect(ended).toBeVisible();
   } finally {
     const deleted = await page.request.delete(`/api/decks/${deckId}`, { headers: { "x-mana-vault": "1" } });

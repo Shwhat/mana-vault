@@ -12,6 +12,8 @@ The **Play** mode is a workspace for testing saved decks. Open it from the deskt
 
 Manual play is a tabletop helper, not a rules engine. Players resolve spells, priority, combat, triggers and other Magic rules themselves. Playing cards never changes the saved deck or collection.
 
+In manual solo and multiplayer games, drag your own cards between zones or use each card's **Move to** selector, including on touch devices. The selector offers the top or bottom of the library; the Library drop target places cards on the bottom. Open library search to move cards out of your library. Changing zones clears counters, and leaving the battlefield clears attachments. During a solo mulligan, choose the required cards to put on the bottom before moving other cards from hand.
+
 ## Manual solo
 
 Choose a saved deck and select **Manual solo**. **New manual game** shuffles the main deck and draws seven. **Mulligan** draws a new hand and asks you to put one card per mulligan on the bottom. Cards from the saved deck, including original custom cards, can be moved through the manual zones. Use the zone buttons to play or move cards, copy battlefield cards, track totals and counters, and add tokens. The game is local to the current browser session and is lost when the page is refreshed or closed.
