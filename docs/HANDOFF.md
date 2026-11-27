@@ -1,12 +1,21 @@
 # Mana Vault handoff
 
+## 0.29.0 (2026-11-26): Server-side Playmat game integration
+
+- Added authenticated per-user Playmat sessions and server routes for discovery, exact-printing saved-deck validation, private AI table startup, filtered player events and prompt-bound responses. A delayed synthetic event test covers delivery while the route is waiting.
+- Account deletion and removal of a user's last valid device/session now close the engine session immediately. Logout, disablement, password reset and sign-out-everywhere also revoke it.
+- The optional live acceptance test passed against the session-local Playmat 1.4.63-V2 test engine using an exact M21 Island printing: the engine reported a terminal result and the original saved deck remained unchanged.
+- Phase 1 is not complete. Docker, Podman and WSL are unavailable in this environment, so the pinned Compose service and private trusted-header boundary are unvalidated. Hidden-state isolation across human players and live reconnect also remain unverified. Phases 2 through 4 are gated and were not started; the existing offline deck Playtest is unchanged.
+- Validation: focused Playmat session tests passed (9 tests), including the live saved-deck AI game after the latest account/device revocation changes. Server type-check passed. `PW_CHANNEL=chrome npm run test:all` passed: 423 server tests, 60 web tests, 6 shared package tests, 3 Wiki tests and 122 browser tests; the environment-gated live test is run separately. Version and lockfile checks and `git diff --check` passed. Docker/Compose validation and Android CI validation remain pending.
+- Delivery: 0.29.0 remains unmerged and is not ready to merge until Phase 1 security and deployment evidence is complete. Server/container and Android artifacts for this version are pending.
+
 ## 0.28.0 (2026-11-26): Play engine integration foundations
 
 - Added an allowlisted server-side Playmat WebSocket client with finite message and request limits, server-only identity header, in-memory restore tokens, reconnect after ordinary disconnects and no automatic reconnect after takeover.
 - Added a persistent opaque engine identity mapping initialized with the database, and exact-printing conversion for immutable deck snapshots. Synthetic tests cover transport, identity mapping, unsupported printings, fallback detection, maybeboard exclusion and commander/sideboard restrictions.
 - These are not a playable integration: no private engine deployment, authenticated game routes, session manager, live deck validation or real saved-deck AI game exists. Phase 1 remains gated; later phases have not started.
 - Validation: `PW_CHANNEL=chrome npm run test:all` passed at 0.28.0: 415 server tests, 60 web tests, 6 shared package tests, 3 Wiki tests and 122 browser tests. `git diff --check` passed.
-- Draft PR #50 is open. Its Android CI check is still unknown/pending. Merge is blocked until Phase 1 engine acceptance is verified; post-merge server/container and Android delivery checks have not been run.
+- PR #50 merged to `main` at `5044766a127016c47b9359f363097623eac85844`. The exact-SHA Android workflow passed and produced `mana-vault-0.28.0-debug`; the matching debug pre-release was updated. The exact-SHA container workflow failed in browser tests before publishing: 121/122 passed, with `release0220.spec.ts` timing out while waiting for the note-conflict dialog. No container was published; investigate on the next CI run.
 
 ## 0.27.0 (2026-11-26): Play table deck snapshots
 
@@ -34,7 +43,7 @@
 - Validation: `PW_CHANNEL=chrome npm run test:all` passed, including 119 browser tests. `git diff --check` passed.
 - At handoff, version 0.24.8 and automatic synchronization are pending delivery. Verify the workflow, container, Android build and debug APK for the merged commit.
 
-Last updated: 2026-11-26, version 0.27.0 deck snapshot work pending delivery.
+Last updated: 2026-11-26, version 0.29.0 Playmat integration work pending validation and delivery.
 
 ## Project
 

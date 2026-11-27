@@ -90,7 +90,7 @@ This page lists what Mana Vault does in the current version, followed by what is
 - Show the cards as a list, text, stacks of pictures or a grid, grouped by type, subtype, type and tag, rarity, color, color identity, mana value, set, artist or your own tags, and sorted by name, mana value, price, rarity or color.
 - Check a deck against its format: deck and sideboard size, copies of each card, banned and not legal cards, and the commander's color identity.
 - Keep a maybeboard of cards being considered, list the tokens the deck makes, and point at a card name for a large picture.
-- Playtest: shuffle, draw opening hands, mulligan, draw and play cards.
+- Playtest: shuffle, draw opening hands, mulligan, draw and play cards offline. The server-side Playmat integration is not yet available through the interface.
 - Write a description with headings, lists and links, choose a cover card, and see the history of every change.
 - Link each deck card to the copy in a collection that fills it: one deck per copy, chosen when a card is free in more than one collection, changeable later, following the copy when it moves or changes printing (or keeping its version when you choose), and missing when it is removed.
 - Rename and delete decks.

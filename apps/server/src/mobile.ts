@@ -128,7 +128,13 @@ export class Revision {
 
 type CompactCache = { stamp: string; body: Buffer } | null;
 
-export function registerMobileRoutes(app: FastifyInstance, database: DatabaseSync, revision: Revision, signIn: (name: string, password: string, request: FastifyRequest, reply: FastifyReply) => Promise<User | null>): void {
+export function registerMobileRoutes(
+  app: FastifyInstance,
+  database: DatabaseSync,
+  revision: Revision,
+  signIn: (name: string, password: string, request: FastifyRequest, reply: FastifyReply) => Promise<User | null>,
+  disconnectPlaySessionIfUnauthorized?: (userId: number) => Promise<void>,
+): void {
   initializeMobileTables(database);
 
   app.post<{ Body: { name?: unknown; password?: unknown; device?: unknown } }>("/api/devices", async (request, reply) => {
@@ -151,6 +157,12 @@ export function registerMobileRoutes(app: FastifyInstance, database: DatabaseSyn
   app.delete<{ Params: { deviceId: string } }>("/api/devices/:deviceId", async (request, reply) => {
     const result = database.prepare("DELETE FROM devices WHERE id = ? AND user_id = ?").run(request.params.deviceId, request.user!.id);
     if (!result.changes) return reply.code(404).send({ error: "That device is not signed in." });
+    try {
+      await disconnectPlaySessionIfUnauthorized?.(request.user!.id);
+    } catch (error) {
+      request.log.error({ error, userId: request.user!.id }, "Could not close Playmat session after device removal");
+      return reply.code(503).send({ error: "Device access was revoked, but the play engine could not confirm session cleanup." });
+    }
     return { status: "removed" };
   });
 

@@ -25,6 +25,10 @@ export type AdminContext = {
   exitAfterRestore: boolean;
   /** Picture totals for the overview. */
   pictureSummary: () => unknown;
+  /** Ends the user's server-managed engine session when auth is revoked. */
+  disconnectPlaySession?: (userId: number) => Promise<void>;
+  /** Ends the engine session only when the user has no remaining valid sign-in. */
+  disconnectPlaySessionIfUnauthorized?: (userId: number) => Promise<void>;
 };
 
 export function initializeAdminTables(database: DatabaseSync): void {
@@ -184,6 +188,28 @@ export function registerAdminRoutes(app: FastifyInstance, context: AdminContext)
     return false;
   };
   const log = (request: FastifyRequest, kind: string, detail: string) => logActivity(database, request.user?.name ?? "", kind, detail, request.ip);
+  const disconnectPlaySession = async (request: FastifyRequest, reply: FastifyReply, userId: number) => {
+    if (!context.disconnectPlaySession) return true;
+    try {
+      await context.disconnectPlaySession(userId);
+      return true;
+    } catch (error) {
+      request.log.error({ error, userId }, "Could not close Playmat session after account access changed");
+      void reply.code(503).send({ error: "Account access was revoked, but the play engine could not confirm session cleanup." });
+      return false;
+    }
+  };
+  const disconnectPlaySessionIfUnauthorized = async (request: FastifyRequest, reply: FastifyReply, userId: number) => {
+    if (!context.disconnectPlaySessionIfUnauthorized) return true;
+    try {
+      await context.disconnectPlaySessionIfUnauthorized(userId);
+      return true;
+    } catch (error) {
+      request.log.error({ error, userId }, "Could not close Playmat session after device access changed");
+      void reply.code(503).send({ error: "Device access was revoked, but the play engine could not confirm session cleanup." });
+      return false;
+    }
+  };
   const adminCount = () => Number(database.prepare("SELECT COUNT(*) AS n FROM users WHERE is_admin = 1 AND disabled = 0").get()?.n ?? 0);
 
   app.get("/api/admin/overview", async (request, reply) => {
@@ -263,6 +289,7 @@ export function registerAdminRoutes(app: FastifyInstance, context: AdminContext)
     const password = temporaryPassword();
     auth.setPassword(user.id, password, true);
     database.prepare("DELETE FROM devices WHERE user_id = ?").run(user.id);
+    if (!await disconnectPlaySession(request, reply, user.id)) return reply;
     log(request, "Password reset", user.name);
     return { password };
   });
@@ -284,6 +311,7 @@ export function registerAdminRoutes(app: FastifyInstance, context: AdminContext)
       if (disable) {
         database.prepare("DELETE FROM sessions WHERE user_id = ?").run(user.id);
         database.prepare("DELETE FROM devices WHERE user_id = ?").run(user.id);
+        if (!await disconnectPlaySession(request, reply, user.id)) return reply;
       }
       log(request, disable ? "Account disabled" : "Account enabled", user.name);
     }
@@ -296,6 +324,7 @@ export function registerAdminRoutes(app: FastifyInstance, context: AdminContext)
     if (!user) return reply;
     database.prepare("DELETE FROM sessions WHERE user_id = ?").run(user.id);
     database.prepare("DELETE FROM devices WHERE user_id = ?").run(user.id);
+    if (!await disconnectPlaySession(request, reply, user.id)) return reply;
     log(request, "Signed out everywhere", user.name);
     return { status: "signed out" };
   });
@@ -311,6 +340,7 @@ export function registerAdminRoutes(app: FastifyInstance, context: AdminContext)
     if (to !== null && (to === user.id || !database.prepare("SELECT 1 FROM users WHERE id = ?").get(to))) {
       return reply.code(400).send({ error: "Choose another account to receive the collections and decks." });
     }
+    if (!await disconnectPlaySession(request, reply, user.id)) return reply;
     database.exec("BEGIN");
     try {
       if (to !== null) {
@@ -366,9 +396,10 @@ export function registerAdminRoutes(app: FastifyInstance, context: AdminContext)
 
   app.delete<{ Params: { deviceId: string } }>("/api/admin/devices/:deviceId", async (request, reply) => {
     if (!admin(request, reply)) return reply;
-    const row = database.prepare("SELECT d.name, u.name AS user_name FROM devices d JOIN users u ON u.id = d.user_id WHERE d.id = ?").get(request.params.deviceId);
+    const row = database.prepare("SELECT d.name, d.user_id, u.name AS user_name FROM devices d JOIN users u ON u.id = d.user_id WHERE d.id = ?").get(request.params.deviceId);
     if (!row) return reply.code(404).send({ error: "That device is not signed in." });
     database.prepare("DELETE FROM devices WHERE id = ?").run(request.params.deviceId);
+    if (!await disconnectPlaySessionIfUnauthorized(request, reply, Number(row.user_id))) return reply;
     log(request, "Device removed", `${String(row.name)} (${String(row.user_name)})`);
     return { status: "removed" };
   });

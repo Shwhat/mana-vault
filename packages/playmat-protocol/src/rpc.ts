@@ -24,7 +24,15 @@ export type PlaymatRpcParams = {
   getDeckTypes: [];
   lookupCards: [cards: readonly DeckCardInfo[]];
   deckValidate: [deckType: string, deck: DeckCardLists];
-  roomCreateTable: [sessionId: string, roomId: string, options: Readonly<{ name: string; gameType: string; deckType: string; winsNeeded: number }>];
+  roomCreateTable: [sessionId: string, roomId: string, options: Readonly<{
+    name: string;
+    gameType: string;
+    deckType: string;
+    winsNeeded: number;
+    playerTypes?: readonly string[];
+    rated?: boolean;
+    spectatorsAllowed?: boolean;
+  }>];
   roomJoinTable: [sessionId: string, roomId: string, tableId: string, name: string, playerType: string, skill: number, deck: DeckCardLists, password?: string | null];
   matchStart: [sessionId: string, roomId: string, tableId: string];
   roomLeaveTableOrTournament: [sessionId: string, roomId: string, tableId: string];

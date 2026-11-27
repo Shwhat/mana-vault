@@ -113,6 +113,14 @@ export class PlaymatConnection {
     return this.#takenOver;
   }
 
+  get isClosed(): boolean {
+    return this.#closed || this.#socket.readyState === WebSocket.CLOSED;
+  }
+
+  get sessionId(): string {
+    return this.#sessionId;
+  }
+
   async call<M extends PlaymatRpcMethod>(method: M, ...params: PlaymatRpcParams[M]): Promise<unknown> {
     if (this.#closed || this.#socket.readyState !== WebSocket.OPEN) throw new Error("Playmat connection is not open");
     if (this.#nextId >= Number.MAX_SAFE_INTEGER) throw new Error("Playmat request id space exhausted");
