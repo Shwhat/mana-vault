@@ -189,6 +189,8 @@ test("offers engine-approved actions, combat choices and named targets", async (
     await page.getByRole("button", { name: "Start against AI" }).click();
     const chooseCard = page.getByRole("button", { name: "Choose Available Sol Ring" });
     await expect(chooseCard).toBeVisible();
+    await expect(page.getByRole("button", { name: "Pass priority", exact: true })).toBeVisible();
+    await expect(page.getByText("This prompt requires an engine response format not available in the workspace yet.")).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Choose Unavailable Creature" })).toHaveCount(0);
     await chooseCard.click();
     await expect.poll(() => submittedActions).toHaveLength(1);

@@ -689,7 +689,9 @@ function AutomatedGame({ deckId, options, engineError }: { deckId: string; optio
           {prompt.event.method !== "GAME_ASK" && prompt.event.method !== "GAME_GET_AMOUNT" && choices.length === 0
             && !combatKind
             && (!abilities || Object.values(abilities).every((label) => typeof label !== "string"))
-            && <p className="note">This prompt requires an engine response format not available in the workspace yet.</p>}
+            && <p className="note">{prompt.event.method === "GAME_SELECT"
+              ? "Some choices for this prompt may not be available in the workspace yet."
+              : "This prompt requires an engine response format not available in the workspace yet."}</p>}
         </section>}
       </>}
       {error && <p className="note warn" role="alert">{error}</p>}

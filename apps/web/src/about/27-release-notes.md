@@ -2,6 +2,10 @@
 
 The installed version is shown at the top of the in-app guide.
 
+## 0.39.1 (2026-11-27): Engine prompt clarity
+
+- Clarify that some choices may be missing from engine selection prompts without incorrectly saying the available pass response is unsupported.
+
 ## 0.39.0 (2026-11-27): Multiplayer face-down cards
 
 - Play cards face down directly from hand, turn your battlefield cards face down, and reveal them. Opponents and spectators receive a hidden representation without the card's identity or artwork.
