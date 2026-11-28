@@ -10,6 +10,7 @@ services:
         condition: service_healthy
     environment:
       MANAVAULT_PLAYMAT_URL: ws://play-engine:17172
+      MANAVAULT_PLAYMAT_RECONNECT_TEST: "1"
     networks:
       play-engine:
         ipv4_address: ${MANAVAULT_PLAY_APP_IP:-172.30.254.2}

@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { WebSocketServer, type WebSocket } from "ws";
-import type { AddressInfo } from "node:net";
+import { connect, createServer, type AddressInfo, type Socket } from "node:net";
 import type { ServerEvent } from "@mana-vault/playmat-protocol";
 import { buildApp } from "../app.js";
 import { cardExtrasStatement, cardInsertStatement } from "../database.js";
@@ -1178,6 +1178,111 @@ describe("authenticated Playmat sessions", () => {
     });
     expect(privateGame.statusCode).toBe(404);
   });
+
+  it.skipIf(!process.env.MANAVAULT_PLAYMAT_URL || process.env.MANAVAULT_PLAYMAT_RECONNECT_TEST !== "1")(
+    "restores a real engine game after the transport drops",
+    async () => {
+      const target = new URL(process.env.MANAVAULT_PLAYMAT_URL!);
+      if (target.protocol !== "ws:") throw new Error("The isolated reconnect test requires a ws engine URL");
+      const sockets = new Set<Socket>();
+      const errors: Error[] = [];
+      let connections = 0;
+      const proxy = createServer((client) => {
+        connections += 1;
+        const upstream = connect(Number(target.port || 80), target.hostname);
+        for (const socket of [client, upstream]) {
+          sockets.add(socket);
+          socket.on("close", () => sockets.delete(socket));
+          socket.on("error", (error) => errors.push(error));
+        }
+        client.pipe(upstream);
+        upstream.pipe(client);
+      });
+      await new Promise<void>((resolve, reject) => {
+        proxy.once("error", reject);
+        proxy.listen(0, "127.0.0.1", resolve);
+      });
+      const address = proxy.address() as AddressInfo;
+      const { app, database, guard, cookie } = await signedInApp(`ws://127.0.0.1:${address.port}${target.pathname}`, 15_000);
+      cleanup.push(async () => {
+        for (const socket of sockets) socket.destroy();
+        await new Promise<void>((resolve, reject) => proxy.close((error) => error ? reject(error) : resolve()));
+      });
+      cardInsertStatement(database).run(
+        "reconnect-island", "reconnect-island-oracle", "Island", "", 0, "Basic Land - Island", "", "", "",
+        JSON.stringify({ modern: "legal" }), "M21", "Core Set 2021", "265", "common", null, "2020-07-03", "Mana Vault integration test",
+      );
+      cardExtrasStatement(database).run("nonfoil", 0, 0, "reconnect-island");
+      const deck = await app.inject({
+        method: "POST", url: "/api/decks", headers: { ...guard, cookie },
+        payload: { name: "Live reconnect test", format: "modern" },
+      });
+      expect(deck.statusCode).toBe(201);
+      expect((await app.inject({
+        method: "POST", url: `/api/decks/${deck.json().id}/cards`, headers: { ...guard, cookie },
+        payload: { cardId: "reconnect-island", quantity: 60 },
+      })).statusCode).toBe(201);
+      const game = await app.inject({
+        method: "POST", url: "/api/play/games", headers: { ...guard, cookie },
+        payload: { deckId: deck.json().id, gameType: "Two Player Duel", deckType: "Constructed - Modern" },
+      });
+      expect(game.statusCode).toBe(200);
+      const gameId = String(game.json().gameId);
+      let cursor = 0;
+      let promptSeen = false;
+      const openingDeadline = Date.now() + 30_000;
+      while (!promptSeen && Date.now() < openingDeadline) {
+        const response = await app.inject({ method: "GET", url: `/api/play/events?after=${cursor}`, headers: { cookie } });
+        expect(response.statusCode).toBe(200);
+        for (const item of response.json().events as Array<{ id: number; event: { objectId: string; method: string } }>) {
+          cursor = Math.max(cursor, item.id);
+          if (item.event.objectId === gameId && ["GAME_ASK", "GAME_TARGET", "GAME_SELECT"].includes(item.event.method)) promptSeen = true;
+        }
+        if (!promptSeen) await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+      expect(promptSeen).toBe(true);
+      expect(connections).toBe(1);
+      for (const socket of sockets) socket.destroy();
+      await expect.poll(() => sockets.size, { timeout: 5_000 }).toBe(0);
+      let recoveredView = false;
+      let conceded = false;
+      let gameOver = false;
+      const deadline = Date.now() + 90_000;
+      while (!gameOver && Date.now() < deadline) {
+        const response = await app.inject({ method: "GET", url: `/api/play/events?after=${cursor}`, headers: { cookie } });
+        expect(response.statusCode).toBe(200);
+        for (const item of response.json().events as Array<{
+          id: number; event: { objectId: string; method: string; messageId: number; data: unknown };
+        }>) {
+          cursor = Math.max(cursor, item.id);
+          const event = item.event;
+          if (event.objectId !== gameId) continue;
+          if (["GAME_INIT", "GAME_UPDATE", "GAME_UPDATE_AND_INFORM"].includes(event.method)) recoveredView = true;
+          if (event.method === "GAME_OVER" || event.method === "END_GAME_INFO") {
+            gameOver = true;
+            break;
+          }
+          if (conceded || !["GAME_ASK", "GAME_TARGET", "GAME_SELECT", "GAME_CHOOSE_ABILITY", "GAME_CHOOSE_CHOICE"].includes(event.method)) continue;
+          const action = event.method === "GAME_ASK"
+            ? { type: "sendPlayerBoolean", data: false }
+            : { type: "sendPlayerAction", data: "CONCEDE" };
+          const submitted = await app.inject({
+            method: "POST", url: `/api/play/games/${gameId}/actions`, headers: { ...guard, cookie },
+            payload: { expectedMessageId: event.messageId, ...action },
+          });
+          if (submitted.statusCode === 200 && action.type === "sendPlayerAction") conceded = true;
+          else if (submitted.statusCode !== 200) expect(submitted.statusCode).toBe(409);
+        }
+        if (!gameOver) await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+      expect(connections).toBeGreaterThanOrEqual(2);
+      expect(recoveredView).toBe(true);
+      expect(conceded).toBe(true);
+      expect(gameOver).toBe(true);
+      expect(errors).toEqual([]);
+    },
+    150_000,
+  );
 
   it.skipIf(!process.env.MANAVAULT_PLAYMAT_URL)(
     "completes a real AI game from an exact-printing saved deck without changing it",
