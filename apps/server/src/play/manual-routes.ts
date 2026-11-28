@@ -30,6 +30,7 @@ type PlayerState = {
   commanderDamage: Record<string, number>;
   conceded: boolean;
   lost?: boolean;
+  opening?: { mulligans: number; bottom: number };
 };
 type RandomResult =
   | { number: number; seat: number; kind: "d6" | "d20"; value: number }
@@ -186,6 +187,7 @@ function projectTable(database: DatabaseSync, table: Record<string, unknown>, us
       libraryCount: gamePlayer?.library.length ?? null,
       handCount: gamePlayer?.hand.length ?? null,
       hand: own ? gamePlayer?.hand ?? [] : undefined,
+      opening: own ? gamePlayer?.opening : undefined,
       battlefield: gamePlayer?.battlefield.map((card) => card.faceDown && !own
         ? { id: card.id, name: "Face down", imageUrl: null, custom: false, token: false, tapped: card.tapped, faceDown: true, counters: card.counters, attachedTo: card.attachedTo }
         : card) ?? [],
@@ -248,7 +250,32 @@ function applyAction(state: GameState, actorId: number, action: unknown): string
   if (!player) return "You are not seated at this table.";
   if (isOut(player)) return "You are no longer in this game.";
   const type = action.type;
-  if (type === "draw") {
+  if (player.opening && player.opening.bottom > 0 && !["mulligan", "bottom", "random", "concede", "loss"].includes(type)) {
+    return "Put the required opening cards on the bottom of your library first.";
+  }
+  if (type === "mulligan") {
+    if (!player.opening || player.opening.mulligans >= 8) return "You cannot mulligan this hand.";
+    player.library.push(...player.hand);
+    player.hand = [];
+    shuffle(player.library);
+    player.hand = player.library.splice(0, 7);
+    player.opening.mulligans += 1;
+    player.opening.bottom = Math.min(player.hand.length, player.opening.mulligans - 1);
+  } else if (type === "bottom") {
+    if (!player.opening || player.opening.bottom <= 0 || typeof action.cardId !== "string") {
+      return "Choose an opening card to put on the bottom.";
+    }
+    const index = player.hand.findIndex((card) => card.id === action.cardId);
+    if (index < 0) return "Choose a card from your hand.";
+    const [card] = player.hand.splice(index, 1);
+    if (!card) return "Choose a card from your hand.";
+    player.library.push(card);
+    player.opening.bottom -= 1;
+    if (player.opening.bottom === 0) delete player.opening;
+  } else if (type === "keep") {
+    if (!player.opening) return "Your opening hand is already kept.";
+    delete player.opening;
+  } else if (type === "draw") {
     const card = player.library.shift();
     if (!card) return "Your library is empty.";
     player.hand.push(card);
@@ -366,6 +393,9 @@ function applyAction(state: GameState, actorId: number, action: unknown): string
     else target.commanderDamage[key] = next;
   } else if (type === "turn") {
     if (state.activeSeat !== player.seat) return "Only the active player can end the turn.";
+    if (state.players.some((item) => !isOut(item) && (item.opening?.bottom ?? 0) > 0)) {
+      return "Wait for players to put their opening cards on the bottom.";
+    }
     const remaining = state.players.filter((item) => !isOut(item));
     if (remaining.length < 2) return "There are not enough active players to continue.";
     const currentIndex = remaining.findIndex((item) => item.seat === player.seat);
@@ -373,12 +403,14 @@ function applyAction(state: GameState, actorId: number, action: unknown): string
     if (!next) return "There are not enough active players to continue.";
     if (next.seat <= player.seat) state.turn += 1;
     state.activeSeat = next.seat;
+    for (const item of state.players) delete item.opening;
     for (const card of next.battlefield) card.tapped = false;
   } else if (type === "concede" || type === "loss") {
     removeFromGame(state, player, type);
   } else {
     return "That table action is not supported.";
   }
+  if (!["mulligan", "bottom", "keep", "random"].includes(type)) delete player.opening;
   return null;
 }
 
@@ -524,7 +556,7 @@ export function registerManualPlayRoutes(app: FastifyInstance, database: Databas
       return {
         userId: Number(member.user_id), name: String(member.player_name), seat: Number(member.seat),
         library, hand: library.splice(0, 7), battlefield: [], graveyard: [], exile: [], command,
-        life: 40, poison: 0, commanderDamage: {}, conceded: false,
+        life: 40, poison: 0, commanderDamage: {}, conceded: false, opening: { mulligans: 0, bottom: 0 },
       };
     });
     const state: GameState = { turn: 1, activeSeat: 0, players };

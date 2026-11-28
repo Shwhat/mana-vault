@@ -24,6 +24,7 @@ type SharedPlayer = {
   libraryCount: number | null;
   handCount: number | null;
   hand?: ManualCard[];
+  opening?: { mulligans: number; bottom: number };
   battlefield: ManualCard[];
   graveyard: ManualCard[];
   exile: ManualCard[];
@@ -440,6 +441,7 @@ function ManualTable({ deckId }: { deckId: string }) {
   };
 
   const own = table?.players.find((player) => player.hand !== undefined);
+  const pendingBottom = (own?.opening?.bottom ?? 0) > 0;
   const battlefield = table?.players.flatMap((player) => player.battlefield.map((card) => ({ card, player }))) ?? [];
   const attachmentName = (id: string) => {
     const target = battlefield.find((item) => item.card.id === id);
@@ -454,10 +456,10 @@ function ManualTable({ deckId }: { deckId: string }) {
     <section className="play-zone" data-zone={from} key={title} {...drag.target(from)}>
       <h3>{title} <span className="cnt">{cards.length}</span></h3>
       <div className="play-card-row">{cards.map((card) => <article className={card.tapped ? "play-card tapped" : "play-card"} key={card.id}
-        draggable onDragStart={(event) => drag.start(event, card, from)} onDragEnd={drag.end}>
-        <span className="play-drag-handle" aria-hidden="true">Drag</span>
+        draggable={!pendingBottom} onDragStart={(event) => drag.start(event, card, from)} onDragEnd={drag.end}>
+        {!pendingBottom && <span className="play-drag-handle" aria-hidden="true">Drag</span>}
         {cardPicture(card)}
-        <div className="play-card-actions">{body(card)}<ManualMoveSelect card={card} from={from} move={move} /></div>
+        <div className="play-card-actions">{body(card)}<ManualMoveSelect card={card} from={from} move={move} disabled={pendingBottom} /></div>
       </article>)}</div>
     </section>
   );
@@ -514,10 +516,10 @@ function ManualTable({ deckId }: { deckId: string }) {
               <span>Life {player.life} · Poison {player.poison} · Hand {player.handCount} · Library {player.libraryCount}</span>
               {Object.entries(player.commanderDamage).map(([from, amount]) => <span key={from}>Commander damage from seat {Number(from) + 1}: {amount}</span>)}
               {own && !own.conceded && !own.lost && player.seat !== own.seat && <div className="play-toolbar">
-                <button type="button" className="btn small" disabled={(player.commanderDamage[String(own.seat)] ?? 0) >= 999}
+                <button type="button" className="btn small" disabled={pendingBottom || (player.commanderDamage[String(own.seat)] ?? 0) >= 999}
                   onClick={() => void act({ type: "commanderDamage", targetSeat: player.seat, delta: 1 })}>+ Commander damage</button>
                 <button type="button" className="btn small" aria-label={`Remove commander damage from ${player.name}`}
-                  disabled={(player.commanderDamage[String(own.seat)] ?? 0) <= 0}
+                  disabled={pendingBottom || (player.commanderDamage[String(own.seat)] ?? 0) <= 0}
                   onClick={() => void act({ type: "commanderDamage", targetSeat: player.seat, delta: -1 })}>- Commander damage</button>
               </div>}
               <div className="play-card-row">{player.command.map((card) => <div className="engine-card" key={card.id}>{card.name}</div>)}
@@ -528,11 +530,19 @@ function ManualTable({ deckId }: { deckId: string }) {
             </section>)}
           </div>
           {own && !own.conceded && !own.lost && <>
+          {own.opening && <div className="play-toolbar">
+            <span>Opening hand: {own.opening.mulligans} mulligan{own.opening.mulligans === 1 ? "" : "s"}; first is free. Other game actions or the first turn ending close mulligans; dice and coin flips do not.</span>
+            <button type="button" className="btn small" disabled={own.opening.mulligans >= 8}
+              onClick={() => void act({ type: "mulligan" })}>Mulligan</button>
+            <button type="button" className="btn small" disabled={pendingBottom}
+              onClick={() => void act({ type: "keep" })}>Keep hand</button>
+          </div>}
+          {pendingBottom && <p className="legalbar warn">Choose {own.opening?.bottom} card{own.opening?.bottom === 1 ? "" : "s"} from your hand to put on the bottom.</p>}
           <div className="play-toolbar">
-            <button type="button" className="btn small" disabled={!own.libraryCount} onClick={() => void act({ type: "draw" })}>Draw</button>
-            <button type="button" className="btn small" onClick={() => void act({ type: "shuffle" })}>Shuffle</button>
-            <button type="button" className="btn small" onClick={() => setShowLibrary((current) => !current)}>{showLibrary ? "Hide library search" : "Search library"}</button>
-            <button type="button" className="btn small" disabled={table.activeSeat !== own.seat} onClick={() => void act({ type: "turn" })}>End turn</button>
+            <button type="button" className="btn small" disabled={!own.libraryCount || pendingBottom} onClick={() => void act({ type: "draw" })}>Draw</button>
+            <button type="button" className="btn small" disabled={pendingBottom} onClick={() => void act({ type: "shuffle" })}>Shuffle</button>
+            <button type="button" className="btn small" disabled={pendingBottom} onClick={() => setShowLibrary((current) => !current)}>{showLibrary ? "Hide library search" : "Search library"}</button>
+            <button type="button" className="btn small" disabled={table.activeSeat !== own.seat || pendingBottom} onClick={() => void act({ type: "turn" })}>End turn</button>
             <button type="button" className="btn small" onClick={() => void act({ type: "random", kind: "d6" })}>Roll d6</button>
             <button type="button" className="btn small" onClick={() => void act({ type: "random", kind: "d20" })}>Roll d20</button>
             <button type="button" className="btn small" onClick={() => void act({ type: "random", kind: "coin" })}>Flip coin</button>
@@ -540,19 +550,19 @@ function ManualTable({ deckId }: { deckId: string }) {
             <button type="button" className="btn small" onClick={() => void act({ type: "loss" })}>Report loss</button>
           </div>
           <div className="play-totals">
-            <span>Life <button type="button" className="btn small" onClick={() => void act({ type: "life", delta: -1 })}>-</button> <b>{own.life}</b> <button type="button" className="btn small" onClick={() => void act({ type: "life", delta: 1 })}>+</button></span>
-            <span>Poison <button type="button" className="btn small" onClick={() => void act({ type: "poison", delta: -1 })}>-</button> <b>{own.poison}</b> <button type="button" className="btn small" onClick={() => void act({ type: "poison", delta: 1 })}>+</button></span>
+            <span>Life <button type="button" className="btn small" disabled={pendingBottom} onClick={() => void act({ type: "life", delta: -1 })}>-</button> <b>{own.life}</b> <button type="button" className="btn small" disabled={pendingBottom} onClick={() => void act({ type: "life", delta: 1 })}>+</button></span>
+            <span>Poison <button type="button" className="btn small" disabled={pendingBottom} onClick={() => void act({ type: "poison", delta: -1 })}>-</button> <b>{own.poison}</b> <button type="button" className="btn small" disabled={pendingBottom} onClick={() => void act({ type: "poison", delta: 1 })}>+</button></span>
             <form className="play-token" onSubmit={(event) => {
               event.preventDefault();
               void act({ type: "token", name: tokenName });
               setTokenName("");
             }}>
               <label htmlFor="play-table-token">Token</label>
-              <input id="play-table-token" value={tokenName} onChange={(event) => setTokenName(event.target.value)} maxLength={100} />
-              <button type="submit" className="btn small" disabled={!tokenName.trim()}>Add</button>
+              <input id="play-table-token" value={tokenName} onChange={(event) => setTokenName(event.target.value)} maxLength={100} disabled={pendingBottom} />
+              <button type="submit" className="btn small" disabled={!tokenName.trim() || pendingBottom}>Add</button>
             </form>
           </div>
-          {zone("Command zone", "command", own.command, (card) => <button type="button" className="btn small" onClick={() => move(card, "command", "battlefield")}>Play</button>)}
+          {zone("Command zone", "command", own.command, (card) => <button type="button" className="btn small" disabled={pendingBottom} onClick={() => move(card, "command", "battlefield")}>Play</button>)}
           {zone("Battlefield", "battlefield", own.battlefield, (card) => <>
             {card.faceDown && <span className="badge">Your card: {card.name}</span>}
             <button type="button" className="btn small" onClick={() => void act({ type: "tap", cardId: card.id })}>{card.tapped ? "Untap" : "Tap"}</button>
@@ -569,14 +579,16 @@ function ManualTable({ deckId }: { deckId: string }) {
             <button type="button" className="btn small" onClick={() => move(card, "battlefield", "exile")}>Exile</button>
           </>)}
           {zone("Hand", "hand", own.hand ?? [], (card) => <>
-            <button type="button" className="btn small primary" onClick={() => move(card, "hand", "battlefield")}>Play</button>
-            <button type="button" className="btn small" onClick={() => void act({ type: "playFaceDown", cardId: card.id })}>Play face down</button>
+            {pendingBottom
+              ? <button type="button" className="btn small primary" onClick={() => void act({ type: "bottom", cardId: card.id })}>Put on bottom</button>
+              : <><button type="button" className="btn small primary" onClick={() => move(card, "hand", "battlefield")}>Play</button>
+                <button type="button" className="btn small" onClick={() => void act({ type: "playFaceDown", cardId: card.id })}>Play face down</button></>}
           </>)}
           {zone("Graveyard", "graveyard", own.graveyard, (card) => <button type="button" className="btn small" onClick={() => move(card, "graveyard", "hand")}>Return to hand</button>)}
           {zone("Exile", "exile", own.exile, (card) => <button type="button" className="btn small" onClick={() => move(card, "exile", "hand")}>Return to hand</button>)}
           <section className="play-zone" data-zone="library" {...drag.target("library")}>
             <h3>Library <span className="cnt">{own.libraryCount}</span></h3>
-            {showLibrary && <>
+            {showLibrary && !pendingBottom && <>
             <label>Filter library <input value={libraryQuery} onChange={(event) => setLibraryQuery(event.target.value)} /></label>
             {libraryError ? <p className="note warn" role="alert">{libraryError} Close and reopen search to retry.</p> :
               library?.revision !== table.revision ? <p className="note">Loading library search...</p> :

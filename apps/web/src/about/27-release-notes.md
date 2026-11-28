@@ -2,6 +2,10 @@
 
 The installed version is shown at the top of the in-app guide.
 
+## 0.48.0 (2026-11-28): Manual Commander mulligans
+
+- Mulligan private opening hands at new multiplayer Commander tables, with a free first mulligan and bottom-of-library choices for later mulligans.
+
 ## 0.47.0 (2026-11-28): Shared manual dice and coins
 
 - Roll a d6 or d20 or flip a coin at a manual multiplayer table. Players and spectators see the latest server-generated result and the seat that produced it.

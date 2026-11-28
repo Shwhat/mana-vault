@@ -1,5 +1,11 @@
 # Mana Vault handoff
 
+## 0.48.0 (2026-11-28): Manual Commander mulligans
+
+- New manual Commander tables support private opening-hand mulligans: the first is free and later mulligans require bottoming cards. Other actions close the player's mulligan option; the first turn ending closes it for all. Existing active tables remain unchanged.
+- Focused server and browser regressions cover opening-hand privacy, bottoming, stale actions and reconnect. `PW_CHANNEL=chrome npm run test:all` passed with 129 browser tests; two real-engine browser tests and three server tests were skipped. Delivery remains pending.
+- Version 0.47.0 merged as `9140250cce69bff056187ae86fdeaca55f193f82`; its exact-merge server image and Android debug APK were published. Full engine gameplay and production deployment remain unverified.
+
 ## 0.47.0 (2026-11-28): Shared manual dice and coins
 
 - Manual multiplayer players can roll a d6 or d20 or flip a coin. The server generates the result and persists the latest one for all players and spectators; spectators cannot roll.
