@@ -2,6 +2,10 @@
 
 The installed version is shown at the top of the in-app guide.
 
+## 0.52.0 (2026-11-28): Manual game duration
+
+- Show elapsed manual game duration when both valid start and closure times are available.
+
 ## 0.51.1 (2026-11-28): Engine reconnect test
 
 - Add an isolated integration scenario for a dropped engine connection and game restoration; the server-route scenario passed with a real engine and ended by concession.

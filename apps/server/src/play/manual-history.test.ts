@@ -100,12 +100,27 @@ it("retains a participant's manual result and original deck snapshot after datab
     databaseOpen = true;
     app = await buildApp(database, root, undefined, undefined, options);
     appOpen = true;
+    database.prepare("UPDATE play_manual_tables SET started_at = ?, ended_at = ? WHERE id = ?")
+      .run("2020-01-01 00:00:00", "2020-01-01 01:02:03", "history-page-49");
+    database.prepare("UPDATE play_manual_tables SET started_at = ?, ended_at = ? WHERE id = ?")
+      .run("2020-01-01 01:00:00", "2020-01-01 00:00:00", "history-page-48");
+    database.prepare("UPDATE play_manual_tables SET started_at = ?, ended_at = ? WHERE id = ?")
+      .run("2020-02-30 00:00:00", "2020-03-02 00:00:00", "history-page-47");
+    database.prepare("UPDATE play_manual_tables SET started_at = ?, ended_at = ? WHERE id = ?")
+      .run("2020-01-01 00:00:00", "2020-01-01 00:00:00", "history-page-46");
+    database.prepare("UPDATE play_manual_tables SET started_at = ? WHERE id = ?")
+      .run("2020-01-01 00:00:00", "history-page-45");
     const history = await app.inject({ method: "GET", url: "/api/play/manual/history", headers: { cookie: host } });
     expect(history.statusCode).toBe(200);
     expect(history.json().games).toHaveLength(50);
     expect(history.json().games[0]).toMatchObject({
-      id: "history-page-49", completed: true, deckName: "Original deck", startedAt: null, endedAt: null,
+      id: "history-page-49", completed: true, deckName: "Original deck", durationSeconds: 3723,
     });
+    expect(history.json().games[1].durationSeconds).toBeNull();
+    expect(history.json().games[2].durationSeconds).toBeNull();
+    expect(history.json().games[3].durationSeconds).toBe(0);
+    expect(history.json().games[4]).toMatchObject({ endedAt: null, durationSeconds: null });
+    expect(history.json().games[5]).toMatchObject({ startedAt: null, endedAt: null, durationSeconds: null });
     const cursor = history.json().nextBefore;
     expect(typeof cursor).toBe("string");
     const older = await app.inject({ method: "GET", url: `/api/play/manual/history?before=${cursor}`, headers: { cookie: host } });
