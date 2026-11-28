@@ -1,7 +1,7 @@
 {
   "name": "@mana-vault/server",
   "private": true,
-  "version": "0.51.0",
+  "version": "0.51.1",
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
@@ -15,7 +15,7 @@
   },
   "dependencies": {
     "@fastify/static": "^10.1.10",
-    "@mana-vault/playmat-protocol": "0.51.0",
+    "@mana-vault/playmat-protocol": "0.51.1",
     "csv-parse": "^7.0.3",
     "fastify": "^5.12.8",
     "pdfjs-dist": "^6.5.438",

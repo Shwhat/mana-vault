@@ -78,6 +78,7 @@ it("retains a participant's manual result and original deck snapshot after datab
     const endTime = database.prepare("SELECT ended_at FROM play_manual_tables WHERE id = ?").get(table.id)?.ended_at;
     expect(endTime).toMatch(/^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d$/);
     database.prepare("UPDATE decks SET name = ? WHERE id = ?").run("Renamed deck", hostDeck);
+    database.exec("BEGIN");
     for (let index = 0; index < 50; index += 1) {
       const id = `history-page-${index}`;
       database.prepare(
@@ -89,6 +90,7 @@ it("retains a participant's manual result and original deck snapshot after datab
          SELECT ?, user_id, seat, player_name, deck_name, deck_snapshot FROM play_manual_members WHERE table_id = ?`,
       ).run(id, table.id);
     }
+    database.exec("COMMIT");
     await app.close();
     appOpen = false;
     database.close();

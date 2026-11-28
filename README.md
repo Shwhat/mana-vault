@@ -57,7 +57,7 @@ New manual Commander tables offer private opening-hand mulligans, with the first
 Players can review finished or closed manual games, recorded start and closure times, and the deck snapshot captured when they joined, while they still have access to that deck. Older games may not have timing data.
 Manual history also summarizes the selected deck's player-reported completed results and early closures.
 
-The engine workspace reports game-update outages while retrying, and action errors remain visible until the next action. Reconnecting active engine games is covered by simulated tests but has not been verified against a real deployment.
+The engine workspace reports game-update outages while retrying, and action errors remain visible until the next action. Isolated CI restored a real engine game after a dropped connection through the server routes; reconnect in a production deployment remains unverified.
 
 ### Built for collectors who self-host
 

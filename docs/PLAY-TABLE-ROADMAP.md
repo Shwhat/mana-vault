@@ -19,7 +19,10 @@ The 0.50.0 work records actual start and closure times for new manual game
 transitions; missing legacy timestamps are not reconstructed.
 The 0.51.0 work adds per-deck counts for participant-reported manual results
 and early closures, not rules-verified wins or engine-game analytics.
-The Play engine integration CI passed on commit `8a84091713ab617128b1f51989f5b47a4030ca1b`: it built the private Compose profile, verified no published engine ports, ran live saved-deck and hidden-state tests, and rejected a spoofed trusted identity. The 0.34.0 through 0.37.0 live UI tests failed to find Play Mountain; the 0.36.1 and 0.37.0 diagnostics showed an instants-only priority prompt with seven cards in hand. Versions 0.38.0, 0.39.0 and 0.39.2 passed isolated CI for native land play and concession, saved-deck and hidden-state tests, and spoof rejection. None completes a non-concession game. The 0.39.1 engine build failed when Maven Central returned HTTP 429 before tests ran. Version 0.38.0 adds player-only sorted library search to manual multiplayer; 0.39.0 adds face-down manual-table cards with private identity projection; 0.40.0 adds manual battlefield attachments; 0.41.0 adds engine pile, list and amount distribution choices with mocked coverage; 0.42.0 adds manual battlefield copies; and 0.43.0 adds player-reported multiplayer losses. Browser scenarios now end both two-player and four-player games after players manually track poison and report their losses. Rules remain player-resolved and these scenarios do not prove complete Commander gameplay. Local Docker, Podman and WSL remain unavailable. Production deployment and live engine reconnect/outage behavior remain unverified, so Phase 1 is not fully accepted. These tests do not complete phases 2 through 4.
+The 0.51.1 isolated server-route test restored a real engine game after a
+dropped connection and ended it by concession. Native UI reconnect, engine
+outage recovery and production deployment remain unverified.
+The Play engine integration CI passed on commit `8a84091713ab617128b1f51989f5b47a4030ca1b`: it built the private Compose profile, verified no published engine ports, ran live saved-deck and hidden-state tests, and rejected a spoofed trusted identity. The 0.34.0 through 0.37.0 live UI tests failed to find Play Mountain; the 0.36.1 and 0.37.0 diagnostics showed an instants-only priority prompt with seven cards in hand. Versions 0.38.0, 0.39.0 and 0.39.2 passed isolated CI for native land play and concession, saved-deck and hidden-state tests, and spoof rejection. None completes a non-concession game. The 0.39.1 engine build failed when Maven Central returned HTTP 429 before tests ran. Version 0.38.0 adds player-only sorted library search to manual multiplayer; 0.39.0 adds face-down manual-table cards with private identity projection; 0.40.0 adds manual battlefield attachments; 0.41.0 adds engine pile, list and amount distribution choices with mocked coverage; 0.42.0 adds manual battlefield copies; and 0.43.0 adds player-reported multiplayer losses. Browser scenarios now end both two-player and four-player games after players manually track poison and report their losses. Rules remain player-resolved and these scenarios do not prove complete Commander gameplay. Local Docker, Podman and WSL remain unavailable. Production deployment and broader reconnect and outage behavior remain unverified, so Phase 1 is not fully accepted. These tests do not complete phases 2 through 4.
 
 ## Implemented foundation work
 
@@ -34,7 +37,7 @@ engine ports. A live test completed an AI game using a saved Mana Vault deck.
 The Compose profile, unpublished ports, live hidden-state behavior and trusted
 peer spoof rejection passed PR CI on commit
 `8a84091713ab617128b1f51989f5b47a4030ca1b`. Production deployment and
-engine-session reconnect or outage recovery remain unverified. The 0.30.0
+broader engine-session reconnect or outage recovery remain unverified. The 0.30.0
 branch adds a first user-facing Play workspace, but its phase acceptance gates
 remain pending.
 
@@ -68,9 +71,9 @@ not accepted until the private engine and hidden-state boundaries are verified.
    terminal game result, hidden-state isolation and immutable saved-deck
    verification passed in PR CI. Retain the unsupported-card and format tests.
 4. Verify reconnect and engine outage behavior on the configured deployment.
-   The integration code has finite timeouts and CI passed the live game test,
-   but reconnect and outage recovery have not been accepted against the
-   private engine profile.
+   One dropped-connection server-route scenario passed against the private
+   engine in isolated CI; native UI reconnect and engine outage or restart
+   recovery remain unverified.
 5. Review every Phase 1 acceptance criterion in the specification and record
    the commands, results, unresolved limitations and security evidence before
    accepting the native gameplay phase.
