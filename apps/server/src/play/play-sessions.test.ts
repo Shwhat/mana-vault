@@ -355,6 +355,32 @@ describe("authenticated Playmat sessions", () => {
     expect((await app.inject({
       method: "DELETE", url: `/api/play/manual/tables/${openingId}`, headers: { ...guard, cookie: firstCookie }, payload: {},
     })).statusCode).toBe(200);
+    const history = await app.inject({ method: "GET", url: "/api/play/manual/history", headers: { cookie: firstCookie } });
+    expect(history.statusCode).toBe(200);
+    expect(history.headers["cache-control"]).toBe("no-store");
+    expect(history.json().games).toHaveLength(1);
+    expect(history.json().games[0]).toMatchObject({ id: openingId, completed: false, deckName: "Red test deck" });
+    expect(JSON.stringify(history.json())).not.toContain("Hidden Card");
+    expect((await app.inject({ method: "GET", url: "/api/play/manual/history", headers: { cookie: thirdCookie } })).json().games).toEqual([]);
+    const snapshotUrl = `/api/play/manual/history/${openingId}/deck`;
+    const savedSnapshot = await app.inject({ method: "GET", url: snapshotUrl, headers: { cookie: firstCookie } });
+    expect(savedSnapshot.statusCode).toBe(200);
+    expect(savedSnapshot.json().snapshot.name).toBe("Red test deck");
+    expect(JSON.stringify(savedSnapshot.json())).not.toContain("Blue Hidden Card");
+    const guestSnapshot = await app.inject({ method: "GET", url: snapshotUrl, headers: { cookie: secondCookie } });
+    expect(guestSnapshot.json().snapshot.name).toBe("Blue test deck");
+    expect(JSON.stringify(guestSnapshot.json())).not.toContain("Red Hidden Card");
+    expect((await app.inject({ method: "GET", url: snapshotUrl, headers: { cookie: thirdCookie } })).statusCode).toBe(404);
+    database.prepare("UPDATE decks SET name = ? WHERE id = ?").run("Renamed after game", redDeck);
+    expect((await app.inject({ method: "GET", url: snapshotUrl, headers: { cookie: firstCookie } })).json().snapshot.name).toBe("Red test deck");
+    const redOwner = database.prepare("SELECT owner_id FROM decks WHERE id = ?").get(redDeck)?.owner_id;
+    const blueOwner = database.prepare("SELECT owner_id FROM decks WHERE id = ?").get(blueDeck)?.owner_id;
+    expect(typeof redOwner).toBe("number");
+    expect(typeof blueOwner).toBe("number");
+    database.prepare("UPDATE decks SET owner_id = ? WHERE id = ?").run(Number(blueOwner), redDeck);
+    expect((await app.inject({ method: "GET", url: snapshotUrl, headers: { cookie: firstCookie } })).statusCode).toBe(403);
+    expect((await app.inject({ method: "GET", url: "/api/play/manual/history", headers: { cookie: firstCookie } })).json().games[0].deckName).toBeNull();
+    database.prepare("UPDATE decks SET owner_id = ?, name = ? WHERE id = ?").run(Number(redOwner), "Red test deck", redDeck);
     const createdTable = await app.inject({
       method: "POST",
       url: "/api/play/manual/tables",
@@ -727,6 +753,11 @@ describe("authenticated Playmat sessions", () => {
     expect(finalLoss.json().table.status).toBe("closed");
     expect(finalLoss.json().table.players.map((player: { conceded: boolean; lost: boolean }) => [player.conceded, player.lost]))
       .toEqual([[false, false], [true, false], [false, true], [false, true]]);
+    const completedHistory = (await app.inject({ method: "GET", url: "/api/play/manual/history", headers: { cookie: thirdCookie } })).json().games;
+    expect(completedHistory).toHaveLength(1);
+    expect(completedHistory[0]).toMatchObject({ completed: true, deckName: "Green test deck" });
+    expect(completedHistory[0].players.map((player: { result: string }) => player.result))
+      .toEqual(["remaining", "conceded", "reported loss", "reported loss"]);
   });
 
   it("keeps the play routes disabled when no engine endpoint is configured", async () => {

@@ -46,6 +46,20 @@ type SharedTable = {
   players: SharedPlayer[];
 };
 
+type ManualHistoryGame = {
+  id: string;
+  startedAt: string;
+  turn: number;
+  completed: boolean;
+  deckName: string | null;
+  players: { seat: number; name: string; result: "conceded" | "reported loss" | "remaining" | "unfinished" }[];
+};
+type ManualHistoryDeck = {
+  name: string;
+  format: string;
+  cards: { entryId: number; quantity: number; zone: string; printing: { name: string; setCode: string; collectorNumber: string } | null }[];
+};
+
 const PROMPTS = new Set([
   "GAME_TARGET", "GAME_CHOOSE_ABILITY", "GAME_CHOOSE_PILE", "GAME_CHOOSE_CHOICE", "GAME_ASK", "GAME_SELECT",
   "GAME_PLAY_MANA", "GAME_PLAY_XMANA", "GAME_GET_AMOUNT", "GAME_GET_MULTI_AMOUNT",
@@ -271,6 +285,80 @@ function ManualSolo({ cards }: { cards: readonly DeckCard[] }) {
       <p className="note">Manual mode does not enforce Magic rules. It is local to this browser session; the engine and other players are not involved.</p>
     </div>
   );
+}
+
+function ManualHistory() {
+  const [shown, setShown] = useState(false);
+  const [games, setGames] = useState<ManualHistoryGame[] | null>(null);
+  const [before, setBefore] = useState("");
+  const [nextBefore, setNextBefore] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [selectedId, setSelectedId] = useState("");
+  const [snapshot, setSnapshot] = useState<ManualHistoryDeck | null>(null);
+  const [error, setError] = useState("");
+  const [snapshotError, setSnapshotError] = useState("");
+
+  useEffect(() => {
+    if (!shown) return;
+    let active = true;
+    if (!before) setGames(null);
+    setLoading(true);
+    setError("");
+    const url = `/api/play/manual/history${before ? `?before=${encodeURIComponent(before)}` : ""}`;
+    void request<{ games: ManualHistoryGame[]; nextBefore: string | null }>(url)
+      .then((result) => {
+        if (active) {
+          setGames((current) => before ? [...(current ?? []), ...result.games] : result.games);
+          setNextBefore(result.nextBefore);
+        }
+      })
+      .catch((reason) => { if (active) setError(reason instanceof Error ? reason.message : "Could not load game history."); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [shown, before]);
+
+  useEffect(() => {
+    if (!shown || !selectedId) return;
+    let active = true;
+    setSnapshot(null);
+    setSnapshotError("");
+    void request<{ snapshot: ManualHistoryDeck }>(`/api/play/manual/history/${encodeURIComponent(selectedId)}/deck`)
+      .then((result) => { if (active) setSnapshot(result.snapshot); })
+      .catch((reason) => { if (active) setSnapshotError(reason instanceof Error ? reason.message : "Could not load the saved deck snapshot."); });
+    return () => { active = false; };
+  }, [shown, selectedId]);
+
+  return <section>
+    <button type="button" className="btn small" onClick={() => { setShown((current) => !current); setSelectedId(""); setBefore(""); }}>
+      {shown ? "Hide manual game history" : "Show manual game history"}
+    </button>
+    {shown && <>
+      <p className="note">Your finished or closed manual games. Results are reported by players, not checked by the rules engine. Hide and reopen to refresh.</p>
+      {error && <p className="note warn" role="alert">{error} Hide and reopen history to retry.</p>}
+      {!games ? !error && <p className="note">Loading game history...</p>
+          : games.length === 0 ? <p className="note">No completed or closed manual games yet.</p>
+            : games.map((game) => <section className="play-player" key={game.id}>
+              <b>{game.deckName ?? "Deck unavailable"} · {game.completed ? "Game completed" : "Closed before a result"}</b>
+              <span>Started {game.startedAt} UTC · Turn {game.turn}</span>
+              {game.players.map((player) => <span key={player.seat}>Seat {player.seat + 1}: {player.name} · {player.result}</span>)}
+              {game.deckName !== null && <button type="button" className="btn small" onClick={() => {
+                setSnapshot(null);
+                setSnapshotError("");
+                setSelectedId(selectedId === game.id ? "" : game.id);
+              }}>
+                {selectedId === game.id ? "Hide deck snapshot" : "Show deck snapshot"}
+              </button>}
+              {selectedId === game.id && (snapshotError ? <p className="note warn" role="alert">{snapshotError}</p>
+                : !snapshot ? <p className="note">Loading deck snapshot...</p>
+                  : <div><b>{snapshot.name} ({snapshot.format})</b>
+                    <ul>{snapshot.cards.map((card) => <li key={card.entryId}>{card.quantity} x {card.printing?.name ?? "Unavailable printing"} ({card.zone}{card.printing ? `, ${card.printing.setCode} ${card.printing.collectorNumber}` : ""})</li>)}</ul>
+                  </div>)}
+            </section>)}
+      {nextBefore && games && !error && <button type="button" className="btn small" disabled={loading} onClick={() => setBefore(nextBefore)}>
+        {loading ? "Loading..." : "Show older games"}
+      </button>}
+    </>}
+  </section>;
 }
 
 function ManualTable({ deckId }: { deckId: string }) {
@@ -603,6 +691,7 @@ function ManualTable({ deckId }: { deckId: string }) {
       </>}
       {error && <p className="note warn" role="alert">{error}</p>}
       <p className="note">Manual tables do not enforce Magic rules. Game state is saved on the server so seated players can reconnect. The server hides each opponent’s hand and library.</p>
+      <ManualHistory />
     </section>
   );
 }

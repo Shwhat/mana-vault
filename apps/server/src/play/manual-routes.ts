@@ -1,6 +1,7 @@
 import { randomBytes, randomInt, randomUUID } from "node:crypto";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { DatabaseSync } from "node:sqlite";
+import { access } from "../library.js";
 import { DeckSnapshotError, snapshotDeck, type DeckSnapshot } from "./deck-snapshot.js";
 
 type Zone = "library" | "hand" | "battlefield" | "graveyard" | "exile" | "command";
@@ -416,6 +417,72 @@ function applyAction(state: GameState, actorId: number, action: unknown): string
 
 export function registerManualPlayRoutes(app: FastifyInstance, database: DatabaseSync): void {
   initializeManualTables(database);
+
+  app.get<{ Querystring: { before?: unknown } }>("/api/play/manual/history", async (request, reply) => {
+    reply.header("cache-control", "no-store");
+    const userId = signedIn(request, reply);
+    if (userId === null) return reply;
+    const before = request.query.before;
+    if (before !== undefined && (typeof before !== "string" || !before || before.length > 128)) {
+      return reply.code(400).send({ error: "Choose a valid history page." });
+    }
+    let beforeRow: number | null = null;
+    if (typeof before === "string") {
+      const cursor = database.prepare(
+        `SELECT t.rowid AS row_id FROM play_manual_tables t
+         JOIN play_manual_members m ON m.table_id = t.id
+         WHERE t.id = ? AND m.user_id = ? AND t.status = 'closed' AND t.state_json IS NOT NULL`,
+      ).get(before, userId);
+      if (!cursor || typeof cursor.row_id !== "number") return reply.code(404).send({ error: "Game history not found." });
+      beforeRow = cursor.row_id;
+    }
+    const rows = database.prepare(
+      `SELECT t.id, t.created_at, t.state_json, m.deck_snapshot
+       FROM play_manual_tables t
+       JOIN play_manual_members m ON m.table_id = t.id
+       WHERE m.user_id = ? AND t.status = 'closed' AND t.state_json IS NOT NULL
+         AND (? IS NULL OR t.rowid < ?)
+       ORDER BY t.rowid DESC LIMIT 51`,
+    ).all(userId, beforeRow, beforeRow);
+    const page = rows.slice(0, 50);
+    return {
+      nextBefore: rows.length > 50 ? String(rows[49]!.id) : null,
+      games: page.map((row) => {
+        const state = parseState(row.state_json);
+        const snapshot = JSON.parse(String(row.deck_snapshot)) as DeckSnapshot;
+        const remaining = state.players.filter((player) => !isOut(player)).length;
+        return {
+          id: String(row.id),
+          startedAt: String(row.created_at),
+          turn: state.turn,
+          completed: remaining === 1,
+          deckName: access(database, "deck", snapshot.deckId, userId) ? snapshot.name : null,
+          players: state.players.map((player) => ({
+            seat: player.seat,
+            name: player.name,
+            result: player.conceded ? "conceded" : player.lost ? "reported loss" : remaining === 1 ? "remaining" : "unfinished",
+          })),
+        };
+      }),
+    };
+  });
+
+  app.get<{ Params: { tableId: string } }>("/api/play/manual/history/:tableId/deck", async (request, reply) => {
+    reply.header("cache-control", "no-store");
+    const userId = signedIn(request, reply);
+    if (userId === null) return reply;
+    const row = database.prepare(
+      `SELECT m.deck_snapshot FROM play_manual_tables t
+       JOIN play_manual_members m ON m.table_id = t.id
+       WHERE t.id = ? AND m.user_id = ? AND t.status = 'closed' AND t.state_json IS NOT NULL`,
+    ).get(request.params.tableId, userId);
+    if (!row) return reply.code(404).send({ error: "Game history not found." });
+    const snapshot = JSON.parse(String(row.deck_snapshot)) as DeckSnapshot;
+    if (!access(database, "deck", snapshot.deckId, userId)) {
+      return reply.code(403).send({ error: "The original deck is no longer available to you." });
+    }
+    return { snapshot };
+  });
 
   app.get("/api/play/manual/tables", async (request, reply) => {
     const userId = signedIn(request, reply);
