@@ -52,6 +52,8 @@ Manual battlefield cards support adding and removing +1/+1, -1/-1, loyalty, char
 
 Manual multiplayer players can roll a d6 or d20 or flip a coin; the server generates the result and displays the latest result to players and spectators.
 
+New manual Commander tables offer private opening-hand mulligans, with the first mulligan free and later bottom-of-library choices made by the player.
+
 The engine workspace reports game-update outages while retrying, and action errors remain visible until the next action. Reconnecting active engine games is covered by simulated tests but has not been verified against a real deployment.
 
 ### Built for collectors who self-host

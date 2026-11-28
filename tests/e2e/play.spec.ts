@@ -77,6 +77,47 @@ test("manual table shares server-generated dice and coin results", async ({ brow
   }
 });
 
+test("manual Commander tables support private opening-hand mulligans", async ({ browser, page }) => {
+  const guestContext = await browser.newContext();
+  const guest = await guestContext.newPage();
+  try {
+    await signUp(page, "mulliganhost");
+    await signUp(guest, "mulliganguest");
+    const hostDeck = await createCommanderDeck(page, "Mulligan host", "sol-ring");
+    const guestDeck = await createCommanderDeck(guest, "Mulligan guest", "llanowar");
+    const headers = { "x-mana-vault": "1" };
+    const created = await page.request.post("/api/play/manual/tables", { headers, data: { deckId: hostDeck, playerLimit: 2 } });
+    expect(created.status()).toBe(201);
+    const { table, inviteCode } = await created.json();
+    expect((await guest.request.post("/api/play/manual/tables/join", { headers, data: { inviteCode, deckId: guestDeck } })).status()).toBe(200);
+    expect((await page.request.post(`/api/play/manual/tables/${table.id}/start`, { headers, data: {} })).status()).toBe(200);
+    for (const viewer of [page, guest]) {
+      await viewer.reload();
+      await viewer.locator("#modetabs .mtab", { hasText: "Play" }).click();
+      await viewer.getByRole("tab", { name: "Multiplayer table" }).click();
+    }
+    await page.getByRole("button", { name: "Mulligan", exact: true }).click();
+    await expect(page.getByText("Opening hand: 1 mulligan; first is free.", { exact: false })).toBeVisible();
+    await page.getByRole("button", { name: "Mulligan", exact: true }).click();
+    await expect(page.getByText("Choose 1 card from your hand to put on the bottom.")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Draw" })).toBeDisabled();
+    await expect(page.getByRole("button", { name: "Keep hand" })).toBeDisabled();
+    await page.reload();
+    await page.locator("#modetabs .mtab", { hasText: "Play" }).click();
+    await page.getByRole("tab", { name: "Multiplayer table" }).click();
+    await expect(page.getByText("Choose 1 card from your hand to put on the bottom.")).toBeVisible();
+    await page.getByRole("button", { name: "Put on bottom" }).first().click();
+    await expect(page.getByRole("button", { name: "Mulligan", exact: true })).toHaveCount(0);
+    await expect(page.locator('.play-zone[data-zone="hand"] .play-card')).toHaveCount(6);
+    await expect(guest.locator(".play-player-row .play-player").first()).toContainText("Hand 6");
+    await expect(guest.locator("#view-play")).not.toContainText("Sol Ring");
+    await guest.getByRole("button", { name: "Keep hand" }).click();
+    await expect(guest.getByRole("button", { name: "Mulligan", exact: true })).toHaveCount(0);
+  } finally {
+    await guestContext.close();
+  }
+});
+
 test("private manual Commander table plays shared cards without exposing opponents' hands", async ({ browser, page }) => {
   await page.setViewportSize({ width: 1440, height: 1400 });
   const otherContext = await browser.newContext();

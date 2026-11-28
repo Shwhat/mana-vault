@@ -264,6 +264,97 @@ describe("authenticated Playmat sessions", () => {
     const blueDeck = await createDeck(secondCookie, "Blue test deck", "blue-commander", "blue-hidden");
     const greenDeck = await createDeck(thirdCookie, "Green test deck", "green-commander", "green-hidden");
     const yellowDeck = await createDeck(fourthCookie, "Yellow test deck", "yellow-commander", "yellow-hidden");
+    const openingTable = await app.inject({
+      method: "POST", url: "/api/play/manual/tables", headers: { ...guard, cookie: firstCookie },
+      payload: { deckId: redDeck, playerLimit: 2 },
+    });
+    const openingId = openingTable.json().table.id;
+    const openingCode = openingTable.json().inviteCode;
+    expect((await app.inject({
+      method: "POST", url: "/api/play/manual/tables/join", headers: { ...guard, cookie: secondCookie },
+      payload: { inviteCode: openingCode, deckId: blueDeck },
+    })).statusCode).toBe(200);
+    expect((await app.inject({
+      method: "POST", url: "/api/play/manual/tables/watch", headers: { ...guard, cookie: thirdCookie },
+      payload: { inviteCode: openingCode },
+    })).statusCode).toBe(200);
+    const openingStarted = await app.inject({
+      method: "POST", url: `/api/play/manual/tables/${openingId}/start`, headers: { ...guard, cookie: firstCookie }, payload: {},
+    });
+    const openingActions = `/api/play/manual/tables/${openingId}/actions`;
+    const firstMulligan = await app.inject({
+      method: "POST", url: openingActions, headers: { ...guard, cookie: firstCookie },
+      payload: { revision: openingStarted.json().table.revision, action: { type: "mulligan" } },
+    });
+    expect(firstMulligan.statusCode).toBe(200);
+    expect(firstMulligan.json().table.players[0]).toMatchObject({ opening: { mulligans: 1, bottom: 0 }, handCount: 7 });
+    const secondMulligan = await app.inject({
+      method: "POST", url: openingActions, headers: { ...guard, cookie: firstCookie },
+      payload: { revision: firstMulligan.json().table.revision, action: { type: "mulligan" } },
+    });
+    expect(secondMulligan.statusCode).toBe(200);
+    const openingView = secondMulligan.json().table;
+    expect(openingView.players[0]).toMatchObject({ opening: { mulligans: 2, bottom: 1 }, handCount: 7 });
+    const chosenId = openingView.players[0].hand[0].id;
+    for (const cookie of [secondCookie, thirdCookie]) {
+      const view = (await app.inject({ method: "GET", url: `/api/play/manual/tables/${openingId}`, headers: { cookie } })).json().table;
+      expect(view.players[0]).not.toHaveProperty("opening");
+      expect(JSON.stringify(view)).not.toContain("Red Hidden Card");
+    }
+    for (const action of [{ type: "draw" }, { type: "keep" }, { type: "turn" }, { type: "bottom", cardId: "not-in-hand" }]) {
+      const rejected = await app.inject({
+        method: "POST", url: openingActions, headers: { ...guard, cookie: firstCookie },
+        payload: { revision: openingView.revision, action },
+      });
+      expect(rejected.statusCode).toBe(400);
+    }
+    expect((await app.inject({
+      method: "POST", url: openingActions, headers: { ...guard, cookie: thirdCookie },
+      payload: { revision: openingView.revision, action: { type: "bottom", cardId: chosenId } },
+    })).statusCode).toBe(404);
+    const bottomed = await app.inject({
+      method: "POST", url: openingActions, headers: { ...guard, cookie: firstCookie },
+      payload: { revision: openingView.revision, action: { type: "bottom", cardId: chosenId } },
+    });
+    expect(bottomed.statusCode).toBe(200);
+    expect(bottomed.json().table.players[0].hand).toHaveLength(6);
+    expect(bottomed.json().table.players[0]).not.toHaveProperty("opening");
+    const storedOpening = JSON.parse(String(database.prepare("SELECT state_json FROM play_manual_tables WHERE id = ?").get(openingId)?.state_json));
+    expect(storedOpening.players[0].library.at(-1).id).toBe(chosenId);
+    expect((await app.inject({
+      method: "POST", url: openingActions, headers: { ...guard, cookie: firstCookie },
+      payload: { revision: openingView.revision, action: { type: "mulligan" } },
+    })).statusCode).toBe(409);
+    expect((await app.inject({
+      method: "POST", url: openingActions, headers: { ...guard, cookie: firstCookie },
+      payload: { revision: bottomed.json().table.revision, action: { type: "mulligan" } },
+    })).statusCode).toBe(400);
+    const guestFirst = await app.inject({
+      method: "POST", url: openingActions, headers: { ...guard, cookie: secondCookie },
+      payload: { revision: bottomed.json().table.revision, action: { type: "mulligan" } },
+    });
+    const guestSecond = await app.inject({
+      method: "POST", url: openingActions, headers: { ...guard, cookie: secondCookie },
+      payload: { revision: guestFirst.json().table.revision, action: { type: "mulligan" } },
+    });
+    expect(guestSecond.statusCode).toBe(200);
+    const guestOpening = guestSecond.json().table;
+    expect((await app.inject({
+      method: "POST", url: openingActions, headers: { ...guard, cookie: firstCookie },
+      payload: { revision: guestOpening.revision, action: { type: "turn" } },
+    })).statusCode).toBe(400);
+    const guestBottomed = await app.inject({
+      method: "POST", url: openingActions, headers: { ...guard, cookie: secondCookie },
+      payload: { revision: guestOpening.revision, action: { type: "bottom", cardId: guestOpening.players[1].hand[0].id } },
+    });
+    expect(guestBottomed.statusCode).toBe(200);
+    expect((await app.inject({
+      method: "POST", url: openingActions, headers: { ...guard, cookie: firstCookie },
+      payload: { revision: guestBottomed.json().table.revision, action: { type: "turn" } },
+    })).statusCode).toBe(200);
+    expect((await app.inject({
+      method: "DELETE", url: `/api/play/manual/tables/${openingId}`, headers: { ...guard, cookie: firstCookie }, payload: {},
+    })).statusCode).toBe(200);
     const createdTable = await app.inject({
       method: "POST",
       url: "/api/play/manual/tables",
