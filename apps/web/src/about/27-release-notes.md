@@ -4,7 +4,7 @@ The installed version is shown at the top of the in-app guide.
 
 ## 0.51.1 (2026-11-28): Engine reconnect test
 
-- Add an isolated integration scenario for a dropped engine connection and game restoration. Live verification is pending.
+- Add an isolated integration scenario for a dropped engine connection and game restoration; the server-route scenario passed with a real engine and ended by concession.
 - Reduce disk writes in the manual history test fixture.
 
 ## 0.51.0 (2026-11-28): Manual deck results
