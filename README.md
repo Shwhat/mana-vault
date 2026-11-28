@@ -50,6 +50,8 @@ Manual tables leave Magic rules to the players, keep opponents' hands and librar
 
 Manual battlefield cards support adding and removing +1/+1, -1/-1, loyalty, charge and custom counters. Multiplayer boards show these counters to players and spectators, and players can correct commander damage they recorded on an opponent's board.
 
+Manual multiplayer players can roll a d6 or d20 or flip a coin; the server generates the result and displays the latest result to players and spectators.
+
 The engine workspace reports game-update outages while retrying, and action errors remain visible until the next action. Reconnecting active engine games is covered by simulated tests but has not been verified against a real deployment.
 
 ### Built for collectors who self-host

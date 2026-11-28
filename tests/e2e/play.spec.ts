@@ -30,6 +30,53 @@ async function reportPoisonLoss(page: Page): Promise<void> {
   await page.getByRole("button", { name: "Report loss" }).click();
 }
 
+test("manual table shares server-generated dice and coin results", async ({ browser, page }) => {
+  const guestContext = await browser.newContext();
+  const spectatorContext = await browser.newContext();
+  const guest = await guestContext.newPage();
+  const spectator = await spectatorContext.newPage();
+  try {
+    await signUp(page, "dicehost");
+    await signUp(guest, "diceguest");
+    await signUp(spectator, "dicewatcher");
+    const hostDeck = await createCommanderDeck(page, "Dice host", "sol-ring");
+    const guestDeck = await createCommanderDeck(guest, "Dice guest", "llanowar");
+    const headers = { "x-mana-vault": "1" };
+    const created = await page.request.post("/api/play/manual/tables", { headers, data: { deckId: hostDeck, playerLimit: 2 } });
+    expect(created.status()).toBe(201);
+    const { table, inviteCode } = await created.json();
+    expect((await guest.request.post("/api/play/manual/tables/join", { headers, data: { inviteCode, deckId: guestDeck } })).status()).toBe(200);
+    expect((await page.request.post(`/api/play/manual/tables/${table.id}/start`, { headers, data: {} })).status()).toBe(200);
+    expect((await spectator.request.post("/api/play/manual/tables/watch", { headers, data: { inviteCode } })).status()).toBe(200);
+
+    for (const viewer of [page, guest, spectator]) {
+      await viewer.reload();
+      await viewer.locator("#modetabs .mtab", { hasText: "Play" }).click();
+      await viewer.getByRole("tab", { name: "Multiplayer table" }).click();
+    }
+    await expect(spectator.getByRole("button", { name: "Roll d6" })).toHaveCount(0);
+    await page.getByRole("button", { name: "Roll d6" }).click();
+    const hostResult = page.locator(".play-panel [role=status]");
+    await expect(hostResult).toHaveText(/^Result 1: Seat 1 \(dicehost[^)]*\) rolled d6: [1-6]$/);
+    const d6 = await hostResult.textContent();
+    await expect(spectator.locator(".play-panel [role=status]")).toHaveText(d6 ?? "");
+    await expect(guest.locator(".play-panel [role=status]")).toHaveText(d6 ?? "");
+    await guest.getByRole("button", { name: "Flip coin" }).click();
+    await expect(spectator.locator(".play-panel [role=status]")).toHaveText(/^Result 2: Seat 2 \(diceguest[^)]*\) flipped a coin: (heads|tails)$/);
+    const coin = await spectator.locator(".play-panel [role=status]").textContent();
+    await spectator.reload();
+    await spectator.locator("#modetabs .mtab", { hasText: "Play" }).click();
+    await spectator.getByRole("tab", { name: "Multiplayer table" }).click();
+    await expect(spectator.locator(".play-panel [role=status]")).toHaveText(coin ?? "");
+    await expect(page.locator(".play-panel [role=status]")).toHaveText(coin ?? "");
+    await page.getByRole("button", { name: "Roll d20" }).click();
+    await expect(spectator.locator(".play-panel [role=status]")).toHaveText(/^Result 3: Seat 1 \(dicehost[^)]*\) rolled d20: ([1-9]|1[0-9]|20)$/);
+  } finally {
+    await guestContext.close();
+    await spectatorContext.close();
+  }
+});
+
 test("private manual Commander table plays shared cards without exposing opponents' hands", async ({ browser, page }) => {
   await page.setViewportSize({ width: 1440, height: 1400 });
   const otherContext = await browser.newContext();

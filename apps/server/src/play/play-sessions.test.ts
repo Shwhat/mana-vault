@@ -452,11 +452,50 @@ describe("authenticated Playmat sessions", () => {
     });
     expect(drewBlue.statusCode).toBe(200);
     expect(drewBlue.json().table.players[1].hand.at(-1).id).toBe(blueId);
+    let revision = drewBlue.json().table.revision;
+    for (const [index, kind] of (["d6", "d20", "coin"] as const).entries()) {
+      const rolled = await app.inject({
+        method: "POST", url: actionsUrl, headers: { ...guard, cookie: firstCookie },
+        payload: { revision, action: { type: "random", kind } },
+      });
+      expect(rolled.statusCode).toBe(200);
+      revision = rolled.json().table.revision;
+      const result = rolled.json().table.lastRandom;
+      expect(result).toMatchObject({ number: index + 1, seat: 0, kind });
+      if (kind === "coin") expect(["heads", "tails"]).toContain(result.value);
+      else {
+        expect(Number.isInteger(result.value)).toBe(true);
+        expect(result.value).toBeGreaterThanOrEqual(1);
+        expect(result.value).toBeLessThanOrEqual(kind === "d6" ? 6 : 20);
+      }
+      for (const cookie of [secondCookie, thirdCookie]) {
+        const view = (await app.inject({ method: "GET", url: `/api/play/manual/tables/${waitingTable.id}`, headers: { cookie } })).json().table;
+        expect(view.lastRandom).toEqual(result);
+        expect(JSON.stringify(view)).not.toContain("Red Hidden Card");
+      }
+    }
+    const repeatedCoin = await app.inject({
+      method: "POST", url: actionsUrl, headers: { ...guard, cookie: firstCookie },
+      payload: { revision, action: { type: "random", kind: "coin" } },
+    });
+    expect(repeatedCoin.statusCode).toBe(200);
+    expect(repeatedCoin.json().table.lastRandom).toMatchObject({ number: 4, seat: 0, kind: "coin" });
+    revision = repeatedCoin.json().table.revision;
+    const invalidRoll = await app.inject({
+      method: "POST", url: actionsUrl, headers: { ...guard, cookie: firstCookie },
+      payload: { revision, action: { type: "random", kind: "d100" } },
+    });
+    expect(invalidRoll.statusCode).toBe(400);
+    const staleRoll = await app.inject({
+      method: "POST", url: actionsUrl, headers: { ...guard, cookie: secondCookie },
+      payload: { revision: revision - 1, action: { type: "random", kind: "coin" } },
+    });
+    expect(staleRoll.statusCode).toBe(409);
     const spectatorAction = await app.inject({
       method: "POST",
       url: `/api/play/manual/tables/${waitingTable.id}/actions`,
       headers: { ...guard, cookie: thirdCookie },
-      payload: { revision: watched.json().table.revision, action: { type: "draw" } },
+      payload: { revision, action: { type: "random", kind: "coin" } },
     });
     expect(spectatorAction.statusCode).toBe(404);
     expect((await app.inject({
