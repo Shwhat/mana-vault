@@ -61,6 +61,7 @@ type ManualHistoryDeck = {
   format: string;
   cards: { entryId: number; quantity: number; zone: string; printing: { name: string; setCode: string; collectorNumber: string } | null }[];
 };
+type ManualDeckResults = { completed: number; remaining: number; conceded: number; reportedLoss: number; closedEarly: number };
 
 const PROMPTS = new Set([
   "GAME_TARGET", "GAME_CHOOSE_ABILITY", "GAME_CHOOSE_PILE", "GAME_CHOOSE_CHOICE", "GAME_ASK", "GAME_SELECT",
@@ -289,7 +290,7 @@ function ManualSolo({ cards }: { cards: readonly DeckCard[] }) {
   );
 }
 
-function ManualHistory() {
+function ManualHistory({ deckId }: { deckId: string }) {
   const [shown, setShown] = useState(false);
   const [games, setGames] = useState<ManualHistoryGame[] | null>(null);
   const [before, setBefore] = useState("");
@@ -299,6 +300,8 @@ function ManualHistory() {
   const [snapshot, setSnapshot] = useState<ManualHistoryDeck | null>(null);
   const [error, setError] = useState("");
   const [snapshotError, setSnapshotError] = useState("");
+  const [deckResults, setDeckResults] = useState<{ deckId: string; results: ManualDeckResults } | null>(null);
+  const [resultsError, setResultsError] = useState<{ deckId: string; message: string } | null>(null);
 
   useEffect(() => {
     if (!shown) return;
@@ -330,12 +333,29 @@ function ManualHistory() {
     return () => { active = false; };
   }, [shown, selectedId]);
 
+  useEffect(() => {
+    if (!shown || !deckId) return;
+    let active = true;
+    setDeckResults(null);
+    setResultsError(null);
+    void request<{ results: ManualDeckResults }>(`/api/play/manual/decks/${encodeURIComponent(deckId)}/results`)
+      .then((response) => { if (active) setDeckResults({ deckId, results: response.results }); })
+      .catch((reason) => { if (active) setResultsError({ deckId, message: reason instanceof Error ? reason.message : "Could not load deck results." }); });
+    return () => { active = false; };
+  }, [shown, deckId]);
+
+  const results = deckResults?.deckId === deckId ? deckResults.results : null;
+  const currentResultsError = resultsError?.deckId === deckId ? resultsError.message : "";
+
   return <section>
     <button type="button" className="btn small" onClick={() => { setShown((current) => !current); setSelectedId(""); setBefore(""); }}>
       {shown ? "Hide manual game history" : "Show manual game history"}
     </button>
     {shown && <>
       <p className="note">Your finished or closed manual games. Results are reported by players, not checked by the rules engine. Hide and reopen to refresh.</p>
+      {deckId && (currentResultsError ? <p className="note warn" role="alert">{currentResultsError} Hide and reopen history to retry.</p>
+        : !results ? <p className="note">Loading selected deck results...</p>
+          : <p className="note">Selected deck: {results.completed} completed; remaining: {results.remaining}, reported losses: {results.reportedLoss}, concessions: {results.conceded}. Closed early: {results.closedEarly}. Results are player-reported.</p>)}
       {error && <p className="note warn" role="alert">{error} Hide and reopen history to retry.</p>}
       {!games ? !error && <p className="note">Loading game history...</p>
           : games.length === 0 ? <p className="note">No completed or closed manual games yet.</p>
@@ -694,7 +714,7 @@ function ManualTable({ deckId }: { deckId: string }) {
       </>}
       {error && <p className="note warn" role="alert">{error}</p>}
       <p className="note">Manual tables do not enforce Magic rules. Game state is saved on the server so seated players can reconnect. The server hides each opponent’s hand and library.</p>
-      <ManualHistory />
+      <ManualHistory deckId={deckId} />
     </section>
   );
 }

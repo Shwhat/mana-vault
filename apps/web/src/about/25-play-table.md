@@ -40,6 +40,8 @@ When a player loses under the rules the group is using, they can select **Report
 
 Select **Show manual game history** to see your finished or closed manual games, 50 at a time. A game closed before only one player remains is marked as closed before a result. Results reflect player reports, not enforced rules. You can view the snapshot of your own deck captured when you created or joined the table while you still have access to that deck. Other players' snapshots and spectators' history are not available. Hide and reopen history to refresh it.
 
+History also summarizes your selected deck across all your closed manual games. Completed games count the times you remained, reported a loss or conceded; tables closed before a result are counted separately. These counts reflect player reports, not verified wins, and exclude engine games. Choose a different saved deck to see its results.
+
 ## Limits
 
 - Manual games do not enforce Magic rules. They do not resolve spells, targets, combat, priority or Commander-specific rules.

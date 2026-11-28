@@ -141,6 +141,7 @@ test("manual game history shows player-reported results and the saved deck snaps
     await page.getByRole("tab", { name: "Multiplayer table" }).click();
     await page.getByRole("button", { name: "Show manual game history" }).click();
     await expect(page.getByText("History host deck · Game completed")).toBeVisible();
+    await expect(page.getByText("Selected deck: 1 completed; remaining: 1, reported losses: 0, concessions: 0. Closed early: 0. Results are player-reported.")).toBeVisible();
     await expect(page.getByText(/Game started: \d{4}-\d\d-\d\d.*Closed: \d{4}-\d\d-\d\d/)).toBeVisible();
     await expect(page.getByText(/Seat 2: historyguest.* · reported loss/)).toBeVisible();
     await page.getByRole("button", { name: "Show deck snapshot" }).click();

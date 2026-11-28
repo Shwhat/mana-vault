@@ -386,6 +386,9 @@ describe("authenticated Playmat sessions", () => {
     expect(typeof blueOwner).toBe("number");
     database.prepare("UPDATE decks SET owner_id = ? WHERE id = ?").run(Number(blueOwner), redDeck);
     expect((await app.inject({ method: "GET", url: snapshotUrl, headers: { cookie: firstCookie } })).statusCode).toBe(403);
+    expect((await app.inject({
+      method: "GET", url: `/api/play/manual/decks/${redDeck}/results`, headers: { cookie: firstCookie },
+    })).statusCode).toBe(404);
     expect((await app.inject({ method: "GET", url: "/api/play/manual/history", headers: { cookie: firstCookie } })).json().games[0].deckName).toBeNull();
     database.prepare("UPDATE decks SET owner_id = ?, name = ? WHERE id = ?").run(Number(redOwner), "Red test deck", redDeck);
     const createdTable = await app.inject({

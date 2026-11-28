@@ -114,6 +114,7 @@ This page lists what Mana Vault does in the current version, followed by what is
 - Roll a d6 or d20 or flip a coin at a manual multiplayer table. The server generates each result and shows the latest result, with the player's seat, to everyone at the table, including spectators.
 - At new manual Commander tables, mulligan your private opening hand with the first mulligan free and put the required cards on the bottom after later mulligans. Opening choices persist on reconnect; existing active tables do not gain this option.
 - Review finished or closed manual games, including player-reported outcomes, recorded start and closure times, and your own deck snapshot from joining while you retain access to that deck. Earlier games may lack timing data. History loads 50 games at a time; spectators cannot access it.
+- See counts for the selected deck across your completed manual games: times remaining, reported losses and concessions, plus games closed early. These are player-reported outcomes, not rules-verified wins.
 - The initial table version does not include match analytics, server-restart recovery guarantees, all manual table interactions or full Playmat prompt support. The private Compose profile, unpublished port and trusted-header spoof boundary passed PR CI. Production deployment and engine reconnect or outage behavior remain unverified; do not expose the engine port.
 
 ### Proxies and custom cards

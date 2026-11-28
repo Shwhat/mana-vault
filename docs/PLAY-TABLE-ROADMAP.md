@@ -13,10 +13,12 @@ UI without player concession. This narrow scenario does not test real combat,
 targeting or all engine prompts.
 The 0.49.0 work adds participant-only manual game history with player-reported
 outcomes and access-controlled join-time deck snapshots. A disk-backed test
-verifies those records across an application and database restart; analytics,
-engine-game history and the remaining Phase 5 gates are not implemented.
+verifies those records across an application and database restart; verified win
+rates, engine-game history and the remaining Phase 5 gates are not implemented.
 The 0.50.0 work records actual start and closure times for new manual game
 transitions; missing legacy timestamps are not reconstructed.
+The 0.51.0 work adds per-deck counts for participant-reported manual results
+and early closures, not rules-verified wins or engine-game analytics.
 The Play engine integration CI passed on commit `8a84091713ab617128b1f51989f5b47a4030ca1b`: it built the private Compose profile, verified no published engine ports, ran live saved-deck and hidden-state tests, and rejected a spoofed trusted identity. The 0.34.0 through 0.37.0 live UI tests failed to find Play Mountain; the 0.36.1 and 0.37.0 diagnostics showed an instants-only priority prompt with seven cards in hand. Versions 0.38.0, 0.39.0 and 0.39.2 passed isolated CI for native land play and concession, saved-deck and hidden-state tests, and spoof rejection. None completes a non-concession game. The 0.39.1 engine build failed when Maven Central returned HTTP 429 before tests ran. Version 0.38.0 adds player-only sorted library search to manual multiplayer; 0.39.0 adds face-down manual-table cards with private identity projection; 0.40.0 adds manual battlefield attachments; 0.41.0 adds engine pile, list and amount distribution choices with mocked coverage; 0.42.0 adds manual battlefield copies; and 0.43.0 adds player-reported multiplayer losses. Browser scenarios now end both two-player and four-player games after players manually track poison and report their losses. Rules remain player-resolved and these scenarios do not prove complete Commander gameplay. Local Docker, Podman and WSL remain unavailable. Production deployment and live engine reconnect/outage behavior remain unverified, so Phase 1 is not fully accepted. These tests do not complete phases 2 through 4.
 
 ## Implemented foundation work
@@ -40,7 +42,7 @@ remain pending.
 | --- | --- |
 | `apps/server/src/play/engine-identity.ts`, `app.ts`, `admin.ts` | Persist an opaque engine name per Mana Vault user, manage server-side sessions and close them on account or last-device revocation. The spoofed trusted-header boundary passed PR CI; production deployment remains unverified. |
 | `apps/server/src/play/playmat-connection.ts`, `play-sessions.ts`, `routes.ts`, `packages/playmat-protocol/src/rpc.ts`, `apps/web/src/views/PlayView.tsx` | Server-only WebSocket client, RPC allowlist, authenticated game routes, per-user event queues, prompt freshness and takeover refusal. The Engine AI UI can choose hand or battlefield objects exposed by `canPlayObjects` during `GAME_SELECT`; deployment and broader prompt coverage remain incomplete. |
-| `apps/server/src/play/manual-routes.ts`, `apps/web/src/views/PlayView.tsx` | Server-authoritative manual table membership and state for two or four players, per-player hidden-zone projection, invitation-code read-only spectators, offline solo mode, a first native workspace and participant-only manual game history. Full manual interactions and match analytics are not implemented. |
+| `apps/server/src/play/manual-routes.ts`, `apps/web/src/views/PlayView.tsx` | Server-authoritative manual table membership and state for two or four players, per-player hidden-zone projection, invitation-code read-only spectators, offline solo mode, a first native workspace and participant-only manual game history. Full manual interactions, verified win rates and engine-game analytics are not implemented. |
 | `apps/server/src/play/deck-converter.ts`, `routes.ts` | Convert authorized immutable snapshots, verify exact printings, validate against the live engine and start the human-plus-AI match. A real game and hidden-state isolation passed CI; production deployment remains unverified. |
 | `apps/server/src/play/*.test.ts`, `packages/playmat-protocol/src/*.test.ts` | Synthetic lifecycle and route tests plus an optional real-engine acceptance test. Loopback test evidence does not prove private deployment security. |
 | Package manifests and lockfile | Add server WebSocket dependencies and build the shared protocol package before server tests and type-checks. |
