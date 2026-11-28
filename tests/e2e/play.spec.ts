@@ -118,6 +118,39 @@ test("manual Commander tables support private opening-hand mulligans", async ({ 
   }
 });
 
+test("manual game history shows player-reported results and the saved deck snapshot", async ({ browser, page }) => {
+  const guestContext = await browser.newContext();
+  const guest = await guestContext.newPage();
+  try {
+    await signUp(page, "historyhost");
+    await signUp(guest, "historyguest");
+    const hostDeck = await createCommanderDeck(page, "History host deck", "sol-ring");
+    const guestDeck = await createCommanderDeck(guest, "History guest deck", "llanowar");
+    const headers = { "x-mana-vault": "1" };
+    const created = await page.request.post("/api/play/manual/tables", { headers, data: { deckId: hostDeck, playerLimit: 2 } });
+    expect(created.status()).toBe(201);
+    const { table, inviteCode } = await created.json();
+    expect((await guest.request.post("/api/play/manual/tables/join", { headers, data: { inviteCode, deckId: guestDeck } })).status()).toBe(200);
+    const started = await page.request.post(`/api/play/manual/tables/${table.id}/start`, { headers, data: {} });
+    expect(started.status()).toBe(200);
+    expect((await guest.request.post(`/api/play/manual/tables/${table.id}/actions`, {
+      headers, data: { revision: (await started.json()).table.revision, action: { type: "loss" } },
+    })).status()).toBe(200);
+    await page.reload();
+    await page.locator("#modetabs .mtab", { hasText: "Play" }).click();
+    await page.getByRole("tab", { name: "Multiplayer table" }).click();
+    await page.getByRole("button", { name: "Show manual game history" }).click();
+    await expect(page.getByText("History host deck · Game completed")).toBeVisible();
+    await expect(page.getByText(/Seat 2: historyguest.* · reported loss/)).toBeVisible();
+    await page.getByRole("button", { name: "Show deck snapshot" }).click();
+    await expect(page.getByText("History host deck (commander)")).toBeVisible();
+    await expect(page.getByText(/9 x Sol Ring \(main,/)).toBeVisible();
+    await expect(page.locator("#view-play")).not.toContainText("Llanowar Elves");
+  } finally {
+    await guestContext.close();
+  }
+});
+
 test("private manual Commander table plays shared cards without exposing opponents' hands", async ({ browser, page }) => {
   await page.setViewportSize({ width: 1440, height: 1400 });
   const otherContext = await browser.newContext();

@@ -2,6 +2,10 @@
 
 The installed version is shown at the top of the in-app guide.
 
+## 0.49.0 (2026-11-28): Manual game history
+
+- Review finished or closed manual games, player-reported results and your own authorized deck snapshot, 50 games at a time.
+
 ## 0.48.0 (2026-11-28): Manual Commander mulligans
 
 - Mulligan private opening hands at new multiplayer Commander tables, with a free first mulligan and bottom-of-library choices for later mulligans.
