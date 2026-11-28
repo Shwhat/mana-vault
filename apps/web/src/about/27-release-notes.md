@@ -8,6 +8,7 @@ The installed version is shown at the top of the in-app guide.
 - Keep older opening refreshes from overwriting newer live updates.
 - Run the container's Linux verification on pull requests before publishing after merge.
 - Limit server test workers to reduce contention in CI without relaxing test timeouts.
+- Make the note-conflict browser test establish competing saves in a deterministic order.
 
 ## 0.45.2 (2026-11-27): Engine connection recovery
 

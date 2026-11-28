@@ -204,10 +204,26 @@ test("history restores a version, and a save that meets someone else's asks whic
   await page.keyboard.type("First text");
   await saved(page);
   const id = (await notes(page)).pages[0]!.id;
-  // another device saves meanwhile
   const other = await (await page.request.get(`/api/notes/pages/${id}`)).json();
-  await page.request.put(`/api/notes/pages/${id}`, { headers: guard, data: { body: "Their text\n", baseVersion: other.version } });
+  let releaseSave!: () => void;
+  let saveStarted!: () => void;
+  const blockedSave = new Promise<void>((resolve) => { releaseSave = resolve; });
+  const localSaveStarted = new Promise<void>((resolve) => { saveStarted = resolve; });
+  await page.route(`**/api/notes/pages/${id}`, async (route) => {
+    if (route.request().method() === "PUT") {
+      saveStarted();
+      await blockedSave;
+    }
+    await route.continue();
+  });
   await page.keyboard.type(" and mine");
+  try {
+    await localSaveStarted;
+    const response = await page.request.put(`/api/notes/pages/${id}`, { headers: guard, data: { body: "Their text\n", baseVersion: other.version } });
+    expect(response.status()).toBe(200);
+  } finally {
+    releaseSave();
+  }
   const clash = page.locator("dialog#dlg[open]");
   await expect(clash).toContainText("Choose which text to keep");
   await expect(clash.getByLabel("Their text")).toContainText("Their text");
