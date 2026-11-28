@@ -360,6 +360,13 @@ describe("authenticated Playmat sessions", () => {
     expect(history.headers["cache-control"]).toBe("no-store");
     expect(history.json().games).toHaveLength(1);
     expect(history.json().games[0]).toMatchObject({ id: openingId, completed: false, deckName: "Red test deck" });
+    expect(history.json().games[0].startedAt).toMatch(/^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d$/);
+    expect(history.json().games[0].endedAt).toMatch(/^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d$/);
+    database.prepare("UPDATE play_manual_tables SET ended_at = ? WHERE id = ?").run("2020-01-01 00:00:00", openingId);
+    expect((await app.inject({
+      method: "DELETE", url: `/api/play/manual/tables/${openingId}`, headers: { ...guard, cookie: firstCookie }, payload: {},
+    })).statusCode).toBe(200);
+    expect(database.prepare("SELECT ended_at FROM play_manual_tables WHERE id = ?").get(openingId)?.ended_at).toBe("2020-01-01 00:00:00");
     expect(JSON.stringify(history.json())).not.toContain("Hidden Card");
     expect((await app.inject({ method: "GET", url: "/api/play/manual/history", headers: { cookie: thirdCookie } })).json().games).toEqual([]);
     const snapshotUrl = `/api/play/manual/history/${openingId}/deck`;

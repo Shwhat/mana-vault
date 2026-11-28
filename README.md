@@ -54,7 +54,7 @@ Manual multiplayer players can roll a d6 or d20 or flip a coin; the server gener
 
 New manual Commander tables offer private opening-hand mulligans, with the first mulligan free and later bottom-of-library choices made by the player.
 
-Players can review finished or closed manual games and the deck snapshot captured when they joined, while they still have access to that deck.
+Players can review finished or closed manual games, recorded start and closure times, and the deck snapshot captured when they joined, while they still have access to that deck. Older games may not have timing data.
 
 The engine workspace reports game-update outages while retrying, and action errors remain visible until the next action. Reconnecting active engine games is covered by simulated tests but has not been verified against a real deployment.
 

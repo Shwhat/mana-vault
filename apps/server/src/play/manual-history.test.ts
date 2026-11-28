@@ -11,6 +11,16 @@ it("retains a participant's manual result and original deck snapshot after datab
   const databasePath = join(root, "history.sqlite");
   await writeFile(join(root, "index.html"), "<!doctype html><title>App</title>", "utf8");
   let database = new DatabaseSync(databasePath);
+  database.exec(`
+    CREATE TABLE play_manual_tables (
+      id TEXT PRIMARY KEY, invite_code TEXT NOT NULL UNIQUE,
+      owner_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      player_limit INTEGER NOT NULL CHECK(player_limit IN (2, 4)),
+      status TEXT NOT NULL CHECK(status IN ('waiting', 'active', 'closed')),
+      revision INTEGER NOT NULL DEFAULT 0, state_json TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
   const options = { passwordIterations: 1000, pictureDownloads: false, mtgjsonSchedule: false };
   let app = await buildApp(database, root, undefined, undefined, options);
   let appOpen = true;
@@ -59,10 +69,14 @@ it("retains a participant's manual result and original deck snapshot after datab
       method: "POST", url: `/api/play/manual/tables/${table.id}/start`, headers: { ...guard, cookie: host }, payload: {},
     });
     expect(started.statusCode).toBe(200);
+    const startTime = database.prepare("SELECT started_at FROM play_manual_tables WHERE id = ?").get(table.id)?.started_at;
+    expect(startTime).toMatch(/^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d$/);
     expect((await app.inject({
       method: "POST", url: `/api/play/manual/tables/${table.id}/actions`, headers: { ...guard, cookie: guest },
       payload: { revision: started.json().table.revision, action: { type: "loss" } },
     })).statusCode).toBe(200);
+    const endTime = database.prepare("SELECT ended_at FROM play_manual_tables WHERE id = ?").get(table.id)?.ended_at;
+    expect(endTime).toMatch(/^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d$/);
     database.prepare("UPDATE decks SET name = ? WHERE id = ?").run("Renamed deck", hostDeck);
     for (let index = 0; index < 50; index += 1) {
       const id = `history-page-${index}`;
@@ -87,18 +101,41 @@ it("retains a participant's manual result and original deck snapshot after datab
     const history = await app.inject({ method: "GET", url: "/api/play/manual/history", headers: { cookie: host } });
     expect(history.statusCode).toBe(200);
     expect(history.json().games).toHaveLength(50);
-    expect(history.json().games[0]).toMatchObject({ id: "history-page-49", completed: true, deckName: "Original deck" });
+    expect(history.json().games[0]).toMatchObject({
+      id: "history-page-49", completed: true, deckName: "Original deck", startedAt: null, endedAt: null,
+    });
     const cursor = history.json().nextBefore;
     expect(typeof cursor).toBe("string");
     const older = await app.inject({ method: "GET", url: `/api/play/manual/history?before=${cursor}`, headers: { cookie: host } });
     expect(older.statusCode).toBe(200);
-    expect(older.json().games).toMatchObject([{ id: table.id, completed: true, deckName: "Original deck" }]);
+    expect(older.json().games).toMatchObject([{
+      id: table.id, completed: true, deckName: "Original deck", startedAt: startTime, endedAt: endTime,
+    }]);
     expect(older.json().nextBefore).toBeNull();
     expect((await app.inject({ method: "GET", url: `/api/play/manual/history?before=${table.id}`, headers: { cookie: outsider } })).statusCode).toBe(404);
     const snapshot = await app.inject({ method: "GET", url: `/api/play/manual/history/${table.id}/deck`, headers: { cookie: host } });
     expect(snapshot.statusCode).toBe(200);
     expect(snapshot.json().snapshot.name).toBe("Original deck");
     expect(snapshot.json().snapshot.cards).toHaveLength(2);
+    const another = await app.inject({
+      method: "POST", url: "/api/play/manual/tables", headers: { ...guard, cookie: host },
+      payload: { deckId: hostDeck, playerLimit: 2 },
+    });
+    expect(another.statusCode).toBe(201);
+    const anotherId = another.json().table.id;
+    expect((await app.inject({
+      method: "POST", url: "/api/play/manual/tables/join", headers: { ...guard, cookie: guest },
+      payload: { inviteCode: another.json().inviteCode, deckId: guestDeck },
+    })).statusCode).toBe(200);
+    expect((await app.inject({
+      method: "POST", url: `/api/play/manual/tables/${anotherId}/start`, headers: { ...guard, cookie: host }, payload: {},
+    })).statusCode).toBe(200);
+    expect((await app.inject({
+      method: "POST", url: `/api/play/manual/tables/${anotherId}/leave`, headers: { ...guard, cookie: guest }, payload: {},
+    })).statusCode).toBe(200);
+    const leftHistory = (await app.inject({ method: "GET", url: "/api/play/manual/history", headers: { cookie: host } })).json().games[0];
+    expect(leftHistory).toMatchObject({ id: anotherId, completed: true });
+    expect(leftHistory.endedAt).toMatch(/^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d$/);
   } finally {
     if (appOpen) await app.close();
     if (databaseOpen) database.close();

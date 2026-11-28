@@ -1,9 +1,15 @@
 # Mana Vault handoff
 
+## 0.50.0 (2026-11-28): Manual game timing
+
+- Manual game history records the actual game start and table closure times, separately from table creation, for newly recorded transitions. Legacy timestamps are not guessed.
+- Focused server tests cover legacy schema migration, missing older times, start, loss, early closure, repeat closure and leaving; browser coverage verifies the displayed times. `PW_CHANNEL=chrome npm run test:all` passed: 430 server tests and 130 browser tests passed; three server tests and two real-engine browser tests were skipped locally.
+- Delivery is pending. This release builds on 0.49.0, merged as `77c699b4ac65bc89badefa440be0f67b986a95df`; its exact-merge server image and Android debug APK were published.
+
 ## 0.49.0 (2026-11-28): Manual game history
 
 - Participants can review finished or closed manual games, 50 at a time, and their own immutable deck snapshot from joining while they retain deck access. Spectators and other players cannot access that snapshot. Player-reported results distinguish a completed game from a table closed early.
-- Focused server and browser tests cover authorization, deck edits, early closure and completed results. A disk-backed test closes and reopens the database and application to verify persistence. `PW_CHANNEL=chrome npm run test:all` passed: 430 server tests and 130 browser tests passed; three server tests and two real-engine browser tests were skipped locally. Delivery remains pending.
+- Focused server and browser tests cover authorization, deck edits, early closure and completed results. A disk-backed test closes and reopens the database and application to verify persistence. `PW_CHANNEL=chrome npm run test:all` passed: 430 server tests and 130 browser tests passed; three server tests and two real-engine browser tests were skipped locally. The exact-merge server and Android workflows passed, with the versioned debug artifact and pre-release APK published.
 - This release builds on 0.48.0, merged as `c288901a9887723567b5a4f214e7008550c31d20`. Its exact-merge server image and Android debug APK were published. Full engine gameplay and production deployment remain unverified.
 
 ## 0.48.0 (2026-11-28): Manual Commander mulligans

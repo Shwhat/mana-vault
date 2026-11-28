@@ -82,7 +82,9 @@ function initializeManualTables(database: DatabaseSync): void {
       status TEXT NOT NULL CHECK(status IN ('waiting', 'active', 'closed')),
       revision INTEGER NOT NULL DEFAULT 0,
       state_json TEXT,
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      started_at TEXT,
+      ended_at TEXT
     );
     CREATE TABLE IF NOT EXISTS play_manual_members (
       table_id TEXT NOT NULL REFERENCES play_manual_tables(id) ON DELETE CASCADE,
@@ -103,6 +105,9 @@ function initializeManualTables(database: DatabaseSync): void {
     );
     CREATE INDEX IF NOT EXISTS play_manual_spectators_user_idx ON play_manual_spectators(user_id, table_id);
   `);
+  const columns = new Set(database.prepare("PRAGMA table_info(play_manual_tables)").all().map((column) => String(column.name)));
+  if (!columns.has("started_at")) database.exec("ALTER TABLE play_manual_tables ADD COLUMN started_at TEXT");
+  if (!columns.has("ended_at")) database.exec("ALTER TABLE play_manual_tables ADD COLUMN ended_at TEXT");
 }
 
 function checkedSnapshot(database: DatabaseSync, deckId: unknown, userId: number): DeckSnapshot {
@@ -437,7 +442,7 @@ export function registerManualPlayRoutes(app: FastifyInstance, database: Databas
       beforeRow = cursor.row_id;
     }
     const rows = database.prepare(
-      `SELECT t.id, t.created_at, t.state_json, m.deck_snapshot
+      `SELECT t.id, t.created_at, t.started_at, t.ended_at, t.state_json, m.deck_snapshot
        FROM play_manual_tables t
        JOIN play_manual_members m ON m.table_id = t.id
        WHERE m.user_id = ? AND t.status = 'closed' AND t.state_json IS NOT NULL
@@ -453,7 +458,9 @@ export function registerManualPlayRoutes(app: FastifyInstance, database: Databas
         const remaining = state.players.filter((player) => !isOut(player)).length;
         return {
           id: String(row.id),
-          startedAt: String(row.created_at),
+          createdAt: String(row.created_at),
+          startedAt: typeof row.started_at === "string" ? row.started_at : null,
+          endedAt: typeof row.ended_at === "string" ? row.ended_at : null,
           turn: state.turn,
           completed: remaining === 1,
           deckName: access(database, "deck", snapshot.deckId, userId) ? snapshot.name : null,
@@ -628,7 +635,7 @@ export function registerManualPlayRoutes(app: FastifyInstance, database: Databas
     });
     const state: GameState = { turn: 1, activeSeat: 0, players };
     database.prepare(
-      "UPDATE play_manual_tables SET status = 'active', state_json = ?, revision = revision + 1 WHERE id = ? AND status = 'waiting'",
+      "UPDATE play_manual_tables SET status = 'active', started_at = CURRENT_TIMESTAMP, state_json = ?, revision = revision + 1 WHERE id = ? AND status = 'waiting'",
     ).run(JSON.stringify(state), request.params.tableId);
     const updated = tableForUser(database, request.params.tableId, userId)!;
     return { table: projectTable(database, updated, userId) };
@@ -652,8 +659,8 @@ export function registerManualPlayRoutes(app: FastifyInstance, database: Databas
       }
       const status = state.players.filter((player) => !isOut(player)).length <= 1 ? "closed" : "active";
       const update = database.prepare(
-        "UPDATE play_manual_tables SET state_json = ?, revision = revision + 1, status = ? WHERE id = ? AND revision = ? AND status = 'active'",
-      ).run(JSON.stringify(state), status, request.params.tableId, Number(table.revision));
+        "UPDATE play_manual_tables SET state_json = ?, revision = revision + 1, status = ?, ended_at = CASE WHEN ? = 'closed' THEN CURRENT_TIMESTAMP ELSE ended_at END WHERE id = ? AND revision = ? AND status = 'active'",
+      ).run(JSON.stringify(state), status, status, request.params.tableId, Number(table.revision));
       if (Number(update.changes) !== 1) return reply.code(409).send({ error: "The table has changed. Refresh and try again." });
       const updated = tableForUser(database, request.params.tableId, userId)!;
       return { table: projectTable(database, updated, userId) };
@@ -687,8 +694,8 @@ export function registerManualPlayRoutes(app: FastifyInstance, database: Databas
     removeFromGame(state, player, "concede");
     const status = state.players.filter((item) => !isOut(item)).length <= 1 ? "closed" : "active";
     database.prepare(
-      "UPDATE play_manual_tables SET state_json = ?, revision = revision + 1, status = ? WHERE id = ? AND revision = ? AND status = 'active'",
-    ).run(JSON.stringify(state), status, request.params.tableId, Number(table.revision));
+      "UPDATE play_manual_tables SET state_json = ?, revision = revision + 1, status = ?, ended_at = CASE WHEN ? = 'closed' THEN CURRENT_TIMESTAMP ELSE ended_at END WHERE id = ? AND revision = ? AND status = 'active'",
+    ).run(JSON.stringify(state), status, status, request.params.tableId, Number(table.revision));
     return { left: true };
   });
 
@@ -698,7 +705,9 @@ export function registerManualPlayRoutes(app: FastifyInstance, database: Databas
     const table = tableForUser(database, request.params.tableId, userId);
     if (!table) return reply.code(404).send({ error: "Table not found." });
     if (Number(table.owner_id) !== userId) return reply.code(403).send({ error: "Only the table host can close it." });
-    database.prepare("UPDATE play_manual_tables SET status = 'closed', revision = revision + 1 WHERE id = ?").run(request.params.tableId);
+    database.prepare(
+      "UPDATE play_manual_tables SET ended_at = CASE WHEN status <> 'closed' THEN CURRENT_TIMESTAMP ELSE ended_at END, status = 'closed', revision = revision + 1 WHERE id = ?",
+    ).run(request.params.tableId);
     return { closed: true };
   });
 }
