@@ -31,6 +31,7 @@ async function reportPoisonLoss(page: Page): Promise<void> {
 }
 
 test("private manual Commander table plays shared cards without exposing opponents' hands", async ({ browser, page }) => {
+  await page.setViewportSize({ width: 1440, height: 1400 });
   const otherContext = await browser.newContext();
   const otherPage = await otherContext.newPage();
   const spectatorContext = await browser.newContext();
@@ -107,7 +108,7 @@ test("private manual Commander table plays shared cards without exposing opponen
     const hostExile = page.locator('.play-zone[data-zone="exile"]');
     await expect(hostExile).toContainText("Sol Ring");
     await expect(spectatorPage.locator(".play-player-row")).toContainText("Exile: Sol Ring");
-    await hostExile.locator(".play-card").first().dragTo(hostHand);
+    await hostExile.locator(".play-drag-handle").first().dragTo(hostHand.locator("h3"));
     await expect(hostHand.locator(".playcardname")).toHaveCount(8);
     await expect(hostExile.locator(".play-card")).toHaveCount(0);
     await expect(spectatorPage.locator(".play-player-row")).not.toContainText("Sol Ring");
@@ -249,6 +250,7 @@ test("four-player manual Commander tables keep every hand private and advance tu
 });
 
 test("plays an original custom card offline and in a completed manual game", async ({ browser, page }) => {
+  await page.setViewportSize({ width: 1440, height: 1400 });
   const suffix = Date.now().toString(36).slice(-5);
   const setCode = `p${suffix}`;
   const customName = `Practice Bear ${suffix}`;
@@ -320,8 +322,9 @@ test("plays an original custom card offline and in a completed manual game", asy
     await battlefield.getByLabel(`Move ${customName} from battlefield`).last().selectOption("exile");
     const exile = page.locator('.play-zone[data-zone="exile"]');
     await expect(exile.getByRole("img", { name: customName })).toBeVisible();
-    await exile.locator(".play-card").first().dragTo(battlefield);
+    await exile.locator(".play-drag-handle").first().dragTo(battlefield.locator("h3"));
     await expect(battlefield.getByRole("img", { name: customName })).toHaveCount(2);
+    await expect(exile.locator(".play-card")).toHaveCount(0);
     await page.getByRole("button", { name: "Show library" }).click();
     await page.getByLabel("Search library").fill("no matching card");
     await expect(page.getByRole("button", { name: `Put ${customName} into hand` })).toHaveCount(0);

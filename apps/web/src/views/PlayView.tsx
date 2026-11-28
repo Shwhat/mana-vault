@@ -183,6 +183,7 @@ function ManualSolo({ cards }: { cards: readonly DeckCard[] }) {
       <h3>{title} <span className="cnt">{values.length}</span>{extra}</h3>
       <div className="play-card-row">{values.map((card) => <article className={card.tapped ? "play-card tapped" : "play-card"} key={card.id}
         draggable={from !== "hand" || game.bottom === 0} onDragStart={(event) => drag.start(event, card, from)} onDragEnd={drag.end}>
+        {(from !== "hand" || game.bottom === 0) && <span className="play-drag-handle" aria-hidden="true">Drag</span>}
         {cardPicture(card)}
         <div className="play-card-actions">{body(card)}<ManualMoveSelect card={card} from={from} move={move} disabled={from === "hand" && game.bottom > 0} /></div>
       </article>)}</div>
@@ -434,6 +435,7 @@ function ManualTable({ deckId }: { deckId: string }) {
       <h3>{title} <span className="cnt">{cards.length}</span></h3>
       <div className="play-card-row">{cards.map((card) => <article className={card.tapped ? "play-card tapped" : "play-card"} key={card.id}
         draggable onDragStart={(event) => drag.start(event, card, from)} onDragEnd={drag.end}>
+        <span className="play-drag-handle" aria-hidden="true">Drag</span>
         {cardPicture(card)}
         <div className="play-card-actions">{body(card)}<ManualMoveSelect card={card} from={from} move={move} /></div>
       </article>)}</div>

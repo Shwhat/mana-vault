@@ -1,7 +1,7 @@
 {
   "name": "@mana-vault/server",
   "private": true,
-  "version": "0.45.2",
+  "version": "0.45.3",
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
@@ -9,13 +9,13 @@
     "pretest": "npm run build --workspace @mana-vault/playmat-protocol",
     "start": "node dist/index.js",
     "import:cards": "tsx src/import-cards.ts",
-    "test": "vitest run",
+    "test": "vitest run --maxWorkers=2",
     "pretypecheck": "npm run build --workspace @mana-vault/playmat-protocol",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@fastify/static": "^10.1.10",
-    "@mana-vault/playmat-protocol": "0.45.2",
+    "@mana-vault/playmat-protocol": "0.45.3",
     "csv-parse": "^7.0.3",
     "fastify": "^5.12.8",
     "pdfjs-dist": "^6.5.438",
