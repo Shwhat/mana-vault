@@ -1,5 +1,11 @@
 # Mana Vault handoff
 
+## 0.50.0 (2026-11-28): Manual game timing
+
+- Manual game history records the actual game start and table closure times, separately from table creation, for newly recorded transitions. Legacy timestamps are not guessed.
+- Focused server tests cover legacy schema migration, missing older times, start, loss, early closure, repeat closure and leaving; browser coverage verifies the displayed times. `PW_CHANNEL=chrome npm run test:all` passed: 430 server tests and 130 browser tests passed; three server tests and two real-engine browser tests were skipped locally.
+- Delivery is pending. This release builds on the 0.49.0 manual history PR.
+
 ## 0.49.0 (2026-11-28): Manual game history
 
 - Participants can review finished or closed manual games, 50 at a time, and their own immutable deck snapshot from joining while they retain deck access. Spectators and other players cannot access that snapshot. Player-reported results distinguish a completed game from a table closed early.

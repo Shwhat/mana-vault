@@ -48,7 +48,9 @@ type SharedTable = {
 
 type ManualHistoryGame = {
   id: string;
-  startedAt: string;
+  createdAt: string;
+  startedAt: string | null;
+  endedAt: string | null;
   turn: number;
   completed: boolean;
   deckName: string | null;
@@ -339,7 +341,8 @@ function ManualHistory() {
           : games.length === 0 ? <p className="note">No completed or closed manual games yet.</p>
             : games.map((game) => <section className="play-player" key={game.id}>
               <b>{game.deckName ?? "Deck unavailable"} · {game.completed ? "Game completed" : "Closed before a result"}</b>
-              <span>Started {game.startedAt} UTC · Turn {game.turn}</span>
+              <span>Table created {game.createdAt} UTC · Turn {game.turn}</span>
+              <span>Game started: {game.startedAt ? `${game.startedAt} UTC` : "Not recorded"} · Closed: {game.endedAt ? `${game.endedAt} UTC` : "Not recorded"}</span>
               {game.players.map((player) => <span key={player.seat}>Seat {player.seat + 1}: {player.name} · {player.result}</span>)}
               {game.deckName !== null && <button type="button" className="btn small" onClick={() => {
                 setSnapshot(null);
