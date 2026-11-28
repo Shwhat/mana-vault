@@ -2,6 +2,12 @@
 
 The installed version is shown at the top of the in-app guide.
 
+## 0.45.3 (2026-11-27): Preview reliability
+
+- Add a clear drag area to manual cards and make the browser drag test check both source and destination.
+- Keep older opening refreshes from overwriting newer live updates.
+- Run the container's Linux verification on pull requests before publishing after merge.
+
 ## 0.45.2 (2026-11-27): Engine connection recovery
 
 - Retry failed active-game rejoins before returning a restored engine connection. Show game-update outages and retain action errors until the next action.

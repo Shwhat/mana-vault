@@ -87,12 +87,14 @@ export type ChartPoint = { date: string; spent: number; value: number };
 // the opening that pulled cards are tied to, shared by the status bar and the Purchases view
 let opening: Opening | null = null;
 let loaded = false;
+let openingRevision = 0;
 const listeners = new Set<(value: Opening | null) => void>();
 
 /** The opening cards are tied to now, when known. */
 export const currentOpening = () => opening;
 
 export function setActiveOpening(value: Opening | null) {
+  openingRevision += 1;
   opening = value;
   loaded = true;
   for (const listener of listeners) listener(value);
@@ -100,9 +102,10 @@ export function setActiveOpening(value: Opening | null) {
 
 /** Reads the opening again from the server (after a change made elsewhere). */
 export async function reloadOpening(): Promise<void> {
+  const revision = ++openingRevision;
   try {
     const list = await request<PurchaseList>("/api/purchases");
-    setActiveOpening(list.activeOpening);
+    if (revision === openingRevision) setActiveOpening(list.activeOpening);
   } catch {
     // offline or signed out: the last known opening stays
   }

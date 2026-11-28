@@ -873,6 +873,7 @@ button.tag.badge{border:0;cursor:pointer;font:inherit;font-size:10.5px}
 .play-zone h3{display:flex;align-items:center;gap:8px;margin:0 0 8px;font-size:13px}
 .play-card-row{display:flex;align-items:flex-start;gap:8px;flex-wrap:wrap}
 .play-card{width:150px;min-height:110px;display:flex;flex-direction:column;justify-content:space-between;overflow:hidden;border:1px solid var(--line);border-radius:6px;background:var(--panel);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.play-drag-handle{cursor:grab;padding:3px 6px;font-size:11px}
 .play-card.tapped{transform:rotate(5deg);opacity:.8}
 .play-card>img{width:100%;height:auto;max-height:210px;object-fit:cover}
 .playcardname{display:flex;min-height:70px;align-items:center;justify-content:center;flex-direction:column;gap:4px;padding:8px;text-align:center;font-size:13px;font-weight:600}
