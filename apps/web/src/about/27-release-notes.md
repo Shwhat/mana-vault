@@ -2,6 +2,10 @@
 
 The installed version is shown at the top of the in-app guide.
 
+## 0.47.0 (2026-11-28): Shared manual dice and coins
+
+- Roll a d6 or d20 or flip a coin at a manual multiplayer table. Players and spectators see the latest server-generated result and the seat that produced it.
+
 ## 0.46.0 (2026-11-27): Manual counter controls
 
 - Add and remove five counter types on your manual battlefield cards; multiplayer boards show their counters without revealing face-down identities.

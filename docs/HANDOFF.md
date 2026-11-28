@@ -1,5 +1,11 @@
 # Mana Vault handoff
 
+## 0.47.0 (2026-11-28): Shared manual dice and coins
+
+- Manual multiplayer players can roll a d6 or d20 or flip a coin. The server generates the result and persists the latest one for all players and spectators; spectators cannot roll.
+- Focused server and browser tests passed, including visibility, bounds, stale revisions and reload. `PW_CHANNEL=chrome npm run test:all` passed with 128 browser tests; two real-engine browser tests and three server tests were skipped. Delivery remains pending.
+- Version 0.46.0 merged as `5f5c545eb3a6f89d11949ff2fccd6be4bc8f19f1`; its exact-merge server image and Android debug APK were published. Production deployment and full engine gameplay remain unverified.
+
 ## 0.46.0 (2026-11-27): Manual counter controls
 
 - Manual solo and multiplayer battlefield cards can add or remove +1/+1, -1/-1, loyalty, charge and custom counters. Multiplayer players and spectators see public counters on battlefield cards, including face-down cards without identity.

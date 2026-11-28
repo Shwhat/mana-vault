@@ -31,7 +31,10 @@ type PlayerState = {
   conceded: boolean;
   lost?: boolean;
 };
-type GameState = { turn: number; activeSeat: number; players: PlayerState[] };
+type RandomResult =
+  | { number: number; seat: number; kind: "d6" | "d20"; value: number }
+  | { number: number; seat: number; kind: "coin"; value: "heads" | "tails" };
+type GameState = { turn: number; activeSeat: number; players: PlayerState[]; lastRandom?: RandomResult };
 
 const ZONES: readonly Zone[] = ["library", "hand", "battlefield", "graveyard", "exile", "command"];
 const COUNTER_NAMES = new Set(["+1/+1", "-1/-1", "loyalty", "charge", "custom"]);
@@ -204,6 +207,7 @@ function projectTable(database: DatabaseSync, table: Record<string, unknown>, us
       ? { inviteCode: table.invite_code } : {}),
     turn: state?.turn ?? null,
     activeSeat: state?.activeSeat ?? null,
+    lastRandom: state?.lastRandom ?? null,
     players,
   };
 }
@@ -250,6 +254,15 @@ function applyAction(state: GameState, actorId: number, action: unknown): string
     player.hand.push(card);
   } else if (type === "shuffle") {
     shuffle(player.library);
+  } else if (type === "random") {
+    const number = (state.lastRandom?.number ?? 0) + 1;
+    if (action.kind === "d6" || action.kind === "d20") {
+      state.lastRandom = { number, seat: player.seat, kind: action.kind, value: randomInt(1, action.kind === "d6" ? 7 : 21) };
+    } else if (action.kind === "coin") {
+      state.lastRandom = { number, seat: player.seat, kind: "coin", value: randomInt(2) === 0 ? "heads" : "tails" };
+    } else {
+      return "Choose a d6, d20, or coin.";
+    }
   } else if (type === "play" || type === "playFaceDown" || type === "move") {
     const cardId = action.cardId;
     const from = type === "move" ? action.from : "hand";

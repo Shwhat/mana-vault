@@ -41,6 +41,7 @@ type SharedTable = {
   inviteCode?: string;
   turn: number | null;
   activeSeat: number | null;
+  lastRandom: { number: number; seat: number; kind: "d6" | "d20"; value: number } | { number: number; seat: number; kind: "coin"; value: "heads" | "tails" } | null;
   players: SharedPlayer[];
 };
 
@@ -506,6 +507,7 @@ function ManualTable({ deckId }: { deckId: string }) {
         </div>}
         {table.status === "active" && <>
           {table.role === "spectator" && <p className="note">You are watching this table. Spectators cannot change the game.</p>}
+          {table.lastRandom && <p role="status">Result {table.lastRandom.number}: Seat {table.lastRandom.seat + 1} ({table.players.find((player) => player.seat === table.lastRandom?.seat)?.name}) {table.lastRandom.kind === "coin" ? "flipped a coin" : `rolled ${table.lastRandom.kind}`}: {table.lastRandom.value}</p>}
           <div className="play-player-row">
             {table.players.map((player) => <section className="play-player" key={player.seat}>
               <b>{player.name}{player.seat === table.activeSeat ? " · Active" : ""}{player.conceded ? " · Conceded" : player.lost ? " · Reported loss" : ""}</b>
@@ -531,6 +533,9 @@ function ManualTable({ deckId }: { deckId: string }) {
             <button type="button" className="btn small" onClick={() => void act({ type: "shuffle" })}>Shuffle</button>
             <button type="button" className="btn small" onClick={() => setShowLibrary((current) => !current)}>{showLibrary ? "Hide library search" : "Search library"}</button>
             <button type="button" className="btn small" disabled={table.activeSeat !== own.seat} onClick={() => void act({ type: "turn" })}>End turn</button>
+            <button type="button" className="btn small" onClick={() => void act({ type: "random", kind: "d6" })}>Roll d6</button>
+            <button type="button" className="btn small" onClick={() => void act({ type: "random", kind: "d20" })}>Roll d20</button>
+            <button type="button" className="btn small" onClick={() => void act({ type: "random", kind: "coin" })}>Flip coin</button>
             <button type="button" className="btn small" onClick={() => void act({ type: "concede" })}>Concede</button>
             <button type="button" className="btn small" onClick={() => void act({ type: "loss" })}>Report loss</button>
           </div>
