@@ -4,12 +4,12 @@
 
 - Participants can review finished or closed manual games, 50 at a time, and their own immutable deck snapshot from joining while they retain deck access. Spectators and other players cannot access that snapshot. Player-reported results distinguish a completed game from a table closed early.
 - Focused server and browser tests cover authorization, deck edits, early closure and completed results. A disk-backed test closes and reopens the database and application to verify persistence. `PW_CHANNEL=chrome npm run test:all` passed: 430 server tests and 130 browser tests passed; three server tests and two real-engine browser tests were skipped locally. Delivery remains pending.
-- This release builds on the 0.48.0 mulligan PR; its merge and delivery must be verified before this release is delivered. Full engine gameplay and production deployment remain unverified.
+- This release builds on 0.48.0, merged as `c288901a9887723567b5a4f214e7008550c31d20`. Its exact-merge server image and Android debug APK were published. Full engine gameplay and production deployment remain unverified.
 
 ## 0.48.0 (2026-11-28): Manual Commander mulligans
 
 - New manual Commander tables support private opening-hand mulligans: the first is free and later mulligans require bottoming cards. Other actions close the player's mulligan option; the first turn ending closes it for all. Existing active tables remain unchanged.
-- Focused server and browser regressions cover opening-hand privacy, bottoming, stale actions and reconnect. `PW_CHANNEL=chrome npm run test:all` passed with 129 browser tests; two real-engine browser tests and three server tests were skipped. Delivery remains pending.
+- Focused server and browser regressions cover opening-hand privacy, bottoming, stale actions and reconnect. `PW_CHANNEL=chrome npm run test:all` passed with 129 browser tests; two real-engine browser tests and three server tests were skipped locally. The exact-merge server and Android workflows passed, with the versioned debug artifact and pre-release APK published.
 - Version 0.47.0 merged as `9140250cce69bff056187ae86fdeaca55f193f82`; its exact-merge server image and Android debug APK were published. Full engine gameplay and production deployment remain unverified.
 
 ## 0.47.0 (2026-11-28): Shared manual dice and coins
