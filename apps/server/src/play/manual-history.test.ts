@@ -113,6 +113,15 @@ it("retains a participant's manual result and original deck snapshot after datab
     }]);
     expect(older.json().nextBefore).toBeNull();
     expect((await app.inject({ method: "GET", url: `/api/play/manual/history?before=${table.id}`, headers: { cookie: outsider } })).statusCode).toBe(404);
+    const hostResultsUrl = `/api/play/manual/decks/${hostDeck}/results`;
+    const guestResultsUrl = `/api/play/manual/decks/${guestDeck}/results`;
+    const hostResults = await app.inject({ method: "GET", url: hostResultsUrl, headers: { cookie: host } });
+    expect(hostResults.headers["cache-control"]).toBe("no-store");
+    expect(hostResults.json().results).toEqual({ completed: 51, remaining: 51, reportedLoss: 0, conceded: 0, closedEarly: 0 });
+    expect((await app.inject({ method: "GET", url: guestResultsUrl, headers: { cookie: guest } })).json().results)
+      .toEqual({ completed: 51, remaining: 0, reportedLoss: 51, conceded: 0, closedEarly: 0 });
+    expect((await app.inject({ method: "GET", url: hostResultsUrl, headers: { cookie: outsider } })).statusCode).toBe(404);
+    expect((await app.inject({ method: "GET", url: hostResultsUrl, headers: { cookie: guest } })).statusCode).toBe(404);
     const snapshot = await app.inject({ method: "GET", url: `/api/play/manual/history/${table.id}/deck`, headers: { cookie: host } });
     expect(snapshot.statusCode).toBe(200);
     expect(snapshot.json().snapshot.name).toBe("Original deck");
@@ -136,6 +145,25 @@ it("retains a participant's manual result and original deck snapshot after datab
     const leftHistory = (await app.inject({ method: "GET", url: "/api/play/manual/history", headers: { cookie: host } })).json().games[0];
     expect(leftHistory).toMatchObject({ id: anotherId, completed: true });
     expect(leftHistory.endedAt).toMatch(/^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d$/);
+    expect((await app.inject({ method: "GET", url: guestResultsUrl, headers: { cookie: guest } })).json().results)
+      .toEqual({ completed: 52, remaining: 0, reportedLoss: 51, conceded: 1, closedEarly: 0 });
+    const early = await app.inject({
+      method: "POST", url: "/api/play/manual/tables", headers: { ...guard, cookie: host },
+      payload: { deckId: hostDeck, playerLimit: 2 },
+    });
+    const earlyId = early.json().table.id;
+    expect((await app.inject({
+      method: "POST", url: "/api/play/manual/tables/join", headers: { ...guard, cookie: guest },
+      payload: { inviteCode: early.json().inviteCode, deckId: guestDeck },
+    })).statusCode).toBe(200);
+    expect((await app.inject({
+      method: "POST", url: `/api/play/manual/tables/${earlyId}/start`, headers: { ...guard, cookie: host }, payload: {},
+    })).statusCode).toBe(200);
+    expect((await app.inject({
+      method: "DELETE", url: `/api/play/manual/tables/${earlyId}`, headers: { ...guard, cookie: host }, payload: {},
+    })).statusCode).toBe(200);
+    expect((await app.inject({ method: "GET", url: hostResultsUrl, headers: { cookie: host } })).json().results)
+      .toEqual({ completed: 52, remaining: 52, reportedLoss: 0, conceded: 0, closedEarly: 1 });
   } finally {
     if (appOpen) await app.close();
     if (databaseOpen) database.close();

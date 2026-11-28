@@ -2,6 +2,10 @@
 
 The installed version is shown at the top of the in-app guide.
 
+## 0.51.0 (2026-11-28): Manual deck results
+
+- See player-reported completed results and early closures for the selected deck across your manual game history.
+
 ## 0.50.0 (2026-11-28): Manual game timing
 
 - Record and show manual game start and closure times. Earlier games may not have timing data.

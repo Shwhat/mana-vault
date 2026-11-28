@@ -491,6 +491,36 @@ export function registerManualPlayRoutes(app: FastifyInstance, database: Databas
     return { snapshot };
   });
 
+  app.get<{ Params: { deckId: string } }>("/api/play/manual/decks/:deckId/results", async (request, reply) => {
+    reply.header("cache-control", "no-store");
+    const userId = signedIn(request, reply);
+    if (userId === null) return reply;
+    if (!access(database, "deck", request.params.deckId, userId)) {
+      return reply.code(404).send({ error: "Deck not found." });
+    }
+    const results = { completed: 0, remaining: 0, conceded: 0, reportedLoss: 0, closedEarly: 0 };
+    const rows = database.prepare(
+      `SELECT t.state_json FROM play_manual_tables t
+       JOIN play_manual_members m ON m.table_id = t.id
+       WHERE m.user_id = ? AND t.status = 'closed' AND t.state_json IS NOT NULL
+         AND json_extract(m.deck_snapshot, '$.deckId') = ?`,
+    ).iterate(userId, request.params.deckId);
+    for (const row of rows) {
+      const state = parseState(row.state_json);
+      const player = state.players.find((item) => item.userId === userId);
+      if (!player) throw new Error("Manual game history is missing the participant");
+      if (state.players.filter((item) => !isOut(item)).length !== 1) {
+        results.closedEarly += 1;
+        continue;
+      }
+      results.completed += 1;
+      if (player.conceded) results.conceded += 1;
+      else if (player.lost) results.reportedLoss += 1;
+      else results.remaining += 1;
+    }
+    return { results };
+  });
+
   app.get("/api/play/manual/tables", async (request, reply) => {
     const userId = signedIn(request, reply);
     if (userId === null) return reply;

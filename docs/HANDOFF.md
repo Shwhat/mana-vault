@@ -1,10 +1,16 @@
 # Mana Vault handoff
 
+## 0.51.0 (2026-11-28): Manual deck results
+
+- History summarizes the selected authorized deck across all of the participant's closed manual games, distinguishing remaining, reported loss, concession and early closure. These are not verified wins and do not include engine games.
+- Focused server tests cover authorization, access revocation, pagination-independent counts, early closure, loss and concession; browser coverage verifies the summary. `PW_CHANNEL=chrome npm run test:all` passed: 430 server tests and 130 browser tests passed; three server tests and two real-engine browser tests were skipped locally.
+- Delivery is pending. This release builds on 0.50.0, merged as `5b1d99bd45f5114ae0f2d7a6e4165e60e8564690`; its exact-merge server image and Android debug APK were published.
+
 ## 0.50.0 (2026-11-28): Manual game timing
 
 - Manual game history records the actual game start and table closure times, separately from table creation, for newly recorded transitions. Legacy timestamps are not guessed.
 - Focused server tests cover legacy schema migration, missing older times, start, loss, early closure, repeat closure and leaving; browser coverage verifies the displayed times. `PW_CHANNEL=chrome npm run test:all` passed: 430 server tests and 130 browser tests passed; three server tests and two real-engine browser tests were skipped locally.
-- Delivery is pending. This release builds on 0.49.0, merged as `77c699b4ac65bc89badefa440be0f67b986a95df`; its exact-merge server image and Android debug APK were published.
+- The exact-merge server and Android workflows passed, with the versioned debug artifact and pre-release APK published. This release builds on 0.49.0, merged as `77c699b4ac65bc89badefa440be0f67b986a95df`; its exact-merge server image and Android debug APK were published.
 
 ## 0.49.0 (2026-11-28): Manual game history
 
