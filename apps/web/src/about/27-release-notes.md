@@ -7,6 +7,7 @@ The installed version is shown at the top of the in-app guide.
 - Add a clear drag area to manual cards and make the browser drag test check both source and destination.
 - Keep older opening refreshes from overwriting newer live updates.
 - Run the container's Linux verification on pull requests before publishing after merge.
+- Limit server test workers to reduce contention in CI without relaxing test timeouts.
 
 ## 0.45.2 (2026-11-27): Engine connection recovery
 

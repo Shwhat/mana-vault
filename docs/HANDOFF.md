@@ -5,7 +5,8 @@
 - Manual cards have a visible drag area. The custom-card browser test checks the source and destination and keeps both visible while dragging, avoiding an unintended hand-card drag caused by target scrolling.
 - Opening refreshes no longer overwrite newer opening changes or later refresh results when responses arrive out of order.
 - Container source and browser verification now run on pull requests; image publication remains limited to pushes and manual runs after verification.
-- Focused opening race tests, three custom-card runs and five cross-page update runs passed locally. `PW_CHANNEL=chrome npm run test:all` passed: 429 server tests (3 skipped), 70 web tests, 3 play-core tests, 3 protocol tests, 3 Wiki tests and 127 browser tests (2 real-engine tests skipped). The separate CI catalog-test timeout has not been reproduced locally.
+- Focused opening race tests, three custom-card runs and five cross-page update runs passed locally. `PW_CHANNEL=chrome npm run test:all` passed before the worker-limit change: 429 server tests (3 skipped), 70 web tests, 3 play-core tests, 3 protocol tests, 3 Wiki tests and 127 browser tests (2 real-engine tests skipped).
+- The Linux PR run timed out a second test in the same disk-backed server suite; its first six tests took 22 seconds while other suites were running, and the remaining tests were much faster. Server tests now use at most two workers to reduce contention, retaining the existing timeout. The revised run needs validation.
 - Linux PR validation and server and Android delivery are pending. The 0.45.2 container workflow failed, so that server image was not published.
 - Full native gameplay, real-engine recovery and production deployment remain unverified.
 
