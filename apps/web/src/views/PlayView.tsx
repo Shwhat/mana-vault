@@ -102,6 +102,26 @@ function cardPicture(card: Pick<ManualCard, "name" | "imageUrl" | "custom" | "to
     : <span className="playcardname">{card.name}{card.custom && <small>Custom</small>}{card.token && <small>Token</small>}</span>;
 }
 
+const MANUAL_COUNTERS = ["+1/+1", "-1/-1", "loyalty", "charge", "custom"] as const;
+type ManualCounter = typeof MANUAL_COUNTERS[number];
+
+function ManualCounterControls({ card, change }: { card: ManualCard; change: (name: ManualCounter, delta: 1 | -1) => void }) {
+  const [counter, setCounter] = useState<ManualCounter>("+1/+1");
+  const count = card.counters[counter] ?? 0;
+  return <>
+    <label>Counter <select aria-label={`Counter type for ${card.name}`} value={counter}
+      onChange={(event) => {
+        const selected = MANUAL_COUNTERS.find((name) => name === event.target.value);
+        if (selected) setCounter(selected);
+      }}>
+      {MANUAL_COUNTERS.map((name) => <option key={name} value={name}>{name}</option>)}
+    </select></label>
+    <button type="button" className="btn small" aria-label={`Add counter to ${card.name}`} disabled={count >= 999} onClick={() => change(counter, 1)}>+</button>
+    <button type="button" className="btn small" aria-label={`Remove counter from ${card.name}`} disabled={count <= 0} onClick={() => change(counter, -1)}>-</button>
+    {Object.entries(card.counters).map(([name, value]) => <span className="badge" key={name}>{name}: {value}</span>)}
+  </>;
+}
+
 type ManualDestination = ManualZone | "library-top";
 const MANUAL_ZONES: readonly { id: ManualDestination; label: string }[] = [
   { id: "library-top", label: "Library top" },
@@ -223,7 +243,7 @@ function ManualSolo({ cards }: { cards: readonly DeckCard[] }) {
       {zone("Command zone", "command", game.command, (card) => <button type="button" className="btn small" onClick={() => move(card, "command", "battlefield")}>Play</button>)}
       {zone("Battlefield", "battlefield", game.battlefield, (card) => <>
         <button type="button" className="btn small" onClick={() => setGame((current) => current ? toggleManualTap(current, card.id) : current)}>{card.tapped ? "Untap" : "Tap"}</button>
-        <button type="button" className="btn small" onClick={() => setGame((current) => current ? changeManualCounter(current, card.id, "+1/+1", 1) : current)}>+1/+1</button>
+        <ManualCounterControls card={card} change={(name, delta) => setGame((current) => current ? changeManualCounter(current, card.id, name, delta) : current)} />
         <button type="button" className="btn small" onClick={() => setGame((current) => current ? copyManualCard(current, card.id) : current)}>Copy</button>
         <button type="button" className="btn small" onClick={() => move(card, "battlefield", "graveyard")}>Graveyard</button>
         <button type="button" className="btn small" onClick={() => move(card, "battlefield", "exile")}>Exile</button>
@@ -234,7 +254,6 @@ function ManualSolo({ cards }: { cards: readonly DeckCard[] }) {
           {game.battlefield.filter((target) => target.id !== card.id).map((target) =>
             <option value={target.id} key={target.id} disabled={!canAttachManualCard(game, card.id, target.id)}>{target.name}</option>)}
         </select></label>
-        {Object.entries(card.counters).map(([name, count]) => <span className="badge" key={name}>{name}: {count}</span>)}
       </>)}
       {zone("Hand", "hand", game.hand, (card) => <button type="button" className="btn small primary" onClick={() => play(card)}>{game.bottom > 0 ? "Put on bottom" : "Play"}</button>)}
       {zone("Graveyard", "graveyard", game.graveyard, (card) => <button type="button" className="btn small" onClick={() => move(card, "graveyard", "hand")}>Return to hand</button>)}
@@ -493,10 +512,15 @@ function ManualTable({ deckId }: { deckId: string }) {
               <span>Life {player.life} · Poison {player.poison} · Hand {player.handCount} · Library {player.libraryCount}</span>
               {Object.entries(player.commanderDamage).map(([from, amount]) => <span key={from}>Commander damage from seat {Number(from) + 1}: {amount}</span>)}
               {own && !own.conceded && !own.lost && player.seat !== own.seat && <div className="play-toolbar">
-                <button type="button" className="btn small" onClick={() => void act({ type: "commanderDamage", targetSeat: player.seat, delta: 1 })}>+ Commander damage</button>
+                <button type="button" className="btn small" disabled={(player.commanderDamage[String(own.seat)] ?? 0) >= 999}
+                  onClick={() => void act({ type: "commanderDamage", targetSeat: player.seat, delta: 1 })}>+ Commander damage</button>
+                <button type="button" className="btn small" aria-label={`Remove commander damage from ${player.name}`}
+                  disabled={(player.commanderDamage[String(own.seat)] ?? 0) <= 0}
+                  onClick={() => void act({ type: "commanderDamage", targetSeat: player.seat, delta: -1 })}>- Commander damage</button>
               </div>}
               <div className="play-card-row">{player.command.map((card) => <div className="engine-card" key={card.id}>{card.name}</div>)}
-                {player.battlefield.map((card) => <div className="engine-card" key={card.id}>{card.tapped ? "Tapped · " : ""}{card.name}{card.attachedTo && ` · Attached to ${attachmentName(card.attachedTo)}`}</div>)}</div>
+                {player.battlefield.map((card) => <div className="engine-card" key={card.id}>{card.tapped ? "Tapped · " : ""}{card.name}
+                  {Object.entries(card.counters).map(([name, count]) => ` · ${name}: ${count}`)}{card.attachedTo && ` · Attached to ${attachmentName(card.attachedTo)}`}</div>)}</div>
               <span>Graveyard: {player.graveyard.length ? player.graveyard.map((card) => card.name).join(", ") : "Empty"}</span>
               <span>Exile: {player.exile.length ? player.exile.map((card) => card.name).join(", ") : "Empty"}</span>
             </section>)}
@@ -528,7 +552,7 @@ function ManualTable({ deckId }: { deckId: string }) {
             {card.faceDown && <span className="badge">Your card: {card.name}</span>}
             <button type="button" className="btn small" onClick={() => void act({ type: "tap", cardId: card.id })}>{card.tapped ? "Untap" : "Tap"}</button>
             <button type="button" className="btn small" onClick={() => void act({ type: "faceDown", cardId: card.id })}>{card.faceDown ? "Reveal" : "Face down"}</button>
-            <button type="button" className="btn small" onClick={() => void act({ type: "counter", cardId: card.id, counter: "+1/+1", delta: 1 })}>+1/+1</button>
+            <ManualCounterControls card={card} change={(counter, delta) => void act({ type: "counter", cardId: card.id, counter, delta })} />
             <button type="button" className="btn small" onClick={() => void act({ type: "copy", cardId: card.id })}>Copy</button>
             <label>Attached to <select aria-label={`Attach ${card.name}`} value={card.attachedTo ?? ""}
               onChange={(event) => void act({ type: "attach", cardId: card.id, targetId: event.target.value || null })}>
@@ -536,7 +560,6 @@ function ManualTable({ deckId }: { deckId: string }) {
               {battlefield.filter((target) => target.card.id !== card.id).map((target) =>
                 <option key={target.card.id} value={target.card.id}>{target.card.name} ({target.player.name})</option>)}
             </select></label>
-            {Object.entries(card.counters).map(([name, count]) => <span className="badge" key={name}>{name}: {count}</span>)}
             <button type="button" className="btn small" onClick={() => move(card, "battlefield", "graveyard")}>Graveyard</button>
             <button type="button" className="btn small" onClick={() => move(card, "battlefield", "exile")}>Exile</button>
           </>)}

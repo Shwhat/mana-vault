@@ -2,6 +2,11 @@
 
 The installed version is shown at the top of the in-app guide.
 
+## 0.46.0 (2026-11-27): Manual counter controls
+
+- Add and remove five counter types on your manual battlefield cards; multiplayer boards show their counters without revealing face-down identities.
+- Correct commander damage attributed to your seat by removing it from an opponent's tracked total.
+
 ## 0.45.3 (2026-11-27): Preview reliability
 
 - Add a clear drag area to manual cards and make the browser drag test check both source and destination.

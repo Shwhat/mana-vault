@@ -120,6 +120,17 @@ test("private manual Commander table plays shared cards without exposing opponen
     await expect(spectatorPage.locator(".play-player-row")).toContainText("Face down");
     await expect(otherPage.locator("#view-play")).not.toContainText("Sol Ring");
     await expect(spectatorPage.locator("#view-play")).not.toContainText("Sol Ring");
+    const faceDownCard = hostBattlefield.locator(".play-card").first();
+    const removeCounter = faceDownCard.getByRole("button", { name: "Remove counter from Sol Ring" });
+    await expect(removeCounter).toBeDisabled();
+    await faceDownCard.getByLabel("Counter type for Sol Ring").selectOption("charge");
+    await faceDownCard.getByRole("button", { name: "Add counter to Sol Ring" }).click();
+    await expect(spectatorPage.locator(".play-player-row")).toContainText("Face down · charge: 1");
+    await expect(otherPage.locator("#view-play")).not.toContainText("Sol Ring");
+    await expect(spectatorPage.locator("#view-play")).not.toContainText("Sol Ring");
+    await expect(removeCounter).toBeEnabled();
+    await removeCounter.click();
+    await expect(spectatorPage.locator(".play-player-row")).not.toContainText("charge: 1");
     await hostBattlefield.getByRole("button", { name: "Reveal" }).click();
     await expect(page.locator(".play-zone").filter({ has: page.locator("h3", { hasText: "Battlefield" }) })).toContainText("Sol Ring");
     await expect(otherPage.locator(".play-player-row")).toContainText("Sol Ring");
@@ -139,6 +150,15 @@ test("private manual Commander table plays shared cards without exposing opponen
     await expect(hostBattlefield.locator(".play-card").filter({ hasText: "Wolf" })).toHaveCount(2);
     await expect(spectatorPage.locator(".play-player-row .engine-card").filter({ hasText: "Wolf" })).toHaveCount(2);
     expect(otherPageErrors).toEqual([]);
+
+    const guestBoard = page.locator(".play-player-row .play-player").nth(1);
+    const undoDamage = guestBoard.getByRole("button", { name: /^Remove commander damage from / });
+    await expect(undoDamage).toBeDisabled();
+    await guestBoard.getByRole("button", { name: "+ Commander damage" }).click();
+    await expect(spectatorPage.locator(".play-player-row .play-player").nth(1)).toContainText("Commander damage from seat 1: 1");
+    await expect(undoDamage).toBeEnabled();
+    await undoDamage.click();
+    await expect(spectatorPage.locator(".play-player-row .play-player").nth(1)).not.toContainText("Commander damage from seat 1");
 
     await page.getByRole("button", { name: "End turn" }).click();
     await expect(otherPage.locator(".play-player-row .play-player").nth(1)).toContainText("Active");
@@ -334,6 +354,12 @@ test("plays an original custom card offline and in a completed manual game", asy
     await expect(page.locator(".play-toolbar")).toContainText("0 in library");
     await page.getByLabel("Token", { exact: true }).fill("Wolf");
     await page.getByRole("button", { name: "Add", exact: true }).click();
+    const soloWolf = battlefield.locator(".play-card").filter({ has: page.getByLabel("Counter type for Wolf") });
+    await soloWolf.getByLabel("Counter type for Wolf").selectOption("loyalty");
+    await soloWolf.getByRole("button", { name: "Add counter to Wolf" }).click();
+    await expect(soloWolf).toContainText("loyalty: 1");
+    await soloWolf.getByRole("button", { name: "Remove counter from Wolf" }).click();
+    await expect(soloWolf).not.toContainText("loyalty: 1");
     await battlefield.getByLabel("Move Wolf from battlefield").selectOption("library-top");
     await page.getByRole("button", { name: "Draw" }).click();
     await expect(hand.getByText("Wolf", { exact: false })).toBeVisible();

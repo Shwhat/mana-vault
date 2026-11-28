@@ -16,6 +16,8 @@ Manual play is a tabletop helper, not a rules engine. Players resolve spells, pr
 
 In manual solo and multiplayer games, use the **Drag** area on your own cards to drag them between zones, or use each card's **Move to** selector, including on touch devices. The selector offers the top or bottom of the library; the Library drop target places cards on the bottom. Open library search to move cards out of your library. Changing zones clears counters, and leaving the battlefield clears attachments. During a solo mulligan, choose the required cards to put on the bottom before moving other cards from hand.
 
+On your battlefield cards, choose +1/+1, -1/-1, loyalty, charge or custom counters and add or remove them. Multiplayer boards show counters to players and spectators, including on face-down cards without revealing their identities. Counter totals can range from 0 to 999.
+
 ## Manual solo
 
 Choose a saved deck and select **Manual solo**. **New manual game** shuffles the main deck and draws seven. **Mulligan** draws a new hand and asks you to put one card per mulligan on the bottom. Cards from the saved deck, including original custom cards, can be moved through the manual zones. Use the zone buttons to play or move cards, copy battlefield cards, track totals and counters, and add tokens. The game is local to the current browser session and is lost when the page is refreshed or closed.
@@ -25,6 +27,8 @@ Choose a saved deck and select **Manual solo**. **New manual game** shuffles the
 Choose a saved deck that has at least one card in its Commander zone. Select **Multiplayer table**, then create a two- or four-player table. Share the invitation code with the players you want to invite. A signed-in player needs a Commander deck to join. The host can start when every seat is filled.
 
 Each player sees their own hand, public battlefield and graveyard zones, and the number of cards in each player's hand and library. Opponents' hand and library contents are not returned by the server. Players can privately search their own library by name and move a selected card to hand; results are sorted rather than showing draw order. Shuffle separately after searching when appropriate. Players can play cards directly from hand face down, turn battlefield cards face down, and reveal their own cards. Opponents and spectators receive no card identity or artwork for a face-down card; the owner can still see its name. Players can also draw and shuffle their libraries, move cards, tap cards, track life, poison, counters, commander damage and tokens, change turns, and concede.
+
+Add or remove commander damage attributed to your seat on an opponent's board to correct the tracked total. The table does not calculate commander damage or losses automatically.
 
 The server stores active table state so a seated player can reload the page or reconnect with the same account. A signed-in spectator with the invitation code can watch public table state, but cannot see any hand or library contents or change the game. The Play workspace lists the most recently created waiting or active table. Recovery after a server process restart has not been verified. A player who leaves an active table concedes.
 

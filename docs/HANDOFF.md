@@ -1,5 +1,12 @@
 # Mana Vault handoff
 
+## 0.46.0 (2026-11-27): Manual counter controls
+
+- Manual solo and multiplayer battlefield cards can add or remove +1/+1, -1/-1, loyalty, charge and custom counters. Multiplayer players and spectators see public counters on battlefield cards, including face-down cards without identity.
+- Players can reduce commander damage attributed to their own seat on an opponent's board. Manual rules and losses remain player-resolved.
+- Focused offline and multiplayer browser scenarios and `PW_CHANNEL=chrome npm run test:all` passed. The full suite skipped three server tests and two real-engine browser tests; delivery remains pending.
+- Version 0.45.3 merged as `d162adf48f95fd299ace379ba6d3c354193e0bdd`; its exact-merge server image and Android debug APK were published. Full native gameplay, real-engine recovery and production deployment remain unverified.
+
 ## 0.45.3 (2026-11-27): Preview reliability
 
 - Manual cards have a visible drag area. The custom-card browser test checks the source and destination and keeps both visible while dragging, avoiding an unintended hand-card drag caused by target scrolling.
