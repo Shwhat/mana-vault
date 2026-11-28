@@ -442,7 +442,13 @@ export function registerManualPlayRoutes(app: FastifyInstance, database: Databas
       beforeRow = cursor.row_id;
     }
     const rows = database.prepare(
-      `SELECT t.id, t.created_at, t.started_at, t.ended_at, t.state_json, m.deck_snapshot
+      `SELECT t.id, t.created_at, t.started_at, t.ended_at,
+              CASE WHEN datetime(t.started_at, '+0 seconds') = t.started_at
+                         AND datetime(t.ended_at, '+0 seconds') = t.ended_at
+                         AND t.ended_at >= t.started_at
+                   THEN unixepoch(t.ended_at) - unixepoch(t.started_at)
+              END AS duration_seconds,
+              t.state_json, m.deck_snapshot
        FROM play_manual_tables t
        JOIN play_manual_members m ON m.table_id = t.id
        WHERE m.user_id = ? AND t.status = 'closed' AND t.state_json IS NOT NULL
@@ -461,6 +467,7 @@ export function registerManualPlayRoutes(app: FastifyInstance, database: Databas
           createdAt: String(row.created_at),
           startedAt: typeof row.started_at === "string" ? row.started_at : null,
           endedAt: typeof row.ended_at === "string" ? row.ended_at : null,
+          durationSeconds: typeof row.duration_seconds === "number" && row.duration_seconds >= 0 ? row.duration_seconds : null,
           turn: state.turn,
           completed: remaining === 1,
           deckName: access(database, "deck", snapshot.deckId, userId) ? snapshot.name : null,

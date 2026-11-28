@@ -51,6 +51,7 @@ type ManualHistoryGame = {
   createdAt: string;
   startedAt: string | null;
   endedAt: string | null;
+  durationSeconds: number | null;
   turn: number;
   completed: boolean;
   deckName: string | null;
@@ -363,6 +364,7 @@ function ManualHistory({ deckId }: { deckId: string }) {
               <b>{game.deckName ?? "Deck unavailable"} · {game.completed ? "Game completed" : "Closed before a result"}</b>
               <span>Table created {game.createdAt} UTC · Turn {game.turn}</span>
               <span>Game started: {game.startedAt ? `${game.startedAt} UTC` : "Not recorded"} · Closed: {game.endedAt ? `${game.endedAt} UTC` : "Not recorded"}</span>
+              <span>Duration: {game.durationSeconds === null ? "Not available" : `${Math.floor(game.durationSeconds / 3600)}h ${Math.floor(game.durationSeconds % 3600 / 60)}m ${game.durationSeconds % 60}s`}</span>
               {game.players.map((player) => <span key={player.seat}>Seat {player.seat + 1}: {player.name} · {player.result}</span>)}
               {game.deckName !== null && <button type="button" className="btn small" onClick={() => {
                 setSnapshot(null);

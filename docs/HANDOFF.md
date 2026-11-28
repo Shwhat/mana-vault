@@ -1,10 +1,16 @@
 # Mana Vault handoff
 
+## 0.52.0 (2026-11-28): Manual game duration
+
+- Manual history shows elapsed time from start to closure, including breaks, when both recorded timestamps are valid and ordered. Older or inconsistent timestamps do not produce a duration.
+- Focused history tests and `PW_CHANNEL=chrome npm run test:all` passed locally: 430 server tests and 130 browser tests passed; four server tests and two real-engine browser tests were skipped. Delivery is pending.
+- Version 0.51.1 merged as `b2e6329a10ccf61cc1e66ef2a3eba1779a3f9b26`; its exact-merge server image and Android debug APK were published.
+
 ## 0.51.1 (2026-11-28): Engine reconnect test
 
 - Add an isolated CI scenario that interrupts the connection to the real engine during a game and checks restoration and a terminal result. It uses a test-only loopback proxy inside the test container; it must not be used as evidence that shared-host loopback is secure.
 - The 0.51.0 exact-merge server workflow timed out the disk-backed history and backup tests at the existing five-second limit. The history test fixture now groups its 100 pagination inserts into one transaction to reduce disk contention without changing assertions or timeouts. The exact-merge rerun passed and published the server image; the matching Android artifact and debug pre-release APK also passed.
-- Focused server tests and `PW_CHANNEL=chrome npm run test:all` passed locally: 430 server tests and 130 browser tests passed; four server tests and two real-engine browser tests were skipped. On PR head `8ab8c315c8493bf4c56848c378adc726ef92429f`, isolated CI passed the real-engine reconnect test and its other integration checks. Delivery and exact-new-head validation remain pending. This does not establish production deployment security, native UI reconnect, full engine outage recovery or all game interactions.
+- Focused server tests and `PW_CHANNEL=chrome npm run test:all` passed locally: 430 server tests and 130 browser tests passed; four server tests and two real-engine browser tests were skipped. Isolated CI passed the real-engine reconnect test and its other integration checks on the final PR head. Exact-merge server and Android workflows passed, with the versioned debug artifact and pre-release APK published. This does not establish production deployment security, native UI reconnect, full engine outage recovery or all game interactions.
 
 ## 0.51.0 (2026-11-28): Manual deck results
 
